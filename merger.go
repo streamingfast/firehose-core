@@ -31,8 +31,8 @@ func registerMergerApp() {
 			return mergerApp.New(&mergerApp.Config{
 				GRPCListenAddr:               viper.GetString("merger-grpc-listen-addr"),
 				PruneForkedBlocksAfter:       viper.GetUint64("merger-prune-forked-blocks-after"),
-				StorageOneBlockFilesPath:     mergedBlocksStoreURL,
-				StorageMergedBlocksFilesPath: oneBlocksStoreURL,
+				StorageOneBlockFilesPath:     oneBlocksStoreURL,
+				StorageMergedBlocksFilesPath: mergedBlocksStoreURL,
 				StorageForkedBlocksFilesPath: forkedBlocksStoreURL,
 				TimeBetweenPruning:           viper.GetDuration("merger-time-between-store-pruning"),
 				TimeBetweenPolling:           viper.GetDuration("merger-time-between-store-lookups"),
