@@ -12,7 +12,9 @@ import (
 	"github.com/streamingfast/dlauncher/launcher"
 	"github.com/streamingfast/logging"
 	nodeManager "github.com/streamingfast/node-manager"
-	nodeManagerApp "github.com/streamingfast/node-manager/app/node_manager2"
+	nodeManagerApp "github.com/streamingfast/node-manager/app/node_manager"
+
+	nm "github.com/streamingfast/firehose-core/nodemanager"
 	"github.com/streamingfast/node-manager/metrics"
 	reader "github.com/streamingfast/node-manager/mindreader"
 	"github.com/streamingfast/node-manager/operator"
@@ -31,7 +33,7 @@ func registerReaderNodeApp(chain *Chain) {
 	supervisedProcessLogger, _ := logging.PackageLogger(fmt.Sprintf("reader.%s", chain.ShortName), chain.LoggerPackageID(fmt.Sprintf("reader/%s", chain.ShortName)), logging.LoggerDefaultLevel(zap.InfoLevel))
 
 	launcher.RegisterApp(rootLog, &launcher.AppDef{
-		ID:          "reader",
+		ID:          "reader-node",
 		Title:       fmt.Sprintf("%s Reader Node", chain.LongName),
 		Description: fmt.Sprintf("%s node with built-in operational manager", chain.LongName),
 		RegisterFlags: func(cmd *cobra.Command) error {
@@ -102,20 +104,23 @@ func registerReaderNodeApp(chain *Chain) {
 				readinessMaxLatency,
 			)
 
-			superviser, err := chain.ChainSuperviserFactory(
-				chain.ShortName,
-				nodePath,
-				nodeArguments,
-				nodeDataDir,
-				metricsAndReadinessManager.UpdateHeadBlock,
-				debugFirehose,
-				logToZap,
-				appLogger,
-				supervisedProcessLogger,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("chain superviser factory: %w", err)
-			}
+			superviser := nm.SupervisorFactory(chain.ExecutableName, nodePath, nodeArguments, appLogger)
+			superviser.RegisterLogPlugin(nm.NewNodeLogPlugin(logToZap, debugFirehose, supervisedProcessLogger))
+
+			//superviser, err := chain.ChainSuperviserFactory(
+			//	chain.ShortName,
+			//	nodePath,
+			//	nodeArguments,
+			//	nodeDataDir,
+			//	metricsAndReadinessManager.UpdateHeadBlock,
+			//	debugFirehose,
+			//	logToZap,
+			//	appLogger,
+			//	supervisedProcessLogger,
+			//)
+			//if err != nil {
+			//	return nil, fmt.Errorf("chain superviser factory: %w", err)
+			//}
 
 			bootstrapper := &bootstrapper{
 				nodeDataDir: nodeDataDir,

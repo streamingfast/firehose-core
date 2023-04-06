@@ -8,7 +8,6 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/logging"
-	nodeManager "github.com/streamingfast/node-manager"
 	"github.com/streamingfast/node-manager/mindreader"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
@@ -83,18 +82,6 @@ type Chain struct {
 	//
 	// The [ConsoleReaderFactory] **must** be non-nil and must return a non-nil [mindreader.ConsolerReader] or an error.
 	ConsoleReaderFactory func(lines chan string, logger *zap.Logger, tracer logging.Tracer) (mindreader.ConsolerReader, error)
-
-	ChainSuperviserFactory func(
-		chainShortName string,
-		binary string,
-		arguments []string,
-		dataDir string,
-		headBlockUpdateFunc nodeManager.HeadBlockUpdater,
-		debugFirehose bool,
-		logToZap bool,
-		appLogger *zap.Logger,
-		nodelogger *zap.Logger,
-	) (nodeManager.ChainSuperviser, error)
 
 	// Tools aggregate together all configuration options required for the various `fire<chain> tools`
 	// to work properly for example to print block using chain specific information.
@@ -175,10 +162,6 @@ func (c *Chain) Validate() {
 
 	if c.ConsoleReaderFactory == nil {
 		err = multierr.Append(err, fmt.Errorf("field 'ConsoleReaderFactory' must be non-nil"))
-	}
-
-	if c.ChainSuperviserFactory == nil {
-		err = multierr.Append(err, fmt.Errorf("field 'ChainSuperviserFactory' must be non-nil"))
 	}
 
 	errors := multierr.Errors(err)
