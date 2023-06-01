@@ -37,7 +37,7 @@ func registerReaderNodeStdinApp(chain *Chain) {
 			sfDataDir := runtime.AbsDataDir
 			archiveStoreURL := MustReplaceDataDir(sfDataDir, viper.GetString("common-one-block-store-url"))
 			consoleReaderFactory := func(lines chan string) (mindreader.ConsolerReader, error) {
-				return chain.ConsoleReaderFactory(lines, appLogger, appTracer)
+				return chain.ConsoleReaderFactory(lines, chain.blockEncoder, appLogger, appTracer)
 			}
 
 			metricID := "reader-node-stdin"

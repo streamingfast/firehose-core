@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"regexp"
@@ -10,7 +11,6 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/jsonpb"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )
@@ -264,13 +264,13 @@ func validateBlockSegment(
 			}
 
 			if printDetails == PrintFull {
-				out, err := jsonpb.MarshalIndentToString(block.ToProtocol().(proto.Message), "  ")
+				out, err := json.MarshalIndent(block.ToProtocol().(proto.Message), "", "  ")
 				if err != nil {
 					fmt.Printf("❌ Unable to print full block %s: %s\n", block.AsRef(), err)
 					continue
 				}
 
-				fmt.Println(out)
+				fmt.Println(string(out))
 			}
 
 			continue
