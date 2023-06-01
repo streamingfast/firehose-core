@@ -21,12 +21,12 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose-core/tools"
+	"google.golang.org/protobuf/proto"
 )
 
 var toolsPrintCmd = &cobra.Command{

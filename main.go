@@ -30,6 +30,7 @@ var rootLog *zap.Logger
 // 'main' entrypoint directly.
 func Main(chain *Chain) {
 	chain.Validate()
+	chain.Init()
 
 	binaryName := chain.BinaryName()
 	rootLog, _ = logging.RootLogger(binaryName, chain.RootLoggerPackageID())

@@ -5,12 +5,15 @@ import (
 	"io"
 	"runtime/debug"
 	"strings"
+	"time"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/node-manager/mindreader"
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 )
 
 // BlockPrinterFunc takes a chain agnostic [block] and prints it to a human readable form.
@@ -40,7 +43,22 @@ type Chain struct {
 	// The [LongName] **must** be non-empty.
 	LongName string
 
-	// ExecutableName is the name of the binary that is used to launch a syncing node for this chain. For example,
+	// Protocol is exactly 3 characters long that is going to identify your chain when writing blocks
+	// to file. The written file contains an header and a part of this header is the protocol value.
+	//
+	// The [Protocol] **must** be non-empty and exactly 3 characters long all upper case.
+	Protocol string
+
+	// ProtocolVersion is the version of the protocol that is used to write blocks to file. This value
+	// is used in the header of the written file. It should be changed each time the Protobuf model change
+	// to become backward incompatible. This usually should be accompagnied by a change in the Protobuf
+	// block model of the chain. For example for Ethereum we would go from `sf.ethereum.v1.Block` to
+	// `sf.ethereum.v2.Block` and the [ProtocolVersion] would be incremented from `1` to `2`.
+	//
+	// The [ProtocolVersion] **must** be positive and non-zero and should be incremented each time the Protobuf model change.
+	ProtocolVersion int32
+
+	// ExecutableName is the name of the binary that is used to launch a syncing full node for this chain. For example,
 	// on Ethereum, the binary by default is `geth`. This is used by the `reader-node` app to specify the
 	// `reader-node-binary-name` flag.
 	//
@@ -49,7 +67,7 @@ type Chain struct {
 
 	// FullyQualifiedModule is the Go module of your actual `firehose-<chain>` repository and should
 	// correspond to the `module` line of the `go.mod` file found at the root of your **own** `firehose-<chain>`
-	// repository.
+	// repository. The value can be seen using `head -1 go.mod | sed 's/module //'`.
 	//
 	// The [FullyQualifiedModule] **must** be non-empty.
 	FullyQualifiedModule string
@@ -76,18 +94,29 @@ type Chain struct {
 	// Must be greater than 0 and lower than 1024
 	BlockDifferenceThresholdConsideredNear uint64
 
+	// BlockFactory is a factory function that returns a new instance of your chain's Block.
+	// This new instance is usually used within `firecore` to unmarshal some bytes into your
+	// chain's specific block model and return a [proto.Message] fully instantiated.
+	//
+	// The [BlockFactory] **must** be non-nil and must return a non-nil [proto.Message].
+	BlockFactory func() Block
+
 	// ConsoleReaderFactory is the function that should return the `ConsoleReader` that knowns
 	// how to transform your your chain specific Firehose instrumentation logs into the proper
 	// Block model of your chain.
 	//
 	// The [ConsoleReaderFactory] **must** be non-nil and must return a non-nil [mindreader.ConsolerReader] or an error.
-	ConsoleReaderFactory func(lines chan string, logger *zap.Logger, tracer logging.Tracer) (mindreader.ConsolerReader, error)
+	ConsoleReaderFactory func(lines chan string, blockEncoder BlockEncoder, logger *zap.Logger, tracer logging.Tracer) (mindreader.ConsolerReader, error)
 
 	// Tools aggregate together all configuration options required for the various `fire<chain> tools`
 	// to work properly for example to print block using chain specific information.
 	//
 	// The [Tools] element is optional and if not provided, sane defaults will be used.
 	Tools *ToolsConfig
+
+	// BlockEncoder is the cached block encoder object that should be used for this chain. Populate
+	// when Init() is called.
+	blockEncoder BlockEncoder
 }
 
 type ToolsConfig struct {
@@ -124,6 +153,7 @@ type ToolsConfig struct {
 func (c *Chain) Validate() {
 	c.ShortName = strings.ToLower(strings.TrimSpace(c.ShortName))
 	c.LongName = strings.TrimSpace(c.LongName)
+	c.Protocol = strings.ToLower(c.Protocol)
 	c.ExecutableName = strings.TrimSpace(c.ExecutableName)
 
 	var err error
@@ -138,6 +168,14 @@ func (c *Chain) Validate() {
 
 	if c.LongName == "" {
 		err = multierr.Append(err, fmt.Errorf("field 'LongName' must be non-empty"))
+	}
+
+	if len(c.Protocol) != 3 {
+		err = multierr.Append(err, fmt.Errorf("field 'Protocol' must be non-empty and have exactly 3 characters"))
+	}
+
+	if c.ProtocolVersion <= 0 {
+		err = multierr.Append(err, fmt.Errorf("field 'ProtocolVersion' must be positive and non-zero"))
 	}
 
 	if c.ExecutableName == "" {
@@ -160,6 +198,12 @@ func (c *Chain) Validate() {
 		err = multierr.Append(err, fmt.Errorf("field 'BlockDifferenceThresholdConsideredNear' must be lower than 1024"))
 	}
 
+	if c.BlockFactory == nil {
+		err = multierr.Append(err, fmt.Errorf("field 'BlockFactory' must be non-nil"))
+	} else if c.BlockFactory() == nil {
+		err = multierr.Append(err, fmt.Errorf("field 'BlockFactory' must not produce nil blocks"))
+	}
+
 	if c.ConsoleReaderFactory == nil {
 		err = multierr.Append(err, fmt.Errorf("field 'ConsoleReaderFactory' must be non-nil"))
 	}
@@ -171,8 +215,76 @@ func (c *Chain) Validate() {
 			errorLines[i] = fmt.Sprintf("- %s", err)
 		}
 
-		panic(fmt.Sprintf("firesdk.Chain is invalid:\n%s", strings.Join(errorLines, "\n")))
+		panic(fmt.Sprintf("firecore.Chain is invalid:\n%s", strings.Join(errorLines, "\n")))
 	}
+}
+
+// Init is called when the chain is first loaded to initialize the `bstream`
+// library with the chain specific configuration.
+//
+// This must called only once per chain per process.
+//
+// **Caveats** Two chain in the same Go binary will not work today as `bstream` uses global
+// variables to store configuration which presents multiple chain to exist in the same process.
+func (c *Chain) Init() {
+	bstream.GetBlockWriterHeaderLen = 10
+	bstream.GetMemoizeMaxAge = 20 * time.Second
+	bstream.GetBlockPayloadSetter = bstream.MemoryBlockPayloadSetter
+
+	bstream.GetBlockDecoder = bstream.BlockDecoderFunc(func(blk *bstream.Block) (any, error) {
+		// blk.Kind() is not used anymore, only the content type and version is checked at read time now
+		if blk.Version() != c.ProtocolVersion {
+			return nil, fmt.Errorf("this decoder only knows about version %d, got %d", c.ProtocolVersion, blk.Version())
+		}
+
+		block := c.BlockFactory()
+		payload, err := blk.Payload.Get()
+		if err != nil {
+			return nil, fmt.Errorf("getting payload: %w", err)
+		}
+
+		err = proto.Unmarshal(payload, block)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode payload: %w", err)
+		}
+
+		return block, nil
+	})
+
+	bstream.GetBlockWriterFactory = bstream.BlockWriterFactoryFunc(func(writer io.Writer) (bstream.BlockWriter, error) {
+		return bstream.NewDBinBlockWriter(writer, c.Protocol, int(c.ProtocolVersion))
+	})
+
+	bstream.GetBlockReaderFactory = bstream.BlockReaderFactoryFunc(func(reader io.Reader) (bstream.BlockReader, error) {
+		return bstream.NewDBinBlockReader(reader, func(contentType string, version int32) error {
+			if contentType != c.Protocol && version != int32(c.ProtocolVersion) {
+				return fmt.Errorf("reader only knows about %s block kind at version %d, got %s at version %d", c.Protocol, c.ProtocolVersion, contentType, version)
+			}
+
+			return nil
+		})
+	})
+
+	c.blockEncoder = BlockEncoderFunc(func(b Block) (*bstream.Block, error) {
+		content, err := proto.Marshal(b)
+		if err != nil {
+			return nil, fmt.Errorf("unable to marshal to binary form: %s", err)
+		}
+
+		block := &bstream.Block{
+			Id:             b.GetFirehoseBlockID(),
+			Number:         b.GetFirehoseBlockNumber(),
+			PreviousId:     b.GetFirehoseBlockParentID(),
+			Timestamp:      b.GetFirehoseBlockTime(),
+			LibNum:         b.GetFirehoseBlockLIBNum(),
+			PayloadVersion: c.ProtocolVersion,
+
+			// PayloadKind is not actually used anymore and should be left to UNKNOWN
+			PayloadKind: pbbstream.Protocol_UNKNOWN,
+		}
+
+		return bstream.GetBlockPayloadSetter(block, content)
+	})
 }
 
 // BinaryName represents the binary name for your Firehose on <Chain> is the [ShortName]

@@ -7,12 +7,12 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/jsonpb"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 )
 
 var numberRegex = regexp.MustCompile(`(\d{10})`)
