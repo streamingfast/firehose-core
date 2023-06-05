@@ -7,6 +7,7 @@ var (
 	MetricsListenAddr string = ":9102"
 
 	// Firehose chain specific port
+	IndexBuilderServiceAddr  string = ":10009"
 	ReaderNodeGRPCAddr       string = ":10010"
 	ReaderNodeManagerAPIAddr string = ":10011"
 	MergerServingAddr        string = ":10012"

@@ -1,10 +1,13 @@
 package firecore
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/dstore"
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -88,3 +91,36 @@ func (f BlockEncoderFunc) Encode(block Block) (blk *bstream.Block, err error) {
 }
 
 type CommandExecutor func(cmd *cobra.Command, args []string) (err error)
+
+func NewGenericBlockEncoder(protocolVersion int32) BlockEncoder {
+	return BlockEncoderFunc(func(block Block) (blk *bstream.Block, err error) {
+		return EncodeBlock(protocolVersion, block)
+	})
+}
+
+func EncodeBlock(protocolVersion int32, b Block) (blk *bstream.Block, err error) {
+	content, err := proto.Marshal(b)
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal to binary form: %s", err)
+	}
+
+	bstreamBlock := &bstream.Block{
+		Id:             b.GetFirehoseBlockID(),
+		Number:         b.GetFirehoseBlockNumber(),
+		PreviousId:     b.GetFirehoseBlockParentID(),
+		Timestamp:      b.GetFirehoseBlockTime(),
+		LibNum:         b.GetFirehoseBlockLIBNum(),
+		PayloadVersion: protocolVersion,
+
+		// PayloadKind is not actually used anymore and should be left to UNKNOWN
+		PayloadKind: pbbstream.Protocol_UNKNOWN,
+	}
+
+	return bstream.GetBlockPayloadSetter(bstreamBlock, content)
+}
+
+type BlockIndexerFactory[B Block] func(indexStore dstore.Store, indexSize uint64) BlockIndexer[B]
+
+type BlockIndexer[B Block] interface {
+	ProcessBlock(block B) error
+}

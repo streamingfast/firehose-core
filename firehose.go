@@ -24,7 +24,7 @@ var metricset = dmetrics.NewSet()
 var headBlockNumMetric = metricset.NewHeadBlockNumber("firehose")
 var headTimeDriftmetric = metricset.NewHeadTimeDrift("firehose")
 
-func registerFirehoseApp(chain *Chain) {
+func registerFirehoseApp[B Block](chain *Chain[B]) {
 	appLogger, _ := logging.PackageLogger("firehose", chain.LoggerPackageID("firehose"))
 
 	launcher.RegisterApp(rootLog, &launcher.AppDef{

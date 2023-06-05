@@ -44,7 +44,7 @@ func init() {
 	toolsCheckMergedBlocksCmd.Flags().BoolP("print-full", "f", false, "Natively decode each block and print the full JSON representation of the block, should be used with a small range only if you don't want to be overwhelmed")
 }
 
-func configureToolsCheckCmd(chain *Chain) {
+func configureToolsCheckCmd[B Block](chain *Chain[B]) {
 	blockPrinter := chain.BlockPrinter()
 
 	toolsCheckMergedBlocksCmd.RunE = createToolsCheckMergedBlocksE(blockPrinter)

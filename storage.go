@@ -52,9 +52,9 @@ func GetIndexStore(dataDir string) (indexStore dstore.Store, possibleIndexSizes 
 		indexStore = s
 	}
 
-	for _, size := range viper.GetIntSlice("common-block-index-sizes") {
+	for _, size := range viper.GetIntSlice("common-index-block-sizes") {
 		if size < 0 {
-			return nil, nil, fmt.Errorf("invalid negative size for common-block-index-sizes: %d", size)
+			return nil, nil, fmt.Errorf("invalid negative size for common-index-block-sizes: %d", size)
 		}
 		possibleIndexSizes = append(possibleIndexSizes, uint64(size))
 	}

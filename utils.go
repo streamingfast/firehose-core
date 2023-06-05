@@ -6,25 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/spf13/viper"
 	"github.com/streamingfast/cli"
 	"go.uber.org/zap"
 )
-
-// mustGetDataDir returns the absolute data directory configured within this process.
-//
-// Panics only if `os.Getwd()` returns an error which is highly unexpected and should work
-// otherwise something else is quite fishy.
-func mustGetDataDir() string {
-	dataDir := viper.GetString("global-data-dir")
-
-	dataDirAbs, err := filepath.Abs(dataDir)
-	if err != nil {
-		panic(fmt.Errorf("make data dir absolute failed: %w", err))
-	}
-
-	return dataDirAbs
-}
 
 func mkdirStorePathIfLocal(storeURL string) (err error) {
 	rootLog.Debug("creating directory and its parent(s)", zap.String("directory", storeURL))
@@ -87,6 +71,6 @@ var Example = func(in string) string {
 	return string(cli.Example(in))
 }
 
-var ExamplePrefixed = func(chain *Chain, prefix, in string) string {
+func ExamplePrefixed[B Block](chain *Chain[B], prefix, in string) string {
 	return string(cli.ExamplePrefixed(chain.BinaryName()+" "+prefix, in))
 }

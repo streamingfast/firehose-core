@@ -5,12 +5,13 @@ import (
 	"io"
 	"runtime/debug"
 	"strings"
-	"time"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/node-manager/mindreader"
-	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+	"github.com/streamingfast/node-manager/operator"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -26,7 +27,7 @@ type BlockPrinterFunc func(block *bstream.Block, alsoPrintTransactions bool, out
 //
 // Each field is documented about where it's used. Throughtout the different [Chain] option,
 // we will use `Acme` as the chain's name placeholder, replace it with your chain name.
-type Chain struct {
+type Chain[B Block] struct {
 	// ShortName is the short name for your Firehose on <Chain> and is usually how
 	// your chain's name is represented as a diminitutive. If your chain's name is already
 	// short, we suggest to keep [ShortName] and [LongName] the same.
@@ -83,16 +84,15 @@ type Chain struct {
 	// set to 2 (genesis block is 1 there but our instrumentation on this chain instruments
 	// only from block #2).
 	//
-	// This is used in multiple places to determine if we reached the oldest block of the chain.
-	FirstStreamableBlock uint64
-
-	// Should be the number of blocks between two targets before we consider the
-	// first as "near" the second. For example if a chain is at block #215 and another
-	// source is at block #225, then there is a difference of 10 blocks which is <=
-	// than `BlockDifferenceThresholdConsideredNear` which would mean it's "near".
+	// This value is actually the default value of the `--common-first-streamable-block` flag and
+	// all later usages are done using the flag's value and not this value.
 	//
-	// Must be greater than 0 and lower than 1024
-	BlockDifferenceThresholdConsideredNear uint64
+	// So this value is actually dynamic and can be changed at runtime using the
+	// `--common-first-streamable-block`.
+	//
+	// The [FirstStreamableBlock] should be defined but the default 0 value is good enough
+	// for most chains.
+	FirstStreamableBlock uint64
 
 	// BlockFactory is a factory function that returns a new instance of your chain's Block.
 	// This new instance is usually used within `firecore` to unmarshal some bytes into your
@@ -108,13 +108,38 @@ type Chain struct {
 	// The [ConsoleReaderFactory] **must** be non-nil and must return a non-nil [mindreader.ConsolerReader] or an error.
 	ConsoleReaderFactory func(lines chan string, blockEncoder BlockEncoder, logger *zap.Logger, tracer logging.Tracer) (mindreader.ConsolerReader, error)
 
+	// BlockIndexerFactories defines the set of indexes built out of Firehose blocks to be served by Firehose
+	// as custom filters.
+	//
+	// The [BlockIndexerFactories] is optional. if set, each key must return a non-nil [BlockIndexerFactory]. For now,
+	// a single factory can be specified per chain. We use a map to allow for multiple factories in the future.
+	//
+	// If there is indexer factories defined, the `index-builder` app will be disabled for this chain.
+	//
+	// The [BlockIndexerFactories] is optional.
+	BlockIndexerFactories map[string]BlockIndexerFactory[B]
+
+	// RegisterExtraStartFlags is a function that is called by the `reader-node` app to allow your chain
+	// to register extra custom arguments. This function is called after the common flags are registered.
+	//
+	// The [RegisterExtraStartFlags] function is optional and not called if nil.
+	RegisterExtraStartFlags func(flags *pflag.FlagSet)
+
+	// ReaderNodeBootstrapperFactory enables the `reader-node` app to have a custom bootstrapper for your chain.
+	// By default, no specialized bootstrapper is defined.
+	//
+	// If this is set, the `reader-node` app will use the one bootstrapper returned by this function. The function
+	// will receive the `start` command where flags are defined as well as the node's absolute data directory as an
+	// argument.
+	ReaderNodeBootstrapperFactory func(cmd *cobra.Command, nodeDataDir string) (operator.Bootstrapper, error)
+
 	// Tools aggregate together all configuration options required for the various `fire<chain> tools`
 	// to work properly for example to print block using chain specific information.
 	//
 	// The [Tools] element is optional and if not provided, sane defaults will be used.
 	Tools *ToolsConfig
 
-	// BlockEncoder is the cached block encoder object that should be used for this chain. Populate
+	// blockEncoder is the cached block encoder object that should be used for this chain. Populate
 	// when Init() is called.
 	blockEncoder BlockEncoder
 }
@@ -150,7 +175,7 @@ type ToolsConfig struct {
 
 // Validate normalizes some aspect of the [Chain] values (spaces trimming essentially) and validates the chain
 // by accumulating error an panic if all the error found along the way.
-func (c *Chain) Validate() {
+func (c *Chain[B]) Validate() {
 	c.ShortName = strings.ToLower(strings.TrimSpace(c.ShortName))
 	c.LongName = strings.TrimSpace(c.LongName)
 	c.Protocol = strings.ToLower(c.Protocol)
@@ -190,14 +215,6 @@ func (c *Chain) Validate() {
 		err = multierr.Append(err, fmt.Errorf("field 'Version' must be non-empty"))
 	}
 
-	if c.BlockDifferenceThresholdConsideredNear == 0 {
-		err = multierr.Append(err, fmt.Errorf("field 'BlockDifferenceThresholdConsideredNear' must be greater than 0"))
-	}
-
-	if c.BlockDifferenceThresholdConsideredNear > 1024 {
-		err = multierr.Append(err, fmt.Errorf("field 'BlockDifferenceThresholdConsideredNear' must be lower than 1024"))
-	}
-
 	if c.BlockFactory == nil {
 		err = multierr.Append(err, fmt.Errorf("field 'BlockFactory' must be non-nil"))
 	} else if c.BlockFactory() == nil {
@@ -206,6 +223,10 @@ func (c *Chain) Validate() {
 
 	if c.ConsoleReaderFactory == nil {
 		err = multierr.Append(err, fmt.Errorf("field 'ConsoleReaderFactory' must be non-nil"))
+	}
+
+	if len(c.BlockIndexerFactories) > 1 {
+		err = multierr.Append(err, fmt.Errorf("field 'BlockIndexerFactories' must have at most one element"))
 	}
 
 	errors := multierr.Errors(err)
@@ -226,87 +247,32 @@ func (c *Chain) Validate() {
 //
 // **Caveats** Two chain in the same Go binary will not work today as `bstream` uses global
 // variables to store configuration which presents multiple chain to exist in the same process.
-func (c *Chain) Init() {
-	bstream.GetBlockWriterHeaderLen = 10
-	bstream.GetMemoizeMaxAge = 20 * time.Second
-	bstream.GetBlockPayloadSetter = bstream.MemoryBlockPayloadSetter
+func (c *Chain[B]) Init() {
+	bstream.InitGeneric(c.Protocol, c.ProtocolVersion, func() proto.Message { return c.BlockFactory() })
 
-	bstream.GetBlockDecoder = bstream.BlockDecoderFunc(func(blk *bstream.Block) (any, error) {
-		// blk.Kind() is not used anymore, only the content type and version is checked at read time now
-		if blk.Version() != c.ProtocolVersion {
-			return nil, fmt.Errorf("this decoder only knows about version %d, got %d", c.ProtocolVersion, blk.Version())
-		}
-
-		block := c.BlockFactory()
-		payload, err := blk.Payload.Get()
-		if err != nil {
-			return nil, fmt.Errorf("getting payload: %w", err)
-		}
-
-		err = proto.Unmarshal(payload, block)
-		if err != nil {
-			return nil, fmt.Errorf("unable to decode payload: %w", err)
-		}
-
-		return block, nil
-	})
-
-	bstream.GetBlockWriterFactory = bstream.BlockWriterFactoryFunc(func(writer io.Writer) (bstream.BlockWriter, error) {
-		return bstream.NewDBinBlockWriter(writer, c.Protocol, int(c.ProtocolVersion))
-	})
-
-	bstream.GetBlockReaderFactory = bstream.BlockReaderFactoryFunc(func(reader io.Reader) (bstream.BlockReader, error) {
-		return bstream.NewDBinBlockReader(reader, func(contentType string, version int32) error {
-			if contentType != c.Protocol && version != int32(c.ProtocolVersion) {
-				return fmt.Errorf("reader only knows about %s block kind at version %d, got %s at version %d", c.Protocol, c.ProtocolVersion, contentType, version)
-			}
-
-			return nil
-		})
-	})
-
-	c.blockEncoder = BlockEncoderFunc(func(b Block) (*bstream.Block, error) {
-		content, err := proto.Marshal(b)
-		if err != nil {
-			return nil, fmt.Errorf("unable to marshal to binary form: %s", err)
-		}
-
-		block := &bstream.Block{
-			Id:             b.GetFirehoseBlockID(),
-			Number:         b.GetFirehoseBlockNumber(),
-			PreviousId:     b.GetFirehoseBlockParentID(),
-			Timestamp:      b.GetFirehoseBlockTime(),
-			LibNum:         b.GetFirehoseBlockLIBNum(),
-			PayloadVersion: c.ProtocolVersion,
-
-			// PayloadKind is not actually used anymore and should be left to UNKNOWN
-			PayloadKind: pbbstream.Protocol_UNKNOWN,
-		}
-
-		return bstream.GetBlockPayloadSetter(block, content)
-	})
+	c.blockEncoder = NewGenericBlockEncoder(c.ProtocolVersion)
 }
 
 // BinaryName represents the binary name for your Firehose on <Chain> is the [ShortName]
 // lowered appended to 'fire' prefix to before for example `fireacme`.
-func (c *Chain) BinaryName() string {
+func (c *Chain[B]) BinaryName() string {
 	return "fire" + strings.ToLower(c.ShortName)
 }
 
 // RootLoggerPackageID is the `packageID` value when instantiating the root logger on the chain
 // that is used by CLI command and other
-func (c *Chain) RootLoggerPackageID() string {
+func (c *Chain[B]) RootLoggerPackageID() string {
 	return c.LoggerPackageID(fmt.Sprintf("cmd/%s/cli", c.BinaryName()))
 }
 
 // LoggerPackageID computes a logger `packageID` value for a specific sub-package.
-func (c *Chain) LoggerPackageID(subPackage string) string {
+func (c *Chain[B]) LoggerPackageID(subPackage string) string {
 	return fmt.Sprintf("%s/%s", c.FullyQualifiedModule, subPackage)
 }
 
 // VersionString computes the version string that will be display when calling `firexxx --version`
 // and extract build information from Git via Golang `debug.ReadBuildInfo`.
-func (c *Chain) VersionString() string {
+func (c *Chain[B]) VersionString() string {
 	info, ok := debug.ReadBuildInfo()
 	if !ok {
 		panic("we should have been able to retrieve info from 'runtime/debug#ReadBuildInfo'")
@@ -341,7 +307,7 @@ func findSetting(key string, settings []debug.BuildSetting) (value string) {
 	return ""
 }
 
-func (c *Chain) BlockPrinter() BlockPrinterFunc {
+func (c *Chain[B]) BlockPrinter() BlockPrinterFunc {
 	if c.Tools == nil || c.Tools.BlockPrinter == nil {
 		return defaultBlockPrinter
 	}

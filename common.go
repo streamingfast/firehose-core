@@ -21,14 +21,16 @@ import (
 	"go.uber.org/zap"
 )
 
-func registerCommonFlags(chain *Chain) {
+func registerCommonFlags[B Block](chain *Chain[B]) {
 	launcher.RegisterCommonFlags = func(_ *zap.Logger, cmd *cobra.Command) error {
 		// Common stores configuration flags
 		cmd.Flags().String("common-one-block-store-url", OneBlockStoreURL, "[COMMON] Store URL to read/write one-block files")
 		cmd.Flags().String("common-merged-blocks-store-url", MergedBlocksStoreURL, "[COMMON] Store URL where to read/write merged blocks.")
 		cmd.Flags().String("common-forked-blocks-store-url", ForkedBlocksStoreURL, "[COMMON] Store URL where to read/write forked block files that we want to keep.")
 		cmd.Flags().String("common-live-blocks-addr", RelayerServingAddr, "[COMMON] gRPC endpoint to get real-time blocks.")
+
 		cmd.Flags().String("common-index-store-url", IndexStoreURL, "[COMMON] Store URL where to read/write index files (if used on the chain).")
+		cmd.Flags().IntSlice("common-index-block-sizes", []int{100000, 10000, 1000, 100}, "Index bundle sizes that that are considered valid when looking for block indexes")
 
 		cmd.Flags().Bool("common-blocks-cache-enabled", false, cli.FlagDescription(`
 			[COMMON] Use a disk cache to store the blocks data to disk and instead of keeping it in RAM. By enabling this, block's Protobuf content, in bytes,
@@ -58,6 +60,8 @@ func registerCommonFlags(chain *Chain) {
 		cmd.Flags().String("common-metering-plugin", "null://", "[COMMON] Metering plugin URI, see streamingfast/dmetering repository")
 
 		// System Behavior
+		cmd.Flags().Uint64("common-auto-mem-limit-percent", 0, "[COMMON] Automatically sets GOMEMLIMIT to a percentage of memory limit from cgroup (useful for container environments)")
+		cmd.Flags().Bool("common-auto-max-procs", false, "[COMMON] Automatically sets GOMAXPROCS to max cpu available from cgroup (useful for container environments)")
 		cmd.Flags().Duration("common-system-shutdown-signal-delay", 0, cli.FlagDescription(`
 			[COMMON] Add a delay between receiving SIGTERM signal and shutting down apps.
 			Apps will respond negatively to /healthz during this period

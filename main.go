@@ -28,7 +28,7 @@ var rootLog *zap.Logger
 
 // Main is the main entry point that configures everything and should be called from your Go
 // 'main' entrypoint directly.
-func Main(chain *Chain) {
+func Main[B Block](chain *Chain[B]) {
 	chain.Validate()
 	chain.Init()
 
@@ -36,7 +36,7 @@ func Main(chain *Chain) {
 	rootLog, _ = logging.RootLogger(binaryName, chain.RootLoggerPackageID())
 
 	cobra.OnInitialize(func() {
-		allFlags = flags.AutoBind(rootCmd, binaryName)
+		allFlags = flags.AutoBind(rootCmd, strings.ToUpper(binaryName))
 	})
 
 	rootCmd.Use = binaryName
@@ -81,12 +81,20 @@ func Main(chain *Chain) {
 	registerRelayerApp()
 	registerFirehoseApp(chain)
 
+	if len(chain.BlockIndexerFactories) > 0 {
+		registerIndexBuilderApp(chain)
+	}
+
 	configureStartCmd(chain)
 	configureToolsCheckCmd(chain)
 	configureToolsPrintCmd(chain)
 
 	if err := launcher.RegisterFlags(rootLog, startCmd); err != nil {
 		exitWithError("registering application flags", err)
+	}
+
+	if chain.RegisterExtraStartFlags != nil {
+		chain.RegisterExtraStartFlags(startCmd.Flags())
 	}
 
 	var availableCmds []string

@@ -25,7 +25,7 @@ import (
 	"github.com/streamingfast/node-manager/mindreader"
 )
 
-func registerReaderNodeStdinApp(chain *Chain) {
+func registerReaderNodeStdinApp[B Block](chain *Chain[B]) {
 	appLogger, appTracer := logging.PackageLogger("reader-node-stdin", chain.LoggerPackageID("reader-node-stdin"))
 
 	launcher.RegisterApp(rootLog, &launcher.AppDef{

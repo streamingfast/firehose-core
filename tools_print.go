@@ -56,7 +56,7 @@ func init() {
 	toolsPrintCmd.PersistentFlags().Bool("transactions", false, "When in 'text' output mode, also print transactions summary")
 }
 
-func configureToolsPrintCmd(chain *Chain) {
+func configureToolsPrintCmd[B Block](chain *Chain[B]) {
 	blockPrinter := chain.BlockPrinter()
 
 	toolsPrintOneBlockCmd.RunE = createToolsPrintOneBlockE(blockPrinter)

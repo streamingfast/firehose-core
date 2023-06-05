@@ -2,30 +2,33 @@ package firecore
 
 import (
 	"fmt"
-	"strings"
+	"os"
+	"regexp"
 	"time"
 
+	"github.com/kballard/go-shellquote"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/streamingfast/bstream/blockstream"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dlauncher/launcher"
+	nm "github.com/streamingfast/firehose-core/nodemanager"
 	"github.com/streamingfast/logging"
 	nodeManager "github.com/streamingfast/node-manager"
 	nodeManagerApp "github.com/streamingfast/node-manager/app/node_manager"
-
-	nm "github.com/streamingfast/firehose-core/nodemanager"
 	"github.com/streamingfast/node-manager/metrics"
 	reader "github.com/streamingfast/node-manager/mindreader"
 	"github.com/streamingfast/node-manager/operator"
 	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	pbheadinfo "github.com/streamingfast/pbgo/sf/headinfo/v1"
+	"github.com/streamingfast/snapshotter"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
-func registerReaderNodeApp(chain *Chain) {
+func registerReaderNodeApp[B Block](chain *Chain[B]) {
 	appLogger, appTracer := logging.PackageLogger("reader", chain.LoggerPackageID("reader"))
+
 	// FIXME: We use `chain.ShortName` here, but we are actually want the final binary name, I think we should have the executable name.
 	// However a problem here to get this value is that we are "before" the actual flags registration that happens a bit lower via
 	// `launcher.RegisterApp`, so we cannot get the value yet because the flag is not defined. Maybe solveable with our refactoring
@@ -53,7 +56,7 @@ func registerReaderNodeApp(chain *Chain) {
 			cmd.Flags().String("reader-node-manager-api-addr", ReaderNodeManagerAPIAddr, "Acme node manager API address")
 			cmd.Flags().Duration("reader-node-readiness-max-latency", 30*time.Second, "Determine the maximum head block latency at which the instance will be determined healthy. Some chains have more regular block production than others.")
 			cmd.Flags().String("reader-node-arguments", "", "If not empty, overrides the list of default node arguments (computed from node type and role). Start with '+' to append to default args instead of replacing. ")
-
+			cmd.Flags().StringSlice("reader-node-backups", []string{}, "Repeatable, space-separated key=values definitions for backups. Example: 'type=gke-pvc-snapshot prefix= tag=v1 freq-blocks=1000 freq-time= project=myproj'")
 			cmd.Flags().String("reader-node-grpc-listen-addr", ReaderNodeGRPCAddr, "The gRPC listening address to use for serving real-time blocks")
 			cmd.Flags().Bool("reader-node-discard-after-stop-num", false, "Ignore remaining blocks being processed after stop num (only useful if we discard the reader data after reprocessing a chunk of blocks)")
 			cmd.Flags().String("reader-node-working-dir", "{data-dir}/reader/work", "Path where reader will stores its files")
@@ -82,13 +85,18 @@ func registerReaderNodeApp(chain *Chain) {
 			logToZap := viper.GetBool("reader-node-log-to-zap")
 			shutdownDelay := viper.GetDuration("common-system-shutdown-signal-delay") // we reuse this global value
 			httpAddr := viper.GetString("reader-node-manager-api-addr")
+			backupConfigs := viper.GetStringSlice("reader-node-backups")
 
-			arguments := viper.GetString("reader-node-arguments")
-			nodeArguments, err := buildNodeArguments(
-				nodeDataDir,
-				"reader",
-				arguments,
-			)
+			backupModules, backupSchedules, err := operator.ParseBackupConfigs(appLogger, backupConfigs, map[string]operator.BackupModuleFactory{
+				"gke-pvc-snapshot": gkeSnapshotterFactory,
+			})
+
+			if err != nil {
+				return nil, fmt.Errorf("parse backup configs: %w", err)
+			}
+
+			hostname, _ := os.Hostname()
+			nodeArguments, err := buildNodeArguments(sfDataDir, nodeDataDir, hostname, viper.GetString("reader-node-arguments"))
 			if err != nil {
 				return nil, fmt.Errorf("cannot build node bootstrap arguments: %w", err)
 			}
@@ -107,23 +115,12 @@ func registerReaderNodeApp(chain *Chain) {
 			superviser := nm.SupervisorFactory(chain.ExecutableName, nodePath, nodeArguments, appLogger)
 			superviser.RegisterLogPlugin(nm.NewNodeLogPlugin(logToZap, debugFirehose, supervisedProcessLogger))
 
-			//superviser, err := chain.ChainSuperviserFactory(
-			//	chain.ShortName,
-			//	nodePath,
-			//	nodeArguments,
-			//	nodeDataDir,
-			//	metricsAndReadinessManager.UpdateHeadBlock,
-			//	debugFirehose,
-			//	logToZap,
-			//	appLogger,
-			//	supervisedProcessLogger,
-			//)
-			//if err != nil {
-			//	return nil, fmt.Errorf("chain superviser factory: %w", err)
-			//}
-
-			bootstrapper := &bootstrapper{
-				nodeDataDir: nodeDataDir,
+			var bootstrapper operator.Bootstrapper
+			if chain.ReaderNodeBootstrapperFactory != nil {
+				bootstrapper, err = chain.ReaderNodeBootstrapperFactory(startCmd, nodeDataDir)
+				if err != nil {
+					return nil, fmt.Errorf("new bootstrapper: %w", err)
+				}
 			}
 
 			chainOperator, err := operator.New(
@@ -137,6 +134,20 @@ func registerReaderNodeApp(chain *Chain) {
 				})
 			if err != nil {
 				return nil, fmt.Errorf("unable to create chain operator: %w", err)
+			}
+
+			for name, mod := range backupModules {
+				appLogger.Info("registering backup module", zap.String("name", name), zap.Any("module", mod))
+				err := chainOperator.RegisterBackupModule(name, mod)
+				if err != nil {
+					return nil, fmt.Errorf("unable to register backup module %s: %w", name, err)
+				}
+
+				appLogger.Info("backup module registered", zap.String("name", name), zap.Any("module", mod))
+			}
+
+			for _, sched := range backupSchedules {
+				chainOperator.RegisterBackupSchedule(sched)
 			}
 
 			blockStreamServer := blockstream.NewUnmanagedServer(blockstream.ServerOptionWithLogger(appLogger))
@@ -190,37 +201,26 @@ func registerReaderNodeApp(chain *Chain) {
 	})
 }
 
-type bootstrapper struct {
-	nodeDataDir string
+var variablesRegex = regexp.MustCompile(`\{(data-dir|node-data-dir|hostname)\}`)
+
+func buildNodeArguments(dataDir, nodeDataDir, hostname string, args string) ([]string, error) {
+	out := variablesRegex.ReplaceAllStringFunc(args, func(match string) string {
+		switch match {
+		case "{data-dir}":
+			return dataDir
+		case "{node-data-dir}":
+			return nodeDataDir
+		case "{hostname}":
+			return hostname
+		default:
+			return fmt.Sprintf("<!%%Unknown(%s)%%!>", match)
+		}
+	})
+
+	// Split arguments according to standard shell rules
+	return shellquote.Split(out)
 }
 
-func (b *bootstrapper) Bootstrap() error {
-	// You can copy coniguration files here into your working data dir to run the node off of
-	return nil
-}
-
-type nodeArgsByRole map[string]string
-
-func buildNodeArguments(nodeDataDir, nodeRole string, args string) ([]string, error) {
-	typeRoles := nodeArgsByRole{
-		"reader": "start --store-dir={node-data-dir} {extra-arg}",
-	}
-
-	argsString, ok := typeRoles[nodeRole]
-	if !ok {
-		return nil, fmt.Errorf("invalid node role: %s", nodeRole)
-	}
-
-	if strings.HasPrefix(args, "+") {
-		argsString = strings.Replace(argsString, "{extra-arg}", args[1:], -1)
-	} else if args == "" {
-		argsString = strings.Replace(argsString, "{extra-arg}", "", -1)
-	} else {
-		argsString = args
-	}
-
-	argsString = strings.Replace(argsString, "{node-data-dir}", nodeDataDir, -1)
-	fmt.Println(argsString)
-	argsSlice := strings.Fields(argsString)
-	return argsSlice, nil
+func gkeSnapshotterFactory(conf operator.BackupModuleConfig) (operator.BackupModule, error) {
+	return snapshotter.NewGKEPVCSnapshotter(conf)
 }

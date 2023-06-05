@@ -22,13 +22,14 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dlauncher/launcher"
 	"go.uber.org/zap"
 )
 
 var startCmd = &cobra.Command{Use: "start", Args: cobra.ArbitraryArgs}
 
-func configureStartCmd(chain *Chain) {
+func configureStartCmd[B Block](chain *Chain[B]) {
 	binaryName := chain.BinaryName()
 
 	startCmd.Short = fmt.Sprintf("Starts `%s` services all at once", binaryName)
@@ -41,7 +42,7 @@ func configureStartCmd(chain *Chain) {
 		configFile := viper.GetString("global-config-file")
 		rootLog.Info(fmt.Sprintf("starting Firehose on %s with config file '%s'", chain.LongName, configFile))
 
-		err = start(chain, dataDir, args)
+		err = start(dataDir, args)
 		if err != nil {
 			return fmt.Errorf("unable to launch: %w", err)
 		}
@@ -51,7 +52,7 @@ func configureStartCmd(chain *Chain) {
 	}
 }
 
-func start(chain *Chain, dataDir string, args []string) (err error) {
+func start(dataDir string, args []string) (err error) {
 	dataDirAbs, err := filepath.Abs(dataDir)
 	if err != nil {
 		return fmt.Errorf("unable to setup directory structure: %w", err)
@@ -62,11 +63,8 @@ func start(chain *Chain, dataDir string, args []string) (err error) {
 		return err
 	}
 
-	tracker := bstream.NewTracker(chain.BlockDifferenceThresholdConsideredNear)
-
 	modules := &launcher.Runtime{
 		AbsDataDir: dataDirAbs,
-		Tracker:    tracker,
 	}
 
 	blocksCacheEnabled := viper.GetBool("common-blocks-cache-enabled")
@@ -101,7 +99,7 @@ func start(chain *Chain, dataDir string, args []string) (err error) {
 		return err
 	}
 
-	signalHandler := setupSignalHandler(viper.GetDuration("common-system-shutdown-signal-delay"))
+	signalHandler, _, _ := cli.SetupSignalHandler(viper.GetDuration("common-system-shutdown-signal-delay"), rootLog)
 	select {
 	case <-signalHandler:
 		rootLog.Info("received termination signal, quitting")

@@ -4,16 +4,11 @@ import (
 	"fmt"
 	_ "net/http/pprof"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/streamingfast/dlauncher/launcher"
-	"go.uber.org/atomic"
-	"go.uber.org/zap"
 )
 
 func setupCmd(cmd *cobra.Command) error {
@@ -69,8 +64,14 @@ func setupCmd(cmd *cobra.Command) error {
 		LogListenAddr: viper.GetString("global-log-level-switcher-listen-addr"),
 		LogToStderr:   true,
 	})
+
 	launcher.SetupTracing("fireacme")
 	launcher.SetupAnalyticsMetrics(rootLog, viper.GetString("global-metrics-listen-addr"), viper.GetString("global-pprof-listen-addr"))
+	launcher.SetAutoMemoryLimit(viper.GetUint64("common-auto-mem-limit-percent"), rootLog)
+
+	if viper.GetBool("common-auto-max-procs") {
+		launcher.SetAutoMaxProcs(rootLog)
+	}
 
 	return nil
 }
@@ -115,48 +116,4 @@ func fileExists(file string) (bool, error) {
 	}
 
 	return !stat.IsDir(), nil
-}
-
-var isShuttingDown = atomic.NewBool(false)
-
-// setupSignalHandler this is a graceful delay to allow residual traffic sent by the load balancer to be processed
-// without returning 500. Once the delay has passed then the service can be shutdown
-func setupSignalHandler(gracefulShutdownDelay time.Duration) <-chan os.Signal {
-	outgoingSignals := make(chan os.Signal, 10)
-	signals := make(chan os.Signal)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
-
-	seen := 0
-
-	go func() {
-		for {
-			s := <-signals
-			switch s {
-			case syscall.SIGTERM, syscall.SIGINT:
-				seen++
-
-				if seen > 3 {
-					rootLog.Info("received termination signal 3 times, forcing kill")
-					rootLog.Sync()
-					os.Exit(1)
-				}
-
-				if !isShuttingDown.Load() {
-					rootLog.Info("received termination signal (Ctrl+C multiple times to force kill)", zap.Stringer("signal", s))
-					isShuttingDown.Store(true)
-
-					go time.AfterFunc(gracefulShutdownDelay, func() {
-						outgoingSignals <- s
-					})
-
-					break
-				}
-
-				rootLog.Info("received termination signal twice, shutting down now", zap.Stringer("signal", s))
-				outgoingSignals <- s
-			}
-		}
-	}()
-
-	return outgoingSignals
 }
