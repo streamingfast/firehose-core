@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/bstream/transform"
 	"github.com/streamingfast/dstore"
 	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	"google.golang.org/protobuf/proto"
@@ -119,8 +120,17 @@ func EncodeBlock(protocolVersion int32, b Block) (blk *bstream.Block, err error)
 	return bstream.GetBlockPayloadSetter(bstreamBlock, content)
 }
 
-type BlockIndexerFactory[B Block] func(indexStore dstore.Store, indexSize uint64) BlockIndexer[B]
+type BlockIndexerFactory[B Block] func(indexStore dstore.Store, indexSize uint64) (BlockIndexer[B], error)
 
 type BlockIndexer[B Block] interface {
 	ProcessBlock(block B) error
 }
+
+// BlockTransformerFactory is a bit convoluted, but yes it's a function acting as a factory that returns itself
+// a factory. The reason for this is that the factory needs to be able to access the index store and the index
+// size to be able to create the actual factory.
+//
+// In the context of `firehose-core` transform registration, this function will be called exactly once
+// for the overall process. The returns [transform.Factory] will be used multiple times (one per request
+// requesting this transform).
+type BlockTransformerFactory func(indexStore dstore.Store, indexPossibleSizes []uint64) (*transform.Factory, error)

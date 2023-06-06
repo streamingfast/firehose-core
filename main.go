@@ -85,16 +85,16 @@ func Main[B Block](chain *Chain[B]) {
 		registerIndexBuilderApp(chain)
 	}
 
+	if chain.RegisterExtraStartFlags != nil {
+		chain.RegisterExtraStartFlags(startCmd.Flags())
+	}
+
 	configureStartCmd(chain)
 	configureToolsCheckCmd(chain)
 	configureToolsPrintCmd(chain)
 
 	if err := launcher.RegisterFlags(rootLog, startCmd); err != nil {
 		exitWithError("registering application flags", err)
-	}
-
-	if chain.RegisterExtraStartFlags != nil {
-		chain.RegisterExtraStartFlags(startCmd.Flags())
 	}
 
 	var availableCmds []string

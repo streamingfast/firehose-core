@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/streamingfast/bstream/transform"
 	dauthAuthenticator "github.com/streamingfast/dauth/authenticator"
 	discoveryservice "github.com/streamingfast/dgrpc/server/discovery-service"
 	"github.com/streamingfast/dlauncher/launcher"
@@ -126,6 +127,21 @@ func registerFirehoseApp[B Block](chain *Chain[B]) {
 				registerServiceExt = sss.Register
 			}
 
+			indexStore, possibleIndexSizes, err := GetIndexStore(runtime.AbsDataDir)
+			if err != nil {
+				return nil, fmt.Errorf("unable to initialize indexes: %w", err)
+			}
+
+			registry := transform.NewRegistry()
+			for _, factory := range chain.BlockTransformerFactories {
+				transformer, err := factory(indexStore, possibleIndexSizes)
+				if err != nil {
+					return nil, fmt.Errorf("unable to create transformer: %w", err)
+				}
+
+				registry.Register(transformer)
+			}
+
 			return firehoseApp.New(appLogger, &firehoseApp.Config{
 				MergedBlocksStoreURL:    mergedBlocksStoreURL,
 				OneBlocksStoreURL:       oneBlocksStoreURL,
@@ -139,6 +155,7 @@ func registerFirehoseApp[B Block](chain *Chain[B]) {
 				HeadTimeDriftMetric:      headTimeDriftmetric,
 				HeadBlockNumberMetric:    headBlockNumMetric,
 				RegisterServiceExtension: registerServiceExt,
+				TransformRegistry:        registry,
 			}), nil
 		},
 	})

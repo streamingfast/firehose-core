@@ -64,7 +64,11 @@ func registerIndexBuilderApp[B Block](chain *Chain[B]) {
 			}
 			stopBlockNum := viper.GetUint64("index-builder-stop-block")
 
-			indexer := indexerFactory(indexStore, viper.GetUint64("index-builder-index-size"))
+			indexer, err := indexerFactory(indexStore, viper.GetUint64("index-builder-index-size"))
+			if err != nil {
+				return nil, fmt.Errorf("unable to create indexer: %w", err)
+			}
+
 			handler := bstream.HandlerFunc(func(blk *bstream.Block, _ interface{}) error {
 				indexer.ProcessBlock(blk.ToProtocol().(B))
 				return nil

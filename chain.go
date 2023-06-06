@@ -15,6 +15,7 @@ import (
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 // BlockPrinterFunc takes a chain agnostic [block] and prints it to a human readable form.
@@ -111,13 +112,22 @@ type Chain[B Block] struct {
 	// BlockIndexerFactories defines the set of indexes built out of Firehose blocks to be served by Firehose
 	// as custom filters.
 	//
-	// The [BlockIndexerFactories] is optional. if set, each key must return a non-nil [BlockIndexerFactory]. For now,
+	// The [BlockIndexerFactories] is optional. If set, each key must be assigned to a non-nil [BlockIndexerFactory]. For now,
 	// a single factory can be specified per chain. We use a map to allow for multiple factories in the future.
 	//
-	// If there is indexer factories defined, the `index-builder` app will be disabled for this chain.
+	// If there is no indexer factories defined, the `index-builder` app will be disabled for this chain.
 	//
 	// The [BlockIndexerFactories] is optional.
 	BlockIndexerFactories map[string]BlockIndexerFactory[B]
+
+	// BlockTransformerFactories defines the set of transformer that will be enabled when the client request Firehose
+	// blocks.
+	//
+	// The [BlockTransformerFactories] is optional. If set, each key must be assigned to a non-nil
+	// [BlockTransformerFactory]. Multiple transformers can be defined.
+	//
+	// The [BlockTransformerFactories] is optional.
+	BlockTransformerFactories map[protoreflect.FullName]BlockTransformerFactory
 
 	// RegisterExtraStartFlags is a function that is called by the `reader-node` app to allow your chain
 	// to register extra custom arguments. This function is called after the common flags are registered.
@@ -227,6 +237,18 @@ func (c *Chain[B]) Validate() {
 
 	if len(c.BlockIndexerFactories) > 1 {
 		err = multierr.Append(err, fmt.Errorf("field 'BlockIndexerFactories' must have at most one element"))
+	}
+
+	for key, indexerFactory := range c.BlockIndexerFactories {
+		if indexerFactory == nil {
+			err = multierr.Append(err, fmt.Errorf("entry %q for field 'BlockIndexerFactories' must be non-nil", key))
+		}
+	}
+
+	for key, transformerFactory := range c.BlockTransformerFactories {
+		if transformerFactory == nil {
+			err = multierr.Append(err, fmt.Errorf("entry %q for field 'BlockTransformerFactories' must be non-nil", key))
+		}
 	}
 
 	errors := multierr.Errors(err)
