@@ -163,7 +163,7 @@ func registerReaderNodeApp[B Block](chain *Chain[B]) {
 				oneBlocksStoreURL,
 				workingDir,
 				func(lines chan string) (reader.ConsolerReader, error) {
-					return chain.ConsoleReaderFactory(lines, chain.blockEncoder, appLogger, appTracer)
+					return chain.ConsoleReaderFactory(lines, chain.BlockEncoder, appLogger, appTracer)
 				},
 				batchStartBlockNum,
 				batchStopBlockNum,

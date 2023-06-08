@@ -7,11 +7,13 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dlauncher/launcher"
 )
 
-func setupCmd(cmd *cobra.Command) error {
+func setupCmd(cmd *cobra.Command, binaryName string) error {
 	cmd.SilenceUsage = true
 
 	cmds := extractCmd(cmd)
@@ -37,21 +39,17 @@ func setupCmd(cmd *cobra.Command) error {
 		}
 	}
 
+	startFlagByName := getStartFlags()
+
 	subconf := launcher.Config[subCommand]
 	if subconf != nil {
 		for k, v := range subconf.Flags {
-			validFlag := false
-			if _, ok := allFlags["global-"+k]; ok {
-				viper.SetDefault("global-"+k, v)
-				validFlag = true
-			}
-			if _, ok := allFlags[k]; ok {
-				viper.SetDefault(k, v)
-				validFlag = true
-			}
-			if !validFlag {
+			flag, found := startFlagByName[k]
+			if !found {
 				return fmt.Errorf("invalid flag %s in config file under command %s", k, subCommand)
 			}
+
+			viper.SetDefault(flag.viperKey, v)
 		}
 	}
 
@@ -65,7 +63,7 @@ func setupCmd(cmd *cobra.Command) error {
 		LogToStderr:   true,
 	})
 
-	launcher.SetupTracing("fireacme")
+	launcher.SetupTracing(binaryName)
 	launcher.SetupAnalyticsMetrics(rootLog, viper.GetString("global-metrics-listen-addr"), viper.GetString("global-pprof-listen-addr"))
 	launcher.SetAutoMemoryLimit(viper.GetUint64("common-auto-mem-limit-percent"), rootLog)
 
@@ -116,4 +114,23 @@ func fileExists(file string) (bool, error) {
 	}
 
 	return !stat.IsDir(), nil
+}
+
+type flagInfo struct {
+	originalName string
+	viperKey     string
+}
+
+func getStartFlags() (byName map[string]*flagInfo) {
+	byName = make(map[string]*flagInfo)
+
+	rootCmd.PersistentFlags().VisitAll(func(flag *pflag.Flag) {
+		byName[flag.Name] = &flagInfo{flag.Name, sflags.MustGetViperKeyFromFlag(flag)}
+	})
+
+	startCmd.LocalFlags().VisitAll(func(flag *pflag.Flag) {
+		byName[flag.Name] = &flagInfo{flag.Name, sflags.MustGetViperKeyFromFlag(flag)}
+	})
+
+	return byName
 }

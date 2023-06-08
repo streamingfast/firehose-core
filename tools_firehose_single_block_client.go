@@ -1,4 +1,4 @@
-package tools
+package firecore
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/mostynb/go-grpc-compression/zstd"
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/firehose/client"
 	"github.com/streamingfast/jsonpb"
 	"github.com/streamingfast/logging"
@@ -19,19 +20,22 @@ import (
 )
 
 // You should add your custom 'transforms' flags to this command in your init(), then parse them in transformsSetter
-var GetFirehoseSingleBlockClientCmd = func(zlog *zap.Logger, tracer logging.Tracer) *cobra.Command {
-	out := &cobra.Command{
-		Use:     "firehose-single-block-client {endpoint} {block_num|block_num:block_id|cursor}",
-		Short:   "fetch a single block from firehose and print as JSON",
-		Args:    cobra.ExactArgs(2),
-		RunE:    getFirehoseSingleBlockClientE(zlog, tracer),
-		Example: "firehose-single-block-client --compression=gzip my.firehose.endpoint:443 2344:0x32d8e8d98a798da98d6as9d69899as86s9898d8ss8d87",
+func newToolsFirehoseSingleBlockClientCmd[B Block](chain *Chain[B], zlog *zap.Logger, tracer logging.Tracer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "firehose-single-block-client {endpoint} {block_num|block_num:block_id|cursor}",
+		Short: "fetch a single block from firehose and print as JSON",
+		Args:  cobra.ExactArgs(2),
+		RunE:  getFirehoseSingleBlockClientE(zlog, tracer),
+		Example: ExamplePrefixed(chain, "tools ", `
+			firehose-single-block-client --compression=gzip my.firehose.endpoint:443 2344:0x32d8e8d98a798da98d6as9d69899as86s9898d8ss8d87
+		`),
 	}
-	out.Flags().StringP("api-token-env-var", "a", "FIREHOSE_API_TOKEN", "Look for a JWT in this environment variable to authenticate against endpoint")
-	out.Flags().String("compression", "none", "http compression: use either 'none', 'gzip' or 'zstd'")
-	out.Flags().BoolP("plaintext", "p", false, "Use plaintext connection to firehose")
-	out.Flags().BoolP("insecure", "k", false, "Skip SSL certificate validation when connecting to firehose")
-	return out
+	// cmd.Flags().StringP("api-token-env-var", "a", "FIREHOSE_API_TOKEN", "Look for a JWT in this environment variable to authenticate against endpoint")
+	cmd.Flags().String("compression", "none", "http compression: use either 'none', 'gzip' or 'zstd'")
+	cmd.Flags().BoolP("plaintext", "p", false, "Use plaintext connection to firehose")
+	cmd.Flags().BoolP("insecure", "k", false, "Skip SSL certificate validation when connecting to firehose")
+
+	return cmd
 }
 
 func getFirehoseSingleBlockClientE(zlog *zap.Logger, tracer logging.Tracer) func(cmd *cobra.Command, args []string) error {
@@ -67,10 +71,10 @@ func getFirehoseSingleBlockClientE(zlog *zap.Logger, tracer logging.Tracer) func
 				},
 			}
 		}
-		apiTokenEnvVar := mustGetString(cmd, "api-token-env-var")
+		apiTokenEnvVar := sflags.MustGetString(cmd, "api-token-env-var")
 		jwt := os.Getenv(apiTokenEnvVar)
-		plaintext := mustGetBool(cmd, "plaintext")
-		insecure := mustGetBool(cmd, "insecure")
+		plaintext := sflags.MustGetBool(cmd, "plaintext")
+		insecure := sflags.MustGetBool(cmd, "insecure")
 
 		firehoseClient, connClose, err := client.NewFirehoseFetchClient(endpoint, jwt, insecure, plaintext)
 		if err != nil {
@@ -79,7 +83,7 @@ func getFirehoseSingleBlockClientE(zlog *zap.Logger, tracer logging.Tracer) func
 		defer connClose()
 
 		var grpcCallOpts []grpc.CallOption
-		compression := mustGetString(cmd, "compression")
+		compression := sflags.MustGetString(cmd, "compression")
 		switch compression {
 		case "gzip":
 			grpcCallOpts = append(grpcCallOpts, grpc.UseCompressor(gzip.Name))
@@ -101,6 +105,5 @@ func getFirehoseSingleBlockClientE(zlog *zap.Logger, tracer logging.Tracer) func
 		}
 		fmt.Println(line)
 		return nil
-
 	}
 }

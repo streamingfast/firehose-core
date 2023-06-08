@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // BlockPrinterFunc takes a chain agnostic [block] and prints it to a human readable form.
@@ -147,14 +148,20 @@ type Chain[B Block] struct {
 	// to work properly for example to print block using chain specific information.
 	//
 	// The [Tools] element is optional and if not provided, sane defaults will be used.
-	Tools *ToolsConfig
+	Tools *ToolsConfig[B]
 
-	// blockEncoder is the cached block encoder object that should be used for this chain. Populate
-	// when Init() is called.
-	blockEncoder BlockEncoder
+	// BlockEncoder is the cached block encoder object that should be used for this chain. Populate
+	// when Init() is called will be `nil` prior to that.
+	//
+	// When you need to encode your chain specific block like `pbeth.Block` into a `bstream.Block` you
+	// should use this encoder:
+	//
+	//     bstreamBlock, err := chain.BlockEncoder.Encode(block)
+	//
+	BlockEncoder BlockEncoder
 }
 
-type ToolsConfig struct {
+type ToolsConfig[B Block] struct {
 	// BlockPrinter represents a printing function that render a chain specific human readable
 	// form of the receive chain agnostic [bstream.Block]. This block is expected to be rendered as
 	// a single line for example on Ethereum rendering of a single block looks like:
@@ -181,7 +188,39 @@ type ToolsConfig struct {
 	// The [BlockPrinter] is optional, if nil, a default block printer will be used. It's important to note
 	// that the default block printer error out if `alsoPrintTransactions` is true.
 	BlockPrinter BlockPrinterFunc
+
+	// RegisterExtraCmd enables you to register extra commands to the `fire<chain> tools` group.
+	// The callback function is called with the `toolsCmd` command that is the root command of the `fire<chain> tools`
+	// as well as the chain, the root logger and root tracer for tools.
+	//
+	// You are responsible of calling `toolsCmd.AddCommand` to register your extra commands.
+	//
+	// The [RegisterExtraCmd] function is optional and not called if nil.
+	RegisterExtraCmd func(chain *Chain[B], toolsCmd *cobra.Command, zlog *zap.Logger, tracer logging.Tracer) error
+
+	// TransformFlags specify chain specific transforms flags (and parsing of flag's value). The flags defined
+	// in there are added to all Firehose-client like tools commannd (`tools firehose-client`, `tools firehose-prometheus-exporter`, etc.).
+	//
+	// The [TransformFlags] is optional.
+	TransformFlags map[string]*TransformFlag
+
+	// MergedBlockUpgrader when define enables for your chain to upgrade between different versions of "merged-blocks".
+	// It happens from time to time that a data bug is found in the way merged blocks and it's possible to fix it by
+	// applying a transformation to the block. This is what this function is for.
+	//
+	// When defined, a new tools `fire<chain> tools upgrade-merged-blocks` is added. This command will enable operators
+	// to upgrade from one version to another of the merged blocks.
+	//
+	// The [MergedBlockUpgrader] is optional and not specifying it disables command `fire<chain> tools upgrade-merged-blocks`.
+	MergedBlockUpgrader func(block *bstream.Block) (*bstream.Block, error)
 }
+
+type TransformFlag struct {
+	Description string
+	Parser      TransformFlagParser
+}
+
+type TransformFlagParser func(in string) (*anypb.Any, error)
 
 // Validate normalizes some aspect of the [Chain] values (spaces trimming essentially) and validates the chain
 // by accumulating error an panic if all the error found along the way.
@@ -272,7 +311,7 @@ func (c *Chain[B]) Validate() {
 func (c *Chain[B]) Init() {
 	bstream.InitGeneric(c.Protocol, c.ProtocolVersion, func() proto.Message { return c.BlockFactory() })
 
-	c.blockEncoder = NewGenericBlockEncoder(c.ProtocolVersion)
+	c.BlockEncoder = NewGenericBlockEncoder(c.ProtocolVersion)
 }
 
 // BinaryName represents the binary name for your Firehose on <Chain> is the [ShortName]

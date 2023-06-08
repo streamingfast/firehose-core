@@ -16,15 +16,13 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/streamingfast/dlauncher/flags"
 	"github.com/streamingfast/dlauncher/launcher"
 	"go.uber.org/zap"
 )
 
-var allFlags = make(map[string]bool) // used as global because of async access to cobra init functions
-
 var rootCmd = &cobra.Command{}
 var rootLog *zap.Logger
+var rootTracer logging.Tracer
 
 // Main is the main entry point that configures everything and should be called from your Go
 // 'main' entrypoint directly.
@@ -33,10 +31,10 @@ func Main[B Block](chain *Chain[B]) {
 	chain.Init()
 
 	binaryName := chain.BinaryName()
-	rootLog, _ = logging.RootLogger(binaryName, chain.RootLoggerPackageID())
+	rootLog, rootTracer = logging.RootLogger(binaryName, chain.RootLoggerPackageID())
 
 	cobra.OnInitialize(func() {
-		allFlags = flags.AutoBind(rootCmd, strings.ToUpper(binaryName))
+		cli.ConfigureViperForCommand(rootCmd, strings.ToUpper(binaryName))
 	})
 
 	rootCmd.Use = binaryName
@@ -90,8 +88,10 @@ func Main[B Block](chain *Chain[B]) {
 	}
 
 	configureStartCmd(chain)
-	configureToolsCheckCmd(chain)
-	configureToolsPrintCmd(chain)
+
+	if err := configureToolsCmd(chain); err != nil {
+		exitWithError("registering tools command", err)
+	}
 
 	if err := launcher.RegisterFlags(rootLog, startCmd); err != nil {
 		exitWithError("registering application flags", err)
@@ -106,7 +106,7 @@ func Main[B Block](chain *Chain[B]) {
 	startCmd.Example = fmt.Sprintf("%s start reader-node", binaryName)
 
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
-		if err := setupCmd(cmd); err != nil {
+		if err := setupCmd(cmd, chain.BinaryName()); err != nil {
 			return err
 		}
 
