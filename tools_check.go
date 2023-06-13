@@ -18,8 +18,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/firehose-core/tools"
 )
 
@@ -61,17 +61,17 @@ func createToolsCheckMergedBlocksE(blockPrinter BlockPrinterFunc) CommandExecuto
 		storeURL := args[0]
 		fileBlockSize := uint32(100)
 
-		blockRange, err := tools.Flags.GetBlockRange("range")
+		blockRange, err := tools.GetBlockRangeFromFlag(cmd, "range")
 		if err != nil {
 			return err
 		}
 
 		printDetails := tools.PrintNothing
-		if viper.GetBool("print-stats") {
+		if sflags.MustGetBool(cmd, "print-stats") {
 			printDetails = tools.PrintStats
 		}
 
-		if viper.GetBool("print-full") {
+		if sflags.MustGetBool(cmd, "print-full") {
 			printDetails = tools.PrintFull
 		}
 

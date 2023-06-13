@@ -37,7 +37,7 @@ func configureToolsCmd[B Block](
 	configureToolsCheckCmd(chain)
 	configureToolsPrintCmd(chain)
 
-	toolsCmd.AddCommand(newToolsDownloadFromFirehoseCmd(chain))
+	toolsCmd.AddCommand(newToolsDownloadFromFirehoseCmd(chain, rootLog))
 	toolsCmd.AddCommand(newToolsFirehoseClientCmd(chain))
 	toolsCmd.AddCommand(newToolsFirehoseSingleBlockClientCmd(chain, rootLog, rootTracer))
 	toolsCmd.AddCommand(newToolsFirehosePrometheusExporterCmd(chain, rootLog, rootTracer))
@@ -55,13 +55,17 @@ func configureToolsCmd[B Block](
 	return nil
 }
 
-func addFirehoseClientFlagsToSet[B Block](flags *pflag.FlagSet, chain *Chain[B]) {
+func addFirehoseStreamClientFlagsToSet[B Block](flags *pflag.FlagSet, chain *Chain[B]) {
+	addFirehoseFetchClientFlagsToSet(flags, chain)
+
+	flags.String("cursor", "", "Use this cursor with the request to resume your stream at the following block pointed by the cursor")
+}
+
+func addFirehoseFetchClientFlagsToSet[B Block](flags *pflag.FlagSet, chain *Chain[B]) {
 	flags.StringP("api-token-env-var", "a", "FIREHOSE_API_TOKEN", "Look for a JWT in this environment variable to authenticate against endpoint")
 	flags.String("compression", "none", "The HTTP compression: use either 'none', 'gzip' or 'zstd'")
-	flags.String("cursor", "", "Use this cursor with the request to resume your stream at the following block pointed by the cursor")
 	flags.BoolP("plaintext", "p", false, "Use plaintext connection to Firehose")
 	flags.BoolP("insecure", "k", false, "Use SSL connection to Firehose but skip SSL certificate validation")
-	flags.Bool("final-blocks-only", false, "Only ask for final blocks")
 
 	for flagName, transformFlag := range chain.Tools.TransformFlags {
 		flags.String(flagName, "", transformFlag.Description)
@@ -75,31 +79,60 @@ type firehoseRequestInfo struct {
 	Transforms      []*anypb.Any
 }
 
-func getFirehoseClientFromCmd[B Block](cmd *cobra.Command, endpoint string, chain *Chain[B]) (
+func getFirehoseFetchClientFromCmd[B Block](cmd *cobra.Command, endpoint string, chain *Chain[B]) (
+	firehoseClient pbfirehose.FetchClient,
+	connClose func() error,
+	requestInfo *firehoseRequestInfo,
+	err error,
+) {
+	return getFirehoseClientFromCmd[B, pbfirehose.FetchClient](cmd, "fetch-client", endpoint, chain)
+}
+
+func getFirehoseStreamClientFromCmd[B Block](cmd *cobra.Command, endpoint string, chain *Chain[B]) (
 	firehoseClient pbfirehose.StreamClient,
+	connClose func() error,
+	requestInfo *firehoseRequestInfo,
+	err error,
+) {
+	return getFirehoseClientFromCmd[B, pbfirehose.StreamClient](cmd, "stream-client", endpoint, chain)
+}
+
+func getFirehoseClientFromCmd[B Block, C any](cmd *cobra.Command, kind string, endpoint string, chain *Chain[B]) (
+	firehoseClient C,
 	connClose func() error,
 	requestInfo *firehoseRequestInfo,
 	err error,
 ) {
 	requestInfo = &firehoseRequestInfo{}
 
-	apiTokenEnvVar := sflags.MustGetString(cmd, "api-token-env-var")
-	jwt := os.Getenv(apiTokenEnvVar)
-
-	fmt.Println("JWT", jwt, apiTokenEnvVar)
-
-	requestInfo.Cursor = sflags.MustGetString(cmd, "cursor")
+	jwt := os.Getenv(sflags.MustGetString(cmd, "api-token-env-var"))
 	plaintext := sflags.MustGetBool(cmd, "plaintext")
 	insecure := sflags.MustGetBool(cmd, "insecure")
-	requestInfo.FinalBlocksOnly = sflags.MustGetBool(cmd, "final-blocks-only")
 
-	firehoseClient, connClose, requestInfo.GRPCCallOpts, err = client.NewFirehoseClient(endpoint, jwt, insecure, plaintext)
-	if err != nil {
-		return nil, nil, nil, err
+	if sflags.FlagDefined(cmd, "cursor") {
+		requestInfo.Cursor = sflags.MustGetString(cmd, "cursor")
 	}
 
-	compression := sflags.MustGetString(cmd, "compression")
+	if sflags.FlagDefined(cmd, "final-blocks-only") {
+		requestInfo.FinalBlocksOnly = sflags.MustGetBool(cmd, "final-blocks-only")
+	}
 
+	var rawClient any
+	if kind == "stream-client" {
+		rawClient, connClose, requestInfo.GRPCCallOpts, err = client.NewFirehoseClient(endpoint, jwt, insecure, plaintext)
+	} else if kind == "fetch-client" {
+		rawClient, connClose, err = client.NewFirehoseFetchClient(endpoint, jwt, insecure, plaintext)
+	} else {
+		panic(fmt.Errorf("unsupported Firehose client kind: %s", kind))
+	}
+
+	if err != nil {
+		return firehoseClient, nil, nil, err
+	}
+
+	firehoseClient = rawClient.(C)
+
+	compression := sflags.MustGetString(cmd, "compression")
 	var compressor grpc.CallOption
 	switch compression {
 	case "gzip":
@@ -114,7 +147,7 @@ func getFirehoseClientFromCmd[B Block](cmd *cobra.Command, endpoint string, chai
 	}
 
 	if compressor != nil {
-		requestInfo.GRPCCallOpts = append(requestInfo.GRPCCallOpts)
+		requestInfo.GRPCCallOpts = append(requestInfo.GRPCCallOpts, compressor)
 	}
 
 	for flagName, transformFlag := range chain.Tools.TransformFlags {
@@ -122,7 +155,7 @@ func getFirehoseClientFromCmd[B Block](cmd *cobra.Command, endpoint string, chai
 		if transformValue != "" {
 			transform, err := transformFlag.Parser(transformValue)
 			if err != nil {
-				return nil, nil, nil, fmt.Errorf("invalid value for %q: %w", flagName, err)
+				return firehoseClient, nil, nil, fmt.Errorf("invalid value for %q: %w", flagName, err)
 			}
 
 			requestInfo.Transforms = append(requestInfo.Transforms, transform)

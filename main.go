@@ -9,12 +9,14 @@ import (
 	// Needs to be in this file which is the main entry of wrapper binary
 
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/cli/sflags"
 	_ "github.com/streamingfast/dauth/authenticator/null"   // auth null plugin
 	_ "github.com/streamingfast/dauth/authenticator/secret" // auth secret/hard-coded plugin
 	_ "github.com/streamingfast/dauth/ratelimiter/null"     // ratelimiter plugin
 	"github.com/streamingfast/logging"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/streamingfast/dlauncher/launcher"
 	"go.uber.org/zap"
@@ -35,6 +37,12 @@ func Main[B Block](chain *Chain[B]) {
 
 	cobra.OnInitialize(func() {
 		cli.ConfigureViperForCommand(rootCmd, strings.ToUpper(binaryName))
+
+		// Compatibility to fetch `viper.GetXXX(....)` without `start-` prefix for flags on startCmd
+		startCmd.LocalFlags().VisitAll(func(flag *pflag.Flag) {
+			viper.BindPFlag(flag.Name, flag)
+			viper.BindEnv(sflags.MustGetViperKeyFromFlag(flag), strings.ToUpper(binaryName+"_"+strings.ReplaceAll(flag.Name, "-", "_")))
+		})
 	})
 
 	rootCmd.Use = binaryName

@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strconv"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli/sflags"
+	"github.com/streamingfast/firehose-core/tools"
 	"github.com/streamingfast/jsonpb"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
@@ -15,13 +15,15 @@ import (
 
 func newToolsFirehoseClientCmd[B Block](chain *Chain[B]) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "firehose-client <endpoint> <start> <stop>",
+		Use:   "firehose-client <endpoint> <range>",
 		Short: "Connects to a Firehose endpoint over gRPC and print block stream as JSON to terminal",
-		Args:  cobra.ExactArgs(3),
+		Args:  cobra.ExactArgs(2),
 		RunE:  getFirehoseClientE(chain),
 	}
 
-	addFirehoseClientFlagsToSet(cmd.Flags(), chain)
+	addFirehoseStreamClientFlagsToSet(cmd.Flags(), chain)
+
+	cmd.Flags().Bool("final-blocks-only", false, "Only ask for final blocks")
 	cmd.Flags().Bool("print-cursor-only", false, "Skip block decoding, only print the step cursor (useful for performance testing)")
 
 	return cmd
@@ -31,26 +33,22 @@ func getFirehoseClientE[B Block](chain *Chain[B]) func(cmd *cobra.Command, args 
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-		firehoseClient, connClose, requestInfo, err := getFirehoseClientFromCmd(cmd, args[0], chain)
+		firehoseClient, connClose, requestInfo, err := getFirehoseStreamClientFromCmd(cmd, args[0], chain)
 		if err != nil {
 			return err
 		}
 		defer connClose()
 
-		start, err := strconv.ParseInt(args[1], 10, 64)
+		blockRange, err := tools.GetBlockRangeFromArg(args[1])
 		if err != nil {
-			return fmt.Errorf("parsing start block num: %w", err)
-		}
-		stop, err := strconv.ParseUint(args[2], 10, 64)
-		if err != nil {
-			return fmt.Errorf("parsing stop block num: %w", err)
+			return fmt.Errorf("invalid range %q: %w", args[1], err)
 		}
 
 		printCursorOnly := sflags.MustGetBool(cmd, "print-cursor-only")
 
 		request := &pbfirehose.Request{
-			StartBlockNum:   start,
-			StopBlockNum:    stop,
+			StartBlockNum:   blockRange.Start,
+			StopBlockNum:    uint64(blockRange.GetStopBlockOr(0)),
 			Transforms:      requestInfo.Transforms,
 			FinalBlocksOnly: requestInfo.FinalBlocksOnly,
 			Cursor:          requestInfo.Cursor,

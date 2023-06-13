@@ -16,7 +16,7 @@ import (
 
 func NewToolsUpgradeMergedBlocksCmd[B Block](chain *Chain[B]) *cobra.Command {
 	return &cobra.Command{
-		Use:   "upgrade-merged-blocks <source> <destination> <start> <stop>",
+		Use:   "upgrade-merged-blocks <source> <destination> <range>",
 		Short: "From a merged-blocks source, rewrite blocks to a new merged-blocks destination, while applying all possible upgrades",
 		Args:  cobra.ExactArgs(4),
 		RunE:  getMergedBlockUpgrader(chain.Tools.MergedBlockUpgrader),

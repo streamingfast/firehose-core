@@ -25,8 +25,8 @@ func FlagMergedBlocks(
 	fileBlockSize uint32,
 	blockRange BlockRange,
 ) error {
-	if blockRange.Start < bstream.GetProtocolFirstStreamableBlock {
-		blockRange.Start = bstream.GetProtocolFirstStreamableBlock
+	if !blockRange.IsResolved() {
+		return fmt.Errorf("check merged blocks can only work with fully resolved range, got %s", blockRange)
 	}
 
 	expected := uint64(RoundToBundleStartBlock(uint32(blockRange.Start), fileBlockSize))
@@ -59,8 +59,8 @@ func FlagMergedBlocks(
 
 		// should not happen with firstFilename, but leaving in case
 		baseNum, _ := strconv.ParseUint(match[1], 10, 32)
-		if baseNum+uint64(fileBlockSize)-1 < blockRange.Start {
-			logger.Debug("base num lower than block range start, quitting", zap.Uint64("base_num", baseNum), zap.Uint64("starting_at", blockRange.Start))
+		if baseNum+uint64(fileBlockSize)-1 < uint64(blockRange.Start) {
+			logger.Debug("base num lower than block range start, quitting", zap.Uint64("base_num", baseNum), zap.Int64("starting_at", blockRange.Start))
 			return nil
 		}
 
@@ -84,7 +84,7 @@ func FlagMergedBlocks(
 			return err
 		}
 
-		if !blockRange.Unbounded() && RoundToBundleEndBlock(uint32(baseNum), fileBlockSize) >= uint32(blockRange.Stop-1) {
+		if !blockRange.IsClosed() && RoundToBundleEndBlock(uint32(baseNum), fileBlockSize) >= uint32(*blockRange.Stop-1) {
 			return errStopWalk
 		}
 		expected = baseNum + fileBlockSize64

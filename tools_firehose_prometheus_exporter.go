@@ -29,7 +29,7 @@ func newToolsFirehosePrometheusExporterCmd[B Block](chain *Chain[B], zlog *zap.L
 		RunE:  runPrometheusExporterE(chain, zlog, tracer),
 	}
 
-	// addFirehoseClientFlagsToSet(cmd.Flags(), chain)
+	addFirehoseStreamClientFlagsToSet(cmd.Flags(), chain)
 
 	return cmd
 }
@@ -42,7 +42,7 @@ func runPrometheusExporterE[B Block](chain *Chain[B], zlog *zap.Logger, tracer l
 		start := int64(-1)
 		stop := uint64(0)
 
-		firehoseClient, connClose, requestInfo, err := getFirehoseClientFromCmd(cmd, endpoint, chain)
+		firehoseClient, connClose, requestInfo, err := getFirehoseStreamClientFromCmd(cmd, endpoint, chain)
 		if err != nil {
 			return err
 		}
@@ -52,7 +52,7 @@ func runPrometheusExporterE[B Block](chain *Chain[B], zlog *zap.Logger, tracer l
 			StartBlockNum:   start,
 			StopBlockNum:    stop,
 			Transforms:      requestInfo.Transforms,
-			FinalBlocksOnly: requestInfo.FinalBlocksOnly,
+			FinalBlocksOnly: true,
 			Cursor:          requestInfo.Cursor,
 		}
 

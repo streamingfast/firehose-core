@@ -43,13 +43,13 @@ func CheckMergedBlocks(
 	var highestBlockSeen uint64
 	lowestBlockSeen := MaxUint64
 
-	if blockRange.Start < bstream.GetProtocolFirstStreamableBlock {
-		blockRange.Start = bstream.GetProtocolFirstStreamableBlock
+	if !blockRange.IsResolved() {
+		return fmt.Errorf("check merged blocks can only work with fully resolved range, got %s", blockRange)
 	}
 
-	if blockRange.Stop > 0 && blockRange.Start > blockRange.Stop {
-		return fmt.Errorf("invalid range: start %d is after stop %d", blockRange.Start, blockRange.Stop)
-	}
+	// if blockRange.Start < bstream.GetProtocolFirstStreamableBlock {
+	// 	blockRange.Start = bstream.GetProtocolFirstStreamableBlock
+	// }
 
 	holeFound := false
 	expected = RoundToBundleStartBlock(uint32(blockRange.Start), fileBlockSize)
@@ -78,8 +78,8 @@ func CheckMergedBlocks(
 
 		count++
 		baseNum, _ := strconv.ParseUint(match[1], 10, 32)
-		if baseNum+uint64(fileBlockSize)-1 < blockRange.Start {
-			logger.Debug("base num lower then block range start, quitting", zap.Uint64("base_num", baseNum), zap.Uint64("starting_at", blockRange.Start))
+		if baseNum+uint64(fileBlockSize)-1 < uint64(blockRange.Start) {
+			logger.Debug("base num lower then block range start, quitting", zap.Uint64("base_num", baseNum), zap.Int64("starting_at", blockRange.Start))
 			return nil
 		}
 
@@ -88,11 +88,11 @@ func CheckMergedBlocks(
 		if baseNum32 != expected {
 			// There is no previous valid block range if we are at the ever first seen file
 			if count > 1 {
-				fmt.Printf("✅ Range %s\n", BlockRange{uint64(currentStartBlk), uint64(RoundToBundleEndBlock(expected-fileBlockSize, fileBlockSize))})
+				fmt.Printf("✅ Range %s\n", NewClosedRange(int64(currentStartBlk), uint64(RoundToBundleEndBlock(expected-fileBlockSize, fileBlockSize))))
 			}
 
 			// Otherwise, we do not follow last seen element (previous is `100 - 199` but we are `299 - 300`)
-			missingRange := BlockRange{uint64(expected), uint64(RoundToBundleEndBlock(baseNum32-fileBlockSize, fileBlockSize))}
+			missingRange := NewClosedRange(int64(expected), uint64(RoundToBundleEndBlock(baseNum32-fileBlockSize, fileBlockSize)))
 			fmt.Printf("❌ Range %s (Missing, [%s])\n", missingRange, missingRange.ReprocRange())
 			currentStartBlk = baseNum32
 
@@ -121,11 +121,11 @@ func CheckMergedBlocks(
 		}
 
 		if count%10000 == 0 {
-			fmt.Printf("✅ Range %s\n", BlockRange{uint64(currentStartBlk), uint64(RoundToBundleEndBlock(baseNum32, fileBlockSize))})
+			fmt.Printf("✅ Range %s\n", NewClosedRange(int64(currentStartBlk), uint64(RoundToBundleEndBlock(baseNum32, fileBlockSize))))
 			currentStartBlk = baseNum32 + fileBlockSize
 		}
 
-		if !blockRange.Unbounded() && RoundToBundleEndBlock(baseNum32, fileBlockSize) >= uint32(blockRange.Stop-1) {
+		if blockRange.IsClosed() && RoundToBundleEndBlock(baseNum32, fileBlockSize) >= uint32(*blockRange.Stop-1) {
 			return errStopWalk
 		}
 
@@ -138,22 +138,22 @@ func CheckMergedBlocks(
 
 	logger.Debug("checking incomplete range",
 		zap.Stringer("range", blockRange),
-		zap.Bool("range_unbounded", blockRange.Unbounded()),
+		zap.Bool("range_unbounded", blockRange.IsOpen()),
 		zap.Uint64("lowest_block_seen", lowestBlockSeen),
 		zap.Uint64("highest_block_seen", highestBlockSeen),
 	)
 	if tfdb.lastLinkedBlock != nil && tfdb.lastLinkedBlock.Number < highestBlockSeen {
-		fmt.Printf("🔶 Range %s has issues with forks, last linkable block number: %d\n", BlockRange{uint64(currentStartBlk), highestBlockSeen}, tfdb.lastLinkedBlock.Number)
+		fmt.Printf("🔶 Range %s has issues with forks, last linkable block number: %d\n", NewClosedRange(int64(currentStartBlk), uint64(highestBlockSeen)), tfdb.lastLinkedBlock.Number)
 	} else {
-		fmt.Printf("✅ Range %s\n", BlockRange{uint64(currentStartBlk), uint64(highestBlockSeen)})
+		fmt.Printf("✅ Range %s\n", NewClosedRange(int64(currentStartBlk), uint64(highestBlockSeen)))
 	}
 
 	fmt.Println()
 	fmt.Println("Summary:")
 
-	if blockRange.Bounded() &&
-		(highestBlockSeen < (blockRange.Stop-1) ||
-			(lowestBlockSeen > blockRange.Start && lowestBlockSeen > bstream.GetProtocolFirstStreamableBlock)) {
+	if blockRange.IsClosed() &&
+		(highestBlockSeen < uint64(*blockRange.Stop-1) ||
+			(lowestBlockSeen > uint64(blockRange.Start) && lowestBlockSeen > bstream.GetProtocolFirstStreamableBlock)) {
 		fmt.Printf("> 🔶 Incomplete range %s, started at block %s and stopped at block: %s\n", blockRange, PrettyBlockNum(lowestBlockSeen), PrettyBlockNum(highestBlockSeen))
 	}
 
@@ -211,15 +211,14 @@ func validateBlockSegment(
 	for {
 		block, err := readerFactory.Read()
 		if block != nil {
-			if !blockRange.Unbounded() {
-				if block.Number > blockRange.Stop {
-					return
-				}
-
-				if block.Number < blockRange.Start {
-					continue
-				}
+			if block.Number < uint64(blockRange.Start) {
+				continue
 			}
+
+			if blockRange.IsClosed() && block.Number > uint64(*blockRange.Stop) {
+				return
+			}
+
 			if block.Number < lowestBlockSeen {
 				lowestBlockSeen = block.Number
 			}
@@ -292,12 +291,12 @@ func validateBlockSegment(
 }
 
 func WalkBlockPrefix(blockRange BlockRange, fileBlockSize uint32) string {
-	if blockRange.Unbounded() {
+	if blockRange.IsOpen() {
 		return ""
 	}
 
 	startString := fmt.Sprintf("%010d", RoundToBundleStartBlock(uint32(blockRange.Start), fileBlockSize))
-	endString := fmt.Sprintf("%010d", RoundToBundleEndBlock(uint32(blockRange.Stop-1), fileBlockSize)+1)
+	endString := fmt.Sprintf("%010d", RoundToBundleEndBlock(uint32(*blockRange.Stop-1), fileBlockSize)+1)
 
 	offset := 0
 	for i := 0; i < len(startString); i++ {

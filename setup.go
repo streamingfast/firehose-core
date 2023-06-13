@@ -50,6 +50,16 @@ func setupCmd(cmd *cobra.Command, binaryName string) error {
 			}
 
 			viper.SetDefault(flag.viperKey, v)
+
+			// For root command, we want to keep compatibility for `viper.GetXXX("global-<flag>")` to work with config loaded value
+			if strings.HasPrefix(flag.viperKey, "global.") {
+				viper.SetDefault(strings.Replace(flag.viperKey, "global.", "global-", 1), v)
+			}
+
+			// For 'start' command, we want to keep compatibility for `viper.GetXXX("<flag>")` to work with config loaded value
+			if strings.HasPrefix(flag.viperKey, "start.") {
+				viper.SetDefault(strings.TrimPrefix(flag.viperKey, "start."), v)
+			}
 		}
 	}
 

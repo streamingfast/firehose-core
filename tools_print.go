@@ -22,8 +22,8 @@ import (
 	"strconv"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose-core/tools"
 	"google.golang.org/protobuf/proto"
@@ -67,12 +67,12 @@ func createToolsPrintMergedBlocksE(blockPrinter BlockPrinterFunc) CommandExecuto
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		outputMode, err := toolsPrintCmdGetOutputMode()
+		outputMode, err := toolsPrintCmdGetOutputMode(cmd)
 		if err != nil {
 			return fmt.Errorf("invalid 'output' flag: %w", err)
 		}
 
-		printTransactions := viper.GetBool("transactions")
+		printTransactions := sflags.MustGetBool(cmd, "transactions")
 
 		storeURL := args[0]
 		store, err := dstore.NewDBinStore(storeURL)
@@ -126,12 +126,12 @@ func createToolsPrintOneBlockE(blockPrinter BlockPrinterFunc) CommandExecutor {
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		outputMode, err := toolsPrintCmdGetOutputMode()
+		outputMode, err := toolsPrintCmdGetOutputMode(cmd)
 		if err != nil {
 			return fmt.Errorf("invalid 'output' flag: %w", err)
 		}
 
-		printTransactions := viper.GetBool("transactions")
+		printTransactions := sflags.MustGetBool(cmd, "transactions")
 
 		storeURL := args[0]
 		store, err := dstore.NewDBinStore(storeURL)
@@ -195,8 +195,8 @@ func createToolsPrintOneBlockE(blockPrinter BlockPrinterFunc) CommandExecutor {
 // )
 type PrintOutputMode uint
 
-func toolsPrintCmdGetOutputMode() (PrintOutputMode, error) {
-	outputModeRaw := viper.GetString("output")
+func toolsPrintCmdGetOutputMode(cmd *cobra.Command) (PrintOutputMode, error) {
+	outputModeRaw := sflags.MustGetString(cmd, "output")
 
 	var out PrintOutputMode
 	if err := out.UnmarshalText([]byte(outputModeRaw)); err != nil {
