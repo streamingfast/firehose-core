@@ -159,6 +159,9 @@ type Chain[B Block] struct {
 	//     bstreamBlock, err := chain.BlockEncoder.Encode(block)
 	//
 	BlockEncoder BlockEncoder
+
+	//
+	RegisterSubstreamsExtensions func(chain *Chain[B]) ([]SubstreamsExtension, error)
 }
 
 type ToolsConfig[B Block] struct {

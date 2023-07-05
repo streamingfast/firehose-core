@@ -3,12 +3,10 @@ package nodemanager
 import (
 	"strings"
 
-	nodeManager "github.com/streamingfast/node-manager"
-
-	"go.uber.org/zap"
-
 	"github.com/ShinyTrinkets/overseer"
+	nodeManager "github.com/streamingfast/node-manager"
 	"github.com/streamingfast/node-manager/superviser"
+	"go.uber.org/zap"
 )
 
 var (

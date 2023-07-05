@@ -6,19 +6,17 @@ import (
 	"strings"
 	"time"
 
-	// Needs to be in this file which is the main entry of wrapper binary
-
-	"github.com/streamingfast/cli"
-	"github.com/streamingfast/cli/sflags"
-	_ "github.com/streamingfast/dauth/authenticator/null"   // auth null plugin
-	_ "github.com/streamingfast/dauth/authenticator/secret" // auth secret/hard-coded plugin
-	_ "github.com/streamingfast/dauth/ratelimiter/null"     // ratelimiter plugin
-	"github.com/streamingfast/logging"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"github.com/streamingfast/cli"
+	"github.com/streamingfast/cli/sflags"
+	dauthgrpc "github.com/streamingfast/dauth/grpc"
+	dauthnull "github.com/streamingfast/dauth/null"
+	dauthtrust "github.com/streamingfast/dauth/trust"
 	"github.com/streamingfast/dlauncher/launcher"
+	"github.com/streamingfast/dmetering"
+	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 )
 
@@ -29,6 +27,11 @@ var rootTracer logging.Tracer
 // Main is the main entry point that configures everything and should be called from your Go
 // 'main' entrypoint directly.
 func Main[B Block](chain *Chain[B]) {
+	dauthgrpc.Register()
+	dauthnull.Register()
+	dauthtrust.Register()
+	dmetering.RegisterDefault()
+
 	chain.Validate()
 	chain.Init()
 
@@ -86,6 +89,8 @@ func Main[B Block](chain *Chain[B]) {
 	registerMergerApp()
 	registerRelayerApp()
 	registerFirehoseApp(chain)
+	registerSubstreamsTier1App(chain)
+	registerSubstreamsTier2App(chain)
 
 	if len(chain.BlockIndexerFactories) > 0 {
 		registerIndexBuilderApp(chain)

@@ -24,6 +24,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dlauncher/launcher"
+	"github.com/streamingfast/dmetering"
 	"go.uber.org/zap"
 )
 
@@ -84,6 +85,17 @@ func start(dataDir string, args []string) (err error) {
 	if err != nil {
 		return fmt.Errorf("protocol specific hooks not configured correctly: %w", err)
 	}
+
+	eventEmitter, err := dmetering.New(viper.GetString("common-metering-plugin"), rootLog)
+	if err != nil {
+		return fmt.Errorf("unable to initialize dmetering: %w", err)
+	}
+	defer func() {
+		if err := eventEmitter.Close(); err != nil {
+			rootLog.Warn("failed to properly close event emitter", zap.Error(err))
+		}
+	}()
+	dmetering.SetDefaultEmitter(eventEmitter)
 
 	launch := launcher.NewLauncher(rootLog, modules)
 	rootLog.Debug("launcher created")
