@@ -29,6 +29,10 @@ func newToolsFirehoseClientCmd[B Block](chain *Chain[B]) *cobra.Command {
 	return cmd
 }
 
+type respChan struct {
+	ch chan string
+}
+
 func getFirehoseClientE[B Block](chain *Chain[B]) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
@@ -68,10 +72,6 @@ func getFirehoseClientE[B Block](chain *Chain[B]) func(cmd *cobra.Command, args 
 			}
 		}
 		rootLog.Info("connected")
-
-		type respChan struct {
-			ch chan string
-		}
 
 		resps := make(chan *respChan, 10)
 		allDone := make(chan bool)
