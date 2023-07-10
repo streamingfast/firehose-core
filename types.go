@@ -12,6 +12,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+var UnsafePayloadKind pbbstream.Protocol = pbbstream.Protocol_UNKNOWN
+
 // Block represents the chain-specific Protobuf block. Chain specific's block
 // model must implement this interface so that Firehose core is able to properly
 // marshal/unmarshal your block into/to the Firehose block envelope binary format.
@@ -78,7 +80,7 @@ type Block interface {
 	GetFirehoseBlockLIBNum() uint64
 }
 
-// BlockDecoder is the interface of an object that is going to a chain specific
+// BlockEncoder is the interface of an object that is going to a chain specific
 // block implementing [Block] interface that will be encoded into [bstream.Block]
 // type which is the type used by Firehose core to "envelope" the block.
 type BlockEncoder interface {
@@ -114,7 +116,7 @@ func EncodeBlock(protocolVersion int32, b Block) (blk *bstream.Block, err error)
 		PayloadVersion: protocolVersion,
 
 		// PayloadKind is not actually used anymore and should be left to UNKNOWN
-		PayloadKind: pbbstream.Protocol_UNKNOWN,
+		PayloadKind: UnsafePayloadKind,
 	}
 
 	return bstream.GetBlockPayloadSetter(bstreamBlock, content)
