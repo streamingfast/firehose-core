@@ -13,7 +13,7 @@ require (
 	github.com/spf13/viper v1.15.0
 	github.com/streamingfast/bstream v0.0.2-0.20230619183735-f8325d186119
 	github.com/streamingfast/cli v0.0.4-0.20230608140431-f501fec4f1ce
-	github.com/streamingfast/dauth v0.0.0-20230711174700-20133263e188
+	github.com/streamingfast/dauth v0.0.0-20230711175911-5333b78eb9ac
 	github.com/streamingfast/dgrpc v0.0.0-20230623191332-4ed02c06bc6f
 	github.com/streamingfast/dlauncher v0.0.0-20230607184145-76399faad89e
 	github.com/streamingfast/dmetering v0.0.0-20230706141508-cd783a0fb671
