@@ -13,13 +13,13 @@ require (
 	github.com/spf13/viper v1.15.0
 	github.com/streamingfast/bstream v0.0.2-0.20230619183735-f8325d186119
 	github.com/streamingfast/cli v0.0.4-0.20230608140431-f501fec4f1ce
-	github.com/streamingfast/dauth v0.0.0-20230711170407-25a8c1dc4c4e
+	github.com/streamingfast/dauth v0.0.0-20230711181128-22be70e6ca49
 	github.com/streamingfast/dgrpc v0.0.0-20230623191332-4ed02c06bc6f
 	github.com/streamingfast/dlauncher v0.0.0-20230607184145-76399faad89e
 	github.com/streamingfast/dmetering v0.0.0-20230706141508-cd783a0fb671
 	github.com/streamingfast/dmetrics v0.0.0-20230516031116-28fcfeb4b9ed
 	github.com/streamingfast/dstore v0.1.1-0.20230620124109-3924b3b36c77
-	github.com/streamingfast/firehose v0.1.1-0.20230711170430-33614970a7f3
+	github.com/streamingfast/firehose v0.1.1-0.20230711182035-85d0fe26882c
 	github.com/streamingfast/index-builder v0.0.0-20221031203737-fa2e70f09dc2
 	github.com/streamingfast/jsonpb v0.0.0-20210811021341-3670f0aa02d0
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
@@ -28,7 +28,7 @@ require (
 	github.com/streamingfast/pbgo v0.0.6-0.20221020131607-255008258d28
 	github.com/streamingfast/relayer v0.0.2-0.20220909122435-e67fbc964fd9
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.1.9-0.20230711170604-b06371f84ee0
+	github.com/streamingfast/substreams v1.1.9-0.20230711181747-863ba09a9f45
 	github.com/stretchr/testify v1.8.3
 	go.uber.org/multierr v1.9.0
 	go.uber.org/zap v1.24.0
