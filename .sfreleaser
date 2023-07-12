@@ -1,0 +1,3 @@
+global:
+  language: golang
+  variant: library

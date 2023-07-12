@@ -23,7 +23,7 @@ func registerCommonSubstreamsFlags(cmd *cobra.Command) {
 }
 
 func getSubstreamsBlockMessageType[B Block](chain *Chain[B]) string {
-	return string(proto.MessageName(chain.BlockFactory()).Name())
+	return string(proto.MessageName(chain.BlockFactory()))
 }
 
 func getSubstreamsExtensions[B Block](chain *Chain[B]) ([]wasm.WASMExtensioner, []pipeline.PipelineOptioner, error) {
