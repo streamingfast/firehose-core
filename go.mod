@@ -1,6 +1,6 @@
 module github.com/streamingfast/firehose-core
 
-go 1.21
+go 1.19
 
 require (
 	github.com/ShinyTrinkets/overseer v0.3.0
