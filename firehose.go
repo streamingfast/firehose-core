@@ -13,6 +13,7 @@ import (
 	"github.com/streamingfast/dlauncher/launcher"
 	"github.com/streamingfast/dmetrics"
 	firehoseApp "github.com/streamingfast/firehose/app/firehose"
+	firehoseServer "github.com/streamingfast/firehose/server"
 	"github.com/streamingfast/logging"
 )
 
@@ -30,6 +31,8 @@ func registerFirehoseApp[B Block](chain *Chain[B]) {
 		RegisterFlags: func(cmd *cobra.Command) error {
 			cmd.Flags().String("firehose-grpc-listen-addr", FirehoseGRPCServingAddr, "Address on which the firehose will listen")
 			cmd.Flags().String("firehose-discovery-service-url", "", "Url to configure the gRPC discovery service") //traffic-director://xds?vpc_network=vpc-global&use_xds_reds=true
+			cmd.Flags().Int("firehose-rate-limit-bucket-size", -1, "Rate limit bucket size (default: no rate limit)")
+			cmd.Flags().Duration("firehose-rate-limit-bucket-fill-rate", 10*time.Second, "Rate limit bucket refill rate (default: 10s)")
 
 			return nil
 		},
@@ -73,6 +76,14 @@ func registerFirehoseApp[B Block](chain *Chain[B]) {
 				registry.Register(transformer)
 			}
 
+			var serverOptions []firehoseServer.Option
+
+			limiterSize := viper.GetInt("firehose-rate-limit-bucket-size")
+			limiterRefillRate := viper.GetDuration("firehose-rate-limit-bucket-fill-rate")
+			if limiterSize > 0 {
+				serverOptions = append(serverOptions, firehoseServer.WithLeakyBucketLimiter(limiterSize, limiterRefillRate))
+			}
+
 			return firehoseApp.New(appLogger, &firehoseApp.Config{
 				MergedBlocksStoreURL:    mergedBlocksStoreURL,
 				OneBlocksStoreURL:       oneBlocksStoreURL,
@@ -81,6 +92,7 @@ func registerFirehoseApp[B Block](chain *Chain[B]) {
 				GRPCListenAddr:          viper.GetString("firehose-grpc-listen-addr"),
 				GRPCShutdownGracePeriod: 1 * time.Second,
 				ServiceDiscoveryURL:     serviceDiscoveryURL,
+				ServerOptions:           serverOptions,
 			}, &firehoseApp.Modules{
 				Authenticator:         authenticator,
 				HeadTimeDriftMetric:   headTimeDriftmetric,
