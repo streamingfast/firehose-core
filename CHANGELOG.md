@@ -12,4 +12,11 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 #### Backend Changes
 
+* added missing substreams-tier2-request-stats flag
+* add rate limiting options flags
+
+## v0.1.0
+
+#### Backend Changes
+
 * Fixed Substreams accepted block which was not working properly.
