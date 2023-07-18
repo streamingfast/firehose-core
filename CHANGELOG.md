@@ -12,8 +12,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 #### Backend Changes
 
-* added missing substreams-tier2-request-stats flag
-* add rate limiting options flags
+* added missing `--substreams-tier2-request-stats` request debugging flag
+* added missing firehose rate limiting options flags, `--firehose-rate-limit-bucket-size` and `--firehose-rate-limit-bucket-fill-rate` to manage concurrent connection attempts to Firehose.
 
 ## v0.1.0
 
