@@ -55,33 +55,35 @@ func Main[B Block](chain *Chain[B]) {
 	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(toolsCmd)
 
-	rootCmd.PersistentFlags().StringP("data-dir", "d", "./firehose-data", "Path to data storage for all components of the Firehose stack")
-	rootCmd.PersistentFlags().StringP("config-file", "c", "./firehose.yaml", "Configuration file to use. No config file loaded if set to an empty string.")
+	(func(flags *pflag.FlagSet) {
+		flags.StringP("data-dir", "d", "./firehose-data", "Path to data storage for all components of the Firehose stack")
+		flags.StringP("config-file", "c", "./firehose.yaml", "Configuration file to use. No config file loaded if set to an empty string.")
 
-	rootCmd.PersistentFlags().String("log-format", "text", "Format for logging to stdout. Either 'text' or 'stackdriver'")
-	rootCmd.PersistentFlags().Bool("log-to-file", true, "Also write logs to {data-dir}/firehose.log.json ")
-	rootCmd.PersistentFlags().String("log-level-switcher-listen-addr", "localhost:1065", cli.FlagDescription(`
-		If non-empty, a JSON based HTTP server will listen on this address to let you switch the default logging level
-		of all registered loggers to a different one on the fly. This enables switching to debug level on
-		a live running production instance. Use 'curl -XPUT -d '{"level":"debug","inputs":"*"} http://localhost:1065' to
-		switch the level for all loggers. Each logger (even in transitive dependencies, at least those part of the core
-		StreamingFast's Firehose) are registered using two identifiers, the overarching component usually all loggers in a
-		library uses the same component name like 'bstream' or 'merger', and a fully qualified ID which is usually the Go
-		package fully qualified name in which the logger is defined. The 'inputs' can be either one or many component's name
-		like 'bstream|merger|firehose' or a regex that is matched against the fully qualified name. If there is a match for a
-		given logger, it will change its level to the one specified in 'level' field. The valid levels are 'trace', 'debug',
-		'info', 'warn', 'error', 'panic'. Can be used to silence loggers by using 'panic' (well, technically it's not a full
-		silence but almost), or make them more verbose and change it back later.
-	`))
-	rootCmd.PersistentFlags().CountP("log-verbosity", "v", "Enables verbose output (-vvvv for max verbosity)")
+		flags.String("log-format", "text", "Format for logging to stdout. Either 'text' or 'stackdriver'")
+		flags.Bool("log-to-file", true, "Also write logs to {data-dir}/firehose.log.json ")
+		flags.String("log-level-switcher-listen-addr", "localhost:1065", cli.FlagDescription(`
+			If non-empty, a JSON based HTTP server will listen on this address to let you switch the default logging level
+			of all registered loggers to a different one on the fly. This enables switching to debug level on
+			a live running production instance. Use 'curl -XPUT -d '{"level":"debug","inputs":"*"} http://localhost:1065' to
+			switch the level for all loggers. Each logger (even in transitive dependencies, at least those part of the core
+			StreamingFast's Firehose) are registered using two identifiers, the overarching component usually all loggers in a
+			library uses the same component name like 'bstream' or 'merger', and a fully qualified ID which is usually the Go
+			package fully qualified name in which the logger is defined. The 'inputs' can be either one or many component's name
+			like 'bstream|merger|firehose' or a regex that is matched against the fully qualified name. If there is a match for a
+			given logger, it will change its level to the one specified in 'level' field. The valid levels are 'trace', 'debug',
+			'info', 'warn', 'error', 'panic'. Can be used to silence loggers by using 'panic' (well, technically it's not a full
+			silence but almost), or make them more verbose and change it back later.
+		`))
+		flags.CountP("log-verbosity", "v", "Enables verbose output (-vvvv for max verbosity)")
 
-	rootCmd.PersistentFlags().String("metrics-listen-addr", ":9102", "If non-empty, the process will listen on this address to server the Prometheus metrics collected by the components.")
-	rootCmd.PersistentFlags().String("pprof-listen-addr", "localhost:6060", "If non-empty, the process will listen on this address for pprof analysis (see https://golang.org/pkg/net/http/pprof/)")
-	rootCmd.PersistentFlags().Duration("startup-delay", 0, cli.FlagDescription(`
-		Delay before launching the components defined in config file or via the command line arguments. This can be used to perform
-		maintenance operations on a running container or pod prior it will actually start processing. Useful for example to clear
-		a persistent disks of its content before starting, cleary cached content to try to resolve bugs, etc.
-	`))
+		flags.String("metrics-listen-addr", ":9102", "If non-empty, the process will listen on this address to server the Prometheus metrics collected by the components.")
+		flags.String("pprof-listen-addr", "localhost:6060", "If non-empty, the process will listen on this address for pprof analysis (see https://golang.org/pkg/net/http/pprof/)")
+		flags.Duration("startup-delay", 0, cli.FlagDescription(`
+			Delay before launching the components defined in config file or via the command line arguments. This can be used to perform
+			maintenance operations on a running container or pod prior it will actually start processing. Useful for example to clear
+			a persistent disks of its content before starting, cleary cached content to try to resolve bugs, etc.
+		`))
+	})(rootCmd.PersistentFlags())
 
 	registerCommonFlags(chain)
 	registerReaderNodeApp(chain)

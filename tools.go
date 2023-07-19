@@ -52,6 +52,15 @@ func configureToolsCmd[B Block](
 		}
 	}
 
+	var walkCmd func(node *cobra.Command)
+	walkCmd = func(node *cobra.Command) {
+		hideGlobalFlagsOnChildCmd(node)
+		for _, child := range node.Commands() {
+			walkCmd(child)
+		}
+	}
+	walkCmd(toolsCmd)
+
 	return nil
 }
 
