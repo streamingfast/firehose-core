@@ -69,7 +69,7 @@ func configureToolsCheckCmd[B Block](chain *Chain[B]) {
 		"az://<project>/<bucket>/<path>" -r "10 000 - 1 000 000"
 	`)
 
-	toolsCheckForksCmd.RunE = createToolsCheckForksE(blockPrinter)
+	toolsCheckForksCmd.RunE = toolsCheckForksE
 }
 
 func createToolsCheckMergedBlocksE(blockPrinter BlockPrinterFunc) CommandExecutor {
