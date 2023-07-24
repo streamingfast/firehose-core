@@ -21,7 +21,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/streamingfast/dauth"
 	discoveryservice "github.com/streamingfast/dgrpc/server/discovery-service"
 	"github.com/streamingfast/dlauncher/launcher"
 	"github.com/streamingfast/logging"
@@ -49,11 +48,6 @@ func registerSubstreamsTier2App[B Block](chain *Chain[B]) {
 		},
 
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
-			authenticator, err := dauth.New(viper.GetString("common-auth-plugin"))
-			if err != nil {
-				return nil, fmt.Errorf("unable to initialize dauth: %w", err)
-			}
-
 			mergedBlocksStoreURL, _, _, err := GetCommonStoresURLs(runtime.AbsDataDir)
 			if err != nil {
 				return nil, err
@@ -66,6 +60,8 @@ func registerSubstreamsTier2App[B Block](chain *Chain[B]) {
 			substreamsRequestsStats := viper.GetBool("substreams-tier2-request-stats")
 
 			stateStoreURL := MustReplaceDataDir(sfDataDir, viper.GetString("substreams-state-store-url"))
+			stateStoreDefaultTag := viper.GetString("substreams-state-store-default-tag")
+
 			stateBundleSize := viper.GetUint64("substreams-state-bundle-size")
 
 			tracing := os.Getenv("SUBSTREAMS_TRACING") == "modules_exec"
@@ -91,9 +87,10 @@ func registerSubstreamsTier2App[B Block](chain *Chain[B]) {
 				&app.Tier2Config{
 					MergedBlocksStoreURL: mergedBlocksStoreURL,
 
-					StateStoreURL:   stateStoreURL,
-					StateBundleSize: stateBundleSize,
-					BlockType:       getSubstreamsBlockMessageType(chain),
+					StateStoreURL:        stateStoreURL,
+					StateStoreDefaultTag: stateStoreDefaultTag,
+					StateBundleSize:      stateBundleSize,
+					BlockType:            getSubstreamsBlockMessageType(chain),
 
 					WASMExtensions:  wasmExtensions,
 					PipelineOptions: pipelineOptioner,
@@ -103,10 +100,6 @@ func registerSubstreamsTier2App[B Block](chain *Chain[B]) {
 
 					GRPCListenAddr:      grpcListenAddr,
 					ServiceDiscoveryURL: serviceDiscoveryURL,
-				}, &app.Modules{
-					Authenticator:         authenticator,
-					HeadTimeDriftMetric:   ss2HeadTimeDriftmetric,
-					HeadBlockNumberMetric: ss2HeadBlockNumMetric,
 				}), nil
 		},
 	})

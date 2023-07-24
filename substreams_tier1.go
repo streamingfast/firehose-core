@@ -75,6 +75,8 @@ func registerSubstreamsTier1App[B Block](chain *Chain[B]) {
 			grpcListenAddr := viper.GetString("substreams-tier1-grpc-listen-addr")
 
 			stateStoreURL := MustReplaceDataDir(sfDataDir, viper.GetString("substreams-state-store-url"))
+			stateStoreDefaultTag := viper.GetString("substreams-state-store-default-tag")
+
 			stateBundleSize := viper.GetUint64("substreams-state-bundle-size")
 
 			subrequestsEndpoint := viper.GetString("substreams-tier1-subrequests-endpoint")
@@ -112,6 +114,7 @@ func registerSubstreamsTier1App[B Block](chain *Chain[B]) {
 					BlockStreamAddr:      blockstreamAddr,
 
 					StateStoreURL:        stateStoreURL,
+					StateStoreDefaultTag: stateStoreDefaultTag,
 					StateBundleSize:      stateBundleSize,
 					BlockType:            getSubstreamsBlockMessageType(chain),
 					MaxSubrequests:       maxSubrequests,
@@ -129,7 +132,7 @@ func registerSubstreamsTier1App[B Block](chain *Chain[B]) {
 					GRPCListenAddr:          grpcListenAddr,
 					GRPCShutdownGracePeriod: time.Second,
 					ServiceDiscoveryURL:     serviceDiscoveryURL,
-				}, &app.Modules{
+				}, &app.Tier1Modules{
 					Authenticator:         authenticator,
 					HeadTimeDriftMetric:   ss1HeadTimeDriftmetric,
 					HeadBlockNumberMetric: ss1HeadBlockNumMetric,
