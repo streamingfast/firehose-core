@@ -8,6 +8,18 @@ Operators, you should copy/paste content of this content straight to your `fireh
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository.
 
+## v0.1.4
+
+This release bumps substreams to v1.1.10
+
+### Fixes
+
+* Fixed: jobs would hang when flags `--substreams-state-bundle-size` and `--substreams-tier1-subrequests-size` had different values. The latter flag has been completely **removed**, subrequests will be bound to the state bundle size.
+
+### Added
+
+* Added support for *continuous authentication* via the grpc auth plugin (allowing cutoff triggered by the auth system).
+
 ## v0.1.3
 
 This release bumps substreams to v1.1.9

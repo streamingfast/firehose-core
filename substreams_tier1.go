@@ -48,7 +48,6 @@ func registerSubstreamsTier1App[B Block](chain *Chain[B]) {
 			cmd.Flags().Bool("substreams-tier1-subrequests-insecure", false, "Connect to tier2 without checking certificate validity")
 			cmd.Flags().Bool("substreams-tier1-subrequests-plaintext", true, "Connect to tier2 without client in plaintext mode")
 			cmd.Flags().Int("substreams-tier1-max-subrequests", 4, "number of parallel subrequests that the tier1 can make to the tier2 per request")
-			cmd.Flags().Uint64("substreams-tier1-subrequests-size", 10000, "substreams subrequest block range size value for the scheduler")
 			cmd.Flags().Bool("substreams-tier1-request-stats", false, "Enables stats per request, like block rate. Should only be enabled in debugging instance, not in production")
 
 			// all substreams
@@ -59,7 +58,7 @@ func registerSubstreamsTier1App[B Block](chain *Chain[B]) {
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
 			blockstreamAddr := viper.GetString("common-live-blocks-addr")
 
-			authenticator, err := dauth.New(viper.GetString("common-auth-plugin"))
+			authenticator, err := dauth.New(viper.GetString("common-auth-plugin"), appLogger)
 			if err != nil {
 				return nil, fmt.Errorf("unable to initialize dauth: %w", err)
 			}
@@ -83,7 +82,6 @@ func registerSubstreamsTier1App[B Block](chain *Chain[B]) {
 			subrequestsInsecure := viper.GetBool("substreams-tier1-subrequests-insecure")
 			subrequestsPlaintext := viper.GetBool("substreams-tier1-subrequests-plaintext")
 			maxSubrequests := viper.GetUint64("substreams-tier1-max-subrequests")
-			subrequestsSize := viper.GetUint64("substreams-tier1-subrequests-size")
 
 			requestStats := viper.GetBool("substreams-tier1-request-stats")
 
@@ -118,7 +116,6 @@ func registerSubstreamsTier1App[B Block](chain *Chain[B]) {
 					StateBundleSize:      stateBundleSize,
 					BlockType:            getSubstreamsBlockMessageType(chain),
 					MaxSubrequests:       maxSubrequests,
-					SubrequestsSize:      subrequestsSize,
 					SubrequestsEndpoint:  subrequestsEndpoint,
 					SubrequestsInsecure:  subrequestsInsecure,
 					SubrequestsPlaintext: subrequestsPlaintext,
