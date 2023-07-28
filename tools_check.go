@@ -26,6 +26,8 @@ import (
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose-core/tools"
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 )
 
 var toolsCheckCmd = &cobra.Command{Use: "check", Short: "Various checks for deployment, data integrity & debugging"}
@@ -56,6 +58,7 @@ func init() {
 	toolsCheckMergedBlocksCmd.Flags().BoolP("print-full", "f", false, "Natively decode each block and print the full JSON representation of the block, should be used with a small range only if you don't want to be overwhelmed")
 
 	toolsCheckForksCmd.Flags().Uint64("min-depth", 1, "Only show forks that are at least this deep")
+	toolsCheckForksCmd.Flags().Uint64("after-block", 0, "Only show forks that happened after this block number, if value is not 0")
 }
 
 func configureToolsCheckCmd[B Block](chain *Chain[B]) {
@@ -145,8 +148,22 @@ func toolsCheckForksE(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	for _, link := range links {
-		if len(link) < int(sflags.MustGetUint64(cmd, "min-depth")) {
+	sortedKeys := maps.Keys(links)
+	slices.SortFunc(sortedKeys, func(a, b string) bool {
+		return links[a][0].Num < links[b][0].Num
+	})
+
+	minDepth := sflags.MustGetInt(cmd, "min-depth")
+	afterBlock := sflags.MustGetUint64(cmd, "after-block")
+
+	for _, key := range sortedKeys {
+		link := links[key]
+
+		if len(link) < int(minDepth) {
+			continue
+		}
+
+		if afterBlock != 0 && link[0].Num <= afterBlock {
 			continue
 		}
 
@@ -158,6 +175,7 @@ func toolsCheckForksE(cmd *cobra.Command, args []string) error {
 			if i == 0 {
 				canonical = " (on chain)"
 			}
+
 			chain[i] = fmt.Sprintf(spaces+"#%d [%s <= %s%s]", blockNumber(segment.Num), segment.ID, segment.PreviousID, canonical)
 		}
 

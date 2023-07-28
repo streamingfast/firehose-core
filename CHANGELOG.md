@@ -4,17 +4,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). See [MAINTAINERS.md](./MAINTAINERS.md)
 for instructions to keep up to date.
 
-Operators, you should copy/paste content of this content straight to your `firehose-<chain>` project. It is written and meant to be copied over to your project.
+Operators, you should copy/paste content of this content straight to your project. It is written and meant to be copied over to your project.
 
-If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository.
+If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
+
+## Next
+
+### Changed
+
+* `fire{chain} tools check forks` now sorts forks by block number from ascending order (so that line you see is the current highest fork).
+
+* `fire{chain} tools check forks --after-block` can now be used to show only forks after a certain block number.
 
 ## v0.1.4
 
-This release bumps substreams to v1.1.10
+This release bumps Substreams to [v1.1.10](https://github.com/streamingfast/substreams/releases/tag/v1.1.10).
 
-### Fixes
+### Fixed
 
-* Fixed: jobs would hang when flags `--substreams-state-bundle-size` and `--substreams-tier1-subrequests-size` had different values. The latter flag has been completely **removed**, subrequests will be bound to the state bundle size.
+* Fixed jobs that would hang when flags `--substreams-state-bundle-size` and `--substreams-tier1-subrequests-size` had different values. The latter flag has been completely **removed**, subrequests will be bound to the state bundle size.
 
 ### Added
 
@@ -22,13 +30,13 @@ This release bumps substreams to v1.1.10
 
 ## v0.1.3
 
-This release bumps substreams to v1.1.9
+This release bumps Substreams to [v1.1.9](https://github.com/streamingfast/substreams/releases/tag/v1.1.9).
 
 ### Highlights
 
 #### Substreams Scheduler Improvements for Parallel Processing
 
-The `substreams` scheduler has been improved to reduce the number of required jobs for parallel processing. This affects `backprocessing` (preparing the states of modules up to a "start-block") and `forward processing` (preparing the states and the outputs to speed up streaming in production-mode). 
+The `substreams` scheduler has been improved to reduce the number of required jobs for parallel processing. This affects `backprocessing` (preparing the states of modules up to a "start-block") and `forward processing` (preparing the states and the outputs to speed up streaming in production-mode).
 
 Jobs on `tier2` workers are now divided in "stages", each stage generating the partial states for all the modules that have the same dependencies. A `substreams` that has a single store won't be affected, but one that has 3 top-level stores, which used to run 3 jobs for every segment now only runs a single job per segment to get all the states ready.
 
@@ -70,7 +78,7 @@ The app `substreams-tier1` and `substreams-tier2` should be upgraded concurrentl
 
 #### Operator Changes
 
-* Added `fire<chain> tools check forks <forked-blocks-store-url> [--min-depth=<depth>]` that reads forked blocks you have and prints resolved longest forks you have seen. The command works for any chain, here a sample output:
+* Added `fire{chain} tools check forks <forked-blocks-store-url> [--min-depth=<depth>]` that reads forked blocks you have and prints resolved longest forks you have seen. The command works for any chain, here a sample output:
 
     ```log
     ...
@@ -87,7 +95,7 @@ The app `substreams-tier1` and `substreams-tier2` should be upgraded concurrentl
     ...
     ```
 
-* The `fire<chain> tools` commands and sub-commands have better rendering `--help` by hidden not needed global flags with long description.
+* The `fire{chain} tools` commands and sub-commands have better rendering `--help` by hidden not needed global flags with long description.
 
 ## v0.1.1
 
@@ -95,7 +103,7 @@ The app `substreams-tier1` and `substreams-tier2` should be upgraded concurrentl
 
 * Added missing `--substreams-tier2-request-stats` request debugging flag.
 
-* Added missing Firehose rate limiting options flags, `--firehose-rate-limit-bucket-size` and `--firehose-rate-limit-bucket-fill-rate` to manage concurrent connection attempts to Firehose, check `fire<chain> start --help` for details.
+* Added missing Firehose rate limiting options flags, `--firehose-rate-limit-bucket-size` and `--firehose-rate-limit-bucket-fill-rate` to manage concurrent connection attempts to Firehose, check `fire{chain} start --help` for details.
 
 ## v0.1.0
 
