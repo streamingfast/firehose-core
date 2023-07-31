@@ -11,15 +11,15 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
-	github.com/streamingfast/bstream v0.0.2-0.20230619183735-f8325d186119
+	github.com/streamingfast/bstream v0.0.2-0.20230731142753-b2dbb4d8b89d
 	github.com/streamingfast/cli v0.0.4-0.20230608140431-f501fec4f1ce
 	github.com/streamingfast/dauth v0.0.0-20230726175303-fc1d7198cb33
 	github.com/streamingfast/dgrpc v0.0.0-20230623191332-4ed02c06bc6f
 	github.com/streamingfast/dlauncher v0.0.0-20230607184145-76399faad89e
-	github.com/streamingfast/dmetering v0.0.0-20230706141508-cd783a0fb671
+	github.com/streamingfast/dmetering v0.0.0-20230731134711-568a297e7d00
 	github.com/streamingfast/dmetrics v0.0.0-20230516031116-28fcfeb4b9ed
 	github.com/streamingfast/dstore v0.1.1-0.20230620124109-3924b3b36c77
-	github.com/streamingfast/firehose v0.1.1-0.20230711182035-85d0fe26882c
+	github.com/streamingfast/firehose v0.1.1-0.20230717171430-1d7a06ed55c5
 	github.com/streamingfast/index-builder v0.0.0-20221031203737-fa2e70f09dc2
 	github.com/streamingfast/jsonpb v0.0.0-20210811021341-3670f0aa02d0
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
@@ -32,6 +32,7 @@ require (
 	github.com/stretchr/testify v1.8.3
 	go.uber.org/multierr v1.9.0
 	go.uber.org/zap v1.24.0
+	golang.org/x/exp v0.0.0-20230711153332-06a737ee72cb
 	google.golang.org/grpc v1.54.0
 	google.golang.org/protobuf v1.30.0
 )
@@ -188,7 +189,6 @@ require (
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/automaxprocs v1.5.1 // indirect
 	golang.org/x/crypto v0.6.0 // indirect
-	golang.org/x/exp v0.0.0-20230711153332-06a737ee72cb // indirect
 	golang.org/x/mod v0.11.0 // indirect
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect

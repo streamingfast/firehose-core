@@ -13,8 +13,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### Changed
 
 * `fire{chain} tools check forks` now sorts forks by block number from ascending order (so that line you see is the current highest fork).
-
 * `fire{chain} tools check forks --after-block` can now be used to show only forks after a certain block number.
+* bump `firehose`, `dmetering` and `bstream` dependencies in order to get latest fixes to meter live blocks.
 
 ## v0.1.4
 
