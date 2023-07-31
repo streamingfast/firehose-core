@@ -91,9 +91,7 @@ func start(dataDir string, args []string) (err error) {
 		return fmt.Errorf("unable to initialize dmetering: %w", err)
 	}
 	defer func() {
-		if err := eventEmitter.Close(); err != nil {
-			rootLog.Warn("failed to properly close event emitter", zap.Error(err))
-		}
+		eventEmitter.Shutdown(nil)
 	}()
 	dmetering.SetDefaultEmitter(eventEmitter)
 
