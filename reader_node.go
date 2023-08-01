@@ -112,7 +112,7 @@ func registerReaderNodeApp[B Block](chain *Chain[B]) {
 				return nil, fmt.Errorf("parse backup configs: %w", err)
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 			defer cancel()
 
 			resolveStartBlockNum, err := UnsafeResolveReaderNodeStartBlock(ctx, startCmd, runtime, rootLog)
