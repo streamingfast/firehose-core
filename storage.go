@@ -1,10 +1,12 @@
 package firecore
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/viper"
 	"github.com/streamingfast/dstore"
+	"go.uber.org/zap"
 )
 
 var commonStoresCreated bool
@@ -60,4 +62,43 @@ func GetIndexStore(dataDir string) (indexStore dstore.Store, possibleIndexSizes 
 	}
 
 	return
+}
+
+func LastMergedBlockNum(ctx context.Context, startBlockNum uint64, store dstore.Store, logger *zap.Logger) uint64 {
+	value, err := searchBlockNum(startBlockNum, func(u uint64) (bool, error) {
+		filepath := fmt.Sprintf("%010d", u)
+		found, err := store.FileExists(ctx, filepath)
+		if err != nil {
+			return false, fmt.Errorf("failed to file exists %s: %w", filepath, err)
+		}
+		return found, nil
+	})
+	if err != nil {
+		logger.Warn("failed to resolve block", zap.Error(err))
+		return startBlockNum
+	}
+	return value
+
+}
+
+func searchBlockNum(startBlockNum uint64, f func(uint64) (bool, error)) (uint64, error) {
+	return blockNumIter(startBlockNum, 10_000_000_000, 1_000_000_000, f)
+}
+
+func blockNumIter(startBlockNum, exclusiveEndBlockNum, interval uint64, f func(uint64) (bool, error)) (uint64, error) {
+	i := exclusiveEndBlockNum
+	for i >= startBlockNum {
+		i -= interval
+		match, err := f(i)
+		if err != nil {
+			return 0, fmt.Errorf("failed to match blcok num %d: %w", i, err)
+		}
+		if match {
+			if interval == 100 {
+				return i, nil
+			}
+			return blockNumIter(i, i+interval, interval/10, f)
+		}
+	}
+	return startBlockNum, nil
 }
