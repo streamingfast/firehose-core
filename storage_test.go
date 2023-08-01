@@ -1,7 +1,6 @@
 package firecore
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,15 +12,17 @@ func Test_searchBlockNum(t *testing.T) {
 		name          string
 		startBlockNum uint64
 		lastBlockNum  *uint64
-		expect        uint64
+		expect        int
 		expectErr     bool
 	}{
-		{"has a block num", 1_690_600, uptr(208_853_300), 208_853_300, false},
-		{"has no block num", 1_690_600, nil, 1_690_600, false},
-		{"has no block num", 0, uptr(17821900), 17821900, false},
+		{"golden path", 1_690_600, uptr(208_853_300), 208_853_300, false},
+		{"no block file found", 1_690_600, nil, 1_690_600, false},
+		{"block file greater then start block", 0, uptr(100), 100, false},
+		{"block file less then start block", 200, uptr(100), 200, false},
+		{"golden path 2", 0, uptr(17821900), 17821900, false},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run("", func(t *testing.T) {
 			dstoreOpt := 0
 			v, err := searchBlockNum(tt.startBlockNum, func(i uint64) (bool, error) {
 				dstoreOpt++
@@ -37,9 +38,8 @@ func Test_searchBlockNum(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.expect, v)
+				assert.Equal(t, tt.expect, int(v))
 			}
-			fmt.Println("dstoreOpt: ", dstoreOpt)
 		})
 	}
 }

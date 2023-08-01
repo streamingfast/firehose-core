@@ -82,7 +82,14 @@ func LastMergedBlockNum(ctx context.Context, startBlockNum uint64, store dstore.
 }
 
 func searchBlockNum(startBlockNum uint64, f func(uint64) (bool, error)) (uint64, error) {
-	return blockNumIter(startBlockNum, 10_000_000_000, 1_000_000_000, f)
+	blockNum, err := blockNumIter(startBlockNum, 10_000_000_000, 1_000_000_000, f)
+	if err != nil {
+		return 0, err
+	}
+	if blockNum < startBlockNum {
+		return startBlockNum, nil
+	}
+	return blockNum, nil
 }
 
 func blockNumIter(startBlockNum, exclusiveEndBlockNum, interval uint64, f func(uint64) (bool, error)) (uint64, error) {
