@@ -8,13 +8,21 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+### Changed
+
+* Added templating option to `reader-node-arguments` arg, specifically {start-block-num} and {stop-block-num}
+
 ## v0.1.6
 
 ### Fixed
 
-* Fixed bug where `null` dmetering plugin was not able to be registered. 
+* Fixed bug where `null` dmetering plugin was not able to be registered.
 
 ## v0.1.5
+
+### Fixed
+
+* Fixed dmetering bug where events where dropped, when channel got saturated
 
 ### Changed
 
