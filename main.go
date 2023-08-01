@@ -15,6 +15,7 @@ import (
 	dauthnull "github.com/streamingfast/dauth/null"
 	dauthtrust "github.com/streamingfast/dauth/trust"
 	"github.com/streamingfast/dlauncher/launcher"
+	"github.com/streamingfast/dmetering"
 	dmeteringgrpc "github.com/streamingfast/dmetering/grpc"
 	dmeteringlogger "github.com/streamingfast/dmetering/logger"
 	"github.com/streamingfast/logging"
@@ -33,6 +34,7 @@ func Main[B Block](chain *Chain[B]) {
 	dauthtrust.Register()
 	dmeteringgrpc.Register()
 	dmeteringlogger.Register()
+	dmetering.RegisterNull()
 
 	chain.Validate()
 	chain.Init()
