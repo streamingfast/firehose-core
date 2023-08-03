@@ -21,10 +21,14 @@ type GenericSuperviser struct {
 	name      string
 }
 
+const LIMIT_BYTE = 100 * 1024 * 1024
+
 // This is the default implementation of the Chain Supervisor. If you wish to override the implementation for
 // your given chain you can override the 'SupervisorFactory' variable
 func newGenericSupervisor(name, binary string, arguments []string, appLogger *zap.Logger) nodeManager.ChainSuperviser {
-	overseer.DEFAULT_LINE_BUFFER_SIZE = 50 * 1024 * 1024
+	if overseer.DEFAULT_LINE_BUFFER_SIZE < LIMIT_BYTE {
+		overseer.DEFAULT_LINE_BUFFER_SIZE = LIMIT_BYTE
+	}
 
 	return &GenericSuperviser{
 		Superviser: superviser.New(appLogger, binary, arguments),

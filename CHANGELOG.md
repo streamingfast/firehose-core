@@ -10,6 +10,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Changed
 
+* Bumped supervisor buffer size to 100Mb
 * Added templating option to `reader-node-arguments` arg, specifically {start-block-num} and {stop-block-num}
 
 ## v0.1.6
