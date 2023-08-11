@@ -20,7 +20,7 @@ var numberRegex = regexp.MustCompile(`(\d{10})`)
 type PrintDetails uint8
 
 const (
-	PrintNothing PrintDetails = iota
+	PrintNoDetails PrintDetails = iota
 	PrintStats
 	PrintFull
 	MaxUint64 = ^uint64(0)
@@ -35,7 +35,11 @@ func CheckMergedBlocks(
 	blockPrinter func(block *bstream.Block),
 	printDetails PrintDetails,
 ) error {
+	readAllBlocks := printDetails != PrintNoDetails
 	fmt.Printf("Checking block holes on %s\n", storeURL)
+	if readAllBlocks {
+		fmt.Println("Detailed printing requested: All block files will be read and checked for continuity. This may take a while...")
+	}
 
 	var expected uint32
 	var count int
@@ -100,7 +104,7 @@ func CheckMergedBlocks(
 		}
 		expected = baseNum32 + fileBlockSize
 
-		if printDetails != PrintNothing {
+		if readAllBlocks {
 			newSeenFilters, lowestBlockSegment, highestBlockSegment := validateBlockSegment(ctx, blocksStore, filename, fileBlockSize, blockRange, blockPrinter, printDetails, tfdb)
 			for key, filters := range newSeenFilters {
 				seenFilters[key] = filters
@@ -206,7 +210,6 @@ func validateBlockSegment(
 		return
 	}
 
-	// FIXME: Need to track block continuity (100, 101, 102a, 102b, 103, ...) and report which one are missing
 	seenBlockCount := 0
 	for {
 		block, err := readerFactory.Read()
@@ -238,10 +241,8 @@ func validateBlockSegment(
 					tfdb.firstUnlinkableBlock = block
 				}
 
-				if printDetails != PrintNothing {
-					// TODO: this print should be under a 'check forkable' flag?
-					fmt.Printf("🔶 Block #%d is not linkable at this point\n", block.Num())
-				}
+				// TODO: this print should be under a 'check forkable' flag?
+				fmt.Printf("🔶 Block #%d is not linkable at this point\n", block.Num())
 
 				if tfdb.unlinkableSegmentCount > 99 && tfdb.unlinkableSegmentCount%100 == 0 {
 					// TODO: this print should be under a 'check forkable' flag?

@@ -85,7 +85,7 @@ func createToolsCheckMergedBlocksE(blockPrinter BlockPrinterFunc) CommandExecuto
 			return err
 		}
 
-		printDetails := tools.PrintNothing
+		printDetails := tools.PrintNoDetails
 		if sflags.MustGetBool(cmd, "print-stats") {
 			printDetails = tools.PrintStats
 		}
