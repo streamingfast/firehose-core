@@ -48,7 +48,6 @@ func registerSubstreamsTier1App[B Block](chain *Chain[B]) {
 			cmd.Flags().Bool("substreams-tier1-subrequests-insecure", false, "Connect to tier2 without checking certificate validity")
 			cmd.Flags().Bool("substreams-tier1-subrequests-plaintext", true, "Connect to tier2 without client in plaintext mode")
 			cmd.Flags().Int("substreams-tier1-max-subrequests", 4, "number of parallel subrequests that the tier1 can make to the tier2 per request")
-			cmd.Flags().Bool("substreams-tier1-request-stats", false, "Enables stats per request, like block rate. Should only be enabled in debugging instance, not in production")
 
 			// all substreams
 			registerCommonSubstreamsFlags(cmd)
@@ -82,8 +81,6 @@ func registerSubstreamsTier1App[B Block](chain *Chain[B]) {
 			subrequestsInsecure := viper.GetBool("substreams-tier1-subrequests-insecure")
 			subrequestsPlaintext := viper.GetBool("substreams-tier1-subrequests-plaintext")
 			maxSubrequests := viper.GetUint64("substreams-tier1-max-subrequests")
-
-			requestStats := viper.GetBool("substreams-tier1-request-stats")
 
 			tracing := os.Getenv("SUBSTREAMS_TRACING") == "modules_exec"
 
@@ -123,8 +120,7 @@ func registerSubstreamsTier1App[B Block](chain *Chain[B]) {
 					WASMExtensions:  wasmExtensions,
 					PipelineOptions: pipelineOptioner,
 
-					RequestStats: requestStats,
-					Tracing:      tracing,
+					Tracing: tracing,
 
 					GRPCListenAddr:          grpcListenAddr,
 					GRPCShutdownGracePeriod: time.Second,

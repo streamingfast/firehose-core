@@ -8,10 +8,21 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Next
+
+### Operators
+
+* This release will prevent Substreams Clients prior to v1.1.12 from receiving progress messages, but the data will not be affected. Clients will need to be upgraded to properly decode the new progress messages.
+
 ### Changed
 
 * Bumped supervisor buffer size to 100Mb
 * Added templating option to `reader-node-arguments` arg, specifically {start-block-num} and {stop-block-num}
+* Substreams bumped: better "Progress" messages
+
+### Removed
+
+* Removed `--substreams-tier1-request-stats` and `--substreams-tier1-request-stats` (substreams request-stats are now always sent to clients)
 
 ## v0.1.6
 

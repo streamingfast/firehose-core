@@ -28,7 +28,7 @@ require (
 	github.com/streamingfast/pbgo v0.0.6-0.20221020131607-255008258d28
 	github.com/streamingfast/relayer v0.0.2-0.20220909122435-e67fbc964fd9
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.1.11
+	github.com/streamingfast/substreams v1.1.12-0.20230825185616-0ba49a2ee9ee
 	github.com/stretchr/testify v1.8.3
 	go.uber.org/multierr v1.9.0
 	go.uber.org/zap v1.24.0
