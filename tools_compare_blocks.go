@@ -82,25 +82,16 @@ func runCompareBlocksE[B Block](chain *Chain[B]) CommandExecutor {
 		warnAboutExtraBlocks := sync.Once{}
 
 		ctx := cmd.Context()
-		blockRange, err := bstream.ParseRange(args[2])
+		blockRange, err := tools.GetBlockRangeFromArg(args[2])
 		if err != nil {
 			return fmt.Errorf("parsing range: %w", err)
 		}
 
-		blockRangeSize, err := blockRange.Size()
-		if err != nil {
-			return fmt.Errorf("checking for valid range: %w", err)
+		if !blockRange.IsResolved() {
+			return fmt.Errorf("invalid block range, you must provide a closed range fully resolved (no negative value)")
 		}
 
-		if blockRangeSize == 0 {
-			return fmt.Errorf("invalid block range")
-		}
-
-		stopBlock := *blockRange.EndBlock()
-		blockRangePrefix := tools.WalkBlockPrefix(tools.BlockRange{
-			Start: int64(blockRange.StartBlock()),
-			Stop:  &stopBlock,
-		}, 100)
+		stopBlock := uint64(blockRange.GetStopBlock())
 
 		// Create stores
 		storeReference, err := dstore.NewDBinStore(args[0])
@@ -112,7 +103,7 @@ func runCompareBlocksE[B Block](chain *Chain[B]) CommandExecutor {
 			return fmt.Errorf("unable to create store at path %q: %w", args[1], err)
 		}
 
-		segments, err := blockRange.Split(segmentSize)
+		segments, err := blockRange.Split(segmentSize, tools.EndBoundaryExclusive)
 		if err != nil {
 			return fmt.Errorf("unable to split blockrage in segments: %w", err)
 		}
@@ -120,18 +111,18 @@ func runCompareBlocksE[B Block](chain *Chain[B]) CommandExecutor {
 			segments: segments,
 		}
 
-		err = storeReference.Walk(ctx, blockRangePrefix, func(filename string) (err error) {
+		err = storeReference.Walk(ctx, tools.WalkBlockPrefix(blockRange, 100), func(filename string) (err error) {
 			fileStartBlock, err := strconv.Atoi(filename)
 			if err != nil {
 				return fmt.Errorf("parsing filename: %w", err)
 			}
 
 			// If reached end of range
-			if *blockRange.EndBlock() <= uint64(fileStartBlock) {
+			if stopBlock <= uint64(fileStartBlock) {
 				return dstore.StopIteration
 			}
 
-			if blockRange.Contains(uint64(fileStartBlock)) {
+			if blockRange.Contains(uint64(fileStartBlock), tools.EndBoundaryExclusive) {
 				var wg sync.WaitGroup
 				var bundleErrLock sync.Mutex
 				var bundleReadErr error
@@ -256,7 +247,7 @@ func readBundle[B Block](
 }
 
 type state struct {
-	segments                   []*bstream.Range
+	segments                   []tools.BlockRange
 	currentSegmentIdx          int
 	blocksCountedInThisSegment int
 	differencesFound           int
@@ -265,10 +256,10 @@ type state struct {
 }
 
 func (s *state) process(blockNum uint64, isDifferent bool, isMissing bool) {
-	if !s.segments[s.currentSegmentIdx].Contains(blockNum) { // moving forward
+	if !s.segments[s.currentSegmentIdx].Contains(blockNum, tools.EndBoundaryExclusive) { // moving forward
 		s.print()
 		for i := s.currentSegmentIdx; i < len(s.segments); i++ {
-			if s.segments[i].Contains(blockNum) {
+			if s.segments[i].Contains(blockNum, tools.EndBoundaryExclusive) {
 				s.currentSegmentIdx = i
 				s.totalBlocksCounted += s.blocksCountedInThisSegment
 				s.differencesFound = 0
@@ -288,26 +279,24 @@ func (s *state) process(blockNum uint64, isDifferent bool, isMissing bool) {
 }
 
 func (s *state) print() {
-	endBlock := "∞"
-	if end := s.segments[s.currentSegmentIdx].EndBlock(); end != nil {
-		endBlock = fmt.Sprintf("%d", *end)
-	}
+	endBlock := fmt.Sprintf("%d", s.segments[s.currentSegmentIdx].GetStopBlock())
+
 	if s.totalBlocksCounted == 0 {
-		fmt.Printf("✖ No blocks were found at all for segment %d - %s\n", s.segments[s.currentSegmentIdx].StartBlock(), endBlock)
+		fmt.Printf("✖ No blocks were found at all for segment %d - %s\n", s.segments[s.currentSegmentIdx].Start, endBlock)
 		return
 	}
 
 	if s.differencesFound == 0 && s.missingBlocks == 0 {
-		fmt.Printf("✓ Segment %d - %s has no differences (%d blocks counted)\n", s.segments[s.currentSegmentIdx].StartBlock(), endBlock, s.totalBlocksCounted)
+		fmt.Printf("✓ Segment %d - %s has no differences (%d blocks counted)\n", s.segments[s.currentSegmentIdx].Start, endBlock, s.totalBlocksCounted)
 		return
 	}
 
 	if s.differencesFound == 0 && s.missingBlocks == 0 {
-		fmt.Printf("✓~ Segment %d - %s has no differences but does have %d missing blocks (%d blocks counted)\n", s.segments[s.currentSegmentIdx].StartBlock(), endBlock, s.missingBlocks, s.totalBlocksCounted)
+		fmt.Printf("✓~ Segment %d - %s has no differences but does have %d missing blocks (%d blocks counted)\n", s.segments[s.currentSegmentIdx].Start, endBlock, s.missingBlocks, s.totalBlocksCounted)
 		return
 	}
 
-	fmt.Printf("✖ Segment %d - %s has %d different blocks and %d missing blocks (%d blocks counted)\n", s.segments[s.currentSegmentIdx].StartBlock(), endBlock, s.differencesFound, s.missingBlocks, s.totalBlocksCounted)
+	fmt.Printf("✖ Segment %d - %s has %d different blocks and %d missing blocks (%d blocks counted)\n", s.segments[s.currentSegmentIdx].Start, endBlock, s.differencesFound, s.missingBlocks, s.totalBlocksCounted)
 }
 
 func Compare(reference, current proto.Message, ignoreUnknown bool) (isEqual bool, differences []string) {
@@ -389,10 +378,4 @@ func Compare(reference, current proto.Message, ignoreUnknown bool) (isEqual bool
 		return false, differences
 	}
 	return true, nil
-}
-
-func mustNoError(err error) {
-	if err != nil {
-		panic(err)
-	}
 }

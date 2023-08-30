@@ -58,7 +58,6 @@ func CheckMergedBlocks(
 	holeFound := false
 	expected = RoundToBundleStartBlock(uint32(blockRange.Start), fileBlockSize)
 	currentStartBlk := uint32(blockRange.Start)
-	seenFilters := map[string]FilteringFilters{}
 
 	blocksStore, err := dstore.NewDBinStore(storeURL)
 	if err != nil {
@@ -105,10 +104,7 @@ func CheckMergedBlocks(
 		expected = baseNum32 + fileBlockSize
 
 		if readAllBlocks {
-			newSeenFilters, lowestBlockSegment, highestBlockSegment := validateBlockSegment(ctx, blocksStore, filename, fileBlockSize, blockRange, blockPrinter, printDetails, tfdb)
-			for key, filters := range newSeenFilters {
-				seenFilters[key] = filters
-			}
+			lowestBlockSegment, highestBlockSegment := validateBlockSegment(ctx, blocksStore, filename, fileBlockSize, blockRange, blockPrinter, printDetails, tfdb)
 			if lowestBlockSegment < lowestBlockSeen {
 				lowestBlockSeen = lowestBlockSegment
 			}
@@ -130,13 +126,13 @@ func CheckMergedBlocks(
 		}
 
 		if blockRange.IsClosed() && RoundToBundleEndBlock(baseNum32, fileBlockSize) >= uint32(*blockRange.Stop-1) {
-			return errStopWalk
+			return dstore.StopIteration
 		}
 
 		return nil
 	})
 
-	if err != nil && err != errStopWalk {
+	if err != nil {
 		return err
 	}
 
@@ -159,15 +155,6 @@ func CheckMergedBlocks(
 		(highestBlockSeen < uint64(*blockRange.Stop-1) ||
 			(lowestBlockSeen > uint64(blockRange.Start) && lowestBlockSeen > bstream.GetProtocolFirstStreamableBlock)) {
 		fmt.Printf("> 🔶 Incomplete range %s, started at block %s and stopped at block: %s\n", blockRange, PrettyBlockNum(lowestBlockSeen), PrettyBlockNum(highestBlockSeen))
-	}
-
-	if len(seenFilters) > 0 {
-		fmt.Println()
-		fmt.Println("Seen filters")
-		for _, filters := range seenFilters {
-			fmt.Printf("- [Include %q, Exclude %q, System %q]\n", filters.Include, filters.Exclude, filters.System)
-		}
-		fmt.Println()
 	}
 
 	if holeFound {
@@ -195,7 +182,7 @@ func validateBlockSegment(
 	blockPrinter func(block *bstream.Block),
 	printDetails PrintDetails,
 	tfdb *trackedForkDB,
-) (seenFilters map[string]FilteringFilters, lowestBlockSeen, highestBlockSeen uint64) {
+) (lowestBlockSeen, highestBlockSeen uint64) {
 	lowestBlockSeen = MaxUint64
 	reader, err := store.OpenObject(ctx, segment)
 	if err != nil {

@@ -85,15 +85,16 @@ func FlagMergedBlocks(
 		}
 
 		if !blockRange.IsClosed() && RoundToBundleEndBlock(uint32(baseNum), fileBlockSize) >= uint32(*blockRange.Stop-1) {
-			return errStopWalk
+			return dstore.StopIteration
 		}
 		expected = baseNum + fileBlockSize64
 
 		return nil
 	})
-	if err != nil && err != errStopWalk {
+	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
