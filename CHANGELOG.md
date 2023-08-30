@@ -8,6 +8,12 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## v0.1.8
+
+### Fixed
+
+* More tolerant retry/timeouts on filesource (prevent "Context Deadline Exceeded")
+
 ## v0.1.7
 
 ### Operators
