@@ -19,7 +19,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### Operators
 
 > [!IMPORTANT]
-> The Substreams service exposed from this version will send progress messages that cannot be decoded by substreams clients prior to v1.1.12.
+> The Substreams service exposed from this version will send progress messages that cannot be decoded by Substreams clients prior to v1.1.12.
 > Streaming of the actual data will not be affected. Clients will need to be upgraded to properly decode the new progress messages.
 
 ### Changed
@@ -27,7 +27,6 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 * Bumped substreams to `v1.1.12` to support the new progress message format. Progression now relates to **stages** instead of modules. You can get stage information using the `substreams info` command starting at version `v1.1.12`.
 * Bumped supervisor buffer size to 100Mb
 * Substreams bumped: better "Progress" messages
-* This release will prevent Substreams Clients prior to v1.1.12 from receiving progress messages, but the data will not be affected. Substreams CLI and Substreams Sinks (`posgtres`, `kv`, etc.) will need to be upgraded to their latest version to properly decode the new progress messages.
 
 ### Added
 
@@ -39,7 +38,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Removed
 
-* Removed `--substreams-tier1-request-stats` and `--substreams-tier1-request-stats` (substreams request-stats are now always sent to clients)
+* Removed `--substreams-tier1-request-stats` and `--substreams-tier1-request-stats` (Substreams request-stats are now always sent to clients)
 
 ## v0.1.6
 
