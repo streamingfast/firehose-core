@@ -3,10 +3,11 @@ package firecore
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/cli/sflags"
 	"os"
 	"regexp"
 	"time"
+
+	"github.com/streamingfast/cli/sflags"
 
 	"github.com/kballard/go-shellquote"
 	"github.com/spf13/cobra"
@@ -60,19 +61,19 @@ func registerReaderNodeApp[B Block](chain *Chain[B]) {
 				is intercepted, split line by line and each line is then transformed and logged through the Firehose stack
 				logging system. The transformation extracts the level and remove the timestamps creating a 'sanitized' version
 				of the logs emitted by the blockchain's managed client process. If this is not desirable, disabled the flag
-				and all the invoked process standard error will be redirect to 'fireacme' standard's output.
+				and all the invoked process standard error will be redirect to process's standard output.
 			`))
 			cmd.Flags().String("reader-node-manager-api-addr", ReaderNodeManagerAPIAddr, "Acme node manager API address")
 			cmd.Flags().Duration("reader-node-readiness-max-latency", 30*time.Second, "Determine the maximum head block latency at which the instance will be determined healthy. Some chains have more regular block production than others.")
 			cmd.Flags().String("reader-node-arguments", "", cli.FlagDescription(`
 				Defines the node arguments that will be passed to the node on execution. Supports templating, where we will replace certain sub-string with the appropriate value
-			
+
 				{data-dir} 			The current data-dir path defined by the flag 'data-dir'
 				{node-data-dir}		The node data dir path defined by the flag 'reader-node-data-dir'
 				{hostname}			The machine's hostname
 				{start-block-num}	The resolved start block number defined by the flag 'reader-node-start-block-num' (can be overwritten)
 				{stop-block-num}	The stop block number defined by the flag 'reader-node-stop-block-num'
-			
+
 				Example: 'run blockchain -start {start-block-num} -end {stop-block-num}' may yield 'run blockchain -start 200 -end 500'
 			`))
 			cmd.Flags().StringSlice("reader-node-backups", []string{}, "Repeatable, space-separated key=values definitions for backups. Example: 'type=gke-pvc-snapshot prefix= tag=v1 freq-blocks=1000 freq-time= project=myproj'")

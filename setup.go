@@ -29,7 +29,7 @@ func setupCmd(cmd *cobra.Command, binaryName string) error {
 		}
 
 		if !exists && isMatchingCommand(cmds, forceConfigOn) {
-			return fmt.Errorf("config file %q not found. Did you 'fireacme init'?", configFile)
+			return fmt.Errorf("unable to find config file %q", configFile)
 		}
 
 		if exists {
