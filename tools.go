@@ -37,6 +37,7 @@ func configureToolsCmd[B Block](
 	configureToolsCheckCmd(chain)
 	configureToolsPrintCmd(chain)
 
+	toolsCmd.AddCommand(newToolsCompareBlocksCmd(chain))
 	toolsCmd.AddCommand(newToolsDownloadFromFirehoseCmd(chain, rootLog))
 	toolsCmd.AddCommand(newToolsFirehoseClientCmd(chain))
 	toolsCmd.AddCommand(newToolsFirehoseSingleBlockClientCmd(chain, rootLog, rootTracer))

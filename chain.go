@@ -24,6 +24,10 @@ import (
 // See [ToolsConfig#BlockPrinter] for extra details about expected printing.
 type BlockPrinterFunc func(block *bstream.Block, alsoPrintTransactions bool, out io.Writer) error
 
+// SanitizeBlockForCompareFunc takes a chain agnostic [block] and transforms it in-place, removing fields
+// that should not be compared.
+type SanitizeBlockForCompareFunc[B Block] func(block B) B
+
 // Chain is the omni config object for configuring your chain specific information. It contains various
 // fields that are used everywhere to properly configure the `firehose-<chain>` binary.
 //
@@ -192,6 +196,12 @@ type ToolsConfig[B Block] struct {
 	// that the default block printer error out if `alsoPrintTransactions` is true.
 	BlockPrinter BlockPrinterFunc
 
+	// SanitizeBlockForCompare is a function that takes a chain agnostic [block] and transforms it in-place, removing fields
+	// that should not be compared.
+	//
+	// The [SanitizeBlockForCompare] is optional, if nil, no-op sanitizer be used.
+	SanitizeBlockForCompare SanitizeBlockForCompareFunc[B]
+
 	// RegisterExtraCmd enables you to register extra commands to the `fire<chain> tools` group.
 	// The callback function is called with the `toolsCmd` command that is the root command of the `fire<chain> tools`
 	// as well as the chain, the root logger and root tracer for tools.
@@ -216,6 +226,15 @@ type ToolsConfig[B Block] struct {
 	//
 	// The [MergedBlockUpgrader] is optional and not specifying it disables command `fire<chain> tools upgrade-merged-blocks`.
 	MergedBlockUpgrader func(block *bstream.Block) (*bstream.Block, error)
+}
+
+// GetSanitizeBlockForCompare returns the [SanitizeBlockForCompare] value if defined, otherwise a no-op sanitizer.
+func (t *ToolsConfig[B]) GetSanitizeBlockForCompare() SanitizeBlockForCompareFunc[B] {
+	if t == nil || t.SanitizeBlockForCompare == nil {
+		return func(block B) B { return block }
+	}
+
+	return t.SanitizeBlockForCompare
 }
 
 type TransformFlag struct {

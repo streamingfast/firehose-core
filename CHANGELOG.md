@@ -26,8 +26,16 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 * Bumped substreams to `v1.1.12` to support the new progress message format. Progression now relates to **stages** instead of modules. You can get stage information using the `substreams info` command starting at version `v1.1.12`.
 * Bumped supervisor buffer size to 100Mb
-* Added templating option to `reader-node-arguments` arg, specifically {start-block-num} and {stop-block-num}
 * Substreams bumped: better "Progress" messages
+* This release will prevent Substreams Clients prior to v1.1.12 from receiving progress messages, but the data will not be affected. Substreams CLI and Substreams Sinks (`posgtres`, `kv`, etc.) will need to be upgraded to their latest version to properly decode the new progress messages.
+
+### Added
+
+* Added new templating option to `reader-node-arguments`, specifically `{start-block-num}` (maps to configuration value `reader-node-start-block-num`) and `{stop-block-num}` (maps to value of configuration value `reader-node-stop-block-num`)
+
+### Changed
+
+* The `reader-node` is now able to read Firehose node protocol line up to 100 MiB in raw size (previously the limit was 50 MiB).
 
 ### Removed
 
