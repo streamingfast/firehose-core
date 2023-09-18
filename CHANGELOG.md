@@ -8,10 +8,11 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v0.1.9
 
 ### Changed
 
+* Bumped susbtreams to `v1.1.14` to fix bugs with start blocks, where substreams would fail if the start block was before the first block of the chain, or if the start block was a block that was not yet produced by the chain.
 * Improved error message when referenced config file is not found, removed hard-coded mention of `fireacme`.
 
 ## v0.1.8
