@@ -13,6 +13,7 @@ import (
 	"github.com/streamingfast/cli/sflags"
 	dauthgrpc "github.com/streamingfast/dauth/grpc"
 	dauthnull "github.com/streamingfast/dauth/null"
+	dauthsecret "github.com/streamingfast/dauth/secret"
 	dauthtrust "github.com/streamingfast/dauth/trust"
 	"github.com/streamingfast/dlauncher/launcher"
 	"github.com/streamingfast/dmetering"
@@ -31,6 +32,7 @@ var rootTracer logging.Tracer
 func Main[B Block](chain *Chain[B]) {
 	dauthgrpc.Register()
 	dauthnull.Register()
+	dauthsecret.Register()
 	dauthtrust.Register()
 	dmeteringgrpc.Register()
 	dmeteringlogger.Register()
