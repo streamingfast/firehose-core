@@ -8,6 +8,10 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## v0.1.11
+
+* Bumped substreams to `v1.1.18` with a regression fix for when a substreams has a start block in the reversible segment
+
 ## v0.1.10
 
 ### Added
