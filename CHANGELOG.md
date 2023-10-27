@@ -10,9 +10,14 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Fixed
+
+* Fixed a few false positives on `tools check merged-blocks-batch`
+
 ### Added
 
 * Added retry loop for merger when walking one block files. Some use-cases where the bundle reader was sending files too fast and the merger was not waiting to accumulate enough files to start bundling merged files
+* Added `--dedupe-blocks` flag on `tools download-from-firehose` to ensure no duplicate blocks end up in download merged-blocks (should not be needed in normal operations)
 
 ## v0.1.12
 

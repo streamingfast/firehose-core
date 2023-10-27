@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
@@ -29,6 +30,7 @@ func newToolsDownloadFromFirehoseCmd[B Block](chain *Chain[B], zlog *zap.Logger)
 	}
 
 	addFirehoseStreamClientFlagsToSet(cmd.Flags(), chain)
+	cmd.Flags().Bool("dedupe-blocks", false, "use this flag to look for and remove block duplicates. This flag was added to address a specific situation, you shouldn't need this in normal operations")
 
 	return cmd
 }
@@ -68,6 +70,7 @@ func createToolsDownloadFromFirehoseE[B Block](chain *Chain[B], zlog *zap.Logger
 			logger:        zlog,
 		}
 
+		seen := make(map[string]bool)
 		for {
 
 			request := &pbfirehose.Request{
@@ -105,6 +108,13 @@ func createToolsDownloadFromFirehoseE[B Block](chain *Chain[B], zlog *zap.Logger
 				blk, err := chain.BlockEncoder.Encode(block)
 				if err != nil {
 					return fmt.Errorf("error decoding response to bstream block: %w", err)
+				}
+				if seen[blk.Id] {
+					zlog.Info("skipping seen block (source merged-blocks had duplicates, skipping)", zap.String("id", blk.Id), zap.Uint64("num", blk.Number))
+					continue
+				}
+				if sflags.MustGetBool(cmd, "dedupe-blocks") {
+					seen[blk.Id] = true
 				}
 
 				if err := mergeWriter.ProcessBlock(blk, nil); err != nil {
