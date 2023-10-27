@@ -34,6 +34,7 @@ func registerMergerApp() {
 				StorageOneBlockFilesPath:     oneBlocksStoreURL,
 				StorageMergedBlocksFilesPath: mergedBlocksStoreURL,
 				StorageForkedBlocksFilesPath: forkedBlocksStoreURL,
+				StopBlock:                    viper.GetUint64("merger-stop-block"),
 				TimeBetweenPruning:           viper.GetDuration("merger-time-between-store-pruning"),
 				TimeBetweenPolling:           viper.GetDuration("merger-time-between-store-lookups"),
 			}), nil
