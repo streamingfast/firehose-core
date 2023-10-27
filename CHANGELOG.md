@@ -8,12 +8,6 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
-
-### Added
-
-* `merger-start-delay` for a start delay between the reader and the merger start, some use-cases when the reader sends files way to fast to the merger and we want the merger to wait and accumulate files before starting to merge them
-
 ## v0.1.12
 
 * Added `tools check merged-blocks-batch` to simplify checking blocks continuity in batched mode, writing results to a store
