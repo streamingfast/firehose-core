@@ -85,7 +85,7 @@ func createToolsPrintMergedBlocksE(blockPrinter BlockPrinterFunc) CommandExecuto
 			return fmt.Errorf("unable to parse block number %q: %w", args[1], err)
 		}
 
-		blockBoundary := tools.RoundToBundleStartBlock(uint32(blockNum), 100)
+		blockBoundary := tools.RoundToBundleStartBlock(blockNum, 100)
 
 		filename := fmt.Sprintf("%010d", blockBoundary)
 		reader, err := store.OpenObject(ctx, filename)

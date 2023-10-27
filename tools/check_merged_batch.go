@@ -11,6 +11,25 @@ import (
 	"github.com/streamingfast/dstore"
 )
 
+type blockRef struct {
+	hash string
+	num  uint64
+}
+
+func (b *blockRef) reset() {
+	b.hash = ""
+	b.num = 0
+}
+
+func (b *blockRef) set(hash string, num uint64) {
+	b.hash = hash
+	b.num = num
+}
+
+func (b *blockRef) isUnset() bool {
+	return b.hash == "" && b.num == 0
+}
+
 // CheckMergedBlocksBatch will write a list of base-block-numbers to a store, for merged-blocks-files that are broken or missing
 // broken merged-blocks-files are the ones that contain "empty" blocks (no ID) or unlinkable blocks
 // there could be false positives on unlinkable blocks, though
@@ -19,14 +38,14 @@ func CheckMergedBlocksBatch(
 	ctx context.Context,
 	sourceStoreURL string,
 	destStoreURL string,
-	fileBlockSize uint32,
+	fileBlockSize uint64,
 	blockRange BlockRange,
 ) error {
 	if !blockRange.IsResolved() {
 		return fmt.Errorf("check merged blocks can only work with fully resolved range, got %s", blockRange)
 	}
 
-	expected := uint64(RoundToBundleStartBlock(uint32(blockRange.Start), fileBlockSize))
+	expected := RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize)
 	fileBlockSize64 := uint64(fileBlockSize)
 
 	blocksStore, err := dstore.NewDBinStore(sourceStoreURL)
@@ -38,9 +57,10 @@ func CheckMergedBlocksBatch(
 		return err
 	}
 
-	var firstFilename = fmt.Sprintf("%010d", RoundToBundleStartBlock(uint32(blockRange.Start), fileBlockSize))
+	var firstFilename = fmt.Sprintf("%010d", RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize))
 
-	var lastBlockHash string
+	lastSeenBlock := &blockRef{}
+
 	err = blocksStore.WalkFrom(ctx, "", firstFilename, func(filename string) error {
 		if strings.HasSuffix(filename, ".tmp") {
 			return nil
@@ -66,21 +86,22 @@ func CheckMergedBlocksBatch(
 			expected += fileBlockSize64
 		}
 
-		broken, lastHash, err := checkMergedBlockFileBroken(ctx, blocksStore, filename, lastBlockHash)
+		broken, err := checkMergedBlockFileBroken(ctx, blocksStore, filename, lastSeenBlock)
 		if broken {
-			outputFile := fmt.Sprintf("%010d.broken", baseNum)
-			fmt.Printf("found broken file %s, writing to store\n", outputFile)
-			destStore.WriteObject(ctx, outputFile, strings.NewReader(""))
-			lastBlockHash = ""
-		} else {
-			lastBlockHash = lastHash
+			brokenSince := RoundToBundleStartBlock(uint64(lastSeenBlock.num+1), 100)
+			for i := brokenSince; i <= baseNum; i += fileBlockSize64 {
+				outputFile := fmt.Sprintf("%010d.broken", i)
+				fmt.Printf("found broken file %s, writing to store\n", outputFile)
+				destStore.WriteObject(ctx, outputFile, strings.NewReader(""))
+			}
+			lastSeenBlock.reset()
 		}
 
 		if err != nil {
 			return err
 		}
 
-		if blockRange.IsClosed() && RoundToBundleEndBlock(uint32(baseNum), fileBlockSize) >= uint32(*blockRange.Stop-1) {
+		if blockRange.IsClosed() && RoundToBundleEndBlock(baseNum, fileBlockSize) >= *blockRange.Stop-1 {
 			return dstore.StopIteration
 		}
 		expected = baseNum + fileBlockSize64
@@ -94,26 +115,30 @@ func CheckMergedBlocksBatch(
 	return nil
 }
 
+var printCounter = 0
+
 func checkMergedBlockFileBroken(
 	ctx context.Context,
 	store dstore.Store,
 	filename string,
-	lastBlockHash string,
-) (broken bool, lastHash string, err error) {
-	fmt.Println("checking", filename)
+	lastSeenBlock *blockRef,
+) (broken bool, err error) {
+	if printCounter%100 == 0 {
+		fmt.Println("checking", filename, "... (printing 1/100)")
+	}
+	printCounter++
 
 	reader, err := store.OpenObject(ctx, filename)
 	if err != nil {
-		return true, "", err
+		return true, err
 	}
 	defer reader.Close()
 
 	readerFactory, err := bstream.GetBlockReaderFactory.New(reader)
 	if err != nil {
-		return true, "", err
+		return true, err
 	}
 
-	lastHash = lastBlockHash
 	for {
 		var block *bstream.Block
 		block, err = readerFactory.Read()
@@ -133,14 +158,17 @@ func checkMergedBlockFileBroken(
 			return
 		}
 
-		if lastHash == "" {
-			lastHash = block.PreviousId
+		if lastSeenBlock.isUnset() {
+			fakePreviousNum := block.Number
+			if fakePreviousNum != 0 {
+				fakePreviousNum -= 1
+			}
+			lastSeenBlock.set(block.PreviousId, fakePreviousNum)
 		}
-		if block.PreviousId != lastHash {
+		if block.PreviousId != lastSeenBlock.hash {
 			broken = true
 			return
 		}
-		lastHash = block.Id
+		lastSeenBlock.set(block.Id, block.Number)
 	}
-
 }

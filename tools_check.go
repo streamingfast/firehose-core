@@ -78,7 +78,7 @@ func configureToolsCheckCmd[B Block](chain *Chain[B]) {
 func createToolsCheckMergedBlocksE(blockPrinter BlockPrinterFunc) CommandExecutor {
 	return func(cmd *cobra.Command, args []string) error {
 		storeURL := args[0]
-		fileBlockSize := uint32(100)
+		fileBlockSize := uint64(100)
 
 		blockRange, err := tools.GetBlockRangeFromFlag(cmd, "range")
 		if err != nil {

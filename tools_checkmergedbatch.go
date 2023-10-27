@@ -43,7 +43,7 @@ func checkMergedBlocksBatchRunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	fileBlockSize := uint32(100)
+	fileBlockSize := uint64(100)
 
 	blockRange := tools.BlockRange{
 		Start: int64(start),

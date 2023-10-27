@@ -30,7 +30,7 @@ func CheckMergedBlocks(
 	ctx context.Context,
 	logger *zap.Logger,
 	storeURL string,
-	fileBlockSize uint32,
+	fileBlockSize uint64,
 	blockRange BlockRange,
 	blockPrinter func(block *bstream.Block),
 	printDetails PrintDetails,
@@ -41,9 +41,8 @@ func CheckMergedBlocks(
 		fmt.Println("Detailed printing requested: All block files will be read and checked for continuity. This may take a while...")
 	}
 
-	var expected uint32
+	var expected uint64
 	var count int
-	var baseNum32 uint32
 	var highestBlockSeen uint64
 	lowestBlockSeen := MaxUint64
 
@@ -56,8 +55,8 @@ func CheckMergedBlocks(
 	// }
 
 	holeFound := false
-	expected = RoundToBundleStartBlock(uint32(blockRange.Start), fileBlockSize)
-	currentStartBlk := uint32(blockRange.Start)
+	expected = RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize)
+	currentStartBlk := uint64(blockRange.Start)
 
 	blocksStore, err := dstore.NewDBinStore(storeURL)
 	if err != nil {
@@ -86,22 +85,20 @@ func CheckMergedBlocks(
 			return nil
 		}
 
-		baseNum32 = uint32(baseNum)
-
-		if baseNum32 != expected {
+		if baseNum != expected {
 			// There is no previous valid block range if we are at the ever first seen file
 			if count > 1 {
 				fmt.Printf("✅ Range %s\n", NewClosedRange(int64(currentStartBlk), uint64(RoundToBundleEndBlock(expected-fileBlockSize, fileBlockSize))))
 			}
 
 			// Otherwise, we do not follow last seen element (previous is `100 - 199` but we are `299 - 300`)
-			missingRange := NewClosedRange(int64(expected), uint64(RoundToBundleEndBlock(baseNum32-fileBlockSize, fileBlockSize)))
+			missingRange := NewClosedRange(int64(expected), RoundToBundleEndBlock(baseNum-fileBlockSize, fileBlockSize))
 			fmt.Printf("❌ Range %s (Missing, [%s])\n", missingRange, missingRange.ReprocRange())
-			currentStartBlk = baseNum32
+			currentStartBlk = baseNum
 
 			holeFound = true
 		}
-		expected = baseNum32 + fileBlockSize
+		expected = baseNum + fileBlockSize
 
 		if readAllBlocks {
 			lowestBlockSegment, highestBlockSegment := validateBlockSegment(ctx, blocksStore, filename, fileBlockSize, blockRange, blockPrinter, printDetails, tfdb)
@@ -112,20 +109,20 @@ func CheckMergedBlocks(
 				highestBlockSeen = highestBlockSegment
 			}
 		} else {
-			if uint64(baseNum32) < lowestBlockSeen {
-				lowestBlockSeen = uint64(baseNum32)
+			if baseNum < lowestBlockSeen {
+				lowestBlockSeen = baseNum
 			}
-			if uint64(baseNum32+fileBlockSize) > highestBlockSeen {
-				highestBlockSeen = uint64(baseNum32 + fileBlockSize)
+			if baseNum+fileBlockSize > highestBlockSeen {
+				highestBlockSeen = baseNum + fileBlockSize
 			}
 		}
 
 		if count%10000 == 0 {
-			fmt.Printf("✅ Range %s\n", NewClosedRange(int64(currentStartBlk), uint64(RoundToBundleEndBlock(baseNum32, fileBlockSize))))
-			currentStartBlk = baseNum32 + fileBlockSize
+			fmt.Printf("✅ Range %s\n", NewClosedRange(int64(currentStartBlk), RoundToBundleEndBlock(baseNum, fileBlockSize)))
+			currentStartBlk = baseNum + fileBlockSize
 		}
 
-		if blockRange.IsClosed() && RoundToBundleEndBlock(baseNum32, fileBlockSize) >= uint32(*blockRange.Stop-1) {
+		if blockRange.IsClosed() && RoundToBundleEndBlock(baseNum, fileBlockSize) >= *blockRange.Stop-1 {
 			return dstore.StopIteration
 		}
 
@@ -177,7 +174,7 @@ func validateBlockSegment(
 	ctx context.Context,
 	store dstore.Store,
 	segment string,
-	fileBlockSize uint32,
+	fileBlockSize uint64,
 	blockRange BlockRange,
 	blockPrinter func(block *bstream.Block),
 	printDetails PrintDetails,
@@ -278,13 +275,13 @@ func validateBlockSegment(
 	}
 }
 
-func WalkBlockPrefix(blockRange BlockRange, fileBlockSize uint32) string {
+func WalkBlockPrefix(blockRange BlockRange, fileBlockSize uint64) string {
 	if blockRange.IsOpen() {
 		return ""
 	}
 
-	startString := fmt.Sprintf("%010d", RoundToBundleStartBlock(uint32(blockRange.Start), fileBlockSize))
-	endString := fmt.Sprintf("%010d", RoundToBundleEndBlock(uint32(*blockRange.Stop-1), fileBlockSize)+1)
+	startString := fmt.Sprintf("%010d", RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize))
+	endString := fmt.Sprintf("%010d", RoundToBundleEndBlock(uint64(*blockRange.Stop-1), fileBlockSize)+1)
 
 	offset := 0
 	for i := 0; i < len(startString); i++ {
@@ -299,9 +296,9 @@ func WalkBlockPrefix(blockRange BlockRange, fileBlockSize uint32) string {
 	return startString
 }
 
-func expectedBlockCount(segment string, fileBlockSize uint32) int {
+func expectedBlockCount(segment string, fileBlockSize uint64) int {
 	if segment == "0000000000" {
-		return int(fileBlockSize) - int(bstream.GetProtocolFirstStreamableBlock)
+		return int(fileBlockSize - bstream.GetProtocolFirstStreamableBlock)
 	}
 
 	return int(fileBlockSize)
