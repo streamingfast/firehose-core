@@ -8,9 +8,10 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v0.1.12
 
 * Added `tools check merged-blocks-batch` to simplify checking blocks continuity in batched mode, writing results to a store
+* Bumped substreams to `v1.1.20` with a fix for some minor bug fixes related to start block processing
 
 ## v0.1.11
 
