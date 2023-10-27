@@ -20,6 +20,7 @@ func registerMergerApp() {
 			cmd.Flags().Uint64("merger-stop-block", 0, "If non-zero, merger will trigger shutdown when blocks have been merged up to this block")
 			cmd.Flags().Duration("merger-time-between-store-lookups", 1*time.Second, "Delay between source store polling (should be higher for remote storage)")
 			cmd.Flags().Duration("merger-time-between-store-pruning", time.Minute, "Delay between source store pruning loops")
+			cmd.Flags().Duration("merger-start-delay", 0, "Delay before starting merger")
 			return nil
 		},
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
@@ -36,6 +37,7 @@ func registerMergerApp() {
 				StorageForkedBlocksFilesPath: forkedBlocksStoreURL,
 				TimeBetweenPruning:           viper.GetDuration("merger-time-between-store-pruning"),
 				TimeBetweenPolling:           viper.GetDuration("merger-time-between-store-lookups"),
+				StartDelay:                   viper.GetDuration("merger-start-delay"),
 			}), nil
 		},
 	})

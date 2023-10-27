@@ -609,8 +609,8 @@ github.com/streamingfast/logging v0.0.0-20220304183711-ddba33d79e27/go.mod h1:4G
 github.com/streamingfast/logging v0.0.0-20220304214715-bc750a74b424/go.mod h1:VlduQ80JcGJSargkRU4Sg9Xo63wZD/l8A5NC/Uo1/uU=
 github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091 h1:RN5mrigyirb8anBEtdjtHFIufXdacyTi6i4KBfeNXeo=
 github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091/go.mod h1:VlduQ80JcGJSargkRU4Sg9Xo63wZD/l8A5NC/Uo1/uU=
-github.com/streamingfast/merger v0.0.3-0.20230413191947-fe3ce68cb9f8 h1:riOEu4aTwjy7Gjq8safA8kYUs+jVKi/gZ0+k7S/w/u8=
-github.com/streamingfast/merger v0.0.3-0.20230413191947-fe3ce68cb9f8/go.mod h1:WGMs+zwpPQNfzRnOqnyNdQfyGSG4lXYWQacicAGiP4s=
+github.com/streamingfast/merger v0.0.3-0.20231027130134-5d41abf9e7f0 h1:8UfEfxmsYnTtrFhliOV1v4mWLkZF1uKcT6JRjDK8VOs=
+github.com/streamingfast/merger v0.0.3-0.20231027130134-5d41abf9e7f0/go.mod h1:WGMs+zwpPQNfzRnOqnyNdQfyGSG4lXYWQacicAGiP4s=
 github.com/streamingfast/node-manager v0.0.2-0.20230406142433-692298a8b8d2 h1:6Jdu6LBwaW38n2jjInFk1fM460cq+5paEAHGPPRWWN0=
 github.com/streamingfast/node-manager v0.0.2-0.20230406142433-692298a8b8d2/go.mod h1:R5WwJuyNueq0QXKAFinTGU8zaON0hWJBFHX6KA9WZqk=
 github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308 h1:xlWSfi1BoPfsHtPb0VEHGUcAdBF208LUiFCwfaVPfLA=
@@ -627,8 +627,7 @@ github.com/streamingfast/shutter v1.5.0 h1:NpzDYzj0HVpSiDJVO/FFSL6QIK/YKOxY0gJAt
 github.com/streamingfast/shutter v1.5.0/go.mod h1:B/T6efqdeMGbGwjzPS1ToXzYZI4kDzI5/u4I+7qbjY8=
 github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0 h1:Y15G1Z4fpEdm2b+/70owI7TLuXadlqBtGM7rk4Hxrzk=
 github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0/go.mod h1:/Rnz2TJvaShjUct0scZ9kKV2Jr9/+KBAoWy4UMYxgv4=
-github.com/streamingfast/substreams v1.1.18 h1:XRASHrXeWMOe5D7NXVbi+c9IcFB8hbbtI2oqdivNpE8=
-github.com/streamingfast/substreams v1.1.18/go.mod h1:fFJ8YYBXhzKTKBcC7vRQU6xZl/9KAfVfzuEB8C9hUVw=
+github.com/streamingfast/substreams v1.1.20 h1:61k/HKti9xo7vDAu5zew/VL8qzY+ye/9Zzt1om+tVks=
 github.com/streamingfast/substreams v1.1.20/go.mod h1:Ak7a+EM8MRehep0ZaQD1NwG27ZE9auZY9+/VLbhBnDU=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
