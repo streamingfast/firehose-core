@@ -8,6 +8,12 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Added
+
+* Added retry loop for merger when walking one block files. Some use-cases where the bundle reader was sending files too fast and the merger was not waiting to accumulate enough files to start bundling merged files
+
 ## v0.1.12
 
 * Added `tools check merged-blocks-batch` to simplify checking blocks continuity in batched mode, writing results to a store
