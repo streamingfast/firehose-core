@@ -86,13 +86,19 @@ func CheckMergedBlocksBatch(
 			expected += fileBlockSize64
 		}
 
-		broken, err := checkMergedBlockFileBroken(ctx, blocksStore, filename, lastSeenBlock)
+		broken, details, err := checkMergedBlockFileBroken(ctx, blocksStore, filename, lastSeenBlock)
 		if broken {
-			brokenSince := RoundToBundleStartBlock(uint64(lastSeenBlock.num+1), 100)
-			for i := brokenSince; i <= baseNum; i += fileBlockSize64 {
-				outputFile := fmt.Sprintf("%010d.broken", i)
-				fmt.Printf("found broken file %s, writing to store\n", outputFile)
+			if lastSeenBlock.isUnset() {
+				outputFile := fmt.Sprintf("%010d.broken", baseNum)
+				fmt.Printf("found broken file %s, writing to store. (%s)\n", outputFile, details)
 				destStore.WriteObject(ctx, outputFile, strings.NewReader(""))
+			} else {
+				brokenSince := RoundToBundleStartBlock(uint64(lastSeenBlock.num+1), 100)
+				for i := brokenSince; i <= baseNum; i += fileBlockSize64 {
+					outputFile := fmt.Sprintf("%010d.broken", i)
+					fmt.Printf("found broken file %s, writing to store. (%s)\n", outputFile, details)
+					destStore.WriteObject(ctx, outputFile, strings.NewReader(""))
+				}
 			}
 			lastSeenBlock.reset()
 		}
@@ -122,7 +128,7 @@ func checkMergedBlockFileBroken(
 	store dstore.Store,
 	filename string,
 	lastSeenBlock *blockRef,
-) (broken bool, err error) {
+) (broken bool, details string, err error) {
 	if printCounter%100 == 0 {
 		fmt.Println("checking", filename, "... (printing 1/100)")
 	}
@@ -130,13 +136,13 @@ func checkMergedBlockFileBroken(
 
 	reader, err := store.OpenObject(ctx, filename)
 	if err != nil {
-		return true, err
+		return true, "", err
 	}
 	defer reader.Close()
 
 	readerFactory, err := bstream.GetBlockReaderFactory.New(reader)
 	if err != nil {
-		return true, err
+		return true, "", err
 	}
 
 	for {
@@ -155,6 +161,7 @@ func checkMergedBlockFileBroken(
 
 		if block.Id == "" {
 			broken = true
+			details = "read block with no ID"
 			return
 		}
 
@@ -166,6 +173,10 @@ func checkMergedBlockFileBroken(
 			lastSeenBlock.set(block.PreviousId, fakePreviousNum)
 		}
 		if block.PreviousId != lastSeenBlock.hash {
+			if block.Id == lastSeenBlock.hash && block.Number == lastSeenBlock.num {
+				continue
+			}
+			details = fmt.Sprintf("broken on block %d: expecting %q, got %q", block.Number, lastSeenBlock.hash, block.PreviousId)
 			broken = true
 			return
 		}
