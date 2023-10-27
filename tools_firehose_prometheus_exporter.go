@@ -109,8 +109,6 @@ func runPrometheusExporterE[B Block](chain *Chain[B], zlog *zap.Logger, tracer l
 		//		return err
 		//	}
 		//	return nil
-
-		return nil
 	}
 }
 
