@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"io"
 	"runtime/debug"
-	"slices"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -355,58 +353,9 @@ func (c *Chain[B]) Init() {
 		c.BlockAcceptedVersions = []int32{c.ProtocolVersion}
 	}
 
-	initBstream(c.Protocol, c.ProtocolVersion, c.BlockAcceptedVersions, func() proto.Message { return c.BlockFactory() })
+	InitBstream(c.Protocol, c.ProtocolVersion, c.BlockAcceptedVersions, func() proto.Message { return c.BlockFactory() })
 
 	c.BlockEncoder = NewBlockEncoder()
-}
-
-// initBstream has been copied over from `bstream.InitGeneric` as we changed the signature to accept
-// 'acceptedPayloadVersions' as a parameter. Once we have `firehose-core` released, we are going to port
-// that update back straight in `bstream`.
-func initBstream(protocol string, protocolVersion int32, acceptedPayloadVersions []int32, blockFactory func() proto.Message) {
-	bstream.GetBlockWriterHeaderLen = 10
-	bstream.GetMemoizeMaxAge = 20 * time.Second
-	bstream.GetBlockPayloadSetter = bstream.MemoryBlockPayloadSetter
-
-	bstream.GetBlockDecoder = bstream.BlockDecoderFunc(func(blk *bstream.Block) (any, error) {
-		// blk.Kind() is not used anymore, only the content type and version is checked at read time now
-
-		if !slices.Contains(acceptedPayloadVersions, blk.Version()) {
-			acceptedVersions := make([]string, len(acceptedPayloadVersions))
-			for i, v := range acceptedPayloadVersions {
-				acceptedVersions[i] = fmt.Sprintf("%d", v)
-			}
-
-			return nil, fmt.Errorf("this decoder only knows about version(s) %s, got %d", strings.Join(acceptedVersions, ", "), blk.Version())
-		}
-
-		block := blockFactory()
-		payload, err := blk.Payload.Get()
-		if err != nil {
-			return nil, fmt.Errorf("getting payload: %w", err)
-		}
-
-		err = proto.Unmarshal(payload, block)
-		if err != nil {
-			return nil, fmt.Errorf("unable to decode payload: %w", err)
-		}
-
-		return block, nil
-	})
-
-	bstream.GetBlockWriterFactory = bstream.BlockWriterFactoryFunc(func(writer io.Writer) (bstream.BlockWriter, error) {
-		return bstream.NewDBinBlockWriter(writer, protocol, int(protocolVersion))
-	})
-
-	bstream.GetBlockReaderFactory = bstream.BlockReaderFactoryFunc(func(reader io.Reader) (bstream.BlockReader, error) {
-		return bstream.NewDBinBlockReader(reader, func(contentType string, version int32) error {
-			if contentType != protocol && version != protocolVersion {
-				return fmt.Errorf("reader only knows about %s block kind at version %d, got %s at version %d", protocol, protocolVersion, contentType, version)
-			}
-
-			return nil
-		})
-	})
 }
 
 // BinaryName represents the binary name for your Firehose on <Chain> is the [ShortName]

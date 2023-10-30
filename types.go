@@ -2,6 +2,8 @@ package firecore
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -183,3 +185,39 @@ type BlockIndexer[B Block] interface {
 // for the overall process. The returns [transform.Factory] will be used multiple times (one per request
 // requesting this transform).
 type BlockTransformerFactory func(indexStore dstore.Store, indexPossibleSizes []uint64) (*transform.Factory, error)
+
+// InitBstream initializes `bstream` with a generic block payload setter, reader, decoder and writer that are suitable
+// for all chains. This is used in `firehose-core` as well as in testing method in respective tests to instantiate
+// bstream.
+//
+// We have it in `firehose-core` to make it easier to change it's signature without needing to bump `bstream`.
+func InitBstream(protocol string, protocolVersion int32, acceptedPayloadVersions []int32, blockFactory func() proto.Message) {
+	// We use the same code as in bstream.InitGeneric except that we override below the GetBlockDecoder version
+	bstream.InitGeneric(protocol, protocolVersion, blockFactory)
+
+	bstream.GetBlockDecoder = bstream.BlockDecoderFunc(func(blk *bstream.Block) (any, error) {
+		// blk.Kind() is not used anymore, only the content type and version is checked at read time now
+
+		if !slices.Contains(acceptedPayloadVersions, blk.Version()) {
+			acceptedVersions := make([]string, len(acceptedPayloadVersions))
+			for i, v := range acceptedPayloadVersions {
+				acceptedVersions[i] = fmt.Sprintf("%d", v)
+			}
+
+			return nil, fmt.Errorf("this decoder only knows about version(s) %s, got %d", strings.Join(acceptedVersions, ", "), blk.Version())
+		}
+
+		block := blockFactory()
+		payload, err := blk.Payload.Get()
+		if err != nil {
+			return nil, fmt.Errorf("getting payload: %w", err)
+		}
+
+		err = proto.Unmarshal(payload, block)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode payload: %w", err)
+		}
+
+		return block, nil
+	})
+}
