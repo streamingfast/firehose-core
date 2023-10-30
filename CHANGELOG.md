@@ -8,9 +8,17 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## v0.2.0
+
+### Removed
+
+* **Breaking** The `reader-node-log-to-zap` flag has been removed. This was a source of confusion for operators reporting Firehose on <Chain> bugs because the node's logs where merged within normal Firehose on <Chain> logs and it was not super obvious.
+
+  Now, logs from the node will be printed to `stdout` unformatted exactly like presented by the chain. Filtering of such logs must now be delegated to the node's implementation and how it deals depends on the node's binary. Refer to it to determine how you can tweak the logging verbosity emitted by the node.
+
 ## v0.1.11
 
-* Bumped substreams to `v1.1.18` with a regression fix for when a substreams has a start block in the reversible segment
+* Bumped `substreams` to `v1.1.18` with a regression fix for when a Substreams has a start block in the reversible segment.
 
 ## v0.1.10
 
@@ -19,13 +27,13 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 The `--common-auth-plugin` got back the ability to use `secret://<expected_secret>?[user_id=<user_id>]&[api_key_id=<api_key_id>]` in which case request are authenticated based on the `Authorization: Bearer <actual_secret>` and continue only if `<actual_secret> == <expected_secret>`.
 
 ### Changed
-* Bumped substreams to `v1.1.17` with provider new metrics `substreams_active_requests` and `substreams_counter`
+* Bumped `substreams` to `v1.1.17` with provider new metrics `substreams_active_requests` and `substreams_counter`
 
 ## v0.1.9
 
 ### Changed
 
-* Bumped susbtreams to `v1.1.14` to fix bugs with start blocks, where substreams would fail if the start block was before the first block of the chain, or if the start block was a block that was not yet produced by the chain.
+* Bumped `susbtreams` to `v1.1.14` to fix bugs with start blocks, where Substreams would fail if the start block was before the first block of the chain, or if the start block was a block that was not yet produced by the chain.
 * Improved error message when referenced config file is not found, removed hard-coded mention of `fireacme`.
 
 ## v0.1.8

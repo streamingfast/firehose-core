@@ -7,8 +7,6 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/streamingfast/cli/sflags"
-
 	"github.com/kballard/go-shellquote"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -29,21 +27,8 @@ import (
 	"google.golang.org/grpc"
 )
 
-// UnsafeResolveReaderNodeStartBlock is a function that resolved the reader node start block num, by default it simply
-// returns the value of the 'reader-node-start-block-num'. However, the function may be overwritten in certain chains
-// to perform a more complex resolution logic.
-var UnsafeResolveReaderNodeStartBlock = func(ctx context.Context, command *cobra.Command, runtime *launcher.Runtime, rootLog *zap.Logger) (uint64, error) {
-	return sflags.MustGetUint64(command, "reader-node-start-block-num"), nil
-}
-
 func registerReaderNodeApp[B Block](chain *Chain[B]) {
 	appLogger, appTracer := logging.PackageLogger("reader", chain.LoggerPackageID("reader"))
-
-	// FIXME: We use `chain.ShortName` here, but we are actually want the final binary name, I think we should have the executable name.
-	// However a problem here to get this value is that we are "before" the actual flags registration that happens a bit lower via
-	// `launcher.RegisterApp`, so we cannot get the value yet because the flag is not defined. Maybe solveable with our refactoring
-	// of `node-manager` that is planned.
-	supervisedProcessLogger, _ := logging.PackageLogger(fmt.Sprintf("reader.%s", chain.ShortName), chain.LoggerPackageID(fmt.Sprintf("reader/%s", chain.ShortName)), logging.LoggerDefaultLevel(zap.InfoLevel))
 
 	launcher.RegisterApp(rootLog, &launcher.AppDef{
 		ID:          "reader-node",
@@ -56,26 +41,19 @@ func registerReaderNodeApp[B Block](chain *Chain[B]) {
 			`))
 			cmd.Flags().String("reader-node-data-dir", "{data-dir}/reader/data", "Directory for node data")
 			cmd.Flags().Bool("reader-node-debug-firehose-logs", false, "[DEV] Prints firehose instrumentation logs to standard output, should be use for debugging purposes only")
-			cmd.Flags().Bool("reader-node-log-to-zap", true, cli.FlagDescription(`
-				When sets to 'true', all standard error output emitted by the invoked process defined via 'reader-node-path'
-				is intercepted, split line by line and each line is then transformed and logged through the Firehose stack
-				logging system. The transformation extracts the level and remove the timestamps creating a 'sanitized' version
-				of the logs emitted by the blockchain's managed client process. If this is not desirable, disabled the flag
-				and all the invoked process standard error will be redirect to process's standard output.
-			`))
 			cmd.Flags().String("reader-node-manager-api-addr", ReaderNodeManagerAPIAddr, "Acme node manager API address")
 			cmd.Flags().Duration("reader-node-readiness-max-latency", 30*time.Second, "Determine the maximum head block latency at which the instance will be determined healthy. Some chains have more regular block production than others.")
-			cmd.Flags().String("reader-node-arguments", "", cli.FlagDescription(`
+			cmd.Flags().String("reader-node-arguments", "", string(cli.Description(`
 				Defines the node arguments that will be passed to the node on execution. Supports templating, where we will replace certain sub-string with the appropriate value
 
-				{data-dir} 			The current data-dir path defined by the flag 'data-dir'
-				{node-data-dir}		The node data dir path defined by the flag 'reader-node-data-dir'
-				{hostname}			The machine's hostname
-				{start-block-num}	The resolved start block number defined by the flag 'reader-node-start-block-num' (can be overwritten)
-				{stop-block-num}	The stop block number defined by the flag 'reader-node-stop-block-num'
+				  {data-dir}			The current data-dir path defined by the flag 'data-dir'
+				  {node-data-dir}		The node data dir path defined by the flag 'reader-node-data-dir'
+				  {hostname}			The machine's hostname
+				  {start-block-num}		The resolved start block number defined by the flag 'reader-node-start-block-num' (can be overwritten)
+				  {stop-block-num}		The stop block number defined by the flag 'reader-node-stop-block-num'
 
 				Example: 'run blockchain -start {start-block-num} -end {stop-block-num}' may yield 'run blockchain -start 200 -end 500'
-			`))
+			`)))
 			cmd.Flags().StringSlice("reader-node-backups", []string{}, "Repeatable, space-separated key=values definitions for backups. Example: 'type=gke-pvc-snapshot prefix= tag=v1 freq-blocks=1000 freq-time= project=myproj'")
 			cmd.Flags().String("reader-node-grpc-listen-addr", ReaderNodeGRPCAddr, "The gRPC listening address to use for serving real-time blocks")
 			cmd.Flags().Bool("reader-node-discard-after-stop-num", false, "Ignore remaining blocks being processed after stop num (only useful if we discard the reader data after reprocessing a chunk of blocks)")
@@ -101,7 +79,6 @@ func registerReaderNodeApp[B Block](chain *Chain[B]) {
 
 			readinessMaxLatency := viper.GetDuration("reader-node-readiness-max-latency")
 			debugFirehose := viper.GetBool("reader-node-debug-firehose-logs")
-			logToZap := viper.GetBool("reader-node-log-to-zap")
 			shutdownDelay := viper.GetDuration("common-system-shutdown-signal-delay") // we reuse this global value
 			httpAddr := viper.GetString("reader-node-manager-api-addr")
 			backupConfigs := viper.GetStringSlice("reader-node-backups")
@@ -123,9 +100,12 @@ func registerReaderNodeApp[B Block](chain *Chain[B]) {
 			stopBlockNum := viper.GetUint64("reader-node-stop-block-num")
 
 			hostname, _ := os.Hostname()
-			nodeArguments, err := buildNodeArguments(sfDataDir, nodeDataDir, hostname, resolveStartBlockNum, stopBlockNum, viper.GetString("reader-node-arguments"))
+			nodeArgumentResolver := createNodeArgumentsResolver(sfDataDir, nodeDataDir, hostname, resolveStartBlockNum, stopBlockNum)
+
+			// Split arguments according to standard shell rules
+			nodeArguments, err := shellquote.Split(nodeArgumentResolver(viper.GetString("reader-node-arguments")))
 			if err != nil {
-				return nil, fmt.Errorf("cannot build node bootstrap arguments: %w", err)
+				return nil, fmt.Errorf("cannot split 'reader-node-arguments' value: %w", err)
 			}
 
 			headBlockTimeDrift := metrics.NewHeadBlockTimeDrift("reader-node")
@@ -140,11 +120,11 @@ func registerReaderNodeApp[B Block](chain *Chain[B]) {
 			)
 
 			superviser := nm.SupervisorFactory(chain.ExecutableName, nodePath, nodeArguments, appLogger)
-			superviser.RegisterLogPlugin(nm.NewNodeLogPlugin(logToZap, debugFirehose, supervisedProcessLogger))
+			superviser.RegisterLogPlugin(nm.NewNodeLogPlugin(debugFirehose))
 
 			var bootstrapper operator.Bootstrapper
 			if chain.ReaderNodeBootstrapperFactory != nil {
-				bootstrapper, err = chain.ReaderNodeBootstrapperFactory(startCmd, nodeDataDir)
+				bootstrapper, err = chain.ReaderNodeBootstrapperFactory(startCmd.Context(), appLogger, startCmd, nodeArguments, nodeArgumentResolver)
 				if err != nil {
 					return nil, fmt.Errorf("new bootstrapper: %w", err)
 				}
@@ -228,26 +208,27 @@ func registerReaderNodeApp[B Block](chain *Chain[B]) {
 
 var variablesRegex = regexp.MustCompile(`\{(data-dir|node-data-dir|hostname|start-block-num|stop-block-num)\}`)
 
-func buildNodeArguments(dataDir, nodeDataDir, hostname string, startBlockNum, stopBlockNum uint64, args string) ([]string, error) {
-	out := variablesRegex.ReplaceAllStringFunc(args, func(match string) string {
-		switch match {
-		case "{data-dir}":
-			return dataDir
-		case "{node-data-dir}":
-			return nodeDataDir
-		case "{hostname}":
-			return hostname
-		case "{start-block-num}":
-			return fmt.Sprintf("%d", startBlockNum)
-		case "{stop-block-num}":
-			return fmt.Sprintf("%d", stopBlockNum)
-		default:
-			return fmt.Sprintf("<!%%Unknown(%s)%%!>", match)
-		}
-	})
+type ReaderNodeArgumentResolver = func(in string) string
 
-	// Split arguments according to standard shell rules
-	return shellquote.Split(out)
+func createNodeArgumentsResolver(dataDir, nodeDataDir, hostname string, startBlockNum, stopBlockNum uint64) ReaderNodeArgumentResolver {
+	return func(in string) string {
+		return variablesRegex.ReplaceAllStringFunc(in, func(match string) string {
+			switch match {
+			case "{data-dir}":
+				return dataDir
+			case "{node-data-dir}":
+				return nodeDataDir
+			case "{hostname}":
+				return hostname
+			case "{start-block-num}":
+				return fmt.Sprintf("%d", startBlockNum)
+			case "{stop-block-num}":
+				return fmt.Sprintf("%d", stopBlockNum)
+			default:
+				return fmt.Sprintf("<!%%Unknown(%s)%%!>", match)
+			}
+		})
+	}
 }
 
 func gkeSnapshotterFactory(conf operator.BackupModuleConfig) (operator.BackupModule, error) {

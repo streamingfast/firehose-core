@@ -24,6 +24,7 @@ import (
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/firehose/client"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/encoding/gzip"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -39,7 +40,7 @@ func configureToolsCmd[B Block](
 
 	toolsCmd.AddCommand(newToolsCompareBlocksCmd(chain))
 	toolsCmd.AddCommand(newToolsDownloadFromFirehoseCmd(chain, rootLog))
-	toolsCmd.AddCommand(newToolsFirehoseClientCmd(chain))
+	toolsCmd.AddCommand(newToolsFirehoseClientCmd(chain, rootLog))
 	toolsCmd.AddCommand(newToolsFirehoseSingleBlockClientCmd(chain, rootLog, rootTracer))
 	toolsCmd.AddCommand(newToolsFirehosePrometheusExporterCmd(chain, rootLog, rootTracer))
 	toolsCmd.AddCommand(newToolsUnmergeBlocksCmd(chain, rootLog))
@@ -78,9 +79,7 @@ func addFirehoseFetchClientFlagsToSet[B Block](flags *pflag.FlagSet, chain *Chai
 	flags.BoolP("plaintext", "p", false, "Use plaintext connection to Firehose")
 	flags.BoolP("insecure", "k", false, "Use SSL connection to Firehose but skip SSL certificate validation")
 
-	for flagName, transformFlag := range chain.Tools.TransformFlags {
-		flags.String(flagName, "", transformFlag.Description)
-	}
+	chain.Tools.TransformFlags.Register(flags)
 }
 
 type firehoseRequestInfo struct {
@@ -90,25 +89,25 @@ type firehoseRequestInfo struct {
 	Transforms      []*anypb.Any
 }
 
-func getFirehoseFetchClientFromCmd[B Block](cmd *cobra.Command, endpoint string, chain *Chain[B]) (
+func getFirehoseFetchClientFromCmd[B Block](cmd *cobra.Command, logger *zap.Logger, endpoint string, chain *Chain[B]) (
 	firehoseClient pbfirehose.FetchClient,
 	connClose func() error,
 	requestInfo *firehoseRequestInfo,
 	err error,
 ) {
-	return getFirehoseClientFromCmd[B, pbfirehose.FetchClient](cmd, "fetch-client", endpoint, chain)
+	return getFirehoseClientFromCmd[B, pbfirehose.FetchClient](cmd, logger, "fetch-client", endpoint, chain)
 }
 
-func getFirehoseStreamClientFromCmd[B Block](cmd *cobra.Command, endpoint string, chain *Chain[B]) (
+func getFirehoseStreamClientFromCmd[B Block](cmd *cobra.Command, logger *zap.Logger, endpoint string, chain *Chain[B]) (
 	firehoseClient pbfirehose.StreamClient,
 	connClose func() error,
 	requestInfo *firehoseRequestInfo,
 	err error,
 ) {
-	return getFirehoseClientFromCmd[B, pbfirehose.StreamClient](cmd, "stream-client", endpoint, chain)
+	return getFirehoseClientFromCmd[B, pbfirehose.StreamClient](cmd, logger, "stream-client", endpoint, chain)
 }
 
-func getFirehoseClientFromCmd[B Block, C any](cmd *cobra.Command, kind string, endpoint string, chain *Chain[B]) (
+func getFirehoseClientFromCmd[B Block, C any](cmd *cobra.Command, logger *zap.Logger, kind string, endpoint string, chain *Chain[B]) (
 	firehoseClient C,
 	connClose func() error,
 	requestInfo *firehoseRequestInfo,
@@ -153,24 +152,17 @@ func getFirehoseClientFromCmd[B Block, C any](cmd *cobra.Command, kind string, e
 	case "none":
 		// Valid value but nothing to do
 	default:
-		err = fmt.Errorf("invalid value for compression: only 'gzip', 'zstd' or 'none' are accepted")
-		return
+		return firehoseClient, nil, nil, fmt.Errorf("invalid value for compression: only 'gzip', 'zstd' or 'none' are accepted")
+
 	}
 
 	if compressor != nil {
 		requestInfo.GRPCCallOpts = append(requestInfo.GRPCCallOpts, compressor)
 	}
 
-	for flagName, transformFlag := range chain.Tools.TransformFlags {
-		transformValue := sflags.MustGetString(cmd, flagName)
-		if transformValue != "" {
-			transform, err := transformFlag.Parser(transformValue)
-			if err != nil {
-				return firehoseClient, nil, nil, fmt.Errorf("invalid value for %q: %w", flagName, err)
-			}
-
-			requestInfo.Transforms = append(requestInfo.Transforms, transform)
-		}
+	requestInfo.Transforms, err = chain.Tools.TransformFlags.Parse(cmd, logger)
+	if err != nil {
+		return firehoseClient, nil, nil, fmt.Errorf("unable to parse transforms flags: %w", err)
 	}
 
 	return

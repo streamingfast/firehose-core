@@ -42,7 +42,7 @@ func runPrometheusExporterE[B Block](chain *Chain[B], zlog *zap.Logger, tracer l
 		start := int64(-1)
 		stop := uint64(0)
 
-		firehoseClient, connClose, requestInfo, err := getFirehoseStreamClientFromCmd(cmd, endpoint, chain)
+		firehoseClient, connClose, requestInfo, err := getFirehoseStreamClientFromCmd(cmd, zlog, endpoint, chain)
 		if err != nil {
 			return err
 		}

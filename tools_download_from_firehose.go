@@ -48,7 +48,7 @@ func createToolsDownloadFromFirehoseE[B Block](chain *Chain[B], zlog *zap.Logger
 		}
 		destFolder := args[3]
 
-		firehoseClient, connClose, requestInfo, err := getFirehoseStreamClientFromCmd(cmd, endpoint, chain)
+		firehoseClient, connClose, requestInfo, err := getFirehoseStreamClientFromCmd(cmd, zlog, endpoint, chain)
 		if err != nil {
 			return err
 		}
@@ -67,6 +67,8 @@ func createToolsDownloadFromFirehoseE[B Block](chain *Chain[B], zlog *zap.Logger
 			tweakBlock:    func(b *bstream.Block) (*bstream.Block, error) { return b, nil },
 			logger:        zlog,
 		}
+
+		approximateLIBWarningIssued := false
 
 		for {
 
@@ -100,6 +102,27 @@ func createToolsDownloadFromFirehoseE[B Block](chain *Chain[B], zlog *zap.Logger
 				block := chain.BlockFactory()
 				if err := anypb.UnmarshalTo(response.Block, block, proto.UnmarshalOptions{}); err != nil {
 					return fmt.Errorf("unmarshal response block: %w", err)
+				}
+
+				if _, ok := block.(BlockLIBNumDerivable); !ok {
+					// We must wrap the block in a BlockEnveloppe and "provide" the LIB number as itself minus 1 since
+					// there is nothing we can do more here to obtain the value sadly. For chain where the LIB can be
+					// derived from the Block itself, this code does **not** run (so it will have the correct value)
+					if !approximateLIBWarningIssued {
+						approximateLIBWarningIssued = true
+						zlog.Warn("LIB number is approximated, it is not provided by the chain's Block model so we msut set it to block number minus 1 (which is kinda ok because only final blocks are retrieved in this download tool)")
+					}
+
+					number := block.GetFirehoseBlockNumber()
+					libNum := number - 1
+					if number <= bstream.GetProtocolFirstStreamableBlock {
+						libNum = number
+					}
+
+					block = BlockEnveloppe{
+						Block:  block,
+						LIBNum: libNum,
+					}
 				}
 
 				blk, err := chain.BlockEncoder.Encode(block)
