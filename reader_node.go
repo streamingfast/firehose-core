@@ -102,8 +102,7 @@ func registerReaderNodeApp[B Block](chain *Chain[B]) {
 			hostname, _ := os.Hostname()
 			nodeArgumentResolver := createNodeArgumentsResolver(sfDataDir, nodeDataDir, hostname, resolveStartBlockNum, stopBlockNum)
 
-			// Split arguments according to standard shell rules
-			nodeArguments, err := shellquote.Split(nodeArgumentResolver(viper.GetString("reader-node-arguments")))
+			nodeArguments, err := buildNodeArguments(viper.GetString("reader-node-arguments"), nodeArgumentResolver)
 			if err != nil {
 				return nil, fmt.Errorf("cannot split 'reader-node-arguments' value: %w", err)
 			}
@@ -207,6 +206,19 @@ func registerReaderNodeApp[B Block](chain *Chain[B]) {
 }
 
 var variablesRegex = regexp.MustCompile(`\{(data-dir|node-data-dir|hostname|start-block-num|stop-block-num)\}`)
+
+// buildNodeArguments will resolve and split the given string into arguments, replacing the variables with the appropriate values.
+//
+// We are using a function for testing purposes, so that we can test arguments resolving and splitting correctly.
+func buildNodeArguments(in string, resolver ReaderNodeArgumentResolver) ([]string, error) {
+	// Split arguments according to standard shell rules
+	nodeArguments, err := shellquote.Split(resolver(in))
+	if err != nil {
+		return nil, fmt.Errorf("cannot split 'reader-node-arguments' value: %w", err)
+	}
+
+	return nodeArguments, nil
+}
 
 type ReaderNodeArgumentResolver = func(in string) string
 
