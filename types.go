@@ -43,12 +43,19 @@ type Block interface {
 	// (e.g. block 1, is produced then block 3 where block 3's parent is block 1).
 	GetFirehoseBlockNumber() uint64
 
-	// GetFirehoseBlockPreviousID returns the block ID of the parent block as a string. All blocks
+	// GetFirehoseBlockParentID returns the block ID of the parent block as a string. All blocks
 	// ever produced must have a parent block ID except for the genesis block which is the first
 	// one. The value must be the same as the one returned by GetFirehoseBlockID() of the parent.
 	//
 	// If it's the genesis block, return an empty string.
 	GetFirehoseBlockParentID() string
+
+	// GetFirehoseBlockParentNumber returns the block number of the parent block as a uint64.
+	// The value must be the same as the one returned by GetFirehoseBlockNumber() of the parent
+	// or `0` if the block has no parent
+	//
+	// This is useful on chains that have holes. On other chains, this is as simple as "BlockNumber - 1".
+	GetFirehoseBlockParentNumber() uint64
 
 	// GetFirehoseBlockTime returns the block timestamp as a time.Time of when the block was
 	// produced. This should the consensus agreed time of the block.
