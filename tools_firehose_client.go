@@ -13,12 +13,12 @@ import (
 	"go.uber.org/zap"
 )
 
-func newToolsFirehoseClientCmd[B Block](chain *Chain[B]) *cobra.Command {
+func newToolsFirehoseClientCmd[B Block](chain *Chain[B], logger *zap.Logger) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "firehose-client <endpoint> <range>",
 		Short: "Connects to a Firehose endpoint over gRPC and print block stream as JSON to terminal",
 		Args:  cobra.ExactArgs(2),
-		RunE:  getFirehoseClientE(chain),
+		RunE:  getFirehoseClientE(chain, logger),
 	}
 
 	addFirehoseStreamClientFlagsToSet(cmd.Flags(), chain)
@@ -33,11 +33,11 @@ type respChan struct {
 	ch chan string
 }
 
-func getFirehoseClientE[B Block](chain *Chain[B]) func(cmd *cobra.Command, args []string) error {
+func getFirehoseClientE[B Block](chain *Chain[B], logger *zap.Logger) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-		firehoseClient, connClose, requestInfo, err := getFirehoseStreamClientFromCmd(cmd, args[0], chain)
+		firehoseClient, connClose, requestInfo, err := getFirehoseStreamClientFromCmd(cmd, logger, args[0], chain)
 		if err != nil {
 			return err
 		}

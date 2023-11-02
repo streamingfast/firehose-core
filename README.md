@@ -18,7 +18,18 @@ This repository aims at solving this maintenance burden by acting as a facade fo
 
 ### Changelog
 
-The [CHANGELOG.md](./CHANGELOG.md) of this project will be re-written so that you can copy-paste recent changes straight into your own release notes so that operators that are using your `firehose-<chain>` repository are made aware of deprecation notes, removal, changes and other important elements.
+The [CHANGELOG.md](./CHANGELOG.md) of this project is written in such way so that you can copy-paste recent changes straight into your own release notes so that operators that are using your `firehose-<chain>` repository are made aware of deprecation notes, removal, changes and other important elements.
+
+Maintainers, you should copy/paste content of this content straight to your project. It is written and meant to be copied over to your project. If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
+
+The bash command `awk '/## v0.1.11/,/## v0.1.8/' CHANGELOG.md | grep -v '## v0.1.8'` to obtain the content between 2 versions. You can then merged the different `Added`, `Changed`, `Removed` and others into single merged section.
+
+> [!NOTE]
+> At some point will provide a tool to easily generate the change for you so you can simply copy it over.
+
+### Update
+
+When bumping `firehose-core` to a breaking version, details of such upgrade will be described in [UPDATE.md](./UPDATE.md). Breaking version can be be noticed currently if the minor version is bumped up, for example going from v0.1.11 to v0.2.0 introduces some breaking changes. Once we will release the very first major version 1, breaking changes will be when going from v0.y.z to v1.0.0.
 
 ### Build & CI
 

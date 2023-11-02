@@ -52,7 +52,7 @@ func init() {
 	toolsPrintCmd.AddCommand(toolsPrintOneBlockCmd)
 	toolsPrintCmd.AddCommand(toolsPrintMergedBlocksCmd)
 
-	toolsPrintCmd.PersistentFlags().StringP("output", "o", "text", "Output mode for block printing, either 'text' or 'json'")
+	toolsPrintCmd.PersistentFlags().StringP("output", "o", "text", "Output mode for block printing, either 'text', 'json' or 'jsonl'")
 	toolsPrintCmd.PersistentFlags().Bool("transactions", false, "When in 'text' output mode, also print transactions summary")
 }
 
@@ -80,12 +80,22 @@ func createToolsPrintMergedBlocksE(blockPrinter BlockPrinterFunc) CommandExecuto
 			return fmt.Errorf("unable to create store at path %q: %w", store, err)
 		}
 
-		blockNum, err := strconv.ParseUint(args[1], 10, 64)
+		blockRange, err := tools.GetBlockRangeFromArg(args[1])
 		if err != nil {
-			return fmt.Errorf("unable to parse block number %q: %w", args[1], err)
+			return fmt.Errorf("invalid range %q: %w", args[1], err)
 		}
 
-		blockBoundary := tools.RoundToBundleStartBlock(blockNum, 100)
+		// Force to be a single block if the range was open
+		if blockRange.IsOpen() {
+			stop := uint64(blockRange.Start)
+			blockRange.Stop = &stop
+		}
+
+		if !blockRange.IsResolved() {
+			return fmt.Errorf("range must be fully resolved for %q", args[1])
+		}
+
+		blockBoundary := tools.RoundToBundleStartBlock(uint64(blockRange.Start), 100)
 
 		filename := fmt.Sprintf("%010d", blockBoundary)
 		reader, err := store.OpenObject(ctx, filename)
@@ -106,10 +116,14 @@ func createToolsPrintMergedBlocksE(blockPrinter BlockPrinterFunc) CommandExecuto
 			block, err := readerFactory.Read()
 			if err != nil {
 				if err == io.EOF {
-					fmt.Printf("Total blocks: %d\n", seenBlockCount)
+					fmt.Fprintf(os.Stderr, "Total blocks: %d\n", seenBlockCount)
 					return nil
 				}
 				return fmt.Errorf("error receiving blocks: %w", err)
+			}
+
+			if !blockRange.Contains(block.Number, tools.EndBoundaryInclusive) {
+				continue
 			}
 
 			seenBlockCount++
@@ -191,6 +205,7 @@ func createToolsPrintOneBlockE(blockPrinter BlockPrinterFunc) CommandExecutor {
 //
 //	Text
 //	JSON
+//	JSONL
 //
 // )
 type PrintOutputMode uint
@@ -207,18 +222,24 @@ func toolsPrintCmdGetOutputMode(cmd *cobra.Command) (PrintOutputMode, error) {
 }
 
 func printBlock(block *bstream.Block, outputMode PrintOutputMode, printTransactions bool, blockPrinter BlockPrinterFunc) error {
-	if outputMode == PrintOutputModeText {
+	switch outputMode {
+	case PrintOutputModeText:
 		if err := blockPrinter(block, printTransactions, os.Stdout); err != nil {
 			return fmt.Errorf("block text printing: %w", err)
 		}
-	} else {
+
+	case PrintOutputModeJSON, PrintOutputModeJSONL:
 		nativeBlock := block.ToProtocol().(proto.Message)
-		data, err := json.MarshalIndent(nativeBlock, "", "  ")
+
+		encoder := json.NewEncoder(os.Stdout)
+		if outputMode == PrintOutputModeJSON {
+			encoder.SetIndent("", "  ")
+		}
+
+		err := encoder.Encode(nativeBlock)
 		if err != nil {
 			return fmt.Errorf("block JSON printing: json marshal: %w", err)
 		}
-
-		fmt.Println(string(data))
 	}
 
 	return nil

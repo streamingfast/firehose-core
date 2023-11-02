@@ -2,17 +2,16 @@ package firecore
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/transform"
 	"github.com/streamingfast/dstore"
-	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	"google.golang.org/protobuf/proto"
 )
-
-var UnsafePayloadKind pbbstream.Protocol = pbbstream.Protocol_UNKNOWN
 
 // Block represents the chain-specific Protobuf block. Chain specific's block
 // model must implement this interface so that Firehose core is able to properly
@@ -46,17 +45,39 @@ type Block interface {
 	// (e.g. block 1, is produced then block 3 where block 3's parent is block 1).
 	GetFirehoseBlockNumber() uint64
 
-	// GetFirehoseBlockPreviousID returns the block ID of the parent block as a string. All blocks
+	// GetFirehoseBlockParentID returns the block ID of the parent block as a string. All blocks
 	// ever produced must have a parent block ID except for the genesis block which is the first
 	// one. The value must be the same as the one returned by GetFirehoseBlockID() of the parent.
 	//
 	// If it's the genesis block, return an empty string.
 	GetFirehoseBlockParentID() string
 
+	// GetFirehoseBlockParentNumber returns the block number of the parent block as a uint64.
+	// The value must be the same as the one returned by GetFirehoseBlockNumber() of the parent
+	// or `0` if the block has no parent
+	//
+	// This is useful on chains that have holes. On other chains, this is as simple as "BlockNumber - 1".
+	GetFirehoseBlockParentNumber() uint64
+
 	// GetFirehoseBlockTime returns the block timestamp as a time.Time of when the block was
 	// produced. This should the consensus agreed time of the block.
 	GetFirehoseBlockTime() time.Time
 
+	// GetFirehoseBlockVersion returns the version of this block. This is used to determine
+	// what value to assign to `bstream.Block#PayloadVersion` variable when encoding a chain
+	// specific block to a chain agnostic `bstream.Block` type.
+	//
+	// If you come here because you now need to implement this value, you can implement so it
+	// returned a fixed value, usually `chain.ProtocolVersion`:
+	GetFirehoseBlockVersion() int32
+}
+
+// BlockLIBNumDerivable is an optional interface that can be implemented by your chain's block model Block
+// if the LIB can be derived from the Block model directly.
+//
+// Implementing this make some Firehose core process more convenient since less configuration are
+// necessary.
+type BlockLIBNumDerivable interface {
 	// GetFirehoseBlockLIBNum returns the last irreversible block number as an unsigned integer
 	// of this block. This is one of the most important piece of information for Firehose core.
 	// as it determines when "forks" are now stalled and should be removed from memory and it
@@ -80,6 +101,18 @@ type Block interface {
 	GetFirehoseBlockLIBNum() uint64
 }
 
+var _ BlockLIBNumDerivable = BlockEnveloppe{}
+
+type BlockEnveloppe struct {
+	Block
+	LIBNum uint64
+}
+
+// GetFirehoseBlockLIBNum implements LIBDerivable.
+func (b BlockEnveloppe) GetFirehoseBlockLIBNum() uint64 {
+	return b.LIBNum
+}
+
 // BlockEncoder is the interface of an object that is going to a chain specific
 // block implementing [Block] interface that will be encoded into [bstream.Block]
 // type which is the type used by Firehose core to "envelope" the block.
@@ -95,16 +128,32 @@ func (f BlockEncoderFunc) Encode(block Block) (blk *bstream.Block, err error) {
 
 type CommandExecutor func(cmd *cobra.Command, args []string) (err error)
 
-func NewGenericBlockEncoder(protocolVersion int32) BlockEncoder {
+func NewBlockEncoder() BlockEncoder {
 	return BlockEncoderFunc(func(block Block) (blk *bstream.Block, err error) {
-		return EncodeBlock(protocolVersion, block)
+		return EncodeBlock(block)
 	})
 }
 
-func EncodeBlock(protocolVersion int32, b Block) (blk *bstream.Block, err error) {
-	content, err := proto.Marshal(b)
+func EncodeBlock(b Block) (blk *bstream.Block, err error) {
+	real := b
+	if b, ok := b.(BlockEnveloppe); ok {
+		real = b.Block
+	}
+
+	content, err := proto.Marshal(real)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal to binary form: %s", err)
+	}
+
+	v, ok := b.(BlockLIBNumDerivable)
+	if !ok {
+		return nil, fmt.Errorf(
+			"block %T does not implement 'firecore.BlockLIBNumDerivable' which is mandatory, "+
+				"if you transmit the LIBNum through a side channel, wrap your block with "+
+				"'firecore.BlockEnveloppe{Block: b, LIBNum: <value>}' to send the LIBNum "+
+				"to use for encoding ('firecore.BlockEnveloppe' implements 'firecore.BlockLIBNumDerivable')",
+			b,
+		)
 	}
 
 	bstreamBlock := &bstream.Block{
@@ -112,8 +161,8 @@ func EncodeBlock(protocolVersion int32, b Block) (blk *bstream.Block, err error)
 		Number:         b.GetFirehoseBlockNumber(),
 		PreviousId:     b.GetFirehoseBlockParentID(),
 		Timestamp:      b.GetFirehoseBlockTime(),
-		LibNum:         b.GetFirehoseBlockLIBNum(),
-		PayloadVersion: protocolVersion,
+		LibNum:         v.GetFirehoseBlockLIBNum(),
+		PayloadVersion: b.GetFirehoseBlockVersion(),
 
 		// PayloadKind is not actually used anymore and should be left to UNKNOWN
 		PayloadKind: UnsafePayloadKind,
@@ -136,3 +185,39 @@ type BlockIndexer[B Block] interface {
 // for the overall process. The returns [transform.Factory] will be used multiple times (one per request
 // requesting this transform).
 type BlockTransformerFactory func(indexStore dstore.Store, indexPossibleSizes []uint64) (*transform.Factory, error)
+
+// InitBstream initializes `bstream` with a generic block payload setter, reader, decoder and writer that are suitable
+// for all chains. This is used in `firehose-core` as well as in testing method in respective tests to instantiate
+// bstream.
+//
+// We have it in `firehose-core` to make it easier to change it's signature without needing to bump `bstream`.
+func InitBstream(protocol string, protocolVersion int32, acceptedPayloadVersions []int32, blockFactory func() proto.Message) {
+	// We use the same code as in bstream.InitGeneric except that we override below the GetBlockDecoder version
+	bstream.InitGeneric(protocol, protocolVersion, blockFactory)
+
+	bstream.GetBlockDecoder = bstream.BlockDecoderFunc(func(blk *bstream.Block) (any, error) {
+		// blk.Kind() is not used anymore, only the content type and version is checked at read time now
+
+		if !slices.Contains(acceptedPayloadVersions, blk.Version()) {
+			acceptedVersions := make([]string, len(acceptedPayloadVersions))
+			for i, v := range acceptedPayloadVersions {
+				acceptedVersions[i] = fmt.Sprintf("%d", v)
+			}
+
+			return nil, fmt.Errorf("this decoder only knows about version(s) %s, got %d", strings.Join(acceptedVersions, ", "), blk.Version())
+		}
+
+		block := blockFactory()
+		payload, err := blk.Payload.Get()
+		if err != nil {
+			return nil, fmt.Errorf("getting payload: %w", err)
+		}
+
+		err = proto.Unmarshal(payload, block)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode payload: %w", err)
+		}
+
+		return block, nil
+	})
+}

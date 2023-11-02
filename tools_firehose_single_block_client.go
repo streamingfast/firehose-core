@@ -35,7 +35,7 @@ func getFirehoseSingleBlockClientE[B Block](chain *Chain[B], zlog *zap.Logger, t
 		ctx := context.Background()
 
 		endpoint := args[0]
-		firehoseClient, connClose, requestInfo, err := getFirehoseFetchClientFromCmd(cmd, endpoint, chain)
+		firehoseClient, connClose, requestInfo, err := getFirehoseFetchClientFromCmd(cmd, zlog, endpoint, chain)
 		if err != nil {
 			return err
 		}

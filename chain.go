@@ -1,6 +1,7 @@
 package firecore
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"runtime/debug"
@@ -107,6 +108,8 @@ type Chain[B Block] struct {
 	// The [BlockFactory] **must** be non-nil and must return a non-nil [proto.Message].
 	BlockFactory func() Block
 
+	BlockAcceptedVersions []int32
+
 	// ConsoleReaderFactory is the function that should return the `ConsoleReader` that knowns
 	// how to transform your your chain specific Firehose instrumentation logs into the proper
 	// Block model of your chain.
@@ -146,7 +149,13 @@ type Chain[B Block] struct {
 	// If this is set, the `reader-node` app will use the one bootstrapper returned by this function. The function
 	// will receive the `start` command where flags are defined as well as the node's absolute data directory as an
 	// argument.
-	ReaderNodeBootstrapperFactory func(cmd *cobra.Command, nodeDataDir string) (operator.Bootstrapper, error)
+	ReaderNodeBootstrapperFactory func(
+		ctx context.Context,
+		logger *zap.Logger,
+		cmd *cobra.Command,
+		resolvedNodeArguments []string,
+		resolver ReaderNodeArgumentResolver,
+	) (operator.Bootstrapper, error)
 
 	// Tools aggregate together all configuration options required for the various `fire<chain> tools`
 	// to work properly for example to print block using chain specific information.
@@ -211,11 +220,14 @@ type ToolsConfig[B Block] struct {
 	// The [RegisterExtraCmd] function is optional and not called if nil.
 	RegisterExtraCmd func(chain *Chain[B], toolsCmd *cobra.Command, zlog *zap.Logger, tracer logging.Tracer) error
 
-	// TransformFlags specify chain specific transforms flags (and parsing of flag's value). The flags defined
-	// in there are added to all Firehose-client like tools commannd (`tools firehose-client`, `tools firehose-prometheus-exporter`, etc.).
+	// TransformFlags specify chain specific transforms flags (and parsing of those flag's value). The flags defined
+	// in there are added to all Firehose-client like tools commannd (`tools firehose-client`, `tools firehose-prometheus-exporter`, etc.)
+	// automatically.
+	//
+	// Refer to the TransformFlags for further details on how respect the contract of this field.
 	//
 	// The [TransformFlags] is optional.
-	TransformFlags map[string]*TransformFlag
+	TransformFlags *TransformFlags
 
 	// MergedBlockUpgrader when define enables for your chain to upgrade between different versions of "merged-blocks".
 	// It happens from time to time that a data bug is found in the way merged blocks and it's possible to fix it by
@@ -237,12 +249,18 @@ func (t *ToolsConfig[B]) GetSanitizeBlockForCompare() SanitizeBlockForCompareFun
 	return t.SanitizeBlockForCompare
 }
 
-type TransformFlag struct {
-	Description string
-	Parser      TransformFlagParser
-}
+type TransformFlags struct {
+	// Register is a function that will be called when we need to register the flags for the transforms.
+	// You received the command's flag set and you are responsible of registering the flags.
+	Register func(flags *pflag.FlagSet)
 
-type TransformFlagParser func(in string) (*anypb.Any, error)
+	// Parse is a function that will be called when we need to extract the transforms out of the flags.
+	// You received the command and the logger and you are responsible of parsing the flags and returning
+	// the transforms.
+	//
+	// Flags can be obtain with `sflags.MustGetString(cmd, "<flag-name>")` and you will obtain the value.
+	Parse func(cmd *cobra.Command, logger *zap.Logger) ([]*anypb.Any, error)
+}
 
 // Validate normalizes some aspect of the [Chain] values (spaces trimming essentially) and validates the chain
 // by accumulating error an panic if all the error found along the way.
@@ -331,9 +349,13 @@ func (c *Chain[B]) Validate() {
 // **Caveats** Two chain in the same Go binary will not work today as `bstream` uses global
 // variables to store configuration which presents multiple chain to exist in the same process.
 func (c *Chain[B]) Init() {
-	bstream.InitGeneric(c.Protocol, c.ProtocolVersion, func() proto.Message { return c.BlockFactory() })
+	if c.BlockAcceptedVersions == nil {
+		c.BlockAcceptedVersions = []int32{c.ProtocolVersion}
+	}
 
-	c.BlockEncoder = NewGenericBlockEncoder(c.ProtocolVersion)
+	InitBstream(c.Protocol, c.ProtocolVersion, c.BlockAcceptedVersions, func() proto.Message { return c.BlockFactory() })
+
+	c.BlockEncoder = NewBlockEncoder()
 }
 
 // BinaryName represents the binary name for your Firehose on <Chain> is the [ShortName]

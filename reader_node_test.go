@@ -40,9 +40,11 @@ func Test_buildNodeArguments(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := buildNodeArguments(dataDir, nodeDataDir, hostname, tt.startBlockNum, tt.stopBlockNum, tt.args)
+			resolver := createNodeArgumentsResolver(dataDir, nodeDataDir, hostname, tt.startBlockNum, tt.stopBlockNum)
+			args, err := buildNodeArguments(tt.args, resolver)
 			tt.assertion(t, err)
-			assert.Equal(t, tt.want, got)
+
+			assert.Equal(t, tt.want, args)
 		})
 	}
 }
