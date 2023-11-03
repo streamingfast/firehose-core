@@ -15,8 +15,13 @@
 package firecore
 
 import (
-	"encoding/json"
+	"encoding/hex"
+	"github.com/mr-tron/base58"
+
+	//"encoding/json"
 	"fmt"
+	"github.com/go-json-experiment/json"
+	"github.com/go-json-experiment/json/jsontext"
 	"io"
 	"os"
 	"strconv"
@@ -231,12 +236,29 @@ func printBlock(block *bstream.Block, outputMode PrintOutputMode, printTransacti
 	case PrintOutputModeJSON, PrintOutputModeJSONL:
 		nativeBlock := block.ToProtocol().(proto.Message)
 
-		encoder := json.NewEncoder(os.Stdout)
+		var options []jsontext.Options
 		if outputMode == PrintOutputModeJSON {
-			encoder.SetIndent("", "  ")
+			options = append(options, jsontext.WithIndent("  "))
+		}
+		encoder := jsontext.NewEncoder(os.Stdout)
+
+		var marshallers *json.Marshalers
+		switch UnsafeJsonBytesEncoder {
+		case "hex":
+			marshallers = json.NewMarshalers(
+				json.MarshalFuncV2(func(encoder *jsontext.Encoder, t []byte, options json.Options) error {
+					return encoder.WriteToken(jsontext.String(hex.EncodeToString(t)))
+				}),
+			)
+		case "base58":
+			marshallers = json.NewMarshalers(
+				json.MarshalFuncV2(func(encoder *jsontext.Encoder, t []byte, options json.Options) error {
+					return encoder.WriteToken(jsontext.String(base58.Encode(t)))
+				}),
+			)
 		}
 
-		err := encoder.Encode(nativeBlock)
+		err := json.MarshalEncode(encoder, nativeBlock, json.WithMarshalers(marshallers))
 		if err != nil {
 			return fmt.Errorf("block JSON printing: json marshal: %w", err)
 		}

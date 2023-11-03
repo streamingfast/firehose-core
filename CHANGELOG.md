@@ -8,6 +8,10 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+* Command `tools print one-block and merger-blocks` now supports a new `--output-format` `jsonl` format. You can also provide a block range to only print needed blocks.
+Bytes data can now printed as hex or base58 string instead of base64 string.
+
 ## v0.2.0
 
 ### Fixed

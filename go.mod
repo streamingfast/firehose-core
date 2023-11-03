@@ -5,6 +5,7 @@ go 1.21
 require (
 	github.com/ShinyTrinkets/overseer v0.3.0
 	github.com/dustin/go-humanize v1.0.1
+	github.com/go-json-experiment/json v0.0.0-20231013223334-54c864be5b8d
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/mostynb/go-grpc-compression v1.1.17
 	github.com/prometheus/client_golang v1.16.0

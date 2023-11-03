@@ -78,8 +78,9 @@ func addFirehoseFetchClientFlagsToSet[B Block](flags *pflag.FlagSet, chain *Chai
 	flags.String("compression", "none", "The HTTP compression: use either 'none', 'gzip' or 'zstd'")
 	flags.BoolP("plaintext", "p", false, "Use plaintext connection to Firehose")
 	flags.BoolP("insecure", "k", false, "Use SSL connection to Firehose but skip SSL certificate validation")
-
-	chain.Tools.TransformFlags.Register(flags)
+	if chain.Tools.TransformFlags != nil {
+		chain.Tools.TransformFlags.Register(flags)
+	}
 }
 
 type firehoseRequestInfo struct {
