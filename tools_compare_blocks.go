@@ -91,7 +91,7 @@ func runCompareBlocksE[B Block](chain *Chain[B]) CommandExecutor {
 			return fmt.Errorf("invalid block range, you must provide a closed range fully resolved (no negative value)")
 		}
 
-		stopBlock := uint64(blockRange.GetStopBlock())
+		stopBlock := uint64(blockRange.GetStopBlockOr(tools.MaxUint64))
 
 		// Create stores
 		storeReference, err := dstore.NewDBinStore(args[0])
@@ -279,7 +279,7 @@ func (s *state) process(blockNum uint64, isDifferent bool, isMissing bool) {
 }
 
 func (s *state) print() {
-	endBlock := fmt.Sprintf("%d", s.segments[s.currentSegmentIdx].GetStopBlock())
+	endBlock := fmt.Sprintf("%d", s.segments[s.currentSegmentIdx].GetStopBlockOr(tools.MaxUint64))
 
 	if s.totalBlocksCounted == 0 {
 		fmt.Printf("✖ No blocks were found at all for segment %d - %s\n", s.segments[s.currentSegmentIdx].Start, endBlock)

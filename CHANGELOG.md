@@ -9,7 +9,19 @@ Operators, you should copy/paste content of this content straight to your projec
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
 ## Unreleased
-* Command `tools print one-block and merger-blocks` now supports a new `--output-format` `jsonl` format. You can also provide a block range to only print needed blocks.
+
+### Removed
+* Removed the `--dedupe-blocks` flag on `tools download-from-firehose` as it can create confusion and more issues.
+
+### Fixed
+* Bumped `bstream`: the `filesource` will now refuse to read blocks from a merged-files if they are not ordered or if there are any duplicate.
+* The command `tools download-from-firehose` will now fail if it is being served blocks "out of order", to prevent any corrupted merged-blocks from being created.
+* The command `tools print merged-blocks` did not print the whole merged-blocks file, the arguments were confusing: now it will parse <start_block> as a uint64.
+* The command `tools unmerge-blocks` did not cover the whole given range, now fixed
+
+### Added
+* Added the command `tools fix-bloated-merged-blocks` to try and fix merged-blocks that contain duplicates and blocks outside of their range.
+* Command `tools print one-block and merged-blocks` now supports a new `--output-format` `jsonl` format.
 Bytes data can now printed as hex or base58 string instead of base64 string.
 
 ## v0.2.0

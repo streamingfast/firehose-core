@@ -55,7 +55,7 @@ func (b BlockRange) IsClosed() bool {
 	return b.Stop != nil
 }
 
-func (b BlockRange) GetStopBlock() int64 {
+func (b BlockRange) GetStartBlock() int64 {
 	return b.Start
 }
 

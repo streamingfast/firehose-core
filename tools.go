@@ -44,6 +44,7 @@ func configureToolsCmd[B Block](
 	toolsCmd.AddCommand(newToolsFirehoseSingleBlockClientCmd(chain, rootLog, rootTracer))
 	toolsCmd.AddCommand(newToolsFirehosePrometheusExporterCmd(chain, rootLog, rootTracer))
 	toolsCmd.AddCommand(newToolsUnmergeBlocksCmd(chain, rootLog))
+	toolsCmd.AddCommand(newToolsFixBloatedMergedBlocks(chain, rootLog))
 
 	if chain.Tools.MergedBlockUpgrader != nil {
 		toolsCmd.AddCommand(NewToolsUpgradeMergedBlocksCmd(chain))

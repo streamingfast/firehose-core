@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
@@ -30,7 +29,6 @@ func newToolsDownloadFromFirehoseCmd[B Block](chain *Chain[B], zlog *zap.Logger)
 	}
 
 	addFirehoseStreamClientFlagsToSet(cmd.Flags(), chain)
-	cmd.Flags().Bool("dedupe-blocks", false, "use this flag to look for and remove block duplicates. This flag was added to address a specific situation, you shouldn't need this in normal operations")
 
 	return cmd
 }
@@ -71,9 +69,8 @@ func createToolsDownloadFromFirehoseE[B Block](chain *Chain[B], zlog *zap.Logger
 		}
 
 		approximateLIBWarningIssued := false
-		dedupeBlocks := sflags.MustGetBool(cmd, "dedupe-blocks")
-		seen := make(map[string]bool)
-
+		var lastBlockID string
+		var lastBlockNum uint64
 		for {
 
 			request := &pbfirehose.Request{
@@ -133,14 +130,11 @@ func createToolsDownloadFromFirehoseE[B Block](chain *Chain[B], zlog *zap.Logger
 				if err != nil {
 					return fmt.Errorf("error decoding response to bstream block: %w", err)
 				}
-				if seen[blk.Id] {
-					zlog.Info("skipping seen block (source merged-blocks had duplicates, skipping)", zap.String("id", blk.Id), zap.Uint64("num", blk.Number))
-					continue
+				if lastBlockID != "" && blk.PreviousId != lastBlockID {
+					return fmt.Errorf("got an invalid sequence of blocks: block %q has previousId %s, previous block %d had ID %q, this endpoint is serving blocks out of order", blk.String(), blk.PreviousId, lastBlockNum, lastBlockID)
 				}
-
-				if dedupeBlocks {
-					seen[blk.Id] = true
-				}
+				lastBlockID = blk.Id
+				lastBlockNum = blk.Number
 
 				if err := mergeWriter.ProcessBlock(blk, nil); err != nil {
 					return fmt.Errorf("write to blockwriter: %w", err)

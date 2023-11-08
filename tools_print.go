@@ -16,15 +16,16 @@ package firecore
 
 import (
 	"encoding/hex"
+
 	"github.com/mr-tron/base58"
 
-	//"encoding/json"
 	"fmt"
-	"github.com/go-json-experiment/json"
-	"github.com/go-json-experiment/json/jsontext"
 	"io"
 	"os"
 	"strconv"
+
+	"github.com/go-json-experiment/json"
+	"github.com/go-json-experiment/json/jsontext"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
@@ -46,8 +47,8 @@ var toolsPrintOneBlockCmd = &cobra.Command{
 }
 
 var toolsPrintMergedBlocksCmd = &cobra.Command{
-	Use:   "merged-blocks <store> <block_num>",
-	Short: "Prints the content summary of merged blocks file",
+	Use:   "merged-blocks <store> <start_block>",
+	Short: "Prints the content summary of a merged blocks file.",
 	Args:  cobra.ExactArgs(2),
 }
 
@@ -85,22 +86,11 @@ func createToolsPrintMergedBlocksE(blockPrinter BlockPrinterFunc) CommandExecuto
 			return fmt.Errorf("unable to create store at path %q: %w", store, err)
 		}
 
-		blockRange, err := tools.GetBlockRangeFromArg(args[1])
+		startBlock, err := strconv.ParseUint(args[1], 10, 64)
 		if err != nil {
-			return fmt.Errorf("invalid range %q: %w", args[1], err)
+			return fmt.Errorf("invalid base block %q: %w", args[1], err)
 		}
-
-		// Force to be a single block if the range was open
-		if blockRange.IsOpen() {
-			stop := uint64(blockRange.Start)
-			blockRange.Stop = &stop
-		}
-
-		if !blockRange.IsResolved() {
-			return fmt.Errorf("range must be fully resolved for %q", args[1])
-		}
-
-		blockBoundary := tools.RoundToBundleStartBlock(uint64(blockRange.Start), 100)
+		blockBoundary := tools.RoundToBundleStartBlock(startBlock, 100)
 
 		filename := fmt.Sprintf("%010d", blockBoundary)
 		reader, err := store.OpenObject(ctx, filename)
@@ -125,10 +115,6 @@ func createToolsPrintMergedBlocksE(blockPrinter BlockPrinterFunc) CommandExecuto
 					return nil
 				}
 				return fmt.Errorf("error receiving blocks: %w", err)
-			}
-
-			if !blockRange.Contains(block.Number, tools.EndBoundaryInclusive) {
-				continue
 			}
 
 			seenBlockCount++
