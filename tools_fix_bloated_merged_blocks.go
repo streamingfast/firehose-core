@@ -105,7 +105,6 @@ func runFixBloatedMergedBlocksE(zlog *zap.Logger) CommandExecutor {
 
 				seen[block.Id] = true
 
-				fmt.Println("processing", block.String())
 				if err := mergeWriter.ProcessBlock(block, nil); err != nil {
 					return fmt.Errorf("write to blockwriter: %w", err)
 				}
