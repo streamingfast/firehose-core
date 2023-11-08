@@ -10,6 +10,27 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Operators
+
+> [!IMPORTANT]
+> We have had reports of older versions of this software creating corrupted merged-blocks-files (with duplicate or out-of-bound blocks)
+> This release adds additional validation of merged-blocks to prevent serving duplicate blocks from the firehose or substreams service. 
+> This may cause service outage if you have produced those blocks or downloaded them from another party who was affected by this bug.
+
+* Find the affected files by running the following command (can be run multiple times in parallel, over smaller ranges) 
+
+```
+tools check merged-blocks-batch <merged-blocks-store> <start> <stop>
+```
+
+* If you see any affected range, produce fixed merged-blocks files with the following command, on each range:
+
+```
+tools fix-bloated-merged-blocks <merged-blocks-store> <output-store> <start>:<stop>
+```
+
+* Copy the merged-blocks files created in output-store over to the your merged-blocks-store, replacing the corrupted files.
+
 ### Removed
 * Removed the `--dedupe-blocks` flag on `tools download-from-firehose` as it can create confusion and more issues.
 
