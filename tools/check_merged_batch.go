@@ -52,15 +52,19 @@ func CheckMergedBlocksBatch(
 	if err != nil {
 		return err
 	}
-	destStore, err := dstore.NewSimpleStore(destStoreURL)
-	if err != nil {
-		return err
+	var destStore dstore.Store
+	if destStoreURL != "" {
+		destStore, err = dstore.NewSimpleStore(destStoreURL)
+		if err != nil {
+			return err
+		}
 	}
 
 	var firstFilename = fmt.Sprintf("%010d", RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize))
 
 	lastSeenBlock := &blockRef{}
 
+	var lastFilename string
 	err = blocksStore.WalkFrom(ctx, "", firstFilename, func(filename string) error {
 		if strings.HasSuffix(filename, ".tmp") {
 			return nil
@@ -80,28 +84,35 @@ func CheckMergedBlocksBatch(
 			return fmt.Errorf("unhandled error: found base number %d below expected %d", baseNum, expected)
 		}
 		for expected < baseNum {
-			outputFile := fmt.Sprintf("%010d.missing", expected)
-			fmt.Printf("found missing file %s, writing to store\n", outputFile)
-			destStore.WriteObject(ctx, outputFile, strings.NewReader(""))
+			fmt.Printf("missing file %q\n", filename)
+			if destStore != nil {
+				outputFile := fmt.Sprintf("%010d.missing", expected)
+				destStore.WriteObject(ctx, outputFile, strings.NewReader(""))
+			}
 			expected += fileBlockSize64
 		}
 
 		broken, details, err := checkMergedBlockFileBroken(ctx, blocksStore, filename, lastSeenBlock)
 		if broken {
 			if lastSeenBlock.isUnset() {
-				outputFile := fmt.Sprintf("%010d.broken", baseNum)
-				fmt.Printf("found broken file %s, writing to store. (%s)\n", outputFile, details)
-				destStore.WriteObject(ctx, outputFile, strings.NewReader(""))
+				fmt.Printf("found broken file %q, %s\n", filename, details)
+				if destStore != nil {
+					outputFile := fmt.Sprintf("%010d.broken", baseNum)
+					destStore.WriteObject(ctx, outputFile, strings.NewReader(""))
+				}
 			} else {
 				brokenSince := RoundToBundleStartBlock(uint64(lastSeenBlock.num+1), 100)
 				for i := brokenSince; i <= baseNum; i += fileBlockSize64 {
-					outputFile := fmt.Sprintf("%010d.broken", i)
-					fmt.Printf("found broken file %s, writing to store. (%s)\n", outputFile, details)
-					destStore.WriteObject(ctx, outputFile, strings.NewReader(""))
+					fmt.Printf("found broken file %q, %s\n", filename, details)
+					if destStore != nil {
+						outputFile := fmt.Sprintf("%010d.broken", i)
+						destStore.WriteObject(ctx, outputFile, strings.NewReader(""))
+					}
 				}
 			}
 			lastSeenBlock.reset()
 		}
+		lastFilename = filename
 
 		if err != nil {
 			return err
@@ -114,6 +125,7 @@ func CheckMergedBlocksBatch(
 
 		return nil
 	})
+	fmt.Println("last file processed:", lastFilename)
 	if err != nil {
 		return err
 	}

@@ -18,28 +18,30 @@ import (
 	"strconv"
 
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/firehose-core/tools"
 )
 
 var toolsCheckMergedBlocksBatchCmd = &cobra.Command{
-	Use:   "merged-blocks-batch <store-url> <results-store-url> <start> <stop>",
-	Short: "Checks for any holes or unlinkable blocks in merged blocks files, writing the results as files in a results store",
-	Args:  cobra.ExactArgs(4),
+	Use:   "merged-blocks-batch <store-url> <start> <stop>",
+	Short: "Checks for any missing, disordered or duplicate blocks in merged blocks files",
+	Args:  cobra.ExactArgs(3),
 	RunE:  checkMergedBlocksBatchRunE,
 }
 
 func init() {
 	toolsCheckCmd.AddCommand(toolsCheckMergedBlocksBatchCmd)
+
+	toolsCheckMergedBlocksBatchCmd.PersistentFlags().String("output-to-store", "", "If non-empty, an empty file called <blocknum>.broken will be created for every problematic merged-blocks-file. This is a convenient way to gather the results from multiple parallel processes.")
 }
 
 func checkMergedBlocksBatchRunE(cmd *cobra.Command, args []string) error {
 	storeURL := args[0]
-	resultsStoreURL := args[1]
-	start, err := strconv.ParseUint(args[2], 10, 64)
+	start, err := strconv.ParseUint(args[1], 10, 64)
 	if err != nil {
 		return err
 	}
-	stop, err := strconv.ParseUint(args[3], 10, 64)
+	stop, err := strconv.ParseUint(args[2], 10, 64)
 	if err != nil {
 		return err
 	}
@@ -49,6 +51,8 @@ func checkMergedBlocksBatchRunE(cmd *cobra.Command, args []string) error {
 		Start: int64(start),
 		Stop:  &stop,
 	}
+
+	resultsStoreURL := sflags.MustGetString(cmd, "output-to-store")
 
 	return tools.CheckMergedBlocksBatch(cmd.Context(), storeURL, resultsStoreURL, fileBlockSize, blockRange)
 }

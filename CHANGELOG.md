@@ -24,6 +24,9 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 * Command `tools print one-block and merged-blocks` now supports a new `--output-format` `jsonl` format.
 Bytes data can now printed as hex or base58 string instead of base64 string.
 
+### Changed
+* Changed `tools check merged-blocks-batch` argument syntax: the output-to-store is now optional.
+
 ## v0.2.0
 
 ### Fixed
