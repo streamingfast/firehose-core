@@ -13,7 +13,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### Operators
 
 > [!IMPORTANT]
-> We have had reports of older versions of this software creating corrupted merged-blocks-files (with duplicate or out-of-bound blocks)
+> We have had reports of older versions of this software creating corrupted merged-blocks-files (with duplicate or extra out-of-bound blocks)
 > This release adds additional validation of merged-blocks to prevent serving duplicate blocks from the firehose or substreams service. 
 > This may cause service outage if you have produced those blocks or downloaded them from another party who was affected by this bug.
 
@@ -41,7 +41,7 @@ tools fix-bloated-merged-blocks <merged-blocks-store> <output-store> <start>:<st
 * The command `tools unmerge-blocks` did not cover the whole given range, now fixed
 
 ### Added
-* Added the command `tools fix-bloated-merged-blocks` to try and fix merged-blocks that contain duplicates and blocks outside of their range.
+* Added the command `tools fix-bloated-merged-blocks` to try to fix merged-blocks that contain duplicates and blocks outside of their range.
 * Command `tools print one-block and merged-blocks` now supports a new `--output-format` `jsonl` format.
 Bytes data can now printed as hex or base58 string instead of base64 string.
 
