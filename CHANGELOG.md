@@ -14,6 +14,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 * Firehose logs now include auth information (userID, keyID, realIP) along with blocks + egress bytes sent.
 
+### Fixed
+
+* Filesource validation of block order in merged-blocks now works correctly when using indexes in firehose `Blocks` queries
+
 ## v0.2.1
 
 ### Operators
