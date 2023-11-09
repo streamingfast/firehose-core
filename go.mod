@@ -20,7 +20,7 @@ require (
 	github.com/streamingfast/dmetering v0.0.0-20230731155453-e1df53e362aa
 	github.com/streamingfast/dmetrics v0.0.0-20230919161904-206fa8ebd545
 	github.com/streamingfast/dstore v0.1.1-0.20230620124109-3924b3b36c77
-	github.com/streamingfast/firehose v0.1.1-0.20230731171526-3428fc0ff8d9
+	github.com/streamingfast/firehose v0.1.1-0.20231109192301-ebfed7417cf6
 	github.com/streamingfast/index-builder v0.0.0-20221031203737-fa2e70f09dc2
 	github.com/streamingfast/jsonpb v0.0.0-20210811021341-3670f0aa02d0
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
