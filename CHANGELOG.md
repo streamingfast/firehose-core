@@ -18,16 +18,22 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 * Filesource validation of block order in merged-blocks now works correctly when using indexes in firehose `Blocks` queries
 
+### Removed
+
+* Flag `substreams-rpc-endpoints` removed, this was present by mistake and unused actually.
+* Flag `substreams-rpc-cache-store-url` removed, this was present by mistake and unused actually.
+* Flag `substreams-rpc-cache-chunk-size` removed, this was present by mistake and unused actually.
+
 ## v0.2.1
 
 ### Operators
 
 > [!IMPORTANT]
 > We have had reports of older versions of this software creating corrupted merged-blocks-files (with duplicate or extra out-of-bound blocks)
-> This release adds additional validation of merged-blocks to prevent serving duplicate blocks from the firehose or substreams service. 
+> This release adds additional validation of merged-blocks to prevent serving duplicate blocks from the firehose or substreams service.
 > This may cause service outage if you have produced those blocks or downloaded them from another party who was affected by this bug.
 
-* Find the affected files by running the following command (can be run multiple times in parallel, over smaller ranges) 
+* Find the affected files by running the following command (can be run multiple times in parallel, over smaller ranges)
 
 ```
 tools check merged-blocks-batch <merged-blocks-store> <start> <stop>
