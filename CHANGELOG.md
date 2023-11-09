@@ -8,6 +8,12 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Added
+
+* Firehose logs now include auth information (userID, keyID, realIP) along with blocks + egress bytes sent.
+
 ## v0.2.1
 
 ### Operators
