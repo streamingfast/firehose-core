@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/streamingfast/dlauncher/launcher"
-	mergerApp "github.com/streamingfast/merger/app/merger"
+	"github.com/streamingfast/firehose-core/merger/app/merger"
 )
 
 func registerMergerApp() {
@@ -28,7 +28,7 @@ func registerMergerApp() {
 				return nil, err
 			}
 
-			return mergerApp.New(&mergerApp.Config{
+			return merger.New(&merger.Config{
 				GRPCListenAddr:               viper.GetString("merger-grpc-listen-addr"),
 				PruneForkedBlocksAfter:       viper.GetUint64("merger-prune-forked-blocks-after"),
 				StorageOneBlockFilesPath:     oneBlocksStoreURL,

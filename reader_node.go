@@ -13,13 +13,13 @@ import (
 	"github.com/streamingfast/bstream/blockstream"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dlauncher/launcher"
-	nm "github.com/streamingfast/firehose-core/nodemanager"
+	nodeManager "github.com/streamingfast/firehose-core/node-manager"
+	nodeManagerApp "github.com/streamingfast/firehose-core/node-manager/app/node_manager"
+	"github.com/streamingfast/firehose-core/node-manager/metrics"
+	reader "github.com/streamingfast/firehose-core/node-manager/mindreader"
+	"github.com/streamingfast/firehose-core/node-manager/operator"
+	sv "github.com/streamingfast/firehose-core/superviser"
 	"github.com/streamingfast/logging"
-	nodeManager "github.com/streamingfast/node-manager"
-	nodeManagerApp "github.com/streamingfast/node-manager/app/node_manager"
-	"github.com/streamingfast/node-manager/metrics"
-	reader "github.com/streamingfast/node-manager/mindreader"
-	"github.com/streamingfast/node-manager/operator"
 	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	pbheadinfo "github.com/streamingfast/pbgo/sf/headinfo/v1"
 	"github.com/streamingfast/snapshotter"
@@ -118,8 +118,8 @@ func registerReaderNodeApp[B Block](chain *Chain[B]) {
 				readinessMaxLatency,
 			)
 
-			superviser := nm.SupervisorFactory(chain.ExecutableName, nodePath, nodeArguments, appLogger)
-			superviser.RegisterLogPlugin(nm.NewNodeLogPlugin(debugFirehose))
+			superviser := sv.SupervisorFactory(chain.ExecutableName, nodePath, nodeArguments, appLogger)
+			superviser.RegisterLogPlugin(sv.NewNodeLogPlugin(debugFirehose))
 
 			var bootstrapper operator.Bootstrapper
 			if chain.ReaderNodeBootstrapperFactory != nil {

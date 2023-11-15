@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/streamingfast/dlauncher/launcher"
-	relayerApp "github.com/streamingfast/relayer/app/relayer"
+	"github.com/streamingfast/firehose-core/relayer/app/relayer"
 )
 
 func registerRelayerApp() {
@@ -23,7 +23,7 @@ func registerRelayerApp() {
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
 			sfDataDir := runtime.AbsDataDir
 
-			return relayerApp.New(&relayerApp.Config{
+			return relayer.New(&relayer.Config{
 				SourcesAddr:      viper.GetStringSlice("relayer-source"),
 				OneBlocksURL:     MustReplaceDataDir(sfDataDir, viper.GetString("common-one-block-store-url")),
 				GRPCListenAddr:   viper.GetString("relayer-grpc-listen-addr"),

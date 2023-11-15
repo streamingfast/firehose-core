@@ -10,12 +10,11 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/firehose-core/node-manager/mindreader"
+	"github.com/streamingfast/firehose-core/node-manager/operator"
 	"github.com/streamingfast/logging"
-	"github.com/streamingfast/node-manager/mindreader"
-	"github.com/streamingfast/node-manager/operator"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -100,13 +99,6 @@ type Chain[B Block] struct {
 	// The [FirstStreamableBlock] should be defined but the default 0 value is good enough
 	// for most chains.
 	FirstStreamableBlock uint64
-
-	// BlockFactory is a factory function that returns a new instance of your chain's Block.
-	// This new instance is usually used within `firecore` to unmarshal some bytes into your
-	// chain's specific block model and return a [proto.Message] fully instantiated.
-	//
-	// The [BlockFactory] **must** be non-nil and must return a non-nil [proto.Message].
-	BlockFactory func() Block
 
 	BlockAcceptedVersions []int32
 
@@ -304,12 +296,6 @@ func (c *Chain[B]) Validate() {
 		err = multierr.Append(err, fmt.Errorf("field 'Version' must be non-empty"))
 	}
 
-	if c.BlockFactory == nil {
-		err = multierr.Append(err, fmt.Errorf("field 'BlockFactory' must be non-nil"))
-	} else if c.BlockFactory() == nil {
-		err = multierr.Append(err, fmt.Errorf("field 'BlockFactory' must not produce nil blocks"))
-	}
-
 	if c.ConsoleReaderFactory == nil {
 		err = multierr.Append(err, fmt.Errorf("field 'ConsoleReaderFactory' must be non-nil"))
 	}
@@ -352,8 +338,6 @@ func (c *Chain[B]) Init() {
 	if c.BlockAcceptedVersions == nil {
 		c.BlockAcceptedVersions = []int32{c.ProtocolVersion}
 	}
-
-	InitBstream(c.Protocol, c.ProtocolVersion, c.BlockAcceptedVersions, func() proto.Message { return c.BlockFactory() })
 
 	c.BlockEncoder = NewBlockEncoder()
 }

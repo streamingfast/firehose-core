@@ -1,7 +1,7 @@
-package nodemanager
+package superviser
 
 import (
-	logplugin "github.com/streamingfast/node-manager/log_plugin"
+	logplugin "github.com/streamingfast/firehose-core/node-manager/log_plugin"
 )
 
 // This file configures a logging reader that transforms log lines received from the blockchain process running

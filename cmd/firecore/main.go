@@ -2,28 +2,23 @@ package main
 
 import (
 	firecore "github.com/streamingfast/firehose-core"
-	"github.com/streamingfast/firehose-core/nodemanager"
 	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 )
 
 func main() {
 	firecore.Main(&firecore.Chain[*pbbstream.Block]{
-		ShortName:            "near",
-		LongName:             "NEAR",
-		ExecutableName:       "near-firehose-indexer",
-		FullyQualifiedModule: "github.com/streamingfast/firehose-near",
+		ShortName:            "core",      //used to compose the binary name
+		LongName:             "CORE",      //only used to compose cmd title and description
+		ExecutableName:       "fire-core", //only used to set default value of reader-node-path, we should not provide a default value anymore ...
+		FullyQualifiedModule: "github.com/streamingfast/firehose-core",
 		Version:              version,
 
 		Protocol:        "NEA",
 		ProtocolVersion: 1,
 
-		BlockFactory: func() firecore.Block { return new(pbbstream.Block) },
+		ConsoleReaderFactory: supervisor.NewConsoleReader,
 
-		ConsoleReaderFactory: nodemanager.NewConsoleReader,
-
-		Tools: &firecore.ToolsConfig[*pbnear.Block]{
-			BlockPrinter: printBlock,
-		},
+		Tools: &firecore.ToolsConfig[*pbbstream.Block]{},
 	})
 }
 

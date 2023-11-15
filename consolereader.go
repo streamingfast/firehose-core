@@ -1,4 +1,4 @@
-package nodemanager
+package firecore
 
 import (
 	"encoding/base64"
@@ -8,11 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/streamingfast/node-manager/mindreader"
-
-	firecore "github.com/streamingfast/firehose-core"
-
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/firehose-core/node-manager/mindreader"
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -40,7 +37,7 @@ type ConsoleReader struct {
 	ctx    *parseCtx
 }
 
-func NewConsoleReader(lines chan string, blockEncoder firecore.BlockEncoder, logger *zap.Logger, tracer logging.Tracer) (mindreader.ConsolerReader, error) {
+func NewConsoleReader(lines chan string, blockEncoder BlockEncoder, logger *zap.Logger, tracer logging.Tracer) (mindreader.ConsolerReader, error) {
 	reader := &ConsoleReader{
 		lines:  lines,
 		close:  func() {},
@@ -116,7 +113,7 @@ func (ctx *parseCtx) readBlock(line string) (out *bstream.Block, err error) {
 
 	blockHash := chunks[1]
 
-	_, err = strconv.ParseUint(chunks[2], 10, 64)
+	parentNum, err := strconv.ParseUint(chunks[2], 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("parsing parent num %q: %w", chunks[2], err)
 	}
@@ -137,8 +134,8 @@ func (ctx *parseCtx) readBlock(line string) (out *bstream.Block, err error) {
 
 	payload, err := base64.StdEncoding.DecodeString(chunks[6])
 
-	var blockPayload anypb.Any
-	if err := proto.Unmarshal(payload, &blockPayload); err != nil {
+	var blockPayload *anypb.Any
+	if err := proto.Unmarshal(payload, blockPayload); err != nil {
 		return nil, fmt.Errorf("unmarshaling block payload: %w", err)
 	}
 
@@ -149,19 +146,13 @@ func (ctx *parseCtx) readBlock(line string) (out *bstream.Block, err error) {
 	}
 
 	block := &bstream.Block{
-		Id:         blockHash,
-		Number:     blockNum,
-		PreviousId: parentHash,
-		//todo: missing ParentNumber
-		Timestamp:      timestamp,
-		LibNum:         libNum,
-		PayloadKind:    0, //todo: PayloadKind
-		PayloadVersion: 0, //todo: PayloadVersion
-	}
-
-	block, err = bstream.MemoryBlockPayloadSetter(block, blockPayload.Value)
-	if err != nil {
-		return nil, fmt.Errorf("setting block payload: %w", err)
+		Id:          blockHash,
+		Number:      blockNum,
+		PreviousId:  parentHash,
+		PreviousNum: parentNum,
+		Timestamp:   timestamp,
+		LibNum:      libNum,
+		Payload:     blockPayload,
 	}
 
 	return block, nil

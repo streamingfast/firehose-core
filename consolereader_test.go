@@ -1,4 +1,4 @@
-package nodemanager
+package firecore
 
 import (
 	"encoding/base64"
@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/streamingfast/firehose-core/nodemanager/test"
+	"github.com/streamingfast/firehose-core/test"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -59,9 +59,8 @@ func Test_Ctx_readBlock(t *testing.T) {
 	require.Equal(t, uint64(libNumber), block.LibNum)
 	require.Equal(t, time.Unix(0, nowNano), block.Timestamp)
 
-	blockPayload, err := block.Payload.Get()
 	require.NoError(t, err)
-	require.Equal(t, anypbBlock.GetValue(), blockPayload)
+	require.Equal(t, anypbBlock.GetValue(), block.Payload.Value)
 
 }
 
@@ -74,7 +73,8 @@ func (t *tracer) Enabled() bool {
 
 func Test_GetNext(t *testing.T) {
 	lines := make(chan string, 2)
-	reader := NewConsoleReader(lines, zap.NewNop(), &tracer{})
+	reader, err := NewConsoleReader(lines, NewBlockEncoder(), zap.NewNop(), &tracer{})
+	require.NoError(t, err)
 
 	initLine := "FIRE INIT 1.0 sf.ethereum.type.v2.Block"
 	blockLine := "FIRE BLOCK 18571000 d2836a703a02f3ca2a13f05efe26fc48c6fa0db0d754a49e56b066d3b7d54659 18570999 55de88c909fa368ae1e93b6b8ffb3fbb12e64aefec1d4a1fcc27ae7633de2f81 18570800 1699992393935935000 Ci10eXBlLmdvb2dsZWFwaXMuY29tL3NmLmV0aGVyZXVtLnR5cGUudjIuQmxvY2sSJxIg0oNqcDoC88oqE/Be/ib8SMb6DbDXVKSeVrBm07fVRlkY+L3tCA=="
