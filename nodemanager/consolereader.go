@@ -8,6 +8,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/streamingfast/node-manager/mindreader"
+
+	firecore "github.com/streamingfast/firehose-core"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
@@ -36,7 +40,7 @@ type ConsoleReader struct {
 	ctx    *parseCtx
 }
 
-func NewConsoleReader(lines chan string, logger *zap.Logger, tracer logging.Tracer) *ConsoleReader {
+func NewConsoleReader(lines chan string, blockEncoder firecore.BlockEncoder, logger *zap.Logger, tracer logging.Tracer) (mindreader.ConsolerReader, error) {
 	reader := &ConsoleReader{
 		lines:  lines,
 		close:  func() {},
@@ -45,7 +49,7 @@ func NewConsoleReader(lines chan string, logger *zap.Logger, tracer logging.Trac
 		logger: logger,
 		tracer: tracer,
 	}
-	return reader
+	return reader, nil
 }
 
 func (r *ConsoleReader) Done() <-chan interface{} {
