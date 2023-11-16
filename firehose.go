@@ -12,8 +12,8 @@ import (
 	discoveryservice "github.com/streamingfast/dgrpc/server/discovery-service"
 	"github.com/streamingfast/dlauncher/launcher"
 	"github.com/streamingfast/dmetrics"
-	firehoseApp "github.com/streamingfast/firehose/app/firehose"
-	firehoseServer "github.com/streamingfast/firehose/server"
+	"github.com/streamingfast/firehose-core/firehose/firehose/app/firehose"
+	"github.com/streamingfast/firehose-core/firehose/firehose/server"
 	"github.com/streamingfast/logging"
 )
 
@@ -76,15 +76,15 @@ func registerFirehoseApp[B Block](chain *Chain[B]) {
 				registry.Register(transformer)
 			}
 
-			var serverOptions []firehoseServer.Option
+			var serverOptions []server.Option
 
 			limiterSize := viper.GetInt("firehose-rate-limit-bucket-size")
 			limiterRefillRate := viper.GetDuration("firehose-rate-limit-bucket-fill-rate")
 			if limiterSize > 0 {
-				serverOptions = append(serverOptions, firehoseServer.WithLeakyBucketLimiter(limiterSize, limiterRefillRate))
+				serverOptions = append(serverOptions, server.WithLeakyBucketLimiter(limiterSize, limiterRefillRate))
 			}
 
-			return firehoseApp.New(appLogger, &firehoseApp.Config{
+			return firehose.New(appLogger, &firehose.Config{
 				MergedBlocksStoreURL:    mergedBlocksStoreURL,
 				OneBlocksStoreURL:       oneBlocksStoreURL,
 				ForkedBlocksStoreURL:    forkedBlocksStoreURL,
@@ -93,7 +93,7 @@ func registerFirehoseApp[B Block](chain *Chain[B]) {
 				GRPCShutdownGracePeriod: 1 * time.Second,
 				ServiceDiscoveryURL:     serviceDiscoveryURL,
 				ServerOptions:           serverOptions,
-			}, &firehoseApp.Modules{
+			}, &firehose.Modules{
 				Authenticator:         authenticator,
 				HeadTimeDriftMetric:   headTimeDriftmetric,
 				HeadBlockNumberMetric: headBlockNumMetric,

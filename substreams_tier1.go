@@ -33,7 +33,7 @@ var ss1HeadBlockNumMetric = metricset.NewHeadBlockNumber("substreams-tier1")
 var ss1HeadTimeDriftmetric = metricset.NewHeadTimeDrift("substreams-tier1")
 
 func registerSubstreamsTier1App[B Block](chain *Chain[B]) {
-	appLogger, _ := logging.PackageLogger("substreams-tier1", "github.com/streamingfast/firehose-ethereum/substreams-tier1")
+	appLogger, _ := logging.PackageLogger("substreams-tier1", "github.com/streamingfast/firehose-core/firehose-ethereum/substreams-tier1")
 
 	launcher.RegisterApp(rootLog, &launcher.AppDef{
 		ID:          "substreams-tier1",

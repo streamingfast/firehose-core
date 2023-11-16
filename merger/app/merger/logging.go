@@ -18,4 +18,4 @@ import (
 	"github.com/streamingfast/logging"
 )
 
-var zlog, tracer = logging.PackageLogger("merger", "github.com/streamingfast/firehose-core/merger/app/merger")
+var zlog, tracer = logging.PackageLogger("merger", "github.com/streamingfast/firehose-core/firehose/merger/app/merger")

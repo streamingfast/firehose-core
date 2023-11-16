@@ -9,7 +9,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/firehose-core/tools"
+	"github.com/streamingfast/firehose-core/firehose/tools"
 	"go.uber.org/zap"
 )
 

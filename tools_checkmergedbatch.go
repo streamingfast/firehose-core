@@ -19,7 +19,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli/sflags"
-	"github.com/streamingfast/firehose-core/tools"
+	"github.com/streamingfast/firehose-core/firehose/tools"
 )
 
 var toolsCheckMergedBlocksBatchCmd = &cobra.Command{

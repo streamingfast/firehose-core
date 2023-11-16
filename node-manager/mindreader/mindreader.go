@@ -26,7 +26,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
 	"github.com/streamingfast/dstore"
-	nodeManager "github.com/streamingfast/firehose-core/node-manager"
+	nodeManager "github.com/streamingfast/firehose-core/firehose/node-manager"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"

@@ -15,24 +15,16 @@
 package firecore
 
 import (
-	"encoding/hex"
-
-	"github.com/mr-tron/base58"
-
 	"fmt"
 	"io"
 	"os"
 	"strconv"
 
-	"github.com/go-json-experiment/json"
-	"github.com/go-json-experiment/json/jsontext"
-
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/firehose-core/tools"
-	"google.golang.org/protobuf/proto"
+	"github.com/streamingfast/firehose-core/firehose/tools"
 )
 
 var toolsPrintCmd = &cobra.Command{
@@ -220,34 +212,36 @@ func printBlock(block *bstream.Block, outputMode PrintOutputMode, printTransacti
 		}
 
 	case PrintOutputModeJSON, PrintOutputModeJSONL:
-		nativeBlock := block.ToProtocol().(proto.Message)
-
-		var options []jsontext.Options
-		if outputMode == PrintOutputModeJSON {
-			options = append(options, jsontext.WithIndent("  "))
-		}
-		encoder := jsontext.NewEncoder(os.Stdout)
-
-		var marshallers *json.Marshalers
-		switch UnsafeJsonBytesEncoder {
-		case "hex":
-			marshallers = json.NewMarshalers(
-				json.MarshalFuncV2(func(encoder *jsontext.Encoder, t []byte, options json.Options) error {
-					return encoder.WriteToken(jsontext.String(hex.EncodeToString(t)))
-				}),
-			)
-		case "base58":
-			marshallers = json.NewMarshalers(
-				json.MarshalFuncV2(func(encoder *jsontext.Encoder, t []byte, options json.Options) error {
-					return encoder.WriteToken(jsontext.String(base58.Encode(t)))
-				}),
-			)
-		}
-
-		err := json.MarshalEncode(encoder, nativeBlock, json.WithMarshalers(marshallers))
-		if err != nil {
-			return fmt.Errorf("block JSON printing: json marshal: %w", err)
-		}
+		//todo: implement when we have buf registry
+		panic("not implemented")
+		//nativeBlock := block.ToProtocol().(proto.Message)
+		//
+		//var options []jsontext.Options
+		//if outputMode == PrintOutputModeJSON {
+		//	options = append(options, jsontext.WithIndent("  "))
+		//}
+		//encoder := jsontext.NewEncoder(os.Stdout)
+		//
+		//var marshallers *json.Marshalers
+		//switch UnsafeJsonBytesEncoder {
+		//case "hex":
+		//	marshallers = json.NewMarshalers(
+		//		json.MarshalFuncV2(func(encoder *jsontext.Encoder, t []byte, options json.Options) error {
+		//			return encoder.WriteToken(jsontext.String(hex.EncodeToString(t)))
+		//		}),
+		//	)
+		//case "base58":
+		//	marshallers = json.NewMarshalers(
+		//		json.MarshalFuncV2(func(encoder *jsontext.Encoder, t []byte, options json.Options) error {
+		//			return encoder.WriteToken(jsontext.String(base58.Encode(t)))
+		//		}),
+		//	)
+		//}
+		//
+		//err := json.MarshalEncode(encoder, nativeBlock, json.WithMarshalers(marshallers))
+		//if err != nil {
+		//	return fmt.Errorf("block JSON printing: json marshal: %w", err)
+		//}
 	}
 
 	return nil

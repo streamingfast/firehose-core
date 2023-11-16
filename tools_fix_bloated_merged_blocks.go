@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/firehose-core/tools"
+	"github.com/streamingfast/firehose-core/firehose/tools"
 	"go.uber.org/zap"
 )
 

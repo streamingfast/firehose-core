@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/ShinyTrinkets/overseer"
-	nodeManager "github.com/streamingfast/firehose-core/node-manager"
-	"github.com/streamingfast/firehose-core/node-manager/superviser"
+	nodeManager "github.com/streamingfast/firehose-core/firehose/node-manager"
+	"github.com/streamingfast/firehose-core/firehose/node-manager/superviser"
 	"go.uber.org/zap"
 )
 

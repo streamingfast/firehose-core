@@ -14,7 +14,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/firehose-core/merger/metrics"
+	"github.com/streamingfast/firehose-core/firehose/merger/metrics"
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 )

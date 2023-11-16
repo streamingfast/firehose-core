@@ -31,7 +31,7 @@ var ss2HeadBlockNumMetric = metricset.NewHeadBlockNumber("substreams-tier2")
 var ss2HeadTimeDriftmetric = metricset.NewHeadTimeDrift("substreams-tier2")
 
 func registerSubstreamsTier2App[B Block](chain *Chain[B]) {
-	appLogger, _ := logging.PackageLogger("substreams-tier2", "github.com/streamingfast/firehose-ethereum/substreams-tier2")
+	appLogger, _ := logging.PackageLogger("substreams-tier2", "github.com/streamingfast/firehose-core/firehose-ethereum/substreams-tier2")
 
 	launcher.RegisterApp(rootLog, &launcher.AppDef{
 		ID:          "substreams-tier2",

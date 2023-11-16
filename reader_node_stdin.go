@@ -18,10 +18,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/streamingfast/dlauncher/launcher"
-	nodeManager "github.com/streamingfast/firehose-core/node-manager"
-	nodeReaderStdinApp "github.com/streamingfast/firehose-core/node-manager/app/node_reader_stdin"
-	"github.com/streamingfast/firehose-core/node-manager/metrics"
-	"github.com/streamingfast/firehose-core/node-manager/mindreader"
+	nodeManager "github.com/streamingfast/firehose-core/firehose/node-manager"
+	nodeReaderStdinApp "github.com/streamingfast/firehose-core/firehose/node-manager/app/node_reader_stdin"
+	"github.com/streamingfast/firehose-core/firehose/node-manager/metrics"
+	"github.com/streamingfast/firehose-core/firehose/node-manager/mindreader"
 	"github.com/streamingfast/logging"
 )
 

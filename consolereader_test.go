@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/streamingfast/firehose-core/test"
+	"github.com/streamingfast/firehose-core/firehose/test"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"

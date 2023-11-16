@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improved
 * Logging of OneBlockFile deletion now only called once per delete batch
-* When someone else pushes a merged file, merger now detects it and reads the actual blocks to populate its seenblockscache, as discussed here: https://github.com/streamingfast/firehose-core/merger/issues/1
+* When someone else pushes a merged file, merger now detects it and reads the actual blocks to populate its seenblockscache, as discussed here: https://github.com/streamingfast/firehose-core/firehose/merger/issues/1
 * Fixed waiting time to actually use TimeBetweenStoreLookups instead of hardcoded value of 1 second when bundle is incomplete
 
 ## [v0.0.1]

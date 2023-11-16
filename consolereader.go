@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/firehose-core/node-manager/mindreader"
+	"github.com/streamingfast/firehose-core/firehose/node-manager/mindreader"
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
