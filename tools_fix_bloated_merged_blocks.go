@@ -8,6 +8,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose-core/firehose/tools"
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	"go.uber.org/zap"
 )
 
@@ -60,16 +61,15 @@ func runFixBloatedMergedBlocksE(zlog *zap.Logger) CommandExecutor {
 			}
 			defer rc.Close()
 
-			br, err := bstream.GetBlockReaderFactory.New(rc)
+			br, err := bstream.NewDBinBlockReader(rc)
 			if err != nil {
 				return fmt.Errorf("creating block reader: %w", err)
 			}
 
 			mergeWriter := &mergedBlocksWriter{
-				store:         destStore,
-				writerFactory: bstream.GetBlockWriterFactory,
-				tweakBlock:    func(b *bstream.Block) (*bstream.Block, error) { return b, nil },
-				logger:        zlog,
+				store:      destStore,
+				tweakBlock: func(b *pbbstream.Block) (*pbbstream.Block, error) { return b, nil },
+				logger:     zlog,
 			}
 
 			seen := make(map[string]bool)

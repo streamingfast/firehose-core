@@ -137,7 +137,7 @@ func readBlockTime(data []byte) (time.Time, error) {
 	return blk.Time(), nil
 }
 
-func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
+func (b *Bundler) ProcessBlock(_ *pbbstream.Block, obj interface{}) error {
 	obf := obj.(bstream.ObjectWrapper).WrappedObject().(*bstream.OneBlockFile)
 	if obf.Num < b.baseBlockNum {
 		// we may be receiving an inclusive LIB just before our bundle, ignore it

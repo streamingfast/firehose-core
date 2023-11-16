@@ -32,7 +32,7 @@ func CheckMergedBlocks(
 	storeURL string,
 	fileBlockSize uint64,
 	blockRange BlockRange,
-	blockPrinter func(block *bstream.Block),
+	blockPrinter func(block *pbbstream.Block),
 	printDetails PrintDetails,
 ) error {
 	readAllBlocks := printDetails != PrintNoDetails
@@ -165,8 +165,8 @@ func CheckMergedBlocks(
 
 type trackedForkDB struct {
 	fdb                    *forkable.ForkDB
-	firstUnlinkableBlock   *bstream.Block
-	lastLinkedBlock        *bstream.Block
+	firstUnlinkableBlock   *pbbstream.Block
+	lastLinkedBlock        *pbbstream.Block
 	unlinkableSegmentCount int
 }
 
@@ -176,7 +176,7 @@ func validateBlockSegment(
 	segment string,
 	fileBlockSize uint64,
 	blockRange BlockRange,
-	blockPrinter func(block *bstream.Block),
+	blockPrinter func(block *pbbstream.Block),
 	printDetails PrintDetails,
 	tfdb *trackedForkDB,
 ) (lowestBlockSeen, highestBlockSeen uint64) {

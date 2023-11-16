@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"time"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/spf13/cobra"
-	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/transform"
 	"github.com/streamingfast/dstore"
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -117,24 +119,24 @@ func (b BlockEnveloppe) GetFirehoseBlockLIBNum() uint64 {
 // block implementing [Block] interface that will be encoded into [bstream.Block]
 // type which is the type used by Firehose core to "envelope" the block.
 type BlockEncoder interface {
-	Encode(block Block) (blk *bstream.Block, err error)
+	Encode(block Block) (blk *pbbstream.Block, err error)
 }
 
-type BlockEncoderFunc func(block Block) (blk *bstream.Block, err error)
+type BlockEncoderFunc func(block Block) (blk *pbbstream.Block, err error)
 
-func (f BlockEncoderFunc) Encode(block Block) (blk *bstream.Block, err error) {
+func (f BlockEncoderFunc) Encode(block Block) (blk *pbbstream.Block, err error) {
 	return f(block)
 }
 
 type CommandExecutor func(cmd *cobra.Command, args []string) (err error)
 
 func NewBlockEncoder() BlockEncoder {
-	return BlockEncoderFunc(func(block Block) (blk *bstream.Block, err error) {
+	return BlockEncoderFunc(func(block Block) (blk *pbbstream.Block, err error) {
 		return EncodeBlock(block)
 	})
 }
 
-func EncodeBlock(b Block) (blk *bstream.Block, err error) {
+func EncodeBlock(b Block) (blk *pbbstream.Block, err error) {
 	real := b
 	if b, ok := b.(BlockEnveloppe); ok {
 		real = b.Block
@@ -161,11 +163,11 @@ func EncodeBlock(b Block) (blk *bstream.Block, err error) {
 		return nil, fmt.Errorf("unmarshaling block payload: %w", err)
 	}
 
-	bstreamBlock := &bstream.Block{
+	bstreamBlock := &pbbstream.Block{
 		Id:         b.GetFirehoseBlockID(),
 		Number:     b.GetFirehoseBlockNumber(),
 		PreviousId: b.GetFirehoseBlockParentID(),
-		Timestamp:  b.GetFirehoseBlockTime(),
+		Timestamp:  timestamppb.New(b.GetFirehoseBlockTime()),
 		LibNum:     v.GetFirehoseBlockLIBNum(),
 		Payload:    blockPayload,
 	}

@@ -80,7 +80,7 @@ func (a *Archiver) Start(ctx context.Context) {
 	go a.fileUploader.Start(ctx)
 }
 
-func (a *Archiver) StoreBlock(ctx context.Context, block *bstream.Block) error {
+func (a *Archiver) StoreBlock(ctx context.Context, block *pbbstream.Block) error {
 	if block.Number < a.startBlock {
 		a.logger.Debug("skipping block below start_block", zap.Stringer("block", block), zap.Uint64("start_block", a.startBlock))
 		return nil

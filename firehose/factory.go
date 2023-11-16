@@ -25,7 +25,7 @@ import (
 // bstream blocks to protobuf and applying other transforms
 var StreamMergedBlocksPreprocThreads = 25
 
-var bstreamToProtocolPreprocFunc = func(blk *bstream.Block) (interface{}, error) {
+var bstreamToProtocolPreprocFunc = func(blk *pbbstream.Block) (interface{}, error) {
 	return blk.ToProtocol(), nil
 }
 
@@ -51,7 +51,7 @@ func (g *BlockGetter) Get(
 	ctx context.Context,
 	num uint64,
 	id string,
-	logger *zap.Logger) (out *bstream.Block, err error) {
+	logger *zap.Logger) (out *pbbstream.Block, err error) {
 
 	id = bstream.NormalizeBlockID(id)
 	reqLogger := logger.With(

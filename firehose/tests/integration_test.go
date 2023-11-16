@@ -121,7 +121,7 @@ package firehose
 //			irrStore := getIrrStore(c.irreversibleBlocksIndexes)
 //
 //			// fake block decoder func to return pbbstream.Block
-//			bstream.GetBlockDecoder = bstream.BlockDecoderFunc(func(blk *bstream.Block) (interface{}, error) {
+//			bstream.GetBlockDecoder = bstream.BlockDecoderFunc(func(blk *pbbstream.Block) (interface{}, error) {
 //				block := new(pbbstream.Block)
 //				block.Number = blk.Number
 //				block.Id = blk.Id

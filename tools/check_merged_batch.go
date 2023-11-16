@@ -158,7 +158,7 @@ func checkMergedBlockFileBroken(
 	}
 
 	for {
-		var block *bstream.Block
+		var block *pbbstream.Block
 		block, err = readerFactory.Read()
 
 		if block == nil {

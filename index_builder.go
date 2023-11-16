@@ -10,6 +10,7 @@ import (
 	bstransform "github.com/streamingfast/bstream/transform"
 	"github.com/streamingfast/dlauncher/launcher"
 	indexerApp "github.com/streamingfast/index-builder/app/index-builder"
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 )
 
 func registerIndexBuilderApp[B Block](chain *Chain[B]) {
@@ -69,9 +70,8 @@ func registerIndexBuilderApp[B Block](chain *Chain[B]) {
 				return nil, fmt.Errorf("unable to create indexer: %w", err)
 			}
 
-			handler := bstream.HandlerFunc(func(blk *bstream.Block, _ interface{}) error {
-				indexer.ProcessBlock(blk.ToProtocol().(B))
-				return nil
+			handler := bstream.HandlerFunc(func(blk *pbbstream.Block, _ interface{}) error {
+				return indexer.ProcessBlock(any(blk).(B))
 			})
 
 			app := indexerApp.New(&indexerApp.Config{

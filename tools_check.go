@@ -26,6 +26,7 @@ import (
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose-core/firehose/tools"
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 )
@@ -94,7 +95,7 @@ func createToolsCheckMergedBlocksE(blockPrinter BlockPrinterFunc) CommandExecuto
 			printDetails = tools.PrintFull
 		}
 
-		return tools.CheckMergedBlocks(cmd.Context(), rootLog, storeURL, fileBlockSize, blockRange, func(block *bstream.Block) {
+		return tools.CheckMergedBlocks(cmd.Context(), rootLog, storeURL, fileBlockSize, blockRange, func(block *pbbstream.Block) {
 			blockPrinter(block, false, os.Stdout)
 		}, printDetails)
 	}

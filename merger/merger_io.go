@@ -375,7 +375,7 @@ func (od *oneBlockFilesDeleter) processDeletions() {
 	}
 }
 
-func lastBlock(mergeFileReader io.ReadCloser) (out *bstream.Block, err error) {
+func lastBlock(mergeFileReader io.ReadCloser) (out *pbbstream.Block, err error) {
 	defer mergeFileReader.Close()
 
 	blkReader, err := bstream.GetBlockReaderFactory.New(mergeFileReader)

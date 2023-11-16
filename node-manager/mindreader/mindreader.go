@@ -37,7 +37,7 @@ var (
 )
 
 type ConsolerReader interface {
-	ReadBlock() (obj *bstream.Block, err error)
+	ReadBlock() (obj *pbbstream.Block, err error)
 	Done() <-chan interface{}
 }
 
@@ -179,7 +179,7 @@ func (p *MindReaderPlugin) Launch() {
 
 }
 func (p *MindReaderPlugin) launch() {
-	blocks := make(chan *bstream.Block, p.channelCapacity)
+	blocks := make(chan *pbbstream.Block, p.channelCapacity)
 	p.zlogger.Info("launching blocks reading loop", zap.Int("capacity", p.channelCapacity))
 	go p.consumeReadFlow(blocks)
 
@@ -226,7 +226,7 @@ func (p *MindReaderPlugin) waitForReadFlowToComplete() {
 }
 
 // consumeReadFlow is the one function blocking termination until consumption/writeBlock/upload is done
-func (p *MindReaderPlugin) consumeReadFlow(blocks <-chan *bstream.Block) {
+func (p *MindReaderPlugin) consumeReadFlow(blocks <-chan *pbbstream.Block) {
 	p.zlogger.Info("starting consume flow")
 	defer close(p.consumeReadFlowDone)
 
@@ -291,7 +291,7 @@ func (p *MindReaderPlugin) drainMessages() {
 	}
 }
 
-func (p *MindReaderPlugin) readOneMessage(blocks chan<- *bstream.Block) error {
+func (p *MindReaderPlugin) readOneMessage(blocks chan<- *pbbstream.Block) error {
 	block, err := p.consoleReader.ReadBlock()
 	if err != nil {
 		return err

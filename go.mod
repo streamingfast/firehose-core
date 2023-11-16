@@ -2,6 +2,11 @@ module github.com/streamingfast/firehose-core/firehose
 
 go 1.21
 
+replace (
+	github.com/streamingfast/bstream => ../bstream
+	github.com/streamingfast/pbgo => ../pbgo
+)
+
 require (
 	github.com/ShinyTrinkets/overseer v0.3.0
 	github.com/dustin/go-humanize v1.0.1

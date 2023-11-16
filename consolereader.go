@@ -11,6 +11,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/firehose-core/firehose/node-manager/mindreader"
 	"github.com/streamingfast/logging"
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -53,7 +54,7 @@ func (r *ConsoleReader) Done() <-chan interface{} {
 	return r.done
 }
 
-func (r *ConsoleReader) ReadBlock() (out *bstream.Block, err error) {
+func (r *ConsoleReader) ReadBlock() (out *pbbstream.Block, err error) {
 	out, err = r.next()
 	if err != nil {
 		return nil, err
@@ -62,7 +63,7 @@ func (r *ConsoleReader) ReadBlock() (out *bstream.Block, err error) {
 	return out, nil
 }
 
-func (r *ConsoleReader) next() (out *bstream.Block, err error) {
+func (r *ConsoleReader) next() (out *pbbstream.Block, err error) {
 
 	for line := range r.lines {
 		if !strings.HasPrefix(line, "FIRE ") {
@@ -100,7 +101,7 @@ func (r *ConsoleReader) next() (out *bstream.Block, err error) {
 
 // Formats
 // [block_num:342342342] [block_hash] [parent_num] [parent_hash] [lib:123123123] [timestamp:unix_nano] B64ENCODED_any
-func (ctx *parseCtx) readBlock(line string) (out *bstream.Block, err error) {
+func (ctx *parseCtx) readBlock(line string) (out *pbbstream.Block, err error) {
 	chunks, err := SplitInBoundedChunks(line, 7)
 	if err != nil {
 		return nil, fmt.Errorf("splitting block log line: %w", err)

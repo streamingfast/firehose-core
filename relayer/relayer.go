@@ -90,7 +90,7 @@ func NewMultiplexedSource(handler bstream.Handler, sourceAddresses []string, max
 
 			gate := bstream.NewRealtimeGate(maxSourceLatency, subHandler, bstream.GateOptionWithLogger(logger))
 			var upstreamHandler bstream.Handler
-			upstreamHandler = bstream.HandlerFunc(func(blk *bstream.Block, obj interface{}) error {
+			upstreamHandler = bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
 				return gate.ProcessBlock(blk, &namedObj{
 					Obj:  obj,
 					Name: sourceName,

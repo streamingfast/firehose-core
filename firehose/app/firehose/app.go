@@ -120,7 +120,7 @@ func (a *App) Run() error {
 				context.Background(),
 				a.config.BlockStreamAddr,
 				2,
-				bstream.HandlerFunc(func(blk *bstream.Block, obj interface{}) error {
+				bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
 					a.modules.HeadBlockNumberMetric.SetUint64(blk.Num())
 					a.modules.HeadTimeDriftMetric.SetBlockTime(blk.Time())
 					return h.ProcessBlock(blk, obj)

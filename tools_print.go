@@ -20,6 +20,8 @@ import (
 	"os"
 	"strconv"
 
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/cli/sflags"
@@ -92,7 +94,7 @@ func createToolsPrintMergedBlocksE(blockPrinter BlockPrinterFunc) CommandExecuto
 		}
 		defer reader.Close()
 
-		readerFactory, err := bstream.GetBlockReaderFactory.New(reader)
+		readerFactory, err := bstream.NewDBinBlockReader(reader)
 		if err != nil {
 			fmt.Printf("❌ Unable to read blocks filename %s: %s\n", filename, err)
 			return err
@@ -159,7 +161,7 @@ func createToolsPrintOneBlockE(blockPrinter BlockPrinterFunc) CommandExecutor {
 			}
 			defer reader.Close()
 
-			readerFactory, err := bstream.GetBlockReaderFactory.New(reader)
+			readerFactory, err := bstream.NewDBinBlockReader(reader)
 			if err != nil {
 				fmt.Printf("❌ Unable to read blocks filename %s: %s\n", filepath, err)
 				return err
@@ -204,7 +206,7 @@ func toolsPrintCmdGetOutputMode(cmd *cobra.Command) (PrintOutputMode, error) {
 	return out, nil
 }
 
-func printBlock(block *bstream.Block, outputMode PrintOutputMode, printTransactions bool, blockPrinter BlockPrinterFunc) error {
+func printBlock(block *pbbstream.Block, outputMode PrintOutputMode, printTransactions bool, blockPrinter BlockPrinterFunc) error {
 	switch outputMode {
 	case PrintOutputModeText:
 		if err := blockPrinter(block, printTransactions, os.Stdout); err != nil {

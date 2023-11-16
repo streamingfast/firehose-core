@@ -10,6 +10,7 @@ import (
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose-core/firehose/tools"
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	"go.uber.org/zap"
 )
 
@@ -62,7 +63,7 @@ func runUnmergeBlocksE(zlog *zap.Logger) CommandExecutor {
 			}
 			defer rc.Close()
 
-			br, err := bstream.GetBlockReaderFactory.New(rc)
+			br, err := bstream.NewDBinBlockReader(rc)
 			if err != nil {
 				return fmt.Errorf("creating block reader: %w", err)
 			}
@@ -88,14 +89,13 @@ func runUnmergeBlocksE(zlog *zap.Logger) CommandExecutor {
 				pr, pw := io.Pipe()
 
 				//write block data to pipe, and then close to signal end of data
-				go func(block *bstream.Block) {
+				go func(block *pbbstream.Block) {
 					var err error
 					defer func() {
 						pw.CloseWithError(err)
 					}()
 
-					var bw bstream.BlockWriter
-					bw, err = bstream.GetBlockWriterFactory.New(pw)
+					bw, err := bstream.NewDBinBlockWriter(pw)
 					if err != nil {
 						zlog.Error("creating block writer", zap.Error(err))
 						return

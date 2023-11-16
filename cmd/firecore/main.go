@@ -13,12 +13,8 @@ func main() {
 		FullyQualifiedModule: "github.com/streamingfast/firehose-core/firehose",
 		Version:              version,
 
-		Protocol:        "NEA",
-		ProtocolVersion: 1,
-
 		ConsoleReaderFactory: firecore.NewConsoleReader,
-
-		Tools: &firecore.ToolsConfig[*pbbstream.Block]{},
+		Tools:                &firecore.ToolsConfig[*pbbstream.Block]{},
 	})
 }
 

@@ -54,7 +54,7 @@ func createToolsDownloadFromFirehoseE[B Block](chain *Chain[B], zlog *zap.Logger
 		//mergeWriter := &mergedBlocksWriter{
 		//	store:         store,
 		//	writerFactory: bstream.GetBlockWriterFactory,
-		//	tweakBlock:    func(b *bstream.Block) (*bstream.Block, error) { return b, nil },
+		//	tweakBlock:    func(b *pbbstream.Block) (*pbbstream.Block, error) { return b, nil },
 		//	logger:        zlog,
 		//}
 		//

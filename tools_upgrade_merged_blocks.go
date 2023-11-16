@@ -7,6 +7,8 @@ import (
 	"io"
 	"strconv"
 
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/stream"
@@ -23,7 +25,7 @@ func NewToolsUpgradeMergedBlocksCmd[B Block](chain *Chain[B]) *cobra.Command {
 	}
 }
 
-func getMergedBlockUpgrader(tweakFunc func(block *bstream.Block) (*bstream.Block, error)) func(cmd *cobra.Command, args []string) error {
+func getMergedBlockUpgrader(tweakFunc func(block *pbbstream.Block) (*pbbstream.Block, error)) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		source := args[0]
 		sourceStore, err := dstore.NewDBinStore(source)
@@ -48,12 +50,11 @@ func getMergedBlockUpgrader(tweakFunc func(block *bstream.Block) (*bstream.Block
 
 		rootLog.Info("starting block upgrader process", zap.Uint64("start", start), zap.Uint64("stop", stop), zap.String("source", source), zap.String("dest", dest))
 		writer := &mergedBlocksWriter{
-			cmd:           cmd,
-			store:         destStore,
-			lowBlockNum:   lowBoundary(start),
-			stopBlockNum:  stop,
-			writerFactory: bstream.GetBlockWriterFactory,
-			tweakBlock:    tweakFunc,
+			cmd:          cmd,
+			store:        destStore,
+			lowBlockNum:  lowBoundary(start),
+			stopBlockNum: stop,
+			tweakBlock:   tweakFunc,
 		}
 		stream := stream.New(nil, sourceStore, nil, int64(start), writer, stream.WithFinalBlocksOnly())
 
@@ -71,15 +72,14 @@ type mergedBlocksWriter struct {
 	lowBlockNum  uint64
 	stopBlockNum uint64
 
-	blocks        []*bstream.Block
-	writerFactory bstream.BlockWriterFactory
-	logger        *zap.Logger
-	cmd           *cobra.Command
+	blocks []*pbbstream.Block
+	logger *zap.Logger
+	cmd    *cobra.Command
 
-	tweakBlock func(*bstream.Block) (*bstream.Block, error)
+	tweakBlock func(*pbbstream.Block) (*pbbstream.Block, error)
 }
 
-func (w *mergedBlocksWriter) ProcessBlock(blk *bstream.Block, obj interface{}) error {
+func (w *mergedBlocksWriter) ProcessBlock(blk *pbbstream.Block, obj interface{}) error {
 	if w.tweakBlock != nil {
 		b, err := w.tweakBlock(blk)
 		if err != nil {
@@ -140,7 +140,7 @@ func (w *mergedBlocksWriter) writeBundle() error {
 			pw.CloseWithError(err)
 		}()
 
-		blockWriter, err := w.writerFactory.New(pw)
+		blockWriter, err := bstream.NewDBinBlockWriter(pw)
 		if err != nil {
 			return
 		}

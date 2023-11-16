@@ -98,7 +98,7 @@ func (s *Server) Blocks(request *pbfirehose.Request, streamSrv pbfirehose.Stream
 	}
 
 	var blockCount uint64
-	handlerFunc := bstream.HandlerFunc(func(block *bstream.Block, obj interface{}) error {
+	handlerFunc := bstream.HandlerFunc(func(block *pbbstream.Block, obj interface{}) error {
 		blockCount++
 		cursorable := obj.(bstream.Cursorable)
 		cursor := cursorable.Cursor()
