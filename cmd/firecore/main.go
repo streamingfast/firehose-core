@@ -12,7 +12,7 @@ func main() {
 		ExecutableName:       "fire-core", //only used to set default value of reader-node-path, we should not provide a default value anymore ...
 		FullyQualifiedModule: "github.com/streamingfast/firehose-core/firehose",
 		Version:              version,
-
+		BlockFactory:         func() firecore.Block { return new(pbbstream.Block) },
 		ConsoleReaderFactory: firecore.NewConsoleReader,
 		Tools:                &firecore.ToolsConfig[*pbbstream.Block]{},
 	})

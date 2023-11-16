@@ -15,10 +15,15 @@
 package firecore
 
 import (
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
+
+	"github.com/go-json-experiment/json"
+	"github.com/go-json-experiment/json/jsontext"
+	"github.com/mr-tron/base58"
 
 	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 
@@ -59,7 +64,7 @@ func init() {
 func configureToolsPrintCmd[B Block](chain *Chain[B]) {
 	blockPrinter := chain.BlockPrinter()
 
-	toolsPrintOneBlockCmd.RunE = createToolsPrintOneBlockE(blockPrinter)
+	toolsPrintOneBlockCmd.RunE = createToolsPrintOneBlockE(chain, blockPrinter)
 	toolsPrintMergedBlocksCmd.RunE = createToolsPrintMergedBlocksE(blockPrinter)
 }
 
@@ -121,9 +126,14 @@ func createToolsPrintMergedBlocksE(blockPrinter BlockPrinterFunc) CommandExecuto
 	}
 }
 
-func createToolsPrintOneBlockE(blockPrinter BlockPrinterFunc) CommandExecutor {
+func createToolsPrintOneBlockE[B Block](chain *Chain[B], blockPrinter BlockPrinterFunc) CommandExecutor {
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
+
+		if _, ok := chain.BlockFactory().(*pbbstream.Block); ok {
+			//todo: fix this with buf registry
+			return fmt.Errorf("this tool only works with blocks that are not of type *pbbstream.Block")
+		}
 
 		outputMode, err := toolsPrintCmdGetOutputMode(cmd)
 		if err != nil {
@@ -206,7 +216,7 @@ func toolsPrintCmdGetOutputMode(cmd *cobra.Command) (PrintOutputMode, error) {
 	return out, nil
 }
 
-func printBlock(block *pbbstream.Block, outputMode PrintOutputMode, printTransactions bool, blockPrinter BlockPrinterFunc) error {
+func printBlock(block Block, outputMode PrintOutputMode, printTransactions bool, blockPrinter BlockPrinterFunc) error {
 	switch outputMode {
 	case PrintOutputModeText:
 		if err := blockPrinter(block, printTransactions, os.Stdout); err != nil {
@@ -214,36 +224,32 @@ func printBlock(block *pbbstream.Block, outputMode PrintOutputMode, printTransac
 		}
 
 	case PrintOutputModeJSON, PrintOutputModeJSONL:
-		//todo: implement when we have buf registry
-		panic("not implemented")
-		//nativeBlock := block.ToProtocol().(proto.Message)
-		//
-		//var options []jsontext.Options
-		//if outputMode == PrintOutputModeJSON {
-		//	options = append(options, jsontext.WithIndent("  "))
-		//}
-		//encoder := jsontext.NewEncoder(os.Stdout)
-		//
-		//var marshallers *json.Marshalers
-		//switch UnsafeJsonBytesEncoder {
-		//case "hex":
-		//	marshallers = json.NewMarshalers(
-		//		json.MarshalFuncV2(func(encoder *jsontext.Encoder, t []byte, options json.Options) error {
-		//			return encoder.WriteToken(jsontext.String(hex.EncodeToString(t)))
-		//		}),
-		//	)
-		//case "base58":
-		//	marshallers = json.NewMarshalers(
-		//		json.MarshalFuncV2(func(encoder *jsontext.Encoder, t []byte, options json.Options) error {
-		//			return encoder.WriteToken(jsontext.String(base58.Encode(t)))
-		//		}),
-		//	)
-		//}
-		//
-		//err := json.MarshalEncode(encoder, nativeBlock, json.WithMarshalers(marshallers))
-		//if err != nil {
-		//	return fmt.Errorf("block JSON printing: json marshal: %w", err)
-		//}
+		var options []jsontext.Options
+		if outputMode == PrintOutputModeJSON {
+			options = append(options, jsontext.WithIndent("  "))
+		}
+		encoder := jsontext.NewEncoder(os.Stdout)
+
+		var marshallers *json.Marshalers
+		switch UnsafeJsonBytesEncoder {
+		case "hex":
+			marshallers = json.NewMarshalers(
+				json.MarshalFuncV2(func(encoder *jsontext.Encoder, t []byte, options json.Options) error {
+					return encoder.WriteToken(jsontext.String(hex.EncodeToString(t)))
+				}),
+			)
+		case "base58":
+			marshallers = json.NewMarshalers(
+				json.MarshalFuncV2(func(encoder *jsontext.Encoder, t []byte, options json.Options) error {
+					return encoder.WriteToken(jsontext.String(base58.Encode(t)))
+				}),
+			)
+		}
+
+		err := json.MarshalEncode(encoder, block, json.WithMarshalers(marshallers))
+		if err != nil {
+			return fmt.Errorf("block JSON printing: json marshal: %w", err)
+		}
 	}
 
 	return nil

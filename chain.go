@@ -23,7 +23,7 @@ import (
 // BlockPrinterFunc takes a chain agnostic [block] and prints it to a human readable form.
 //
 // See [ToolsConfig#BlockPrinter] for extra details about expected printing.
-type BlockPrinterFunc func(block *pbbstream.Block, alsoPrintTransactions bool, out io.Writer) error
+type BlockPrinterFunc func(block Block, alsoPrintTransactions bool, out io.Writer) error
 
 // SanitizeBlockForCompareFunc takes a chain agnostic [block] and transforms it in-place, removing fields
 // that should not be compared.
@@ -85,6 +85,13 @@ type Chain[B Block] struct {
 	// The [FirstStreamableBlock] should be defined but the default 0 value is good enough
 	// for most chains.
 	FirstStreamableBlock uint64
+
+	// BlockFactory is a factory function that returns a new instance of your chain's Block.
+	// This new instance is usually used within `firecore` to unmarshal some bytes into your
+	// chain's specific block model and return a [proto.Message] fully instantiated.
+	//
+	// The [BlockFactory] **must** be non-nil and must return a non-nil [proto.Message].
+	BlockFactory func() Block
 
 	// ConsoleReaderFactory is the function that should return the `ConsoleReader` that knowns
 	// how to transform your your chain specific Firehose instrumentation logs into the proper
@@ -271,6 +278,12 @@ func (c *Chain[B]) Validate() {
 		err = multierr.Append(err, fmt.Errorf("field 'Version' must be non-empty"))
 	}
 
+	if c.BlockFactory == nil {
+		err = multierr.Append(err, fmt.Errorf("field 'BlockFactory' must be non-nil"))
+	} else if c.BlockFactory() == nil {
+		err = multierr.Append(err, fmt.Errorf("field 'BlockFactory' must not produce nil blocks"))
+	}
+
 	if c.ConsoleReaderFactory == nil {
 		err = multierr.Append(err, fmt.Errorf("field 'ConsoleReaderFactory' must be non-nil"))
 	}
@@ -376,12 +389,12 @@ func (c *Chain[B]) BlockPrinter() BlockPrinterFunc {
 	return c.Tools.BlockPrinter
 }
 
-func defaultBlockPrinter(block *pbbstream.Block, alsoPrintTransactions bool, out io.Writer) error {
+func defaultBlockPrinter(block Block, alsoPrintTransactions bool, out io.Writer) error {
 	if alsoPrintTransactions {
 		return fmt.Errorf("transactions is not supported by the default block printer")
 	}
 
-	if _, err := fmt.Fprintf(out, "Block #%d (%s)\n", block.Number, block.Id); err != nil {
+	if _, err := fmt.Fprintf(out, "Block #%d (%s)\n", block.GetFirehoseBlockNumber(), block.GetFirehoseBlockID()); err != nil {
 		return err
 	}
 
