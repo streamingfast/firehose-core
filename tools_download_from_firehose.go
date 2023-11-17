@@ -135,8 +135,8 @@ func createToolsDownloadFromFirehoseE[B Block](chain *Chain[B], zlog *zap.Logger
 				if err != nil {
 					return fmt.Errorf("error decoding response to bstream block: %w", err)
 				}
-				if lastBlockID != "" && blk.PreviousId != lastBlockID {
-					return fmt.Errorf("got an invalid sequence of blocks: block %q has previousId %s, previous block %d had ID %q, this endpoint is serving blocks out of order", blk.String(), blk.PreviousId, lastBlockNum, lastBlockID)
+				if lastBlockID != "" && blk.ParentId != lastBlockID {
+					return fmt.Errorf("got an invalid sequence of blocks: block %q has previousId %s, previous block %d had ID %q, this endpoint is serving blocks out of order", blk.String(), blk.ParentId, lastBlockNum, lastBlockID)
 				}
 				lastBlockID = blk.Id
 				lastBlockNum = blk.Number

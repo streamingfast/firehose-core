@@ -1,4 +1,4 @@
-package tools
+package firecore
 
 import (
 	"context"
@@ -6,6 +6,10 @@ import (
 	"io"
 	"strconv"
 	"strings"
+
+	"github.com/streamingfast/firehose-core/tools"
+
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
@@ -39,13 +43,13 @@ func CheckMergedBlocksBatch(
 	sourceStoreURL string,
 	destStoreURL string,
 	fileBlockSize uint64,
-	blockRange BlockRange,
+	blockRange tools.BlockRange,
 ) error {
 	if !blockRange.IsResolved() {
 		return fmt.Errorf("check merged blocks can only work with fully resolved range, got %s", blockRange)
 	}
 
-	expected := RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize)
+	expected := tools.RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize)
 	fileBlockSize64 := uint64(fileBlockSize)
 
 	blocksStore, err := dstore.NewDBinStore(sourceStoreURL)
@@ -60,7 +64,7 @@ func CheckMergedBlocksBatch(
 		}
 	}
 
-	var firstFilename = fmt.Sprintf("%010d", RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize))
+	var firstFilename = fmt.Sprintf("%010d", tools.RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize))
 
 	lastSeenBlock := &blockRef{}
 
@@ -101,7 +105,7 @@ func CheckMergedBlocksBatch(
 					destStore.WriteObject(ctx, outputFile, strings.NewReader(""))
 				}
 			} else {
-				brokenSince := RoundToBundleStartBlock(uint64(lastSeenBlock.num+1), 100)
+				brokenSince := tools.RoundToBundleStartBlock(uint64(lastSeenBlock.num+1), 100)
 				for i := brokenSince; i <= baseNum; i += fileBlockSize64 {
 					fmt.Printf("found broken file %q, %s\n", filename, details)
 					if destStore != nil {
@@ -118,7 +122,7 @@ func CheckMergedBlocksBatch(
 			return err
 		}
 
-		if blockRange.IsClosed() && RoundToBundleEndBlock(baseNum, fileBlockSize) >= *blockRange.Stop-1 {
+		if blockRange.IsClosed() && tools.RoundToBundleEndBlock(baseNum, fileBlockSize) >= *blockRange.Stop-1 {
 			return dstore.StopIteration
 		}
 		expected = baseNum + fileBlockSize64
@@ -152,7 +156,7 @@ func checkMergedBlockFileBroken(
 	}
 	defer reader.Close()
 
-	readerFactory, err := bstream.GetBlockReaderFactory.New(reader)
+	readerFactory, err := bstream.NewDBinBlockReader(reader)
 	if err != nil {
 		return true, "", err
 	}
@@ -182,13 +186,13 @@ func checkMergedBlockFileBroken(
 			if fakePreviousNum != 0 {
 				fakePreviousNum -= 1
 			}
-			lastSeenBlock.set(block.PreviousId, fakePreviousNum)
+			lastSeenBlock.set(block.ParentId, fakePreviousNum)
 		}
-		if block.PreviousId != lastSeenBlock.hash {
+		if block.ParentId != lastSeenBlock.hash {
 			if block.Id == lastSeenBlock.hash && block.Number == lastSeenBlock.num {
 				continue
 			}
-			details = fmt.Sprintf("broken on block %d: expecting %q, got %q", block.Number, lastSeenBlock.hash, block.PreviousId)
+			details = fmt.Sprintf("broken on block %d: expecting %q, got %q", block.Number, lastSeenBlock.hash, block.ParentId)
 			broken = true
 			return
 		}

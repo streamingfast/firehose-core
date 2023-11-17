@@ -31,7 +31,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/firehose-core/firehose/tools"
+	"github.com/streamingfast/firehose-core/tools"
 )
 
 var toolsPrintCmd = &cobra.Command{

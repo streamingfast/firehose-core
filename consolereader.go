@@ -8,8 +8,10 @@ import (
 	"strings"
 	"time"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/firehose-core/firehose/node-manager/mindreader"
+	"github.com/streamingfast/firehose-core/node-manager/mindreader"
 	"github.com/streamingfast/logging"
 	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	"go.uber.org/zap"
@@ -135,7 +137,7 @@ func (ctx *parseCtx) readBlock(line string) (out *pbbstream.Block, err error) {
 
 	payload, err := base64.StdEncoding.DecodeString(chunks[6])
 
-	var blockPayload *anypb.Any
+	blockPayload := &anypb.Any{}
 	if err := proto.Unmarshal(payload, blockPayload); err != nil {
 		return nil, fmt.Errorf("unmarshaling block payload: %w", err)
 	}
@@ -147,13 +149,13 @@ func (ctx *parseCtx) readBlock(line string) (out *pbbstream.Block, err error) {
 	}
 
 	block := &bstream.Block{
-		Id:          blockHash,
-		Number:      blockNum,
-		PreviousId:  parentHash,
-		PreviousNum: parentNum,
-		Timestamp:   timestamp,
-		LibNum:      libNum,
-		Payload:     blockPayload,
+		Id:        blockHash,
+		Number:    blockNum,
+		ParentId:  parentHash,
+		ParentNum: parentNum,
+		Timestamp: timestamppb.New(timestamp),
+		LibNum:    libNum,
+		Payload:   blockPayload,
 	}
 
 	return block, nil

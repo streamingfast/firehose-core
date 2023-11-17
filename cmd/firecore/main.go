@@ -1,7 +1,7 @@
 package main
 
 import (
-	firecore "github.com/streamingfast/firehose-core/firehose"
+	firecore "github.com/streamingfast/firehose-core"
 	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 )
 
@@ -10,7 +10,7 @@ func main() {
 		ShortName:            "core",      //used to compose the binary name
 		LongName:             "CORE",      //only used to compose cmd title and description
 		ExecutableName:       "fire-core", //only used to set default value of reader-node-path, we should not provide a default value anymore ...
-		FullyQualifiedModule: "github.com/streamingfast/firehose-core/firehose",
+		FullyQualifiedModule: "github.com/streamingfast/firehose-core",
 		Version:              version,
 		BlockFactory:         func() firecore.Block { return new(pbbstream.Block) },
 		ConsoleReaderFactory: firecore.NewConsoleReader,

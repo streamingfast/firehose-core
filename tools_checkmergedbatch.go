@@ -19,7 +19,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli/sflags"
-	"github.com/streamingfast/firehose-core/firehose/tools"
+	"github.com/streamingfast/firehose-core/tools"
 )
 
 var toolsCheckMergedBlocksBatchCmd = &cobra.Command{
@@ -54,5 +54,5 @@ func checkMergedBlocksBatchRunE(cmd *cobra.Command, args []string) error {
 
 	resultsStoreURL := sflags.MustGetString(cmd, "output-to-store")
 
-	return tools.CheckMergedBlocksBatch(cmd.Context(), storeURL, resultsStoreURL, fileBlockSize, blockRange)
+	return CheckMergedBlocksBatch(cmd.Context(), storeURL, resultsStoreURL, fileBlockSize, blockRange)
 }

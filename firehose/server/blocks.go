@@ -7,11 +7,13 @@ import (
 	"os"
 	"time"
 
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetering"
-	"github.com/streamingfast/firehose-core/firehose/firehose/metrics"
+	"github.com/streamingfast/firehose-core/firehose/metrics"
 	"github.com/streamingfast/logging"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"

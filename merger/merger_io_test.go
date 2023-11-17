@@ -17,14 +17,12 @@ package merger
 import (
 	"context"
 	"io"
-	"io/ioutil"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -67,11 +65,9 @@ func newDStoreIO(
 }
 
 func TestMergerIO_MergeUploadPerfect(t *testing.T) {
-	bstream.GetBlockWriterHeaderLen = 0
-
 	files := []*bstream.OneBlockFile{
-		block100,
-		block101,
+		block100(),
+		block101(),
 	}
 	var mergeLastBase string
 	var filesRead []string
@@ -79,12 +75,13 @@ func TestMergerIO_MergeUploadPerfect(t *testing.T) {
 	done := make(chan struct{})
 
 	oneBlockStore := dstore.NewMockStore(nil)
+
 	oneBlockStore.OpenObjectFunc = func(_ context.Context, name string) (io.ReadCloser, error) {
 		filesRead = append(filesRead, name)
 		if len(filesRead) == 2 {
 			close(done)
 		}
-		return ioutil.NopCloser(strings.NewReader("")), nil
+		return io.NopCloser(strings.NewReader(string(testOneBlockHeader))), nil
 	}
 	mergedBlocksStore := dstore.NewMockStore(
 		func(base string, f io.Reader) (err error) {
@@ -98,29 +95,28 @@ func TestMergerIO_MergeUploadPerfect(t *testing.T) {
 
 	err := mio.MergeAndStore(context.Background(), 100, files)
 	require.NoError(t, err)
-	assert.Equal(t, mergeCounter, 1)
-	assert.Equal(t, mergeLastBase, "0000000100")
+	require.Equal(t, mergeCounter, 1)
+	require.Equal(t, mergeLastBase, "0000000100")
 
 	expectFilenames := []string{
-		"0000000100-0000000000000100a-0000000000000099a-98-suffix", // read header
 		"0000000100-0000000000000100a-0000000000000099a-98-suffix",
 		"0000000101-0000000000000101a-0000000000000100a-99-suffix",
 	}
 
 	select {
 	case <-time.After(time.Second):
-		t.Error("timeout waiting for read")
+		t.Error("timeout waiting for read", filesRead)
 	case <-done:
+		require.Equal(t, expectFilenames, filesRead)
 	}
-	assert.Equal(t, expectFilenames, filesRead)
 }
 
 func TestMergerIO_MergeUploadFiltered(t *testing.T) {
 	files := []*bstream.OneBlockFile{
-		block98,
-		block99,
-		block100,
-		block101,
+		block98(),
+		block99(),
+		block100(),
+		block101(),
 	}
 
 	var mergeLastBase string
@@ -134,7 +130,7 @@ func TestMergerIO_MergeUploadFiltered(t *testing.T) {
 		if len(filesRead) == 2 {
 			close(done)
 		}
-		return ioutil.NopCloser(strings.NewReader("")), nil
+		return io.NopCloser(strings.NewReader(string(testOneBlockHeader))), nil
 	}
 	mergedBlocksStore := dstore.NewMockStore(
 		func(base string, f io.Reader) (err error) {
@@ -148,8 +144,8 @@ func TestMergerIO_MergeUploadFiltered(t *testing.T) {
 
 	err := mio.MergeAndStore(context.Background(), 100, files)
 	require.NoError(t, err)
-	assert.Equal(t, mergeCounter, 1)
-	assert.Equal(t, mergeLastBase, "0000000100")
+	require.Equal(t, mergeCounter, 1)
+	require.Equal(t, mergeLastBase, "0000000100")
 
 	expectFilenames := []string{
 		"0000000098-0000000000000098a-0000000000000097a-96-suffix", // read header
@@ -160,10 +156,10 @@ func TestMergerIO_MergeUploadFiltered(t *testing.T) {
 
 	select {
 	case <-time.After(time.Second):
-		t.Error("timeout waiting for read")
+		t.Error("timeout waiting for read", filesRead)
 	case <-done:
+		require.Equal(t, expectFilenames, filesRead)
 	}
-	assert.Equal(t, expectFilenames, filesRead)
 }
 
 func TestMergerIO_MergeUploadNoFiles(t *testing.T) {
@@ -177,16 +173,18 @@ func TestMergerIO_MergeUploadNoFiles(t *testing.T) {
 	require.Error(t, err)
 }
 func TestMergerIO_MergeUploadFilteredToZero(t *testing.T) {
+	b100 := block102Final100()
+	b101 := block103Final101()
 	files := []*bstream.OneBlockFile{
-		block102Final100,
-		block103Final101,
+		b100,
+		b101,
 	}
 	oneBlockStore := dstore.NewMockStore(nil)
 	mergedBlocksStore := dstore.NewMockStore(nil)
 	mio := newDStoreIO(oneBlockStore, mergedBlocksStore)
 
-	block102Final100.MemoizeData = []byte{0x0, 0x1, 0x2, 0x3}
-	block103Final101.MemoizeData = []byte{0x0, 0x1, 0x2, 0x3}
+	b100.MemoizeData = append(testOneBlockHeader, []byte{0x0, 0x1, 0x2, 0x3}...)
+	b101.MemoizeData = append(testOneBlockHeader, []byte{0x0, 0x1, 0x2, 0x3}...)
 
 	err := mio.MergeAndStore(context.Background(), 114, files)
 	require.NoError(t, err)

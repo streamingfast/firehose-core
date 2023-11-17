@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/streamingfast/firehose-core/firehose/firehose"
-	"github.com/streamingfast/firehose-core/firehose/firehose/rate"
+	"github.com/streamingfast/firehose-core/firehose"
+	"github.com/streamingfast/firehose-core/firehose/rate"
 
 	_ "github.com/mostynb/go-grpc-compression/zstd"
 	"github.com/streamingfast/bstream/transform"

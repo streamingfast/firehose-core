@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/shutter"
 	"github.com/stretchr/testify/assert"

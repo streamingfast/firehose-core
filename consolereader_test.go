@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/streamingfast/firehose-core/firehose/test"
+	"github.com/streamingfast/firehose-core/test"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -55,9 +55,9 @@ func Test_Ctx_readBlock(t *testing.T) {
 
 	require.Equal(t, blockNumber, block.Number)
 	require.Equal(t, blockHash, block.Id)
-	require.Equal(t, parentHash, block.PreviousId)
+	require.Equal(t, parentHash, block.ParentId)
 	require.Equal(t, uint64(libNumber), block.LibNum)
-	require.Equal(t, time.Unix(0, nowNano), block.Timestamp)
+	require.Equal(t, int32(time.Unix(0, nowNano).Nanosecond()), block.Timestamp.Nanos)
 
 	require.NoError(t, err)
 	require.Equal(t, anypbBlock.GetValue(), block.Payload.Value)
@@ -88,8 +88,8 @@ func Test_GetNext(t *testing.T) {
 
 	require.Equal(t, uint64(18571000), block.Number)
 	require.Equal(t, "d2836a703a02f3ca2a13f05efe26fc48c6fa0db0d754a49e56b066d3b7d54659", block.Id)
-	require.Equal(t, "55de88c909fa368ae1e93b6b8ffb3fbb12e64aefec1d4a1fcc27ae7633de2f81", block.PreviousId)
+	require.Equal(t, "55de88c909fa368ae1e93b6b8ffb3fbb12e64aefec1d4a1fcc27ae7633de2f81", block.ParentId)
 	require.Equal(t, uint64(18570800), block.LibNum)
-	require.Equal(t, time.Unix(0, 1699992393935935000), block.Timestamp)
+	require.Equal(t, int32(time.Unix(0, 1699992393935935000).Nanosecond()), block.Timestamp.Nanos)
 
 }

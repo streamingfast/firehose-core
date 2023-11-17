@@ -30,7 +30,7 @@ import (
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/firehose-core/firehose/tools"
+	"github.com/streamingfast/firehose-core/tools"
 	"go.uber.org/multierr"
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
@@ -91,7 +91,7 @@ func runCompareBlocksE[B Block](chain *Chain[B]) CommandExecutor {
 			return fmt.Errorf("invalid block range, you must provide a closed range fully resolved (no negative value)")
 		}
 
-		stopBlock := uint64(blockRange.GetStopBlockOr(tools.MaxUint64))
+		stopBlock := uint64(blockRange.GetStopBlockOr(MaxUint64))
 
 		// Create stores
 		storeReference, err := dstore.NewDBinStore(args[0])
@@ -111,7 +111,7 @@ func runCompareBlocksE[B Block](chain *Chain[B]) CommandExecutor {
 			segments: segments,
 		}
 
-		err = storeReference.Walk(ctx, tools.WalkBlockPrefix(blockRange, 100), func(filename string) (err error) {
+		err = storeReference.Walk(ctx, WalkBlockPrefix(blockRange, 100), func(filename string) (err error) {
 			fileStartBlock, err := strconv.Atoi(filename)
 			if err != nil {
 				return fmt.Errorf("parsing filename: %w", err)
@@ -213,7 +213,7 @@ func readBundle[B Block](
 		return nil, nil, fmt.Errorf("creating reader: %w", err)
 	}
 
-	blockReader, err := bstream.GetBlockReaderFactory.New(fileReader)
+	blockReader, err := bstream.NewDBinBlockReader(fileReader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating block reader: %w", err)
 	}
@@ -238,7 +238,7 @@ func readBundle[B Block](
 			continue
 		}
 
-		curBlockPB := sanitizer(curBlock.ToProtocol().(B))
+		curBlockPB := sanitizer(any(curBlock).(B))
 		blockHashes = append(blockHashes, curBlock.Id)
 		blocksMap[curBlock.Id] = curBlockPB
 	}
@@ -279,7 +279,7 @@ func (s *state) process(blockNum uint64, isDifferent bool, isMissing bool) {
 }
 
 func (s *state) print() {
-	endBlock := fmt.Sprintf("%d", s.segments[s.currentSegmentIdx].GetStopBlockOr(tools.MaxUint64))
+	endBlock := fmt.Sprintf("%d", s.segments[s.currentSegmentIdx].GetStopBlockOr(MaxUint64))
 
 	if s.totalBlocksCounted == 0 {
 		fmt.Printf("✖ No blocks were found at all for segment %d - %s\n", s.segments[s.currentSegmentIdx].Start, endBlock)

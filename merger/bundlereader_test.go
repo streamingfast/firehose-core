@@ -12,94 +12,88 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dbin"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestBundleReader_ReadSimpleFiles(t *testing.T) {
 	bundle := NewTestBundle()
 
-	bstream.GetBlockWriterHeaderLen = 0
-
 	r, err := NewBundleReader(context.Background(), testLogger, testTracer, bundle, bundle[0], nil)
 	require.NoError(t, err)
-	r1 := make([]byte, 4)
 
+	r1 := make([]byte, len(testOneBlockHeader))
 	read, err := r.Read(r1)
 	require.NoError(t, err, "reading header")
-	assert.Equal(t, 0, read)
+	require.Equal(t, string(testOneBlockHeader), string(r1))
+
+	r1 = make([]byte, 2)
+	read, err = r.Read(r1)
+	require.NoError(t, err)
+	require.Equal(t, 2, read)
+	require.Equal(t, []byte{0x1, 0x2}, r1)
 
 	read, err = r.Read(r1)
 	require.NoError(t, err)
-	assert.Equal(t, 2, read)
-	assert.Equal(t, []byte{0x1, 0x2, 0x0, 0x0}, r1)
+	require.Equal(t, 2, read)
+	require.Equal(t, []byte{0x3, 0x4}, r1)
 
 	read, err = r.Read(r1)
 	require.NoError(t, err)
-	assert.Equal(t, 2, read)
-	assert.Equal(t, []byte{0x3, 0x4, 0x0, 0x0}, r1)
+	require.Equal(t, 2, read)
+	require.Equal(t, []byte{0x5, 0x6}, r1)
 
 	read, err = r.Read(r1)
-	require.NoError(t, err)
-	assert.Equal(t, 2, read)
-	assert.Equal(t, []byte{0x5, 0x6, 0x0, 0x0}, r1)
-
-	read, err = r.Read(r1)
-	assert.Equal(t, 0, read)
-	assert.Equal(t, io.EOF, err)
+	require.Equal(t, 0, read)
+	require.Equal(t, io.EOF, err)
 }
 
 func TestBundleReader_ReadByChunk(t *testing.T) {
 	bundle := NewTestBundle()
 
-	bstream.GetBlockWriterHeaderLen = 0
-
 	r, err := NewBundleReader(context.Background(), testLogger, testTracer, bundle, bundle[0], nil)
 	require.NoError(t, err)
-	r1 := make([]byte, 1)
 
+	r1 := make([]byte, len(testOneBlockHeader))
 	read, err := r.Read(r1)
 	require.NoError(t, err, "reading header")
-	assert.Equal(t, 0, read)
+	require.Equal(t, string(testOneBlockHeader), string(r1))
+
+	r1 = make([]byte, 1)
+	read, err = r.Read(r1)
+	require.NoError(t, err)
+	require.Equal(t, 1, read)
+	require.Equal(t, []byte{0x1}, r1)
 
 	read, err = r.Read(r1)
 	require.NoError(t, err)
-	assert.Equal(t, 1, read)
-	assert.Equal(t, []byte{0x1}, r1)
+	require.Equal(t, 1, read)
+	require.Equal(t, []byte{0x2}, r1)
 
 	read, err = r.Read(r1)
 	require.NoError(t, err)
-	assert.Equal(t, 1, read)
-	assert.Equal(t, []byte{0x2}, r1)
+	require.Equal(t, 1, read)
+	require.Equal(t, []byte{0x3}, r1)
 
 	read, err = r.Read(r1)
 	require.NoError(t, err)
-	assert.Equal(t, 1, read)
-	assert.Equal(t, []byte{0x3}, r1)
+	require.Equal(t, 1, read)
+	require.Equal(t, []byte{0x4}, r1)
 
 	read, err = r.Read(r1)
 	require.NoError(t, err)
-	assert.Equal(t, 1, read)
-	assert.Equal(t, []byte{0x4}, r1)
+	require.Equal(t, 1, read)
+	require.Equal(t, []byte{0x5}, r1)
 
 	read, err = r.Read(r1)
 	require.NoError(t, err)
-	assert.Equal(t, 1, read)
-	assert.Equal(t, []byte{0x5}, r1)
-
-	read, err = r.Read(r1)
-	require.NoError(t, err)
-	assert.Equal(t, 1, read)
-	assert.Equal(t, []byte{0x6}, r1)
+	require.Equal(t, 1, read)
+	require.Equal(t, []byte{0x6}, r1)
 
 	_, err = r.Read(r1)
 	require.Equal(t, err, io.EOF)
 }
 
 func TestBundleReader_Read_Then_Read_Block(t *testing.T) {
-	//important
-	bstream.GetBlockWriterHeaderLen = 10
-
 	bundle := []*bstream.OneBlockFile{
 		NewTestOneBlockFileFromFile(t, "0000000001-20150730T152628.0-13406cb6-b1cb8fa3.dbin"),
 		NewTestOneBlockFileFromFile(t, "0000000002-20150730T152657.0-044698c9-13406cb6.dbin"),
@@ -113,7 +107,7 @@ func TestBundleReader_Read_Then_Read_Block(t *testing.T) {
 	dbinReader := dbin.NewReader(bytes.NewReader(allBlockData))
 
 	//Reader header once
-	_, _, err = dbinReader.ReadHeader()
+	_, err = dbinReader.ReadHeader()
 
 	//Block 1
 	require.NoError(t, err)
@@ -135,12 +129,10 @@ func TestBundleReader_Read_Then_Read_Block(t *testing.T) {
 }
 
 func TestBundleReader_Read_DownloadOneBlockFileError(t *testing.T) {
-	bundle := NewDownloadBundle()
-	bstream.GetBlockWriterHeaderLen = 0
-
+	bundle := NewBundleNoMemoize()
 	anyOB := &bstream.OneBlockFile{
 		CanonicalName: "header",
-		MemoizeData:   []byte{0x3, 0x4},
+		MemoizeData:   testOneBlockHeader,
 	}
 
 	downloadOneBlockFile := func(ctx context.Context, oneBlockFile *bstream.OneBlockFile) (data []byte, err error) {
@@ -148,11 +140,11 @@ func TestBundleReader_Read_DownloadOneBlockFileError(t *testing.T) {
 	}
 	r, err := NewBundleReader(context.Background(), testLogger, testTracer, bundle, anyOB, downloadOneBlockFile)
 	require.NoError(t, err)
-	r1 := make([]byte, 4)
 
+	r1 := make([]byte, len(testOneBlockHeader))
 	read, err := r.Read(r1)
 	require.NoError(t, err, "reading header")
-	require.Equal(t, 0, read)
+	require.Equal(t, string(testOneBlockHeader), string(r1))
 
 	read, err = r.Read(r1)
 	require.Equal(t, 0, read)
@@ -160,9 +152,8 @@ func TestBundleReader_Read_DownloadOneBlockFileError(t *testing.T) {
 }
 
 func TestBundleReader_Read_DownloadOneBlockFileCorrupt(t *testing.T) {
-	bstream.GetBlockWriterHeaderLen = 4
 
-	bundle := NewDownloadBundle()
+	bundle := NewBundleNoMemoize()
 
 	downloadOneBlockFile := func(ctx context.Context, oneBlockFile *bstream.OneBlockFile) (data []byte, err error) {
 		return []byte{0xAB, 0xCD, 0xEF}, nil // shorter than header length
@@ -173,12 +164,11 @@ func TestBundleReader_Read_DownloadOneBlockFileCorrupt(t *testing.T) {
 }
 
 func TestBundleReader_Read_DownloadOneBlockFileZeroLength(t *testing.T) {
-	bundle := NewDownloadBundle()
+	bundle := NewBundleNoMemoize()
 
-	bstream.GetBlockWriterHeaderLen = 2
 	anyBlockFile := &bstream.OneBlockFile{
 		CanonicalName: "header",
-		MemoizeData:   []byte{0xa, 0xb},
+		MemoizeData:   testOneBlockHeader,
 	}
 
 	downloadOneBlockFile := func(ctx context.Context, oneBlockFile *bstream.OneBlockFile) (data []byte, err error) {
@@ -187,24 +177,24 @@ func TestBundleReader_Read_DownloadOneBlockFileZeroLength(t *testing.T) {
 
 	r, err := NewBundleReader(context.Background(), testLogger, testTracer, bundle, anyBlockFile, downloadOneBlockFile)
 	require.NoError(t, err)
-	r1 := make([]byte, 4)
 
+	r1 := make([]byte, len(testOneBlockHeader))
 	read, err := r.Read(r1)
-	require.Equal(t, 2, read, "header")
-	require.NoError(t, err)
+	require.NoError(t, err, "reading header")
+	require.Equal(t, string(testOneBlockHeader), string(r1))
 
+	r1 = make([]byte, 4)
 	read, err = r.Read(r1)
 	require.Equal(t, read, 0)
 	require.Error(t, err, "EOF expected")
 }
 
 func TestBundleReader_Read_ReadBufferNotNil(t *testing.T) {
-	bundle := NewDownloadBundle()
+	bundle := NewBundleNoMemoize()
 
-	bstream.GetBlockWriterHeaderLen = 2
 	anyBlockFile := &bstream.OneBlockFile{
 		CanonicalName: "header",
-		MemoizeData:   []byte{0xa, 0xb},
+		MemoizeData:   testOneBlockHeader,
 	}
 
 	downloadOneBlockFile := func(ctx context.Context, oneBlockFile *bstream.OneBlockFile) (data []byte, err error) {
@@ -222,12 +212,11 @@ func TestBundleReader_Read_ReadBufferNotNil(t *testing.T) {
 }
 
 func TestBundleReader_Read_EmptyListOfOneBlockFiles(t *testing.T) {
-	bundle := NewDownloadBundle()
+	bundle := NewBundleNoMemoize()
 
-	bstream.GetBlockWriterHeaderLen = 2
 	anyBlockFile := &bstream.OneBlockFile{
 		CanonicalName: "header",
-		MemoizeData:   []byte{0xa, 0xb},
+		MemoizeData:   testOneBlockHeader,
 	}
 
 	downloadOneBlockFile := func(ctx context.Context, oneBlockFile *bstream.OneBlockFile) (data []byte, err error) {
@@ -236,12 +225,13 @@ func TestBundleReader_Read_EmptyListOfOneBlockFiles(t *testing.T) {
 
 	r, err := NewBundleReader(context.Background(), testLogger, testTracer, bundle, anyBlockFile, downloadOneBlockFile)
 	require.NoError(t, err)
-	r1 := make([]byte, 4)
 
+	r1 := make([]byte, len(testOneBlockHeader))
 	read, err := r.Read(r1)
-	require.Equal(t, 2, read, "header")
-	require.NoError(t, err)
+	require.NoError(t, err, "reading header")
+	require.Equal(t, string(testOneBlockHeader), string(r1))
 
+	r1 = make([]byte, 4)
 	read, err = r.Read(r1)
 	require.Equal(t, 0, read)
 	require.Errorf(t, err, "EOF")
@@ -262,25 +252,26 @@ func NewTestOneBlockFileFromFile(t *testing.T, fileName string) *bstream.OneBloc
 	}
 }
 
+var testOneBlockHeader = []byte("dbin\x00tes\x00\x00")
+
 func NewTestBundle() []*bstream.OneBlockFile {
-	bstream.GetBlockWriterHeaderLen = 0
 
 	o1 := &bstream.OneBlockFile{
 		CanonicalName: "o1",
-		MemoizeData:   []byte{0x1, 0x2},
+		MemoizeData:   append(testOneBlockHeader, []byte{0x1, 0x2}...),
 	}
 	o2 := &bstream.OneBlockFile{
 		CanonicalName: "o2",
-		MemoizeData:   []byte{0x3, 0x4},
+		MemoizeData:   append(testOneBlockHeader, []byte{0x3, 0x4}...),
 	}
 	o3 := &bstream.OneBlockFile{
 		CanonicalName: "o3",
-		MemoizeData:   []byte{0x5, 0x6},
+		MemoizeData:   append(testOneBlockHeader, []byte{0x5, 0x6}...),
 	}
 	return []*bstream.OneBlockFile{o1, o2, o3}
 }
 
-func NewDownloadBundle() []*bstream.OneBlockFile {
+func NewBundleNoMemoize() []*bstream.OneBlockFile {
 	o1 := &bstream.OneBlockFile{
 		CanonicalName: "o1",
 		MemoizeData:   []byte{},

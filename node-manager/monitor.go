@@ -3,6 +3,8 @@ package node_manager
 import (
 	"time"
 
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+
 	"github.com/streamingfast/dmetrics"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
@@ -66,7 +68,7 @@ func (m *MetricsAndReadinessManager) Launch() {
 
 		// metrics
 		if m.headBlockNumber != nil {
-			m.headBlockNumber.SetUint64(lastSeenBlock.Num())
+			m.headBlockNumber.SetUint64(lastSeenBlock.Number)
 		}
 
 		if lastSeenBlock.Time().IsZero() { // never act upon zero timestamps

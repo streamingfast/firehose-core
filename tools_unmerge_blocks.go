@@ -9,7 +9,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/firehose-core/firehose/tools"
+	"github.com/streamingfast/firehose-core/tools"
 	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	"go.uber.org/zap"
 )
@@ -42,12 +42,12 @@ func runUnmergeBlocksE(zlog *zap.Logger) CommandExecutor {
 			return fmt.Errorf("parsing block range: %w", err)
 		}
 
-		err = srcStore.Walk(ctx, tools.WalkBlockPrefix(blockRange, 100), func(filename string) error {
+		err = srcStore.Walk(ctx, WalkBlockPrefix(blockRange, 100), func(filename string) error {
 			zlog.Debug("checking merged block file", zap.String("filename", filename))
 
 			startBlock := mustParseUint64(filename)
 
-			if startBlock > uint64(blockRange.GetStopBlockOr(tools.MaxUint64)) {
+			if startBlock > uint64(blockRange.GetStopBlockOr(MaxUint64)) {
 				zlog.Debug("skipping merged block file", zap.String("reason", "past stop block"), zap.String("filename", filename))
 				return dstore.StopIteration
 			}
@@ -79,7 +79,7 @@ func runUnmergeBlocksE(zlog *zap.Logger) CommandExecutor {
 					continue
 				}
 
-				if block.Number > uint64(blockRange.GetStopBlockOr(tools.MaxUint64)) {
+				if block.Number > uint64(blockRange.GetStopBlockOr(MaxUint64)) {
 					break
 				}
 

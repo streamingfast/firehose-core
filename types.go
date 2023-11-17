@@ -64,14 +64,6 @@ type Block interface {
 	// GetFirehoseBlockTime returns the block timestamp as a time.Time of when the block was
 	// produced. This should the consensus agreed time of the block.
 	GetFirehoseBlockTime() time.Time
-
-	// GetFirehoseBlockVersion returns the version of this block. This is used to determine
-	// what value to assign to `bstream.Block#PayloadVersion` variable when encoding a chain
-	// specific block to a chain agnostic `bstream.Block` type.
-	//
-	// If you come here because you now need to implement this value, you can implement so it
-	// returned a fixed value, usually `chain.ProtocolVersion`:
-	GetFirehoseBlockVersion() int32
 }
 
 // BlockLIBNumDerivable is an optional interface that can be implemented by your chain's block model Block
@@ -158,18 +150,18 @@ func EncodeBlock(b Block) (blk *pbbstream.Block, err error) {
 		)
 	}
 
-	var blockPayload *anypb.Any
+	blockPayload := &anypb.Any{}
 	if err := proto.Unmarshal(content, blockPayload); err != nil {
 		return nil, fmt.Errorf("unmarshaling block payload: %w", err)
 	}
 
 	bstreamBlock := &pbbstream.Block{
-		Id:         b.GetFirehoseBlockID(),
-		Number:     b.GetFirehoseBlockNumber(),
-		PreviousId: b.GetFirehoseBlockParentID(),
-		Timestamp:  timestamppb.New(b.GetFirehoseBlockTime()),
-		LibNum:     v.GetFirehoseBlockLIBNum(),
-		Payload:    blockPayload,
+		Id:        b.GetFirehoseBlockID(),
+		Number:    b.GetFirehoseBlockNumber(),
+		ParentId:  b.GetFirehoseBlockParentID(),
+		Timestamp: timestamppb.New(b.GetFirehoseBlockTime()),
+		LibNum:    v.GetFirehoseBlockLIBNum(),
+		Payload:   blockPayload,
 	}
 
 	return bstreamBlock, nil

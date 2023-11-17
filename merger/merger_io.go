@@ -12,9 +12,11 @@ import (
 	"sync"
 	"time"
 
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/firehose-core/firehose/merger/metrics"
+	"github.com/streamingfast/firehose-core/merger/metrics"
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 )
@@ -239,7 +241,8 @@ func (s *DStoreIO) readLastBlockFromMerged(ctx context.Context, baseBlock uint64
 		return nil, nil, err
 	}
 	// we truncate the block ID to have the short version that we get on oneBlockFiles
-	return bstream.NewBlockRef(bstream.TruncateBlockID(last.Id), last.Number), &last.Timestamp, nil
+	t := last.Timestamp.AsTime()
+	return bstream.NewBlockRef(bstream.TruncateBlockID(last.Id), last.Number), &t, nil
 }
 
 func (s *DStoreIO) DeleteAsync(oneBlockFiles []*bstream.OneBlockFile) error {
@@ -378,7 +381,7 @@ func (od *oneBlockFilesDeleter) processDeletions() {
 func lastBlock(mergeFileReader io.ReadCloser) (out *pbbstream.Block, err error) {
 	defer mergeFileReader.Close()
 
-	blkReader, err := bstream.GetBlockReaderFactory.New(mergeFileReader)
+	blkReader, err := bstream.NewDBinBlockReader(mergeFileReader)
 	if err != nil {
 		return nil, err
 	}

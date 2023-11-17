@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/streamingfast/derr"
-	nodeManager "github.com/streamingfast/firehose-core/firehose/node-manager"
+	nodeManager "github.com/streamingfast/firehose-core/node-manager"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"

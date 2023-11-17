@@ -25,7 +25,7 @@ import (
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/firehose-core/firehose/tools"
+	"github.com/streamingfast/firehose-core/tools"
 	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
@@ -65,7 +65,7 @@ func init() {
 func configureToolsCheckCmd[B Block](chain *Chain[B]) {
 	blockPrinter := chain.BlockPrinter()
 
-	toolsCheckMergedBlocksCmd.RunE = createToolsCheckMergedBlocksE(blockPrinter)
+	toolsCheckMergedBlocksCmd.RunE = createToolsCheckMergedBlocksE(chain, blockPrinter)
 	toolsCheckMergedBlocksCmd.Example = ExamplePrefixed(chain, "tools check merged-blocks", `
 		"./sf-data/storage/merged-blocks"
 		"gs://<project>/<bucket>/<path>" -s
@@ -76,7 +76,7 @@ func configureToolsCheckCmd[B Block](chain *Chain[B]) {
 	toolsCheckForksCmd.RunE = toolsCheckForksE
 }
 
-func createToolsCheckMergedBlocksE(blockPrinter BlockPrinterFunc) CommandExecutor {
+func createToolsCheckMergedBlocksE[B Block](chain *Chain[B], blockPrinter BlockPrinterFunc) CommandExecutor {
 	return func(cmd *cobra.Command, args []string) error {
 		storeURL := args[0]
 		fileBlockSize := uint64(100)
@@ -86,16 +86,16 @@ func createToolsCheckMergedBlocksE(blockPrinter BlockPrinterFunc) CommandExecuto
 			return err
 		}
 
-		printDetails := tools.PrintNoDetails
+		printDetails := PrintNoDetails
 		if sflags.MustGetBool(cmd, "print-stats") {
-			printDetails = tools.PrintStats
+			printDetails = PrintStats
 		}
 
 		if sflags.MustGetBool(cmd, "print-full") {
-			printDetails = tools.PrintFull
+			printDetails = PrintFull
 		}
 
-		return tools.CheckMergedBlocks(cmd.Context(), rootLog, storeURL, fileBlockSize, blockRange, func(block *pbbstream.Block) {
+		return CheckMergedBlocks(cmd.Context(), chain, rootLog, storeURL, fileBlockSize, blockRange, func(block *pbbstream.Block) {
 			blockPrinter(block, false, os.Stdout)
 		}, printDetails)
 	}

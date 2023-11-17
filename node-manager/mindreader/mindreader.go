@@ -23,10 +23,12 @@ import (
 	"regexp"
 	"sync"
 
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
 	"github.com/streamingfast/dstore"
-	nodeManager "github.com/streamingfast/firehose-core/firehose/node-manager"
+	nodeManager "github.com/streamingfast/firehose-core/node-manager"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
@@ -121,7 +123,6 @@ func NewMindReaderPlugin(
 		oneBlockSuffix,
 		localOneBlocksStore,
 		remoteOneBlocksStore,
-		bstream.GetBlockWriterFactory,
 		zlogger,
 		tracer,
 	)
@@ -297,7 +298,7 @@ func (p *MindReaderPlugin) readOneMessage(blocks chan<- *pbbstream.Block) error 
 		return err
 	}
 
-	if block.Num() < bstream.GetProtocolFirstStreamableBlock {
+	if block.Number < bstream.GetProtocolFirstStreamableBlock {
 		return nil
 	}
 
@@ -320,7 +321,7 @@ func (p *MindReaderPlugin) readOneMessage(blocks chan<- *pbbstream.Block) error 
 
 	blocks <- block
 
-	if p.stopBlock != 0 && block.Num() >= p.stopBlock && !p.IsTerminating() {
+	if p.stopBlock != 0 && block.Number >= p.stopBlock && !p.IsTerminating() {
 		p.zlogger.Info("shutting down because requested end block reached", zap.Stringer("block", block))
 
 		// See comment tagged 0a33f6b578cc4d0b

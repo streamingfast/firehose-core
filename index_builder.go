@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	index_builder "github.com/streamingfast/firehose-core/index-builder/app/index-builder"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/streamingfast/bstream"
 	bstransform "github.com/streamingfast/bstream/transform"
 	"github.com/streamingfast/dlauncher/launcher"
-	indexerApp "github.com/streamingfast/index-builder/app/index-builder"
 	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 )
 
@@ -74,7 +75,7 @@ func registerIndexBuilderApp[B Block](chain *Chain[B]) {
 				return indexer.ProcessBlock(any(blk).(B))
 			})
 
-			app := indexerApp.New(&indexerApp.Config{
+			app := index_builder.New(&index_builder.Config{
 				BlockHandler:       handler,
 				StartBlockResolver: startBlockResolver,
 				EndBlock:           stopBlockNum,

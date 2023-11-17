@@ -20,6 +20,8 @@ import (
 	"net/url"
 	"time"
 
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
 	"github.com/streamingfast/bstream/hub"
@@ -28,9 +30,9 @@ import (
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/firehose-core/firehose/firehose"
-	"github.com/streamingfast/firehose-core/firehose/firehose/metrics"
-	"github.com/streamingfast/firehose-core/firehose/firehose/server"
+	"github.com/streamingfast/firehose-core/firehose"
+	"github.com/streamingfast/firehose-core/firehose/metrics"
+	"github.com/streamingfast/firehose-core/firehose/server"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
@@ -121,7 +123,7 @@ func (a *App) Run() error {
 				a.config.BlockStreamAddr,
 				2,
 				bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
-					a.modules.HeadBlockNumberMetric.SetUint64(blk.Num())
+					a.modules.HeadBlockNumberMetric.SetUint64(blk.Number)
 					a.modules.HeadTimeDriftMetric.SetBlockTime(blk.Time())
 					return h.ProcessBlock(blk, obj)
 				}),

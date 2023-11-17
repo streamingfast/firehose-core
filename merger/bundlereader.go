@@ -15,11 +15,13 @@
 package merger
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/dbin"
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 )
@@ -31,7 +33,9 @@ type BundleReader struct {
 	oneBlockDataChan chan []byte
 	errChan          chan error
 
-	logger *zap.Logger
+	logger       *zap.Logger
+	header       *dbin.Header
+	headerLength int
 }
 
 func NewBundleReader(ctx context.Context, logger *zap.Logger, tracer logging.Tracer, oneBlockFiles []*bstream.OneBlockFile, anyOneBlockFile *bstream.OneBlockFile, oneBlockDownloader bstream.OneBlockDownloaderFunc) (*BundleReader, error) {
@@ -46,13 +50,21 @@ func NewBundleReader(ctx context.Context, logger *zap.Logger, tracer logging.Tra
 	if err != nil {
 		return nil, fmt.Errorf("cannot read one_block_file to get header: %w", err)
 	}
-	if len(data) < bstream.GetBlockWriterHeaderLen {
-		return nil, fmt.Errorf("one-block-file corrupt: expected header size of %d, but file size is only %d bytes", bstream.GetBlockWriterHeaderLen, len(data))
+
+	dbinReader, err := bstream.NewDBinBlockReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("creating block reader: %w", err)
 	}
-	r.readBuffer = data[:bstream.GetBlockWriterHeaderLen]
+
+	r.header = dbinReader.Header
+	r.headerLength = len(r.header.Data)
+
+	if len(data) < r.headerLength {
+		return nil, fmt.Errorf("one-block-file corrupt: expected header size of %d, but file size is only %d bytes", r.headerLength, len(data))
+	}
+	r.readBuffer = data[:r.headerLength]
 
 	go r.downloadAll(oneBlockFiles, oneBlockDownloader)
-
 	return r, nil
 }
 
@@ -70,7 +82,6 @@ func (r *BundleReader) downloadAll(oneBlockFiles []*bstream.OneBlockFile, oneBlo
 }
 
 func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
-
 	if r.readBuffer == nil {
 		if err := r.fillBuffer(); err != nil {
 			return 0, err
@@ -105,10 +116,10 @@ func (r *BundleReader) fillBuffer() error {
 		return fmt.Errorf("one-block-file corrupt: empty data")
 	}
 
-	if len(data) < bstream.GetBlockWriterHeaderLen {
-		return fmt.Errorf("one-block-file corrupt: expected header size of %d, but file size is only %d bytes", bstream.GetBlockWriterHeaderLen, len(data))
+	if len(data) < r.headerLength {
+		return fmt.Errorf("one-block-file corrupt: expected header size of %d, but file size is only %d bytes", r.headerLength, len(data))
 	}
-	data = data[bstream.GetBlockWriterHeaderLen:]
+	data = data[r.headerLength:]
 	r.readBuffer = data
 	r.readBufferOffset = 0
 	return nil

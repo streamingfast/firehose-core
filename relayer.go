@@ -6,7 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/streamingfast/dlauncher/launcher"
-	"github.com/streamingfast/firehose-core/firehose/relayer/app/relayer"
+	"github.com/streamingfast/firehose-core/relayer/app/relayer"
 )
 
 func registerRelayerApp() {

@@ -23,9 +23,11 @@ import (
 	"sync"
 	"time"
 
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
-	"github.com/streamingfast/firehose-core/firehose/merger/metrics"
+	"github.com/streamingfast/firehose-core/merger/metrics"
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 )
@@ -54,7 +56,7 @@ type Bundler struct {
 	logger *zap.Logger
 }
 
-var logger, _ = logging.PackageLogger("merger", "github.com/streamingfast/firehose-core/firehose/merger/bundler")
+var logger, _ = logging.PackageLogger("merger", "github.com/streamingfast/firehose-core/merger/bundler")
 
 func NewBundler(startBlock, stopBlock, firstStreamableBlock, bundleSize uint64, io IOInterface) *Bundler {
 	b := &Bundler{
@@ -126,7 +128,7 @@ func (b *Bundler) Reset(nextBase uint64, lib bstream.BlockRef) {
 
 func readBlockTime(data []byte) (time.Time, error) {
 	reader := bytes.NewReader(data)
-	blockReader, err := bstream.GetBlockReaderFactory.New(reader)
+	blockReader, err := bstream.NewDBinBlockReader(reader)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("unable to create block reader: %w", err)
 	}

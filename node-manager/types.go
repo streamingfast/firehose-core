@@ -14,6 +14,8 @@
 
 package node_manager
 
+import pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+
 type DeepMindDebuggable interface {
 	DebugDeepMind(enabled bool)
 }

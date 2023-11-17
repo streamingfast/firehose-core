@@ -1,4 +1,4 @@
-package tools
+package firecore
 
 import (
 	"context"
@@ -8,11 +8,13 @@ import (
 	"regexp"
 	"strconv"
 
+	"github.com/streamingfast/firehose-core/tools"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
 	"github.com/streamingfast/dstore"
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 )
 
 var numberRegex = regexp.MustCompile(`(\d{10})`)
@@ -26,15 +28,7 @@ const (
 	MaxUint64 = ^uint64(0)
 )
 
-func CheckMergedBlocks(
-	ctx context.Context,
-	logger *zap.Logger,
-	storeURL string,
-	fileBlockSize uint64,
-	blockRange BlockRange,
-	blockPrinter func(block *pbbstream.Block),
-	printDetails PrintDetails,
-) error {
+func CheckMergedBlocks[B Block](ctx context.Context, chain *Chain[B], logger *zap.Logger, storeURL string, fileBlockSize uint64, blockRange tools.BlockRange, blockPrinter func(block *pbbstream.Block), printDetails PrintDetails) error {
 	readAllBlocks := printDetails != PrintNoDetails
 	fmt.Printf("Checking block holes on %s\n", storeURL)
 	if readAllBlocks {
@@ -55,7 +49,7 @@ func CheckMergedBlocks(
 	// }
 
 	holeFound := false
-	expected = RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize)
+	expected = tools.RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize)
 	currentStartBlk := uint64(blockRange.Start)
 
 	blocksStore, err := dstore.NewDBinStore(storeURL)
@@ -88,11 +82,11 @@ func CheckMergedBlocks(
 		if baseNum != expected {
 			// There is no previous valid block range if we are at the ever first seen file
 			if count > 1 {
-				fmt.Printf("✅ Range %s\n", NewClosedRange(int64(currentStartBlk), uint64(RoundToBundleEndBlock(expected-fileBlockSize, fileBlockSize))))
+				fmt.Printf("✅ Range %s\n", tools.NewClosedRange(int64(currentStartBlk), uint64(tools.RoundToBundleEndBlock(expected-fileBlockSize, fileBlockSize))))
 			}
 
 			// Otherwise, we do not follow last seen element (previous is `100 - 199` but we are `299 - 300`)
-			missingRange := NewClosedRange(int64(expected), RoundToBundleEndBlock(baseNum-fileBlockSize, fileBlockSize))
+			missingRange := tools.NewClosedRange(int64(expected), tools.RoundToBundleEndBlock(baseNum-fileBlockSize, fileBlockSize))
 			fmt.Printf("❌ Range %s (Missing, [%s])\n", missingRange, missingRange.ReprocRange())
 			currentStartBlk = baseNum
 
@@ -101,7 +95,7 @@ func CheckMergedBlocks(
 		expected = baseNum + fileBlockSize
 
 		if readAllBlocks {
-			lowestBlockSegment, highestBlockSegment := validateBlockSegment(ctx, blocksStore, filename, fileBlockSize, blockRange, blockPrinter, printDetails, tfdb)
+			lowestBlockSegment, highestBlockSegment := validateBlockSegment(ctx, chain, blocksStore, filename, fileBlockSize, blockRange, blockPrinter, printDetails, tfdb)
 			if lowestBlockSegment < lowestBlockSeen {
 				lowestBlockSeen = lowestBlockSegment
 			}
@@ -118,11 +112,11 @@ func CheckMergedBlocks(
 		}
 
 		if count%10000 == 0 {
-			fmt.Printf("✅ Range %s\n", NewClosedRange(int64(currentStartBlk), RoundToBundleEndBlock(baseNum, fileBlockSize)))
+			fmt.Printf("✅ Range %s\n", tools.NewClosedRange(int64(currentStartBlk), tools.RoundToBundleEndBlock(baseNum, fileBlockSize)))
 			currentStartBlk = baseNum + fileBlockSize
 		}
 
-		if blockRange.IsClosed() && RoundToBundleEndBlock(baseNum, fileBlockSize) >= *blockRange.Stop-1 {
+		if blockRange.IsClosed() && tools.RoundToBundleEndBlock(baseNum, fileBlockSize) >= *blockRange.Stop-1 {
 			return dstore.StopIteration
 		}
 
@@ -140,9 +134,9 @@ func CheckMergedBlocks(
 		zap.Uint64("highest_block_seen", highestBlockSeen),
 	)
 	if tfdb.lastLinkedBlock != nil && tfdb.lastLinkedBlock.Number < highestBlockSeen {
-		fmt.Printf("🔶 Range %s has issues with forks, last linkable block number: %d\n", NewClosedRange(int64(currentStartBlk), uint64(highestBlockSeen)), tfdb.lastLinkedBlock.Number)
+		fmt.Printf("🔶 Range %s has issues with forks, last linkable block number: %d\n", tools.NewClosedRange(int64(currentStartBlk), uint64(highestBlockSeen)), tfdb.lastLinkedBlock.Number)
 	} else {
-		fmt.Printf("✅ Range %s\n", NewClosedRange(int64(currentStartBlk), uint64(highestBlockSeen)))
+		fmt.Printf("✅ Range %s\n", tools.NewClosedRange(int64(currentStartBlk), uint64(highestBlockSeen)))
 	}
 
 	fmt.Println()
@@ -151,7 +145,7 @@ func CheckMergedBlocks(
 	if blockRange.IsClosed() &&
 		(highestBlockSeen < uint64(*blockRange.Stop-1) ||
 			(lowestBlockSeen > uint64(blockRange.Start) && lowestBlockSeen > bstream.GetProtocolFirstStreamableBlock)) {
-		fmt.Printf("> 🔶 Incomplete range %s, started at block %s and stopped at block: %s\n", blockRange, PrettyBlockNum(lowestBlockSeen), PrettyBlockNum(highestBlockSeen))
+		fmt.Printf("> 🔶 Incomplete range %s, started at block %s and stopped at block: %s\n", blockRange, tools.PrettyBlockNum(lowestBlockSeen), tools.PrettyBlockNum(highestBlockSeen))
 	}
 
 	if holeFound {
@@ -170,12 +164,13 @@ type trackedForkDB struct {
 	unlinkableSegmentCount int
 }
 
-func validateBlockSegment(
+func validateBlockSegment[B Block](
 	ctx context.Context,
+	chain *Chain[B],
 	store dstore.Store,
 	segment string,
 	fileBlockSize uint64,
-	blockRange BlockRange,
+	blockRange tools.BlockRange,
 	blockPrinter func(block *pbbstream.Block),
 	printDetails PrintDetails,
 	tfdb *trackedForkDB,
@@ -188,7 +183,7 @@ func validateBlockSegment(
 	}
 	defer reader.Close()
 
-	readerFactory, err := bstream.GetBlockReaderFactory.New(reader)
+	readerFactory, err := bstream.NewDBinBlockReader(reader)
 	if err != nil {
 		fmt.Printf("❌ Unable to read blocks segment %s: %s\n", segment, err)
 		return
@@ -214,10 +209,10 @@ func validateBlockSegment(
 			}
 
 			if !tfdb.fdb.HasLIB() {
-				tfdb.fdb.InitLIB(block)
+				tfdb.fdb.InitLIB(block.AsRef())
 			}
 
-			tfdb.fdb.AddLink(block.AsRef(), block.PreviousID(), nil)
+			tfdb.fdb.AddLink(block.AsRef(), block.ParentId, nil)
 			revSeg, _ := tfdb.fdb.ReversibleSegment(block.AsRef())
 			if revSeg == nil {
 				tfdb.unlinkableSegmentCount++
@@ -226,17 +221,17 @@ func validateBlockSegment(
 				}
 
 				// TODO: this print should be under a 'check forkable' flag?
-				fmt.Printf("🔶 Block #%d is not linkable at this point\n", block.Num())
+				fmt.Printf("🔶 Block #%d is not linkable at this point\n", block.Number)
 
 				if tfdb.unlinkableSegmentCount > 99 && tfdb.unlinkableSegmentCount%100 == 0 {
 					// TODO: this print should be under a 'check forkable' flag?
-					fmt.Printf("❌ Large gap of %d unlinkable blocks found in chain. Last linked block: %d, first Unlinkable block: %d. \n", tfdb.unlinkableSegmentCount, tfdb.lastLinkedBlock.Num(), tfdb.firstUnlinkableBlock.Num())
+					fmt.Printf("❌ Large gap of %d unlinkable blocks found in chain. Last linked block: %d, first Unlinkable block: %d. \n", tfdb.unlinkableSegmentCount, tfdb.lastLinkedBlock.Number, tfdb.firstUnlinkableBlock.Number)
 				}
 			} else {
 				tfdb.lastLinkedBlock = block
 				tfdb.unlinkableSegmentCount = 0
 				tfdb.firstUnlinkableBlock = nil
-				tfdb.fdb.SetLIB(block, block.PreviousId, block.LibNum)
+				tfdb.fdb.SetLIB(block.AsRef(), block.ParentId, block.LibNum)
 				if tfdb.fdb.HasLIB() {
 					tfdb.fdb.PurgeBeforeLIB(0)
 				}
@@ -248,7 +243,20 @@ func validateBlockSegment(
 			}
 
 			if printDetails == PrintFull {
-				out, err := json.MarshalIndent(block.ToProtocol().(proto.Message), "", "  ")
+				var b = chain.BlockFactory()
+
+				if _, ok := b.(*pbbstream.Block); ok {
+					//todo: implements when buf registry available ...
+					panic("printing full block is not supported for pbbstream.Block")
+				}
+
+				if err := block.Payload.UnmarshalTo(b); err != nil {
+					fmt.Printf("❌ Unable unmarshall block %s: %s\n", block.AsRef(), err)
+					break
+				}
+
+				out, err := json.MarshalIndent(b, "", "  ")
+
 				if err != nil {
 					fmt.Printf("❌ Unable to print full block %s: %s\n", block.AsRef(), err)
 					continue
@@ -273,15 +281,16 @@ func validateBlockSegment(
 			return
 		}
 	}
+	return
 }
 
-func WalkBlockPrefix(blockRange BlockRange, fileBlockSize uint64) string {
+func WalkBlockPrefix(blockRange tools.BlockRange, fileBlockSize uint64) string {
 	if blockRange.IsOpen() {
 		return ""
 	}
 
-	startString := fmt.Sprintf("%010d", RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize))
-	endString := fmt.Sprintf("%010d", RoundToBundleEndBlock(uint64(*blockRange.Stop-1), fileBlockSize)+1)
+	startString := fmt.Sprintf("%010d", tools.RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize))
+	endString := fmt.Sprintf("%010d", tools.RoundToBundleEndBlock(uint64(*blockRange.Stop-1), fileBlockSize)+1)
 
 	offset := 0
 	for i := 0; i < len(startString); i++ {

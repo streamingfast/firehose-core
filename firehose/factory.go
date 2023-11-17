@@ -5,29 +5,22 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/streamingfast/dauth"
-	"github.com/streamingfast/derr"
-	"github.com/streamingfast/dmetering"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/bstream/transform"
+	"github.com/streamingfast/dauth"
+	"github.com/streamingfast/derr"
+	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-// StreamMergedBlocksPreprocThreads defines the number of threads
-// that the filesource is allowed to use PER FILE. Used for decoding
-// bstream blocks to protobuf and applying other transforms
 var StreamMergedBlocksPreprocThreads = 25
-
-var bstreamToProtocolPreprocFunc = func(blk *pbbstream.Block) (interface{}, error) {
-	return blk.ToProtocol(), nil
-}
 
 type BlockGetter struct {
 	mergedBlocksStore dstore.Store
@@ -168,7 +161,7 @@ func (sf *StreamFactory) New(
 	if preprocFunc != nil {
 		options = append(options, stream.WithPreprocessFunc(preprocFunc, StreamMergedBlocksPreprocThreads))
 	} else if decodeBlock {
-		options = append(options, stream.WithPreprocessFunc(bstreamToProtocolPreprocFunc, StreamMergedBlocksPreprocThreads)) // decoding bstream in parallel, faster
+		panic("not supported anymore")
 	}
 	if blockIndexProvider != nil {
 		reqLogger = reqLogger.With(zap.Bool("with_index_provider", true))

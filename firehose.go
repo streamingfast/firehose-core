@@ -12,8 +12,8 @@ import (
 	discoveryservice "github.com/streamingfast/dgrpc/server/discovery-service"
 	"github.com/streamingfast/dlauncher/launcher"
 	"github.com/streamingfast/dmetrics"
-	"github.com/streamingfast/firehose-core/firehose/firehose/app/firehose"
-	"github.com/streamingfast/firehose-core/firehose/firehose/server"
+	"github.com/streamingfast/firehose-core/firehose/app/firehose"
+	"github.com/streamingfast/firehose-core/firehose/server"
 	"github.com/streamingfast/logging"
 )
 

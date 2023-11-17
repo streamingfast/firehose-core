@@ -1,11 +1,8 @@
-module github.com/streamingfast/firehose-core/firehose
+module github.com/streamingfast/firehose-core
 
 go 1.21
 
-replace (
-	github.com/streamingfast/bstream => ../bstream
-	github.com/streamingfast/pbgo => ../pbgo
-)
+replace github.com/streamingfast/bstream => ../bstream
 
 require (
 	github.com/ShinyTrinkets/overseer v0.3.0
@@ -17,20 +14,21 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
-	github.com/streamingfast/bstream v0.0.2-0.20231115182919-10a5d61a80ab
+	github.com/streamingfast/bstream v0.0.2-0.20231116220707-c5946cce90ff
 	github.com/streamingfast/cli v0.0.4-0.20230825151644-8cc84512cd80
 	github.com/streamingfast/dauth v0.0.0-20230929180355-921f9c9be330
+	github.com/streamingfast/dbin v0.9.1-0.20231115202300-f0d94cacb713
+	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
 	github.com/streamingfast/dgrpc v0.0.0-20230929132851-893fc52687fa
 	github.com/streamingfast/dlauncher v0.0.0-20230607184145-76399faad89e
 	github.com/streamingfast/dmetering v0.0.0-20230731155453-e1df53e362aa
 	github.com/streamingfast/dmetrics v0.0.0-20230919161904-206fa8ebd545
 	github.com/streamingfast/dstore v0.1.1-0.20230620124109-3924b3b36c77
-	github.com/streamingfast/index-builder v0.0.0-20221031203737-fa2e70f09dc2
 	github.com/streamingfast/jsonpb v0.0.0-20210811021341-3670f0aa02d0
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
-	github.com/streamingfast/pbgo v0.0.6-0.20231115160849-aa578f33a482
+	github.com/streamingfast/pbgo v0.0.6-0.20231116213602-165f136fce2c
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.1.20
+	github.com/streamingfast/substreams v1.1.21-0.20231117153234-b3b90b45b5be
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/multierr v1.10.0
 	go.uber.org/zap v1.26.0
@@ -41,7 +39,6 @@ require (
 
 require (
 	github.com/google/s2a-go v0.1.4 // indirect
-	github.com/streamingfast/firehose v0.1.1-0.20220810182727-6f3191de9804 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230711160842-782d3b101e98 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98 // indirect
 )
@@ -170,8 +167,6 @@ require (
 	github.com/spf13/afero v1.9.3 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
-	github.com/streamingfast/dbin v0.9.1-0.20220513054835-1abebbb944ad
-	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
 	github.com/streamingfast/dtracing v0.0.0-20220305214756-b5c0e8699839 // indirect
 	github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308 // indirect
 	github.com/streamingfast/sf-tracing v0.0.0-20230616174903-cd2ade641ca9 // indirect
