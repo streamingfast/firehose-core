@@ -10,7 +10,7 @@ package firehose
 //	"github.com/alicebob/miniredis/v2/server"
 //	"github.com/streamingfast/bstream"
 //	"github.com/streamingfast/dstore"
-//	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+//	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
 //	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v1"
 //	"github.com/stretchr/testify/assert"
 //	"github.com/stretchr/testify/require"

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
@@ -67,7 +69,7 @@ func (app *IndexBuilder) launch() error {
 		FinalBlocksOnly: true,
 	}
 
-	handlerFunc := func(block *bstream.Block, obj interface{}) error {
+	handlerFunc := func(block *pbbstream.Block, obj interface{}) error {
 		app.logger.Debug("handling block", zap.Uint64("block_num", block.Number))
 
 		metrics.HeadBlockNumber.SetUint64(block.Number)

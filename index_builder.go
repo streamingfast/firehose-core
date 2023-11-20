@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/viper"
 	"github.com/streamingfast/bstream"
 	bstransform "github.com/streamingfast/bstream/transform"
+	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
 	"github.com/streamingfast/dlauncher/launcher"
-	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 )
 
 func registerIndexBuilderApp[B Block](chain *Chain[B]) {

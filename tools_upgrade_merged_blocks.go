@@ -7,7 +7,7 @@ import (
 	"io"
 	"strconv"
 
-	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"

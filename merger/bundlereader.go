@@ -57,7 +57,7 @@ func NewBundleReader(ctx context.Context, logger *zap.Logger, tracer logging.Tra
 	}
 
 	r.header = dbinReader.Header
-	r.headerLength = len(r.header.Data)
+	r.headerLength = len(r.header.RawBytes)
 
 	if len(data) < r.headerLength {
 		return nil, fmt.Errorf("one-block-file corrupt: expected header size of %d, but file size is only %d bytes", r.headerLength, len(data))

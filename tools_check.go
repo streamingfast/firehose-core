@@ -22,11 +22,11 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
+	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose-core/tools"
-	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 )

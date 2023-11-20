@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"

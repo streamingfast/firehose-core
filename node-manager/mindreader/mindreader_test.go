@@ -10,9 +10,8 @@ import (
 	"testing"
 	"time"
 
-	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
 
-	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/shutter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -150,7 +149,7 @@ func (c *testConsoleReader) ReadBlock() (*pbbstream.Block, error) {
 	if err := json.Unmarshal([]byte(formatedLine), data); err != nil {
 		return nil, fmt.Errorf("marshalling error on '%s': %w", formatedLine, err)
 	}
-	return &bstream.Block{
+	return &pbbstream.Block{
 		Id:     data.ID,
 		Number: toBlockNum(data.ID),
 	}, nil
