@@ -14,10 +14,10 @@ require (
 	github.com/spf13/viper v1.15.0
 	github.com/streamingfast/bstream v0.0.2-0.20231109200242-92c3eea7aaba
 	github.com/streamingfast/cli v0.0.4-0.20230825151644-8cc84512cd80
-	github.com/streamingfast/dauth v0.0.0-20230929180355-921f9c9be330
+	github.com/streamingfast/dauth v0.0.0-20231120142446-843f4e045cc2
 	github.com/streamingfast/dgrpc v0.0.0-20230929132851-893fc52687fa
 	github.com/streamingfast/dlauncher v0.0.0-20230607184145-76399faad89e
-	github.com/streamingfast/dmetering v0.0.0-20230731155453-e1df53e362aa
+	github.com/streamingfast/dmetering v0.0.0-20231120142327-a3405f0eed83
 	github.com/streamingfast/dmetrics v0.0.0-20230919161904-206fa8ebd545
 	github.com/streamingfast/dstore v0.1.1-0.20230620124109-3924b3b36c77
 	github.com/streamingfast/firehose v0.1.1-0.20231109192301-ebfed7417cf6
