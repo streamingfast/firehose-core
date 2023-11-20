@@ -580,6 +580,7 @@ github.com/streamingfast/dauth v0.0.0-20230929180355-921f9c9be330 h1:49JYZkn8ALG
 github.com/streamingfast/dauth v0.0.0-20230929180355-921f9c9be330/go.mod h1:zfq+mtesfbaZnNeh1BF+vo+zEFP1sat4pm3lvt40nRw=
 github.com/streamingfast/dbin v0.9.1-0.20231115202300-f0d94cacb713 h1:pVUxJeGfR8+WU+t1ZHiPqRFqeZOp2swYbYW57BAEpWI=
 github.com/streamingfast/dbin v0.9.1-0.20231115202300-f0d94cacb713/go.mod h1:dbfiy9ORrL8c6ldSq+L0H9pg8TOqqu/FsghsgUEWK54=
+github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c/go.mod h1:dbfiy9ORrL8c6ldSq+L0H9pg8TOqqu/FsghsgUEWK54=
 github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1 h1:xJB7rXnOHLesosMjfwWsEL2i/40mFSkzenEb3M0qTyM=
 github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1/go.mod h1:QSm/AfaDsE0k1xBYi0lW580YJ/WDV/FKZI628tkZR0Y=
 github.com/streamingfast/dgrpc v0.0.0-20230929132851-893fc52687fa h1:L/Ipge5pkZtyHucT7c8F/PiCitiNqQxjoUuxyzWKZew=
@@ -607,6 +608,7 @@ github.com/streamingfast/overseer v0.2.1-0.20210326144022-ee491780e3ef h1:9IVFHR
 github.com/streamingfast/overseer v0.2.1-0.20210326144022-ee491780e3ef/go.mod h1:cq8CvbZ3ioFmGrHokSAJalS0lC+pVXLKhITScItUGXY=
 github.com/streamingfast/pbgo v0.0.6-0.20231116213602-165f136fce2c h1:DPvapg4SdVcXlk/lxAFSYJJTh9+M7UGQ2+XZGdw4wko=
 github.com/streamingfast/pbgo v0.0.6-0.20231116213602-165f136fce2c/go.mod h1:fZuijmeFrqxW2YnnXmGrkQpUTHx3eHCaJUKwdvXAYKM=
+github.com/streamingfast/pbgo v0.0.6-0.20231120172814-537d034aad5e/go.mod h1:fZuijmeFrqxW2YnnXmGrkQpUTHx3eHCaJUKwdvXAYKM=
 github.com/streamingfast/sf-tracing v0.0.0-20230616174903-cd2ade641ca9 h1:YRwpVvLYa+FEJlTy0S7mk4UptYjk5zac+A+ZE1phOeA=
 github.com/streamingfast/sf-tracing v0.0.0-20230616174903-cd2ade641ca9/go.mod h1:ktzt1BUj3GF+SKQHEmn3ShryJ7y87JeCHtaTGaDVATs=
 github.com/streamingfast/shutter v1.5.0 h1:NpzDYzj0HVpSiDJVO/FFSL6QIK/YKOxY0gJAtyaTOgs=
