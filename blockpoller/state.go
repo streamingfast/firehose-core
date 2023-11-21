@@ -1,4 +1,4 @@
-package blkpoller
+package blockpoller
 
 import (
 	"github.com/streamingfast/bstream"

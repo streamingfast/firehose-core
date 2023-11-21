@@ -1,4 +1,4 @@
-package blkpoller
+package blockpoller
 
 import (
 	"errors"
@@ -157,7 +157,7 @@ func TestForkHandler_run(t *testing.T) {
 				blocks: tt.expectFireBlock,
 			}
 
-			f := &BlkPoller{
+			f := &BlockPoller{
 				blockFetcher:      blockFetcher,
 				blockFireFunc:     blockFire.fetchBlockFire(t),
 				forkDB:            forkable.NewForkDB(),
@@ -233,7 +233,7 @@ func TestForkHandler_fireCompleteSegment(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			f := &BlkPoller{startBlockNumGate: test.startBlockNum, logger: zap.NewNop()}
+			f := &BlockPoller{startBlockNumGate: test.startBlockNum, logger: zap.NewNop()}
 			receviedIds := []string{}
 			f.blockFireFunc = func(p *pbbstream.Block) {
 				receviedIds = append(receviedIds, p.Id)

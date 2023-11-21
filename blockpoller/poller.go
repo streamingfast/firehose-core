@@ -1,4 +1,4 @@
-package blkpoller
+package blockpoller
 
 import (
 	"context"
@@ -16,21 +16,23 @@ import (
 
 type BlockFireFunc func(*pbbstream.Block)
 
-type BlkPoller struct {
+type BlockPoller struct {
+	// the block number at which
+	startBlockNumGate    uint64
 	blockFetcher         BlockFetcher
 	blockFireFunc        BlockFireFunc
 	fetchBlockRetryCount uint64
 	forkDB               *forkable.ForkDB
-	startBlockNumGate    uint64
-	logger               *zap.Logger
+
+	logger *zap.Logger
 }
 
 func New(
 	blockFetcher BlockFetcher,
 	blockFire BlockFireFunc,
 	logger *zap.Logger,
-) *BlkPoller {
-	return &BlkPoller{
+) *BlockPoller {
+	return &BlockPoller{
 		blockFetcher:         blockFetcher,
 		blockFireFunc:        blockFire,
 		fetchBlockRetryCount: 4,
@@ -39,7 +41,7 @@ func New(
 	}
 }
 
-func (p *BlkPoller) Run(ctx context.Context, startBlockNum uint64, finalizedBlockNum bstream.BlockRef) error {
+func (p *BlockPoller) Run(ctx context.Context, startBlockNum uint64, finalizedBlockNum bstream.BlockRef) error {
 	p.startBlockNumGate = startBlockNum
 	resolveStartBlockNum := resolveStartBlock(startBlockNum, finalizedBlockNum.Num())
 	p.logger.Info("starting poller",
@@ -57,7 +59,7 @@ func (p *BlkPoller) Run(ctx context.Context, startBlockNum uint64, finalizedBloc
 	return p.run(startBlock.AsRef())
 }
 
-func (p *BlkPoller) run(resolvedStartBlock bstream.BlockRef) (err error) {
+func (p *BlockPoller) run(resolvedStartBlock bstream.BlockRef) (err error) {
 	currentState := &state{state: ContinuousSegState, logger: p.logger}
 	p.forkDB.InitLIB(resolvedStartBlock)
 	blkIter := resolvedStartBlock.Num()
@@ -71,7 +73,7 @@ func (p *BlkPoller) run(resolvedStartBlock bstream.BlockRef) (err error) {
 	}
 }
 
-func (p *BlkPoller) processBlock(currentState *state, blkNum uint64) (uint64, error) {
+func (p *BlockPoller) processBlock(currentState *state, blkNum uint64) (uint64, error) {
 	if blkNum < p.forkDB.LIBNum() {
 		panic(fmt.Errorf("unexpected error block %d is below the current LIB num %d. There should be no re-org above the current LIB num", blkNum, p.forkDB.LIBNum()))
 	}
@@ -113,7 +115,7 @@ func (p *BlkPoller) processBlock(currentState *state, blkNum uint64) (uint64, er
 	return prevBlkInSeg(blocks), nil
 }
 
-func (p *BlkPoller) fetchBlock(blkNum uint64) (blk *pbbstream.Block, err error) {
+func (p *BlockPoller) fetchBlock(blkNum uint64) (blk *pbbstream.Block, err error) {
 	var out *pbbstream.Block
 	if err := derr.Retry(p.fetchBlockRetryCount, func(ctx context.Context) error {
 		out, err = p.blockFetcher.Fetch(ctx, blkNum)
@@ -157,7 +159,7 @@ func newBlock(block2 *pbbstream.Block) *block {
 	return &block{block2, false}
 }
 
-func (p *BlkPoller) fireCompleteSegment(blocks []*forkable.Block) {
+func (p *BlockPoller) fireCompleteSegment(blocks []*forkable.Block) {
 	for _, blk := range blocks {
 		if blk.BlockNum < p.startBlockNumGate {
 			continue
@@ -166,7 +168,7 @@ func (p *BlkPoller) fireCompleteSegment(blocks []*forkable.Block) {
 	}
 }
 
-func (p *BlkPoller) tryFire(b *block) bool {
+func (p *BlockPoller) tryFire(b *block) bool {
 	if b.fired {
 		return false
 	}
