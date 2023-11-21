@@ -1,4 +1,4 @@
-package forkhandler
+package blkpoller
 
 import (
 	"github.com/streamingfast/bstream"
