@@ -9,6 +9,7 @@ import (
 	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
 	"github.com/streamingfast/logging"
 	"github.com/stretchr/testify/assert"
+	"github.com/test-go/testify/require"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -18,7 +19,7 @@ func init() {
 	logging.InstantiateLoggers(logging.WithDefaultLevel(zapcore.DebugLevel))
 }
 
-var errCompleteDone = fmt.Errorf("complete done")
+var TestErrCompleteDone = fmt.Errorf("complete done")
 
 type TestBlock struct {
 	expect *pbbstream.Block
@@ -28,9 +29,10 @@ type TestBlock struct {
 var _ BlockFetcher = &TestBlockFetcher{}
 
 type TestBlockFetcher struct {
-	t      *testing.T
-	blocks []*TestBlock
-	idx    uint64
+	t         *testing.T
+	blocks    []*TestBlock
+	idx       uint64
+	completed bool
 }
 
 func newTestBlockFetcher(t *testing.T, blocks []*TestBlock) *TestBlockFetcher {
@@ -50,7 +52,8 @@ func (b *TestBlockFetcher) Fetch(_ context.Context, blkNum uint64) (*pbbstream.B
 	}
 
 	if b.idx >= uint64(len(b.blocks)) {
-		return nil, errCompleteDone
+		b.completed = true
+		return nil, nil
 	}
 
 	if blkNum != b.blocks[b.idx].expect.Number {
@@ -62,32 +65,7 @@ func (b *TestBlockFetcher) Fetch(_ context.Context, blkNum uint64) (*pbbstream.B
 	return blkToSend, nil
 }
 
-func (b *TestBlockFetcher) check() {
-	assert.Equal(b.t, uint64(len(b.blocks)), b.idx, "we should have fetched all %d blocks, only fired %d blocks", len(b.blocks), b.idx)
-}
-
-type TestBlockFire struct {
-	blocks []*pbbstream.Block
-	idx    uint64
-}
-
-func (b *TestBlockFire) check(t *testing.T) {
-	assert.Equal(t, uint64(len(b.blocks)), b.idx, "we should have fired all %d blocks, only fired %d blocks", len(b.blocks), b.idx)
-}
-
-func (b *TestBlockFire) fetchBlockFire(t *testing.T) BlockFireFunc {
-	return func(p *pbbstream.Block) {
-		if len(b.blocks) == 0 {
-			assert.Fail(t, fmt.Sprintf("should not have fired block %d", p.Number))
-		}
-
-		if b.idx >= uint64(len(b.blocks)) {
-			assert.Fail(t, fmt.Sprintf("should not have fired block %d", p.Number))
-		}
-
-		if p.Number != b.blocks[b.idx].Number || p.Id != b.blocks[b.idx].Id {
-			assert.Fail(t, fmt.Sprintf("expected to tryFire block %s, got %s", b.blocks[b.idx].String(), p.String()))
-		}
-		b.idx++
-	}
+func (b *TestBlockFetcher) check(t *testing.T) {
+	t.Helper()
+	require.Equal(b.t, uint64(len(b.blocks)), b.idx, "we should have fetched all %d blocks, only fired %d blocks", len(b.blocks), b.idx)
 }

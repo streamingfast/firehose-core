@@ -2,8 +2,6 @@ module github.com/streamingfast/firehose-core
 
 go 1.21
 
-replace github.com/streamingfast/bstream => ../bstream
-
 require (
 	github.com/ShinyTrinkets/overseer v0.3.0
 	github.com/dustin/go-humanize v1.0.1
@@ -14,7 +12,7 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
-	github.com/streamingfast/bstream v0.0.2-0.20231120175342-23d38d055176
+	github.com/streamingfast/bstream v0.0.2-0.20231121140754-a458ffe57f0d
 	github.com/streamingfast/cli v0.0.4-0.20230825151644-8cc84512cd80
 	github.com/streamingfast/dauth v0.0.0-20230929180355-921f9c9be330
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
@@ -30,6 +28,7 @@ require (
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
 	github.com/streamingfast/substreams v1.1.21-0.20231120175501-9d89549d81a1
 	github.com/stretchr/testify v1.8.4
+	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.10.0
 	go.uber.org/zap v1.26.0
 	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1

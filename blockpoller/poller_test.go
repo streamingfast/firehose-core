@@ -1,17 +1,17 @@
 package blockpoller
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"testing"
-
-	"go.uber.org/zap"
+	"time"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
 	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestForkHandler_run(t *testing.T) {
@@ -153,24 +153,38 @@ func TestForkHandler_run(t *testing.T) {
 
 			blockFetcher := newTestBlockFetcher(t, tt.blocks)
 
-			blockFire := &TestBlockFire{
-				blocks: tt.expectFireBlock,
+			f := New("test", blockFetcher, zap.NewNop())
+			f.forkDB = forkable.NewForkDB()
+
+			done := make(chan error)
+			firedBlock := 0
+
+			f.fireFunc = func(blk *block) error {
+				if blk.Number != tt.expectFireBlock[firedBlock].Number || blk.Id != tt.expectFireBlock[firedBlock].Id {
+					done <- fmt.Errorf("expected [%d] to fire block %d %q, got %d %q", firedBlock, tt.expectFireBlock[firedBlock].Number, tt.expectFireBlock[firedBlock].Id, blk.Number, blk.Id)
+				}
+
+				firedBlock++
+				if firedBlock >= len(tt.expectFireBlock) {
+					f.Stop()
+					close(done)
+				}
+
+				return nil
 			}
 
-			f := &BlockPoller{
-				blockFetcher:      blockFetcher,
-				blockFireFunc:     blockFire.fetchBlockFire(t),
-				forkDB:            forkable.NewForkDB(),
-				startBlockNumGate: 0,
-				logger:            logger,
-			}
+			go func() {
+				err := f.run(tt.startBlock)
+				require.NoError(t, err)
+			}()
 
-			err := f.run(tt.startBlock)
-			if !errors.Is(err, errCompleteDone) {
-				assert.Fail(t, "expected errCompleteDone")
+			select {
+			case err := <-done:
+				require.NoError(t, err)
+				blockFetcher.check(t)
+			case <-time.After(1 * time.Second):
+				t.Fatal("timeout, missing fetch calls")
 			}
-			blockFetcher.check()
-			blockFire.check(t)
 		})
 	}
 }
@@ -234,13 +248,13 @@ func TestForkHandler_fireCompleteSegment(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			f := &BlockPoller{startBlockNumGate: test.startBlockNum, logger: zap.NewNop()}
-			receviedIds := []string{}
-			f.blockFireFunc = func(p *pbbstream.Block) {
-				receviedIds = append(receviedIds, p.Id)
-			}
-
-			f.fireCompleteSegment(test.blocks)
-			assert.Equal(t, test.expect, receviedIds)
+			receivedIds := []string{}
+			err := f.fireCompleteSegment(test.blocks, func(p *block) error {
+				receivedIds = append(receivedIds, p.Id)
+				return nil
+			})
+			require.NoError(t, err)
+			assert.Equal(t, test.expect, receivedIds)
 		})
 	}
 
@@ -255,28 +269,28 @@ func tb(id, prev string, libNum uint64) *TestBlock {
 
 func blk(id, prev string, libNum uint64) *pbbstream.Block {
 	return &pbbstream.Block{
-		Number:    blocknum(id),
+		Number:    blockNum(id),
 		Id:        id,
 		ParentId:  prev,
 		LibNum:    libNum,
-		ParentNum: blocknum(prev),
+		ParentNum: blockNum(prev),
 	}
 }
 
 func forkBlk(id string) *forkable.Block {
 	return &forkable.Block{
 		BlockID:  id,
-		BlockNum: blocknum(id),
+		BlockNum: blockNum(id),
 		Object: &block{
 			Block: &pbbstream.Block{
-				Number: blocknum(id),
+				Number: blockNum(id),
 				Id:     id,
 			},
 		},
 	}
 }
 
-func blocknum(blockID string) uint64 {
+func blockNum(blockID string) uint64 {
 	b := blockID
 	if len(blockID) < 8 { // shorter version, like 8a for 00000008a
 		b = fmt.Sprintf("%09s", blockID)

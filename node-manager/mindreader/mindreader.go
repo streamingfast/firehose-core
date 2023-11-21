@@ -23,10 +23,9 @@ import (
 	"regexp"
 	"sync"
 
-	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
+	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
 	"github.com/streamingfast/dstore"
 	nodeManager "github.com/streamingfast/firehose-core/node-manager"
 	"github.com/streamingfast/logging"

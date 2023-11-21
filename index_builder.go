@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	index_builder "github.com/streamingfast/firehose-core/index-builder/app/index-builder"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/streamingfast/bstream"
 	bstransform "github.com/streamingfast/bstream/transform"
 	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
 	"github.com/streamingfast/dlauncher/launcher"
+	index_builder "github.com/streamingfast/firehose-core/index-builder/app/index-builder"
 )
 
 func registerIndexBuilderApp[B Block](chain *Chain[B]) {

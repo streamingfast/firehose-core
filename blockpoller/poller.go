@@ -2,43 +2,47 @@ package blockpoller
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"time"
-
-	"github.com/streamingfast/derr"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
 	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
-
+	"github.com/streamingfast/derr"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
-type BlockFireFunc func(*pbbstream.Block)
+type BlockFireFunc func(b *block) error
 
 type BlockPoller struct {
+	blockTypeURL string
 	// the block number at which
 	startBlockNumGate    uint64
 	blockFetcher         BlockFetcher
-	blockFireFunc        BlockFireFunc
 	fetchBlockRetryCount uint64
-	forkDB               *forkable.ForkDB
 
-	logger *zap.Logger
+	forkDB        *forkable.ForkDB
+	logger        *zap.Logger
+	fireFunc      BlockFireFunc
+	stopRequested bool
 }
 
 func New(
+	blockType string,
 	blockFetcher BlockFetcher,
-	blockFire BlockFireFunc,
 	logger *zap.Logger,
 ) *BlockPoller {
-	return &BlockPoller{
+	poller := &BlockPoller{
+		blockTypeURL:         blockType,
 		blockFetcher:         blockFetcher,
-		blockFireFunc:        blockFire,
 		fetchBlockRetryCount: 4,
 		forkDB:               forkable.NewForkDB(forkable.ForkDBWithLogger(logger)),
 		logger:               logger,
 	}
+	poller.fireFunc = poller.fire
+	return poller
 }
 
 func (p *BlockPoller) Run(ctx context.Context, startBlockNum uint64, finalizedBlockNum bstream.BlockRef) error {
@@ -49,6 +53,9 @@ func (p *BlockPoller) Run(ctx context.Context, startBlockNum uint64, finalizedBl
 		zap.Stringer("finalized_block_num", finalizedBlockNum),
 		zap.Uint64("resolved_start_block_num", resolveStartBlockNum),
 	)
+
+	//initLine := "FIRE INIT 1.0 sf.ethereum.type.v2.Block"
+	fmt.Println("FIRE INIT 1.0 ", p.blockTypeURL)
 
 	startBlock, err := p.blockFetcher.Fetch(ctx, resolveStartBlockNum)
 	if err != nil {
@@ -69,8 +76,15 @@ func (p *BlockPoller) run(resolvedStartBlock bstream.BlockRef) (err error) {
 		if err != nil {
 			return fmt.Errorf("unable to fetch  block %d: %w", blkIter, err)
 		}
+		if p.stopRequested {
+			return nil
+		}
 		time.Sleep(intervalDuration)
 	}
+}
+
+func (p *BlockPoller) Stop() {
+	p.stopRequested = true
 }
 
 func (p *BlockPoller) processBlock(currentState *state, blkNum uint64) (uint64, error) {
@@ -99,7 +113,10 @@ func (p *BlockPoller) processBlock(currentState *state, blkNum uint64) (uint64, 
 
 	if reachLib {
 		currentState.blkIsConnectedToLib()
-		p.fireCompleteSegment(blocks)
+		err = p.fireCompleteSegment(blocks, p.fireFunc)
+		if err != nil {
+			return 0, fmt.Errorf("firing complete segment: %w", err)
+		}
 
 		// since the block is linkable to the current lib
 		// we can safely set the new lib to the current block's Lib
@@ -117,15 +134,18 @@ func (p *BlockPoller) processBlock(currentState *state, blkNum uint64) (uint64, 
 
 func (p *BlockPoller) fetchBlock(blkNum uint64) (blk *pbbstream.Block, err error) {
 	var out *pbbstream.Block
-	if err := derr.Retry(p.fetchBlockRetryCount, func(ctx context.Context) error {
+	err = derr.Retry(p.fetchBlockRetryCount, func(ctx context.Context) error {
 		out, err = p.blockFetcher.Fetch(ctx, blkNum)
 		if err != nil {
 			return fmt.Errorf("unable to fetch  block %d: %w", blkNum, err)
 		}
 		return nil
-	}); err != nil {
+	})
+
+	if err != nil {
 		return nil, fmt.Errorf("failed to fetch block with retries %d: %w", blkNum, err)
 	}
+
 	return out, nil
 }
 
@@ -159,21 +179,48 @@ func newBlock(block2 *pbbstream.Block) *block {
 	return &block{block2, false}
 }
 
-func (p *BlockPoller) fireCompleteSegment(blocks []*forkable.Block) {
+func (p *BlockPoller) fireCompleteSegment(blocks []*forkable.Block, fireFunc BlockFireFunc) error {
 	for _, blk := range blocks {
 		if blk.BlockNum < p.startBlockNumGate {
 			continue
 		}
-		p.tryFire(blk.Object.(*block))
+
+		b := blk.Object.(*block)
+		if !b.fired {
+			err := fireFunc(b)
+			if err != nil {
+				return fmt.Errorf("fireing block %d %q: %w", b.Block.Number, b.Block.Id, err)
+			}
+			b.fired = true
+		}
 	}
+	return nil
 }
 
-func (p *BlockPoller) tryFire(b *block) bool {
-	if b.fired {
-		return false
+func (p *BlockPoller) fire(b *block) error {
+
+	//blockLine := "FIRE BLOCK 18571000 d2836a703a02f3ca2a13f05efe26fc48c6fa0db0d754a49e56b066d3b7d54659 18570999 55de88c909fa368ae1e93b6b8ffb3fbb12e64aefec1d4a1fcc27ae7633de2f81 18570800 1699992393935935000 Ci10eXBlLmdvb2dsZWFwaXMuY29tL3NmLmV0aGVyZXVtLnR5cGUudjIuQmxvY2sSJxIg0oNqcDoC88oqE/Be/ib8SMb6DbDXVKSeVrBm07fVRlkY+L3tCA=="
+	anyBlock, err := anypb.New(b.Block)
+	if err != nil {
+		return fmt.Errorf("converting block to anypb: %w", err)
 	}
-	p.blockFireFunc(b.Block)
-	p.logger.Debug("block fired", zap.Stringer("blk", b.Block.AsRef()))
-	b.fired = true
-	return true
+
+	if anyBlock.TypeUrl != p.blockTypeURL {
+		return fmt.Errorf("block type url %q does not match expected type %q", anyBlock.TypeUrl, p.blockTypeURL)
+	}
+
+	blockLine := fmt.Sprintf(
+		"FIRE BLOCK %d %s %d %s %d %d %s",
+		b.Block.Number,
+		b.Block.Id,
+		b.Block.ParentNum,
+		b.Block.ParentId,
+		b.Block.LibNum,
+		b.Block.Timestamp.AsTime().UnixNano(),
+		base64.StdEncoding.EncodeToString(anyBlock.Value),
+	)
+
+	fmt.Println(blockLine)
+
+	return nil
 }
