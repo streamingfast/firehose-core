@@ -10,7 +10,7 @@ package firehose
 //	"github.com/alicebob/miniredis/v2/server"
 //	"github.com/streamingfast/bstream"
 //	"github.com/streamingfast/dstore"
-//	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
+//	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 //	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v1"
 //	"github.com/stretchr/testify/assert"
 //	"github.com/stretchr/testify/require"
@@ -37,7 +37,7 @@ package firehose
 //		irreversibleBlocksIndexes map[int]map[int]string
 //		startBlockNum             uint64
 //		stopBlockNum              uint64
-//		cursor                    *bstream.Cursor
+//		cursor                    *bstream.LastFiredBlock
 //		expectedResponses         []expectedResp
 //	}{
 //		{
@@ -160,8 +160,8 @@ package firehose
 //				require.NotNil(t, resp)
 //				require.NoError(t, err)
 //
-//				fmt.Println(resp.Cursor)
-//				cursor, err := bstream.CursorFromOpaque(resp.Cursor)
+//				fmt.Println(resp.LastFiredBlock)
+//				cursor, err := bstream.CursorFromOpaque(resp.LastFiredBlock)
 //				require.NoError(t, err, "cursor sent from firehose should always be valid")
 //				require.False(t, cursor.IsEmpty())
 //

@@ -7,8 +7,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/streamingfast/bstream"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	bstransform "github.com/streamingfast/bstream/transform"
-	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
 	"github.com/streamingfast/dlauncher/launcher"
 	index_builder "github.com/streamingfast/firehose-core/index-builder/app/index-builder"
 )

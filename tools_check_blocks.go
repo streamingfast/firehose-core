@@ -8,12 +8,11 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/streamingfast/firehose-core/tools"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
-	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/firehose-core/tools"
 	"go.uber.org/zap"
 )
 
@@ -231,7 +230,7 @@ func validateBlockSegment[B Block](
 				tfdb.lastLinkedBlock = block
 				tfdb.unlinkableSegmentCount = 0
 				tfdb.firstUnlinkableBlock = nil
-				tfdb.fdb.SetLIB(block.AsRef(), block.ParentId, block.LibNum)
+				tfdb.fdb.SetLIB(block.AsRef(), block.LibNum)
 				if tfdb.fdb.HasLIB() {
 					tfdb.fdb.PurgeBeforeLIB(0)
 				}

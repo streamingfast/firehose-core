@@ -2,7 +2,7 @@ package blockpoller
 
 import (
 	"github.com/streamingfast/bstream"
-	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"go.uber.org/zap"
 )
 
@@ -17,14 +17,14 @@ func (s State) String() string {
 	return string(s)
 }
 
-type state struct {
+type cursor struct {
 	currentBlk           bstream.BlockRef
 	currentIncompleteSeg *bstream.BasicBlockRef
 	state                State
 	logger               *zap.Logger
 }
 
-func (s *state) addBlk(blk *pbbstream.Block, blockSeen bool, parentSeen bool) {
+func (s *cursor) addBlk(blk *pbbstream.Block, blockSeen bool, parentSeen bool) {
 	blkRef := blk.AsRef()
 	logger := s.logger.With(
 		zap.Stringer("blk", blkRef),
@@ -49,22 +49,22 @@ func (s *state) addBlk(blk *pbbstream.Block, blockSeen bool, parentSeen bool) {
 	logger.Debug("received block", zap.Stringer("current_state", s.state))
 }
 
-func (s *state) getBlkSegmentNum() bstream.BlockRef {
+func (s *cursor) getBlkSegmentNum() bstream.BlockRef {
 	if s.state == IncompleteSegState {
 		if s.currentIncompleteSeg == nil {
-			panic("current incomplete segment is nil, when state is incomplete segment, this should never happen")
+			panic("current incomplete segment is nil, when cursor is incomplete segment, this should never happen")
 		}
 		return *s.currentIncompleteSeg
 	}
 	return s.currentBlk
 }
 
-func (s *state) blkIsConnectedToLib() {
+func (s *cursor) blkIsConnectedToLib() {
 	s.state = ContinuousSegState
 	s.currentIncompleteSeg = nil
 }
 
-func (s *state) blkIsNotConnectedToLib() {
+func (s *cursor) blkIsNotConnectedToLib() {
 	if s.state != IncompleteSegState {
 		s.state = IncompleteSegState
 		// we don't want to point the current blk since that will change

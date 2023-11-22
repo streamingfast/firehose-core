@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/spf13/cobra"
-	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dlauncher/launcher"
 	"go.uber.org/zap"

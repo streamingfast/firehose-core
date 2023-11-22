@@ -25,7 +25,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
-	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dstore"
 	nodeManager "github.com/streamingfast/firehose-core/node-manager"
 	"github.com/streamingfast/logging"

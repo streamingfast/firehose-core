@@ -1,17 +1,17 @@
 package blockpoller
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"testing"
-	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
-	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 )
 
 func TestForkHandler_run(t *testing.T) {
@@ -152,39 +152,19 @@ func TestForkHandler_run(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 
 			blockFetcher := newTestBlockFetcher(t, tt.blocks)
+			blockFinalizer := newTestBlockFinalizer(t, tt.expectFireBlock)
 
-			f := New("test", blockFetcher, zap.NewNop())
+			f := New(blockFetcher, blockFinalizer)
 			f.forkDB = forkable.NewForkDB()
 
-			done := make(chan error)
-			firedBlock := 0
-
-			f.fireFunc = func(blk *block) error {
-				if blk.Number != tt.expectFireBlock[firedBlock].Number || blk.Id != tt.expectFireBlock[firedBlock].Id {
-					done <- fmt.Errorf("expected [%d] to fire block %d %q, got %d %q", firedBlock, tt.expectFireBlock[firedBlock].Number, tt.expectFireBlock[firedBlock].Id, blk.Number, blk.Id)
-				}
-
-				firedBlock++
-				if firedBlock >= len(tt.expectFireBlock) {
-					f.Stop()
-					close(done)
-				}
-
-				return nil
+			err := f.run(tt.startBlock)
+			if !errors.Is(err, TestErrCompleteDone) {
+				require.NoError(t, err)
 			}
 
-			go func() {
-				err := f.run(tt.startBlock)
-				require.NoError(t, err)
-			}()
+			blockFetcher.check(t)
+			blockFinalizer.check(t)
 
-			select {
-			case err := <-done:
-				require.NoError(t, err)
-				blockFetcher.check(t)
-			case <-time.After(1 * time.Second):
-				t.Fatal("timeout, missing fetch calls")
-			}
 		})
 	}
 }
@@ -207,54 +187,45 @@ func TestForkHandler_resolveStartBlock(t *testing.T) {
 	}
 }
 
-func TestForkHandler_fireCompleteSegment(t *testing.T) {
+func TestForkHandler_fire(t *testing.T) {
 	tests := []struct {
 		name          string
-		blocks        []*forkable.Block
+		block         *block
 		startBlockNum uint64
-		expect        []string
+		expect        bool
 	}{
 		{
-			name:          "start block less then first block",
-			blocks:        []*forkable.Block{forkBlk("100a"), forkBlk("101a"), forkBlk("102a")},
+			name:          "greater then start block",
+			block:         &block{blk("100a", "99a", 98), false},
 			startBlockNum: 98,
-			expect:        []string{"100a", "101a", "102a"},
+			expect:        true,
 		},
 		{
-			name:          "start block is first block",
-			blocks:        []*forkable.Block{forkBlk("100a"), forkBlk("101a"), forkBlk("102a")},
+			name:          "on then start block",
+			block:         &block{blk("100a", "99a", 98), false},
 			startBlockNum: 100,
-			expect:        []string{"100a", "101a", "102a"},
+			expect:        true,
 		},
 		{
-			name:          "start block is middle block",
-			blocks:        []*forkable.Block{forkBlk("100a"), forkBlk("101a"), forkBlk("102a")},
+			name:          "less then start block",
+			block:         &block{blk("100a", "99a", 98), false},
 			startBlockNum: 101,
-			expect:        []string{"101a", "102a"},
+			expect:        false,
 		},
 		{
-			name:          "start block is last block",
-			blocks:        []*forkable.Block{forkBlk("100a"), forkBlk("101a"), forkBlk("102a")},
-			startBlockNum: 102,
-			expect:        []string{"102a"},
-		},
-		{
-			name: "start block is past block", blocks: []*forkable.Block{forkBlk("100a"), forkBlk("101a"), forkBlk("102a")},
-			startBlockNum: 104,
-			expect:        []string{},
+			name:          "already fired",
+			block:         &block{blk("100a", "99a", 98), true},
+			startBlockNum: 98,
+			expect:        false,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			f := &BlockPoller{startBlockNumGate: test.startBlockNum, logger: zap.NewNop()}
-			receivedIds := []string{}
-			err := f.fireCompleteSegment(test.blocks, func(p *block) error {
-				receivedIds = append(receivedIds, p.Id)
-				return nil
-			})
+			poller := &BlockPoller{startBlockNumGate: test.startBlockNum, blockFinalizer: &TestNoopBlockFinalizer{}}
+			ok, err := poller.fire(test.block)
 			require.NoError(t, err)
-			assert.Equal(t, test.expect, receivedIds)
+			assert.Equal(t, test.expect, ok)
 		})
 	}
 

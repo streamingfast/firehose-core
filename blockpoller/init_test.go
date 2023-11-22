@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
-	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
+	"github.com/streamingfast/derr"
+
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/test-go/testify/require"
@@ -19,7 +21,7 @@ func init() {
 	logging.InstantiateLoggers(logging.WithDefaultLevel(zapcore.DebugLevel))
 }
 
-var TestErrCompleteDone = fmt.Errorf("complete done")
+var TestErrCompleteDone = fmt.Errorf("test complete done")
 
 type TestBlock struct {
 	expect *pbbstream.Block
@@ -48,12 +50,11 @@ func (b *TestBlockFetcher) PollingInterval() time.Duration {
 
 func (b *TestBlockFetcher) Fetch(_ context.Context, blkNum uint64) (*pbbstream.Block, error) {
 	if len(b.blocks) == 0 {
-		assert.Fail(b.t, fmt.Sprintf("should not have ffetchired block %d", blkNum))
+		assert.Fail(b.t, fmt.Sprintf("should not have fetched block %d", blkNum))
 	}
 
 	if b.idx >= uint64(len(b.blocks)) {
-		b.completed = true
-		return nil, nil
+		return nil, derr.NewFatalError(TestErrCompleteDone)
 	}
 
 	if blkNum != b.blocks[b.idx].expect.Number {
@@ -69,3 +70,51 @@ func (b *TestBlockFetcher) check(t *testing.T) {
 	t.Helper()
 	require.Equal(b.t, uint64(len(b.blocks)), b.idx, "we should have fetched all %d blocks, only fired %d blocks", len(b.blocks), b.idx)
 }
+
+var _ BlockFinalizer = &TestBlockFinalizer{}
+
+type TestBlockFinalizer struct {
+	t          *testing.T
+	fireBlocks []*pbbstream.Block
+	idx        uint64
+}
+
+func newTestBlockFinalizer(t *testing.T, fireBlocks []*pbbstream.Block) *TestBlockFinalizer {
+	return &TestBlockFinalizer{
+		t:          t,
+		fireBlocks: fireBlocks,
+	}
+}
+
+func (t *TestBlockFinalizer) Init() {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (t *TestBlockFinalizer) Fire(blk *pbbstream.Block) error {
+	if len(t.fireBlocks) == 0 {
+		assert.Fail(t.t, fmt.Sprintf("should not have fired block %s", blk.AsRef()))
+	}
+
+	if t.idx >= uint64(len(t.fireBlocks)) {
+		return TestErrCompleteDone
+	}
+
+	if blk.Number != t.fireBlocks[t.idx].Number {
+		assert.Fail(t.t, fmt.Sprintf("expected to fetch block %d, got %d", t.fireBlocks[t.idx].Number, blk.Number))
+	}
+	t.idx++
+	return nil
+}
+
+func (b *TestBlockFinalizer) check(t *testing.T) {
+	t.Helper()
+	require.Equal(b.t, uint64(len(b.fireBlocks)), b.idx, "we should have fired all %d blocks, only fired %d blocks", len(b.fireBlocks), b.idx)
+}
+
+var _ BlockFinalizer = &TestNoopBlockFinalizer{}
+
+type TestNoopBlockFinalizer struct{}
+
+func (t *TestNoopBlockFinalizer) Init()                           {}
+func (t *TestNoopBlockFinalizer) Fire(blk *pbbstream.Block) error { return nil }

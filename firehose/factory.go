@@ -7,9 +7,9 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/bstream/transform"
-	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dmetering"

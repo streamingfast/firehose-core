@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/firehose-core/node-manager/mindreader"
 	"github.com/streamingfast/firehose-core/node-manager/operator"
 	"github.com/streamingfast/logging"

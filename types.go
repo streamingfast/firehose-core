@@ -9,8 +9,8 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/spf13/cobra"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/bstream/transform"
-	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
 	"github.com/streamingfast/dstore"
 	"google.golang.org/protobuf/proto"
 )

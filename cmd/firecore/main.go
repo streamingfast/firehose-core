@@ -1,7 +1,7 @@
 package main
 
 import (
-	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	firecore "github.com/streamingfast/firehose-core"
 )
 

@@ -20,7 +20,7 @@ import (
 	"os"
 
 	"github.com/streamingfast/bstream/blockstream"
-	pbbstream "github.com/streamingfast/bstream/types/pb/sf/bstream/v1"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	dgrpcfactory "github.com/streamingfast/dgrpc/server/factory"
 	nodeManager "github.com/streamingfast/firehose-core/node-manager"
