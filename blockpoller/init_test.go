@@ -90,7 +90,7 @@ func (t *TestBlockFinalizer) Init() {
 	panic("implement me")
 }
 
-func (t *TestBlockFinalizer) Fire(blk *pbbstream.Block) error {
+func (t *TestBlockFinalizer) Handle(blk *pbbstream.Block) error {
 	if len(t.fireBlocks) == 0 {
 		assert.Fail(t.t, fmt.Sprintf("should not have fired block %s", blk.AsRef()))
 	}
@@ -115,5 +115,5 @@ var _ BlockHandler = &TestNoopBlockFinalizer{}
 
 type TestNoopBlockFinalizer struct{}
 
-func (t *TestNoopBlockFinalizer) Init()                           {}
-func (t *TestNoopBlockFinalizer) Fire(blk *pbbstream.Block) error { return nil }
+func (t *TestNoopBlockFinalizer) Init()                             {}
+func (t *TestNoopBlockFinalizer) Handle(blk *pbbstream.Block) error { return nil }

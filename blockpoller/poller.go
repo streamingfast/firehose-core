@@ -208,7 +208,7 @@ func (p *BlockPoller) fire(blk *block) (bool, error) {
 		return false, nil
 	}
 
-	if err := p.blockHandler.Fire(blk.Block); err != nil {
+	if err := p.blockHandler.Handle(blk.Block); err != nil {
 		return false, err
 	}
 
