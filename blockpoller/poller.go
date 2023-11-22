@@ -19,23 +19,23 @@ type BlockPoller struct {
 	fetchBlockRetryCount uint64
 	stateStorePath       string
 
-	blockFetcher   BlockFetcher
-	blockFinalizer BlockFinalizer
-	forkDB         *forkable.ForkDB
+	blockFetcher BlockFetcher
+	blockHandler BlockHandler
+	forkDB       *forkable.ForkDB
 
 	logger *zap.Logger
 }
 
 func New(
 	blockFetcher BlockFetcher,
-	blockFinalizer BlockFinalizer,
+	blockFinalizer BlockHandler,
 	opts ...Option,
 ) *BlockPoller {
 
 	b := &BlockPoller{
 		Shutter:              shutter.New(),
 		blockFetcher:         blockFetcher,
-		blockFinalizer:       blockFinalizer,
+		blockHandler:         blockFinalizer,
 		fetchBlockRetryCount: 4,
 		logger:               zap.NewNop(),
 	}
@@ -56,7 +56,7 @@ func (p *BlockPoller) Run(ctx context.Context, startBlockNum uint64, finalizedBl
 		zap.Uint64("resolved_start_block_num", resolveStartBlockNum),
 	)
 
-	p.blockFinalizer.Init()
+	p.blockHandler.Init()
 
 	startBlock, err := p.blockFetcher.Fetch(ctx, resolveStartBlockNum)
 	if err != nil {
@@ -208,7 +208,7 @@ func (p *BlockPoller) fire(blk *block) (bool, error) {
 		return false, nil
 	}
 
-	if err := p.blockFinalizer.Fire(blk.Block); err != nil {
+	if err := p.blockHandler.Fire(blk.Block); err != nil {
 		return false, err
 	}
 

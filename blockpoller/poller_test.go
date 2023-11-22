@@ -222,7 +222,7 @@ func TestForkHandler_fire(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			poller := &BlockPoller{startBlockNumGate: test.startBlockNum, blockFinalizer: &TestNoopBlockFinalizer{}}
+			poller := &BlockPoller{startBlockNumGate: test.startBlockNum, blockHandler: &TestNoopBlockFinalizer{}}
 			ok, err := poller.fire(test.block)
 			require.NoError(t, err)
 			assert.Equal(t, test.expect, ok)

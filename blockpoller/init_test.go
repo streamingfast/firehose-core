@@ -70,7 +70,7 @@ func (b *TestBlockFetcher) check(t *testing.T) {
 	require.Equal(b.t, uint64(len(b.blocks)), b.idx, "we should have fetched all %d blocks, only fired %d blocks", len(b.blocks), b.idx)
 }
 
-var _ BlockFinalizer = &TestBlockFinalizer{}
+var _ BlockHandler = &TestBlockFinalizer{}
 
 type TestBlockFinalizer struct {
 	t          *testing.T
@@ -111,7 +111,7 @@ func (b *TestBlockFinalizer) check(t *testing.T) {
 	require.Equal(b.t, uint64(len(b.fireBlocks)), b.idx, "we should have fired all %d blocks, only fired %d blocks", len(b.fireBlocks), b.idx)
 }
 
-var _ BlockFinalizer = &TestNoopBlockFinalizer{}
+var _ BlockHandler = &TestNoopBlockFinalizer{}
 
 type TestNoopBlockFinalizer struct{}
 
