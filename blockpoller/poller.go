@@ -13,6 +13,15 @@ import (
 	"go.uber.org/zap"
 )
 
+type block struct {
+	*pbbstream.Block
+	fired bool
+}
+
+func newBlock(block2 *pbbstream.Block) *block {
+	return &block{block2, false}
+}
+
 type BlockPoller struct {
 	*shutter.Shutter
 	startBlockNumGate    uint64
@@ -69,7 +78,7 @@ func (p *BlockPoller) Run(ctx context.Context, startBlockNum uint64, finalizedBl
 
 func (p *BlockPoller) run(resolvedStartBlock bstream.BlockRef) (err error) {
 
-	p.forkDB, resolvedStartBlock, err = p.initState(resolvedStartBlock)
+	p.forkDB, resolvedStartBlock, err = initState(resolvedStartBlock, p.stateStorePath, p.logger)
 	if err != nil {
 		return fmt.Errorf("unable to initialize cursor: %w", err)
 	}
@@ -159,6 +168,33 @@ func (p *BlockPoller) fetchBlock(blkNum uint64) (blk *pbbstream.Block, err error
 	return out, nil
 }
 
+func (p *BlockPoller) fireCompleteSegment(blocks []*forkable.Block) error {
+	for _, blk := range blocks {
+		b := blk.Object.(*block)
+		if _, err := p.fire(b); err != nil {
+			return fmt.Errorf("fireing block %d (%qs) %w", blk.BlockNum, blk.BlockID, err)
+		}
+	}
+	return nil
+}
+
+func (p *BlockPoller) fire(blk *block) (bool, error) {
+	if blk.fired {
+		return false, nil
+	}
+
+	if blk.Number < p.startBlockNumGate {
+		return false, nil
+	}
+
+	if err := p.blockHandler.Handle(blk.Block); err != nil {
+		return false, err
+	}
+
+	blk.fired = true
+	return true, nil
+}
+
 func nextBlkInSeg(blocks []*forkable.Block) uint64 {
 	if len(blocks) == 0 {
 		panic(fmt.Errorf("the blocks segments should never be empty"))
@@ -178,40 +214,4 @@ func resolveStartBlock(startBlockNum, finalizedBlockNum uint64) uint64 {
 		return finalizedBlockNum
 	}
 	return startBlockNum
-}
-
-type block struct {
-	*pbbstream.Block
-	fired bool
-}
-
-func newBlock(block2 *pbbstream.Block) *block {
-	return &block{block2, false}
-}
-
-func (p *BlockPoller) fireCompleteSegment(blocks []*forkable.Block) error {
-	for _, blk := range blocks {
-		b := blk.Object.(*block)
-		if _, err := p.fire(b); err != nil {
-			return fmt.Errorf("fireing block %d (%qs) %w", blk.BlockNum, blk.BlockID, err)
-		}
-	}
-	return nil
-}
-
-func (p *BlockPoller) fire(blk *block) (bool, error) {
-	if blk.Number < p.startBlockNumGate {
-		return false, nil
-	}
-
-	if blk.fired {
-		return false, nil
-	}
-
-	if err := p.blockHandler.Handle(blk.Block); err != nil {
-		return false, err
-	}
-
-	blk.fired = true
-	return true, nil
 }
