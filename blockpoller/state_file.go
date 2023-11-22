@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/streamingfast/bstream"
-
 	"github.com/streamingfast/bstream/forkable"
 	"go.uber.org/zap"
 )

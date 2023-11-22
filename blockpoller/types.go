@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"google.golang.org/protobuf/types/known/anypb"
-
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type BlockFireFunc func(b *block) error

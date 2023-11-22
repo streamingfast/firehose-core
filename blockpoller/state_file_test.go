@@ -6,14 +6,10 @@ import (
 	"testing"
 
 	"github.com/streamingfast/bstream"
-
-	"github.com/stretchr/testify/assert"
-
-	"go.uber.org/zap"
-
-	"github.com/stretchr/testify/require"
-
 	"github.com/streamingfast/bstream/forkable"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestFireBlockFinalizer_saveState(t *testing.T) {

@@ -6,9 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/streamingfast/derr"
-
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/derr"
 	"github.com/streamingfast/logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/test-go/testify/require"
