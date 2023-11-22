@@ -3,6 +3,7 @@ package blockpoller
 import (
 	"encoding/base64"
 	"fmt"
+	"strings"
 	"sync"
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
@@ -22,7 +23,7 @@ type FireBlockHandler struct {
 
 func NewFireBlockHandler(blockTypeURL string) *FireBlockHandler {
 	return &FireBlockHandler{
-		blockTypeURL: blockTypeURL,
+		blockTypeURL: clean(blockTypeURL),
 	}
 }
 
@@ -31,9 +32,9 @@ func (f *FireBlockHandler) Init() {
 }
 
 func (f *FireBlockHandler) Handle(b *pbbstream.Block) error {
-	//blockLine := "FIRE BLOCK 18571000 d2836a703a02f3ca2a13f05efe26fc48c6fa0db0d754a49e56b066d3b7d54659 18570999 55de88c909fa368ae1e93b6b8ffb3fbb12e64aefec1d4a1fcc27ae7633de2f81 18570800 1699992393935935000 Ci10eXBlLmdvb2dsZWFwaXMuY29tL3NmLmV0aGVyZXVtLnR5cGUudjIuQmxvY2sSJxIg0oNqcDoC88oqE/Be/ib8SMb6DbDXVKSeVrBm07fVRlkY+L3tCA=="
-	if b.Payload.TypeUrl != f.blockTypeURL {
-		return fmt.Errorf("block type url %q does not match expected type %q", b.Payload.TypeUrl, f.blockTypeURL)
+	typeURL := clean(b.Payload.TypeUrl)
+	if typeURL != f.blockTypeURL {
+		return fmt.Errorf("block type url %q does not match expected type %q", typeURL, f.blockTypeURL)
 	}
 
 	blockLine := fmt.Sprintf(
@@ -49,4 +50,8 @@ func (f *FireBlockHandler) Handle(b *pbbstream.Block) error {
 
 	fmt.Println(blockLine)
 	return nil
+}
+
+func clean(in string) string {
+	return strings.Replace(in, "type.googleapis.com/", "", 1)
 }
