@@ -70,15 +70,15 @@ func (p *BlockPoller) saveState(blocks []*forkable.Block) error {
 		sf.Blocks = append(sf.Blocks, br(blk.BlockID, blk.BlockNum, blk.PreviousBlockID))
 	}
 
-	filepath := filepath.Join(p.stateStorePath, "cursor.json")
-	file, err := os.OpenFile(filepath, os.O_CREATE, os.ModePerm)
+	cnt, err := json.Marshal(sf)
 	if err != nil {
-		return fmt.Errorf("unable to open cursor file %s: %w", filepath, err)
+		return fmt.Errorf("unable to marshal stateFile: %w", err)
 	}
-	defer file.Close()
-	encoder := json.NewEncoder(file)
-	if err := encoder.Encode(sf); err != nil {
-		return fmt.Errorf("unable to encode cursor file %s: %w", filepath, err)
+
+	filepath := filepath.Join(p.stateStorePath, "cursor.json")
+
+	if err := os.WriteFile(filepath, cnt, os.ModePerm); err != nil {
+		return fmt.Errorf("unable to open cursor file %s: %w", filepath, err)
 	}
 
 	p.logger.Info("saved cursor",
