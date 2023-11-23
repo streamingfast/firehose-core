@@ -142,7 +142,10 @@ func (p *BlockPoller) processBlock(currentState *cursor, blkNum uint64) (uint64,
 		p.forkDB.SetLIB(blk.AsRef(), blk.LibNum)
 		p.forkDB.PurgeBeforeLIB(0)
 
-		p.saveState(blocks)
+		err := p.saveState(blocks)
+		if err != nil {
+			return 0, fmt.Errorf("saving state: %w", err)
+		}
 
 		return nextBlkInSeg(blocks), nil
 	}

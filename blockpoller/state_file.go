@@ -52,6 +52,7 @@ func getState(stateStorePath string) (*stateFile, error) {
 }
 
 func (p *BlockPoller) saveState(blocks []*forkable.Block) error {
+	p.logger.Debug("saving cursor", zap.String("state_store_path", p.stateStorePath))
 	if p.stateStorePath == "" {
 		return nil
 	}
@@ -72,14 +73,18 @@ func (p *BlockPoller) saveState(blocks []*forkable.Block) error {
 		return fmt.Errorf("unable to marshal stateFile: %w", err)
 	}
 
-	filepath := filepath.Join(p.stateStorePath, "cursor.json")
+	err = os.MkdirAll(p.stateStorePath, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("making state store path: %w", err)
+	}
+	fpath := filepath.Join(p.stateStorePath, "cursor.json")
 
-	if err := os.WriteFile(filepath, cnt, os.ModePerm); err != nil {
-		return fmt.Errorf("unable to open cursor file %s: %w", filepath, err)
+	if err := os.WriteFile(fpath, cnt, os.ModePerm); err != nil {
+		return fmt.Errorf("unable to open cursor file %s: %w", fpath, err)
 	}
 
 	p.logger.Info("saved cursor",
-		zap.Reflect("filepath", filepath),
+		zap.Reflect("filepath", fpath),
 		zap.Stringer("last_fired_block", sf.LastFiredBlock),
 		zap.Stringer("lib", sf.Lib),
 		zap.Int("block_count", len(sf.Blocks)),
