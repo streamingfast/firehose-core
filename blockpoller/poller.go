@@ -37,14 +37,14 @@ type BlockPoller struct {
 
 func New(
 	blockFetcher BlockFetcher,
-	blockFinalizer BlockHandler,
+	blockHandler BlockHandler,
 	opts ...Option,
 ) *BlockPoller {
 
 	b := &BlockPoller{
 		Shutter:              shutter.New(),
 		blockFetcher:         blockFetcher,
-		blockHandler:         blockFinalizer,
+		blockHandler:         blockHandler,
 		fetchBlockRetryCount: 4,
 		logger:               zap.NewNop(),
 	}
