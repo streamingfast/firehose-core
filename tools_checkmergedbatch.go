@@ -31,7 +31,6 @@ var toolsCheckMergedBlocksBatchCmd = &cobra.Command{
 
 func init() {
 	toolsCheckCmd.AddCommand(toolsCheckMergedBlocksBatchCmd)
-
 	toolsCheckMergedBlocksBatchCmd.PersistentFlags().String("output-to-store", "", "If non-empty, an empty file called <blocknum>.broken will be created for every problematic merged-blocks-file. This is a convenient way to gather the results from multiple parallel processes.")
 }
 

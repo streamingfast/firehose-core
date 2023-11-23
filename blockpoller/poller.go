@@ -56,12 +56,12 @@ func New(
 	return b
 }
 
-func (p *BlockPoller) Run(ctx context.Context, startBlockNum uint64, finalizedBlockNum bstream.BlockRef) error {
+func (p *BlockPoller) Run(ctx context.Context, startBlockNum uint64, chainLatestFinalizeBlock bstream.BlockRef) error {
 	p.startBlockNumGate = startBlockNum
-	resolveStartBlockNum := resolveStartBlock(startBlockNum, finalizedBlockNum.Num())
+	resolveStartBlockNum := resolveStartBlock(startBlockNum, chainLatestFinalizeBlock.Num())
 	p.logger.Info("starting poller",
 		zap.Uint64("start_block_num", startBlockNum),
-		zap.Stringer("finalized_block_num", finalizedBlockNum),
+		zap.Stringer("chain_latest_finalize_block", chainLatestFinalizeBlock),
 		zap.Uint64("resolved_start_block_num", resolveStartBlockNum),
 	)
 
@@ -209,9 +209,9 @@ func prevBlkInSeg(blocks []*forkable.Block) uint64 {
 	return blocks[0].Object.(*block).ParentNum
 }
 
-func resolveStartBlock(startBlockNum, finalizedBlockNum uint64) uint64 {
-	if finalizedBlockNum < startBlockNum {
-		return finalizedBlockNum
+func resolveStartBlock(startBlockNum, chainLatestFinalizeBlock uint64) uint64 {
+	if chainLatestFinalizeBlock < startBlockNum {
+		return chainLatestFinalizeBlock
 	}
 	return startBlockNum
 }
