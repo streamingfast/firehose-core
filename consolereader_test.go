@@ -10,7 +10,6 @@ import (
 	"github.com/streamingfast/firehose-core/test"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -35,7 +34,6 @@ func Test_Ctx_readBlock(t *testing.T) {
 	}
 
 	anypbBlock, err := anypb.New(&pbBlock)
-	payload, err := proto.Marshal(anypbBlock)
 
 	require.NoError(t, err)
 	nowNano := time.Now().UnixNano()
@@ -47,7 +45,7 @@ func Test_Ctx_readBlock(t *testing.T) {
 		parentHash,
 		libNumber,
 		nowNano,
-		base64.StdEncoding.EncodeToString(payload),
+		base64.StdEncoding.EncodeToString(anypbBlock.Value),
 	)
 
 	block, err := ctx.readBlock(line)
