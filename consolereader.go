@@ -14,7 +14,6 @@ import (
 	"github.com/streamingfast/firehose-core/node-manager/mindreader"
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -136,15 +135,9 @@ func (ctx *parseCtx) readBlock(line string) (out *pbbstream.Block, err error) {
 
 	payload, err := base64.StdEncoding.DecodeString(chunks[6])
 
-	blockPayload := &anypb.Any{}
-	if err := proto.Unmarshal(payload, blockPayload); err != nil {
-		return nil, fmt.Errorf("unmarshaling block payload: %w", err)
-	}
-
-	typeChunks := strings.Split(blockPayload.TypeUrl, "/")
-	payloadType := typeChunks[len(typeChunks)-1]
-	if payloadType != ctx.protoMessageType {
-		return nil, fmt.Errorf("invalid payload type, expected %q, got %q", ctx.protoMessageType, blockPayload.TypeUrl)
+	blockPayload := &anypb.Any{
+		TypeUrl: ctx.protoMessageType,
+		Value:   payload,
 	}
 
 	block := &pbbstream.Block{
