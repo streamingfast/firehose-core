@@ -28,7 +28,7 @@ func NewFireBlockHandler(blockTypeURL string) *FireBlockHandler {
 }
 
 func (f *FireBlockHandler) Init() {
-	fmt.Println("FIRE INIT 1.0 ", f.blockTypeURL)
+	fmt.Println("FIRE INIT 1.0", f.blockTypeURL)
 }
 
 func (f *FireBlockHandler) Handle(b *pbbstream.Block) error {
