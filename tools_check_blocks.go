@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"strconv"
 
@@ -27,7 +28,7 @@ const (
 	MaxUint64 = ^uint64(0)
 )
 
-func CheckMergedBlocks[B Block](ctx context.Context, chain *Chain[B], logger *zap.Logger, storeURL string, fileBlockSize uint64, blockRange tools.BlockRange, blockPrinter func(block *pbbstream.Block), printDetails PrintDetails) error {
+func CheckMergedBlocks[B Block](ctx context.Context, chain *Chain[B], logger *zap.Logger, storeURL string, fileBlockSize uint64, blockRange tools.BlockRange, printDetails PrintDetails) error {
 	readAllBlocks := printDetails != PrintNoDetails
 	fmt.Printf("Checking block holes on %s\n", storeURL)
 	if readAllBlocks {
@@ -94,7 +95,7 @@ func CheckMergedBlocks[B Block](ctx context.Context, chain *Chain[B], logger *za
 		expected = baseNum + fileBlockSize
 
 		if readAllBlocks {
-			lowestBlockSegment, highestBlockSegment := validateBlockSegment(ctx, chain, blocksStore, filename, fileBlockSize, blockRange, blockPrinter, printDetails, tfdb)
+			lowestBlockSegment, highestBlockSegment := validateBlockSegment(ctx, chain, blocksStore, filename, fileBlockSize, blockRange, printDetails, tfdb)
 			if lowestBlockSegment < lowestBlockSeen {
 				lowestBlockSeen = lowestBlockSegment
 			}
@@ -170,7 +171,6 @@ func validateBlockSegment[B Block](
 	segment string,
 	fileBlockSize uint64,
 	blockRange tools.BlockRange,
-	blockPrinter func(block *pbbstream.Block),
 	printDetails PrintDetails,
 	tfdb *trackedForkDB,
 ) (lowestBlockSeen, highestBlockSeen uint64) {
@@ -238,7 +238,11 @@ func validateBlockSegment[B Block](
 			seenBlockCount++
 
 			if printDetails == PrintStats {
-				blockPrinter(block)
+				err := block.PrintBlock(false, os.Stdout)
+				if err != nil {
+					fmt.Printf("❌ Unable to print block %s: %s\n", block.AsRef(), err)
+					continue
+				}
 			}
 
 			if printDetails == PrintFull {

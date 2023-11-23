@@ -3,7 +3,6 @@ package firecore
 import (
 	"context"
 	"fmt"
-	"io"
 	"runtime/debug"
 	"strings"
 
@@ -18,11 +17,6 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/anypb"
 )
-
-// BlockPrinterFunc takes a chain agnostic [block] and prints it to a human readable form.
-//
-// See [ToolsConfig#BlockPrinter] for extra details about expected printing.
-type BlockPrinterFunc func(block Block, alsoPrintTransactions bool, out io.Writer) error
 
 // SanitizeBlockForCompareFunc takes a chain agnostic [block] and transforms it in-place, removing fields
 // that should not be compared.
@@ -160,32 +154,6 @@ type Chain[B Block] struct {
 }
 
 type ToolsConfig[B Block] struct {
-	// BlockPrinter represents a printing function that render a chain specific human readable
-	// form of the receive chain agnostic [bstream.Block]. This block is expected to be rendered as
-	// a single line for example on Ethereum rendering of a single block looks like:
-	//
-	// ```
-	// Block #24924194 (01d6d349fbd3fa419182a2f0cf0b00714e101286650c239de8923caef6134b6c) 62 transactions, 607 calls
-	// ```
-	//
-	// If the [alsoPrintTransactions] argument is true, each transaction of the block should also be printed, following
-	// directly the block line. Each transaction should also be on a single line, usually prefixed with a `- ` to make
-	// the rendering more appealing.
-	//
-	// For example on Ethereum rendering with [alsoPrintTransactions] being `true` looks like:
-	//
-	// ```
-	// Block #24924194 (01d6d349fbd3fa419182a2f0cf0b00714e101286650c239de8923caef6134b6c) 62 transactions, 607 calls
-	// - Transaction 0xc7e04240d6f2cc5f382c478fd0a0b5c493463498c64b31477b95bded8cd12ab4 (10 calls)
-	// - Transaction 0xc7d8a698351eb1ac64acb76c8bf898365bb639865271add95d2c81650b2bd98c (4 calls)
-	// ```
-	//
-	// The `out` parameter is used to write to the correct location. You can use [fmt.Fprintf] and [fmt.Fprintln]
-	// and use `out` as the output writer in your implementation.
-	//
-	// The [BlockPrinter] is optional, if nil, a default block printer will be used. It's important to note
-	// that the default block printer error out if `alsoPrintTransactions` is true.
-	BlockPrinter BlockPrinterFunc
 
 	// SanitizeBlockForCompare is a function that takes a chain agnostic [block] and transforms it in-place, removing fields
 	// that should not be compared.
@@ -378,24 +346,4 @@ func findSetting(key string, settings []debug.BuildSetting) (value string) {
 	}
 
 	return ""
-}
-
-func (c *Chain[B]) BlockPrinter() BlockPrinterFunc {
-	if c.Tools == nil || c.Tools.BlockPrinter == nil {
-		return defaultBlockPrinter
-	}
-
-	return c.Tools.BlockPrinter
-}
-
-func defaultBlockPrinter(block Block, alsoPrintTransactions bool, out io.Writer) error {
-	if alsoPrintTransactions {
-		return fmt.Errorf("transactions is not supported by the default block printer")
-	}
-
-	if _, err := fmt.Fprintf(out, "Block #%d (%s)\n", block.GetFirehoseBlockNumber(), block.GetFirehoseBlockID()); err != nil {
-		return err
-	}
-
-	return nil
 }

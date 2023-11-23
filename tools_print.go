@@ -62,13 +62,11 @@ func init() {
 }
 
 func configureToolsPrintCmd[B Block](chain *Chain[B]) {
-	blockPrinter := chain.BlockPrinter()
-
-	toolsPrintOneBlockCmd.RunE = createToolsPrintOneBlockE(chain, blockPrinter)
-	toolsPrintMergedBlocksCmd.RunE = createToolsPrintMergedBlocksE(blockPrinter)
+	toolsPrintOneBlockCmd.RunE = createToolsPrintOneBlockE(chain)
+	toolsPrintMergedBlocksCmd.RunE = createToolsPrintMergedBlocksE()
 }
 
-func createToolsPrintMergedBlocksE(blockPrinter BlockPrinterFunc) CommandExecutor {
+func createToolsPrintMergedBlocksE() CommandExecutor {
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
@@ -118,7 +116,7 @@ func createToolsPrintMergedBlocksE(blockPrinter BlockPrinterFunc) CommandExecuto
 
 			seenBlockCount++
 
-			if err := printBlock(block, outputMode, printTransactions, blockPrinter); err != nil {
+			if err := printBlock(block, outputMode, printTransactions); err != nil {
 				// Error is ready to be passed to the user as-is
 				return err
 			}
@@ -126,7 +124,7 @@ func createToolsPrintMergedBlocksE(blockPrinter BlockPrinterFunc) CommandExecuto
 	}
 }
 
-func createToolsPrintOneBlockE[B Block](chain *Chain[B], blockPrinter BlockPrinterFunc) CommandExecutor {
+func createToolsPrintOneBlockE[B Block](chain *Chain[B]) CommandExecutor {
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
@@ -185,7 +183,7 @@ func createToolsPrintOneBlockE[B Block](chain *Chain[B], blockPrinter BlockPrint
 				return fmt.Errorf("reading block: %w", err)
 			}
 
-			if err := printBlock(block, outputMode, printTransactions, blockPrinter); err != nil {
+			if err := printBlock(block, outputMode, printTransactions); err != nil {
 				// Error is ready to be passed to the user as-is
 				return err
 			}
@@ -216,10 +214,11 @@ func toolsPrintCmdGetOutputMode(cmd *cobra.Command) (PrintOutputMode, error) {
 	return out, nil
 }
 
-func printBlock(block Block, outputMode PrintOutputMode, printTransactions bool, blockPrinter BlockPrinterFunc) error {
+func printBlock(block Block, outputMode PrintOutputMode, printTransactions bool) error {
 	switch outputMode {
 	case PrintOutputModeText:
-		if err := blockPrinter(block, printTransactions, os.Stdout); err != nil {
+		err := block.PrintBlock(printTransactions, os.Stdout)
+		if err != nil {
 			return fmt.Errorf("block text printing: %w", err)
 		}
 

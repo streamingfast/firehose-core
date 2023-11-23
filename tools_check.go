@@ -16,13 +16,11 @@ package firecore
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
-	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
@@ -63,9 +61,7 @@ func init() {
 }
 
 func configureToolsCheckCmd[B Block](chain *Chain[B]) {
-	blockPrinter := chain.BlockPrinter()
-
-	toolsCheckMergedBlocksCmd.RunE = createToolsCheckMergedBlocksE(chain, blockPrinter)
+	toolsCheckMergedBlocksCmd.RunE = createToolsCheckMergedBlocksE(chain)
 	toolsCheckMergedBlocksCmd.Example = ExamplePrefixed(chain, "tools check merged-blocks", `
 		"./sf-data/storage/merged-blocks"
 		"gs://<project>/<bucket>/<path>" -s
@@ -76,7 +72,7 @@ func configureToolsCheckCmd[B Block](chain *Chain[B]) {
 	toolsCheckForksCmd.RunE = toolsCheckForksE
 }
 
-func createToolsCheckMergedBlocksE[B Block](chain *Chain[B], blockPrinter BlockPrinterFunc) CommandExecutor {
+func createToolsCheckMergedBlocksE[B Block](chain *Chain[B]) CommandExecutor {
 	return func(cmd *cobra.Command, args []string) error {
 		storeURL := args[0]
 		fileBlockSize := uint64(100)
@@ -95,9 +91,7 @@ func createToolsCheckMergedBlocksE[B Block](chain *Chain[B], blockPrinter BlockP
 			printDetails = PrintFull
 		}
 
-		return CheckMergedBlocks(cmd.Context(), chain, rootLog, storeURL, fileBlockSize, blockRange, func(block *pbbstream.Block) {
-			blockPrinter(block, false, os.Stdout)
-		}, printDetails)
+		return CheckMergedBlocks(cmd.Context(), chain, rootLog, storeURL, fileBlockSize, blockRange, printDetails)
 	}
 }
 
