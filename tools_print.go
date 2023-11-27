@@ -63,10 +63,10 @@ func init() {
 
 func configureToolsPrintCmd[B Block](chain *Chain[B]) {
 	toolsPrintOneBlockCmd.RunE = createToolsPrintOneBlockE(chain)
-	toolsPrintMergedBlocksCmd.RunE = createToolsPrintMergedBlocksE()
+	toolsPrintMergedBlocksCmd.RunE = createToolsPrintMergedBlocksE(chain)
 }
 
-func createToolsPrintMergedBlocksE() CommandExecutor {
+func createToolsPrintMergedBlocksE[B Block](chain *Chain[B]) CommandExecutor {
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
@@ -116,7 +116,7 @@ func createToolsPrintMergedBlocksE() CommandExecutor {
 
 			seenBlockCount++
 
-			if err := printBlock(block, outputMode, printTransactions); err != nil {
+			if err := printBlock(block, chain, outputMode, printTransactions); err != nil {
 				// Error is ready to be passed to the user as-is
 				return err
 			}
@@ -183,7 +183,7 @@ func createToolsPrintOneBlockE[B Block](chain *Chain[B]) CommandExecutor {
 				return fmt.Errorf("reading block: %w", err)
 			}
 
-			if err := printBlock(block, outputMode, printTransactions); err != nil {
+			if err := printBlock(block, chain, outputMode, printTransactions); err != nil {
 				// Error is ready to be passed to the user as-is
 				return err
 			}
@@ -214,12 +214,12 @@ func toolsPrintCmdGetOutputMode(cmd *cobra.Command) (PrintOutputMode, error) {
 	return out, nil
 }
 
-func printBlock(block Block, outputMode PrintOutputMode, printTransactions bool) error {
+func printBlock[B Block](pbBlock *pbbstream.Block, chain *Chain[B], outputMode PrintOutputMode, printTransactions bool) error {
 	switch outputMode {
 	case PrintOutputModeText:
-		err := block.PrintBlock(printTransactions, os.Stdout)
+		err := pbBlock.PrintBlock(printTransactions, os.Stdout)
 		if err != nil {
-			return fmt.Errorf("block text printing: %w", err)
+			return fmt.Errorf("pbBlock text printing: %w", err)
 		}
 
 	case PrintOutputModeJSON, PrintOutputModeJSONL:
@@ -245,9 +245,20 @@ func printBlock(block Block, outputMode PrintOutputMode, printTransactions bool)
 			)
 		}
 
-		err := json.MarshalEncode(encoder, block, json.WithMarshalers(marshallers))
+		var marshallableBlock Block = pbBlock
+		chainBlock := chain.BlockFactory()
+		if _, ok := chainBlock.(*pbbstream.Block); !ok {
+
+			marshallableBlock = chainBlock
+			err := pbBlock.Payload.UnmarshalTo(marshallableBlock)
+			if err != nil {
+				return fmt.Errorf("pbBlock payload unmarshal: %w", err)
+			}
+		}
+
+		err := json.MarshalEncode(encoder, marshallableBlock, json.WithMarshalers(marshallers))
 		if err != nil {
-			return fmt.Errorf("block JSON printing: json marshal: %w", err)
+			return fmt.Errorf("pbBlock JSON printing: json marshal: %w", err)
 		}
 	}
 
