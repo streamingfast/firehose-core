@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var logger, tracer = logging.PackageLogger("forkhandler", "github.com/streamingfast/firehose-bitcoin/forkhandler.test")
+var logger, tracer = logging.PackageLogger("forkhandler", "github.com/streamingfast/firehose-core/forkhandler.test")
 
 func init() {
 	logging.InstantiateLoggers(logging.WithDefaultLevel(zapcore.DebugLevel))
