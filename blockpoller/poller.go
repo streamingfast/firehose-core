@@ -3,7 +3,6 @@ package blockpoller
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
@@ -85,7 +84,6 @@ func (p *BlockPoller) run(resolvedStartBlock bstream.BlockRef) (err error) {
 
 	currentCursor := &cursor{state: ContinuousSegState, logger: p.logger}
 	blkIter := resolvedStartBlock.Num()
-	intervalDuration := p.blockFetcher.PollingInterval()
 	for {
 		if p.IsTerminating() {
 			p.logger.Info("block poller is terminating")
@@ -99,8 +97,6 @@ func (p *BlockPoller) run(resolvedStartBlock bstream.BlockRef) (err error) {
 		if p.IsTerminating() {
 			p.logger.Info("block poller is terminating")
 		}
-
-		time.Sleep(intervalDuration)
 	}
 }
 
