@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/wasm"
-	"google.golang.org/protobuf/proto"
 )
 
 var registerSSOnce sync.Once
@@ -18,10 +17,6 @@ func registerCommonSubstreamsFlags(cmd *cobra.Command) {
 		cmd.Flags().String("substreams-state-store-url", "{sf-data-dir}/localdata", "where substreams state data are stored")
 		cmd.Flags().String("substreams-state-store-default-tag", "", "If non-empty, will be appended to {substreams-state-store-url} (ex: 'v1'). Can be overriden per-request with 'X-Sf-Substreams-Cache-Tag' header")
 	})
-}
-
-func getSubstreamsBlockMessageType[B Block](chain *Chain[B]) string {
-	return string(proto.MessageName(chain.BlockFactory()))
 }
 
 func getSubstreamsExtensions[B Block](chain *Chain[B]) ([]wasm.WASMExtensioner, []pipeline.PipelineOptioner, error) {

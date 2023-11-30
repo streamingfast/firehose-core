@@ -42,12 +42,12 @@ func registerSubstreamsTier1App[B Block](chain *Chain[B]) {
 		RegisterFlags: func(cmd *cobra.Command) error {
 			cmd.Flags().String("substreams-tier1-grpc-listen-addr", SubstreamsTier1GRPCServingAddr, "Address on which the Substreams tier1 will listen, listen by default in plain text, appending a '*' to the end of the address make it listen in snake-oil (inscure) TLS")
 			cmd.Flags().String("substreams-tier1-subrequests-endpoint", SubstreamsTier2GRPCServingAddr, "Address on which the Substreans tier1 can reach the tier2")
-
 			// communication with tier2
 			cmd.Flags().String("substreams-tier1-discovery-service-url", "", "URL to configure the grpc discovery service, used for communication with tier2") //traffic-director://xds?vpc_network=vpc-global&use_xds_reds=true
 			cmd.Flags().Bool("substreams-tier1-subrequests-insecure", false, "Connect to tier2 without checking certificate validity")
 			cmd.Flags().Bool("substreams-tier1-subrequests-plaintext", true, "Connect to tier2 without client in plaintext mode")
 			cmd.Flags().Int("substreams-tier1-max-subrequests", 4, "number of parallel subrequests that the tier1 can make to the tier2 per request")
+			cmd.Flags().String("substreams-tier1-block-type", "", "fully qualified name of the block type to use for the substreams tier1 (i.e. sf.ethereum.v1.Block)")
 
 			// all substreams
 			registerCommonSubstreamsFlags(cmd)
@@ -81,6 +81,11 @@ func registerSubstreamsTier1App[B Block](chain *Chain[B]) {
 			subrequestsInsecure := viper.GetBool("substreams-tier1-subrequests-insecure")
 			subrequestsPlaintext := viper.GetBool("substreams-tier1-subrequests-plaintext")
 			maxSubrequests := viper.GetUint64("substreams-tier1-max-subrequests")
+			substreamsBlockType := viper.GetString("substreams-tier1-block-type")
+
+			if substreamsBlockType == "" {
+				return nil, fmt.Errorf("substreams-tier1-block-type is required")
+			}
 
 			tracing := os.Getenv("SUBSTREAMS_TRACING") == "modules_exec"
 
@@ -111,7 +116,7 @@ func registerSubstreamsTier1App[B Block](chain *Chain[B]) {
 					StateStoreURL:        stateStoreURL,
 					StateStoreDefaultTag: stateStoreDefaultTag,
 					StateBundleSize:      stateBundleSize,
-					BlockType:            getSubstreamsBlockMessageType(chain),
+					BlockType:            substreamsBlockType,
 					MaxSubrequests:       maxSubrequests,
 					SubrequestsEndpoint:  subrequestsEndpoint,
 					SubrequestsInsecure:  subrequestsInsecure,
