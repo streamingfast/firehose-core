@@ -16,9 +16,9 @@ func WithStoringState(stateStorePath string) Option {
 	}
 }
 
-// WithCursorPurged ensures the poller will ignore the cursor and start from the startBlockNum
+// IgnoreCursor ensures the poller will ignore the cursor and start from the startBlockNum
 // the cursor will still be saved as the poller progresses
-func WithCursorPurged() Option {
+func IgnoreCursor() Option {
 	return func(p *BlockPoller) {
 		p.ignoreCursor = true
 	}
