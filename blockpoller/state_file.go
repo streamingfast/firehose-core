@@ -92,8 +92,21 @@ func (p *BlockPoller) saveState(blocks []*forkable.Block) error {
 	return nil
 }
 
-func initState(resolvedStartBlock bstream.BlockRef, stateStorePath string, logger *zap.Logger) (*forkable.ForkDB, bstream.BlockRef, error) {
+func initState(resolvedStartBlock bstream.BlockRef, stateStorePath string, ignoreCursor bool, logger *zap.Logger) (*forkable.ForkDB, bstream.BlockRef, error) {
 	forkDB := forkable.NewForkDB(forkable.ForkDBWithLogger(logger))
+
+	useStartBlockFunc := func() (*forkable.ForkDB, bstream.BlockRef, error) {
+		forkDB.InitLIB(resolvedStartBlock)
+		return forkDB, resolvedStartBlock, nil
+	}
+
+	if ignoreCursor {
+		logger.Info("ignorign cursor",
+			zap.Stringer("start_block", resolvedStartBlock),
+			zap.Stringer("lib", resolvedStartBlock),
+		)
+		return useStartBlockFunc()
+	}
 
 	sf, err := getState(stateStorePath)
 	if err != nil {
@@ -102,8 +115,7 @@ func initState(resolvedStartBlock bstream.BlockRef, stateStorePath string, logge
 			zap.Stringer("lib", resolvedStartBlock),
 			zap.Error(err),
 		)
-		forkDB.InitLIB(resolvedStartBlock)
-		return forkDB, resolvedStartBlock, nil
+		return useStartBlockFunc()
 	}
 
 	forkDB.InitLIB(bstream.NewBlockRef(sf.Lib.Id, sf.Lib.Num))

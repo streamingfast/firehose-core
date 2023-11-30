@@ -54,7 +54,7 @@ func TestFireBlockFinalizer_state(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, expectedStateFileCnt, string(cnt))
 
-	forkDB, startBlock, err := initState(bstream.NewBlockRef("60a", 60), dirName, zap.NewNop())
+	forkDB, startBlock, err := initState(bstream.NewBlockRef("60a", 60), dirName, false, zap.NewNop())
 	require.NoError(t, err)
 
 	blocks, reachedLib := forkDB.CompleteSegment(bstream.NewBlockRef("105a", 105))
@@ -70,7 +70,7 @@ func TestFireBlockFinalizer_noSstate(t *testing.T) {
 	require.NoError(t, err)
 	defer os.Remove(dirName)
 
-	forkDB, startBlock, err := initState(bstream.NewBlockRef("60a", 60), dirName, logger)
+	forkDB, startBlock, err := initState(bstream.NewBlockRef("60a", 60), dirName, false, logger)
 	require.NoError(t, err)
 
 	blocks, reachedLib := forkDB.CompleteSegment(bstream.NewBlockRef("60a", 60))

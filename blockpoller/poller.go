@@ -26,6 +26,7 @@ type BlockPoller struct {
 	startBlockNumGate    uint64
 	fetchBlockRetryCount uint64
 	stateStorePath       string
+	ignoreCursor         bool
 
 	blockFetcher BlockFetcher
 	blockHandler BlockHandler
@@ -77,7 +78,7 @@ func (p *BlockPoller) Run(ctx context.Context, startBlockNum uint64, chainLatest
 
 func (p *BlockPoller) run(resolvedStartBlock bstream.BlockRef) (err error) {
 
-	p.forkDB, resolvedStartBlock, err = initState(resolvedStartBlock, p.stateStorePath, p.logger)
+	p.forkDB, resolvedStartBlock, err = initState(resolvedStartBlock, p.stateStorePath, p.ignoreCursor, p.logger)
 	if err != nil {
 		return fmt.Errorf("unable to initialize cursor: %w", err)
 	}
