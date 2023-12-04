@@ -11,6 +11,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ## Unreleased
 
 * Fixed SF_TRACING feature (regression broke the ability to specify a tracing endpoint)
+* Firehose connections rate-limiting will now force a delay of between 1 and 4 seconds (random value)  before refusing a connection when under heavy load
 
 ## v0.2.3
 
