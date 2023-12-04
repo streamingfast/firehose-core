@@ -162,7 +162,10 @@ func getFirehoseClientFromCmd[B Block, C any](cmd *cobra.Command, logger *zap.Lo
 		requestInfo.GRPCCallOpts = append(requestInfo.GRPCCallOpts, compressor)
 	}
 
-	requestInfo.Transforms, err = chain.Tools.TransformFlags.Parse(cmd, logger)
+	if chain.Tools.TransformFlags != nil {
+		requestInfo.Transforms, err = chain.Tools.TransformFlags.Parse(cmd, logger)
+	}
+
 	if err != nil {
 		return firehoseClient, nil, nil, fmt.Errorf("unable to parse transforms flags: %w", err)
 	}

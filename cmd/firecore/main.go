@@ -13,6 +13,7 @@ func main() {
 		FullyQualifiedModule: "github.com/streamingfast/firehose-core",
 		Version:              version,
 		BlockFactory:         func() firecore.Block { return new(pbbstream.Block) },
+		CoreBinaryEnabled:    true,
 		ConsoleReaderFactory: firecore.NewConsoleReader,
 		Tools:                &firecore.ToolsConfig[*pbbstream.Block]{},
 	})

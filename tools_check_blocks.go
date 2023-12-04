@@ -238,7 +238,7 @@ func validateBlockSegment[B Block](
 			seenBlockCount++
 
 			if printDetails == PrintStats {
-				err := block.PrintBlock(false, os.Stdout)
+				err := printBlock(block, false, os.Stdout)
 				if err != nil {
 					fmt.Printf("❌ Unable to print block %s: %s\n", block.AsRef(), err)
 					continue

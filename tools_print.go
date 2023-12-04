@@ -128,7 +128,7 @@ func createToolsPrintMergedBlocksE[B Block](chain *Chain[B]) CommandExecutor {
 
 			seenBlockCount++
 
-			if err := printBlock(block, chain, outputMode, printTransactions, dPrinter); err != nil {
+			if err := displayBlock(block, chain, outputMode, printTransactions, dPrinter); err != nil {
 				// Error is ready to be passed to the user as-is
 				return err
 			}
@@ -200,7 +200,7 @@ func createToolsPrintOneBlockE[B Block](chain *Chain[B]) CommandExecutor {
 				return fmt.Errorf("reading block: %w", err)
 			}
 
-			if err := printBlock(block, chain, outputMode, printTransactions, dPrinter); err != nil {
+			if err := displayBlock(block, chain, outputMode, printTransactions, dPrinter); err != nil {
 				// Error is ready to be passed to the user as-is
 				return err
 			}
@@ -224,13 +224,14 @@ func toolsPrintCmdGetOutputMode(cmd *cobra.Command) (PrintOutputMode, error) {
 	return out, nil
 }
 
-func printBlock[B Block](pbBlock *pbbstream.Block, chain *Chain[B], outputMode PrintOutputMode, printTransactions bool, dPrinter *dynamicPrinter) error {
+func displayBlock[B Block](pbBlock *pbbstream.Block, chain *Chain[B], outputMode PrintOutputMode, printTransactions bool, dPrinter *dynamicPrinter) error {
 	if pbBlock == nil {
 		return fmt.Errorf("block is nil")
 	}
+
 	switch outputMode {
 	case PrintOutputModeText:
-		err := pbBlock.PrintBlock(printTransactions, os.Stdout)
+		err := printBlock(pbBlock, printTransactions, os.Stdout)
 		if err != nil {
 			return fmt.Errorf("pbBlock text printing: %w", err)
 		}
@@ -258,32 +259,35 @@ func printBlock[B Block](pbBlock *pbbstream.Block, chain *Chain[B], outputMode P
 			)
 		}
 
-		var marshallableBlock Block = pbBlock
-		chainBlock := chain.BlockFactory()
-		isLegacyBlock := chainBlock == nil
-		if isLegacyBlock {
-			err := proto.Unmarshal(pbBlock.GetPayloadBuffer(), chainBlock)
-			if err != nil {
-				return fmt.Errorf("unmarshalling legacy pb block : %w", err)
-			}
-			marshallableBlock = chainBlock
+		isLegacyBlock := pbBlock.Payload == nil
+		if chain.CoreBinaryEnabled {
+			// since we are running directly the firecore binary we will *NOT* use the BlockFactory
 
-		} else if _, ok := chainBlock.(*pbbstream.Block); ok {
-			return dPrinter.printBlock(pbBlock, encoder, marshallers)
+			if isLegacyBlock {
+				return dPrinter.printBlock(legacyKindsToProtoType(pbBlock.PayloadKind), pbBlock.GetPayloadBuffer(), encoder, marshallers)
+			}
+
+			return dPrinter.printBlock(pbBlock.Payload.TypeUrl, pbBlock.Payload.Value, encoder, marshallers)
 
 		} else {
-			marshallableBlock = chainBlock
+			// since we are running via the chain specific binary (i.e. fireeth) we can use a BlockFactory
+			marshallableBlock := chain.BlockFactory()
+			if isLegacyBlock {
+				if err := proto.Unmarshal(pbBlock.GetPayloadBuffer(), marshallableBlock); err != nil {
+					return fmt.Errorf("unmarshal legacy block payload to protocol block: %w", err)
+				}
+			} else {
+				if err := pbBlock.Payload.UnmarshalTo(marshallableBlock); err != nil {
+					return fmt.Errorf("pbBlock payload unmarshal: %w", err)
+				}
+			}
 
-			err := pbBlock.Payload.UnmarshalTo(marshallableBlock)
+			err := json.MarshalEncode(encoder, marshallableBlock, json.WithMarshalers(marshallers))
 			if err != nil {
-				return fmt.Errorf("pbBlock payload unmarshal: %w", err)
+				return fmt.Errorf("pbBlock JSON printing: json marshal: %w", err)
 			}
 		}
 
-		err := json.MarshalEncode(encoder, marshallableBlock, json.WithMarshalers(marshallers))
-		if err != nil {
-			return fmt.Errorf("pbBlock JSON printing: json marshal: %w", err)
-		}
 	}
 
 	return nil
@@ -303,12 +307,12 @@ func newDynamicPrinter(importPaths []string) (*dynamicPrinter, error) {
 	}, nil
 }
 
-func (d *dynamicPrinter) printBlock(block *pbbstream.Block, encoder *jsontext.Encoder, marshalers *json.Marshalers) error {
+func (d *dynamicPrinter) printBlock(blkTypeURL string, blkPayload []byte, encoder *jsontext.Encoder, marshalers *json.Marshalers) error {
 	for _, fd := range d.fileDescriptors {
-		md := fd.FindSymbol(block.Payload.TypeUrl)
+		md := fd.FindSymbol(blkTypeURL)
 		if md != nil {
 			dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(md.(*desc.MessageDescriptor))
-			if err := dynMsg.Unmarshal(block.Payload.Value); err != nil {
+			if err := dynMsg.Unmarshal(blkPayload); err != nil {
 				return fmt.Errorf("unmarshalling block: %w", err)
 			}
 			err := json.MarshalEncode(encoder, dynMsg, json.WithMarshalers(marshalers))
@@ -318,7 +322,7 @@ func (d *dynamicPrinter) printBlock(block *pbbstream.Block, encoder *jsontext.En
 			return nil
 		}
 	}
-	return fmt.Errorf("no message descriptor in proto paths for type url %q", block.Payload.TypeUrl)
+	return fmt.Errorf("no message descriptor in proto paths for type url %q", blkTypeURL)
 }
 
 func parseProtoFiles(importPaths []string) (fds []*desc.FileDescriptor, err error) {
@@ -347,8 +351,6 @@ func parseProtoFiles(importPaths []string) (fds []*desc.FileDescriptor, err erro
 		ip = append(ip, importPath)
 	}
 
-	fmt.Println("importPaths", importPaths)
-
 	parser := protoparse.Parser{
 		ImportPaths: ip,
 	}
@@ -376,4 +378,43 @@ func parseProtoFiles(importPaths []string) (fds []*desc.FileDescriptor, err erro
 	}
 	return
 
+}
+
+func printBlock(b *pbbstream.Block, printTransactions bool, out io.Writer) error {
+	_, err := out.Write(
+		[]byte(
+			fmt.Sprintf(
+				"Block #%d (%s)\n",
+				b.Number,
+				b.Id,
+			),
+		),
+	)
+	if err != nil {
+		return fmt.Errorf("writing block: %w", err)
+	}
+
+	if printTransactions {
+		if _, err = out.Write([]byte("warning: transaction printing not supported by bstream block")); err != nil {
+			return fmt.Errorf("writing transaction support warning: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func legacyKindsToProtoType(protocol pbbstream.Protocol) string {
+	switch protocol {
+	case pbbstream.Protocol_EOS:
+		return "sf.antelope.type.v1.Block"
+	case pbbstream.Protocol_ETH:
+		return "sf.ethereum.type.v2.Block"
+	case pbbstream.Protocol_SOLANA:
+		return "sf.solana.type.v1.Block"
+	case pbbstream.Protocol_NEAR:
+		return "sf.near.type.v1.Block"
+	case pbbstream.Protocol_COSMOS:
+		return "sf.cosmos.type.v1.Block"
+	}
+	panic("unaligned protocol")
 }

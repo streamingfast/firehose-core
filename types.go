@@ -2,7 +2,6 @@ package firecore
 
 import (
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -63,33 +62,6 @@ type Block interface {
 	// GetFirehoseBlockTime returns the block timestamp as a time.Time of when the block was
 	// produced. This should the consensus agreed time of the block.
 	GetFirehoseBlockTime() time.Time
-
-	// PrintBlock is printing function that render a chain specific human readable
-	// form Block. This block is expected to be rendered as
-	// a single line for example on Ethereum rendering of a single block looks like:
-	//
-	// ```
-	// Block #24924194 (01d6d349fbd3fa419182a2f0cf0b00714e101286650c239de8923caef6134b6c) 62 transactions, 607 calls
-	// ```
-	//
-	// If the [alsoPrintTransactions] argument is true, each transaction of the block should also be printed, following
-	// directly the block line. Each transaction should also be on a single line, usually prefixed with a `- ` to make
-	// the rendering more appealing.
-	//
-	// For example on Ethereum rendering with [alsoPrintTransactions] being `true` looks like:
-	//
-	// ```
-	// Block #24924194 (01d6d349fbd3fa419182a2f0cf0b00714e101286650c239de8923caef6134b6c) 62 transactions, 607 calls
-	// - Transaction 0xc7e04240d6f2cc5f382c478fd0a0b5c493463498c64b31477b95bded8cd12ab4 (10 calls)
-	// - Transaction 0xc7d8a698351eb1ac64acb76c8bf898365bb639865271add95d2c81650b2bd98c (4 calls)
-	// ```
-	//
-	// The `out` parameter is used to write to the correct location. You can use [fmt.Fprintf] and [fmt.Fprintln]
-	// and use `out` as the output writer in your implementation.
-	//
-	// The [BlockPrinter] is optional, if nil, a default block printer will be used. It's important to note
-	// that the default block printer error out if `alsoPrintTransactions` is true.
-	PrintBlock(printTransactions bool, out io.Writer) error
 }
 
 // BlockLIBNumDerivable is an optional interface that can be implemented by your chain's block model Block
