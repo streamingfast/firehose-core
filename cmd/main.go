@@ -1,10 +1,14 @@
-package firecore
+package cmd
 
 import (
 	"fmt"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/streamingfast/firehose-core/cmd/tools"
+
+	"github.com/streamingfast/firehose-core/cmd/apps"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -19,6 +23,7 @@ import (
 	"github.com/streamingfast/dmetering"
 	dmeteringgrpc "github.com/streamingfast/dmetering/grpc"
 	dmeteringlogger "github.com/streamingfast/dmetering/logger"
+	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 )
@@ -29,7 +34,7 @@ var rootTracer logging.Tracer
 
 // Main is the main entry point that configures everything and should be called from your Go
 // 'main' entrypoint directly.
-func Main[B Block](chain *Chain[B]) {
+func Main[B firecore.Block](chain *firecore.Chain[B]) {
 	dauthgrpc.Register()
 	dauthnull.Register()
 	dauthsecret.Register()
@@ -48,7 +53,7 @@ func Main[B Block](chain *Chain[B]) {
 		cli.ConfigureViperForCommand(rootCmd, strings.ToUpper(binaryName))
 
 		// Compatibility to fetch `viper.GetXXX(....)` without `start-` prefix for flags on startCmd
-		startCmd.LocalFlags().VisitAll(func(flag *pflag.Flag) {
+		apps.StartCmd.LocalFlags().VisitAll(func(flag *pflag.Flag) {
 			viper.BindPFlag(flag.Name, flag)
 			viper.BindEnv(sflags.MustGetViperKeyFromFlag(flag), strings.ToUpper(binaryName+"_"+strings.ReplaceAll(flag.Name, "-", "_")))
 		})
@@ -58,8 +63,8 @@ func Main[B Block](chain *Chain[B]) {
 	rootCmd.Short = fmt.Sprintf("Firehose on %s", chain.LongName)
 	rootCmd.Version = chain.VersionString()
 
-	rootCmd.AddCommand(startCmd)
-	rootCmd.AddCommand(toolsCmd)
+	rootCmd.AddCommand(apps.StartCmd)
+	rootCmd.AddCommand(tools.ToolsCmd)
 
 	(func(flags *pflag.FlagSet) {
 		flags.StringP("data-dir", "d", "./firehose-data", "Path to data storage for all components of the Firehose stack")
@@ -92,29 +97,29 @@ func Main[B Block](chain *Chain[B]) {
 	})(rootCmd.PersistentFlags())
 
 	registerCommonFlags(chain)
-	registerReaderNodeApp(chain)
-	registerReaderNodeStdinApp(chain)
-	registerMergerApp()
-	registerRelayerApp()
-	registerFirehoseApp(chain)
-	registerSubstreamsTier1App(chain)
-	registerSubstreamsTier2App(chain)
+	apps.RegisterReaderNodeApp(chain, rootLog)
+	apps.RegisterReaderNodeStdinApp(chain, rootLog)
+	apps.RegisterMergerApp(rootLog)
+	apps.RegisterRelayerApp(rootLog)
+	apps.RegisterFirehoseApp(chain, rootLog)
+	apps.RegisterSubstreamsTier1App(chain, rootLog)
+	apps.RegisterSubstreamsTier2App(chain, rootLog)
 
 	if len(chain.BlockIndexerFactories) > 0 {
-		registerIndexBuilderApp(chain)
+		apps.RegisterIndexBuilderApp(chain, rootLog)
 	}
 
 	if chain.RegisterExtraStartFlags != nil {
-		chain.RegisterExtraStartFlags(startCmd.Flags())
+		chain.RegisterExtraStartFlags(apps.StartCmd.Flags())
 	}
 
-	configureStartCmd(chain)
+	apps.ConfigureStartCmd(chain, "", rootLog)
 
-	if err := configureToolsCmd(chain); err != nil {
+	if err := tools.ConfigureToolsCmd(chain, rootLog, rootTracer); err != nil {
 		exitWithError("registering tools command", err)
 	}
 
-	if err := launcher.RegisterFlags(rootLog, startCmd); err != nil {
+	if err := launcher.RegisterFlags(rootLog, apps.StartCmd); err != nil {
 		exitWithError("registering application flags", err)
 	}
 
@@ -123,8 +128,8 @@ func Main[B Block](chain *Chain[B]) {
 		availableCmds = append(availableCmds, app)
 	}
 
-	startCmd.SetHelpTemplate(fmt.Sprintf(startCmdHelpTemplate, strings.Join(availableCmds, "\n  ")))
-	startCmd.Example = fmt.Sprintf("%s start reader-node", binaryName)
+	apps.StartCmd.SetHelpTemplate(fmt.Sprintf(startCmdHelpTemplate, strings.Join(availableCmds, "\n  ")))
+	apps.StartCmd.Example = fmt.Sprintf("%s start reader-node", binaryName)
 
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
 		if err := setupCmd(cmd, chain.BinaryName()); err != nil {

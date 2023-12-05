@@ -7,13 +7,11 @@ import (
 	"strings"
 
 	"github.com/streamingfast/cli"
-	"go.uber.org/zap"
 )
 
 func mkdirStorePathIfLocal(storeURL string) (err error) {
-	rootLog.Debug("creating directory and its parent(s)", zap.String("directory", storeURL))
 	if dirs := getDirsToMake(storeURL); len(dirs) > 0 {
-		err = makeDirs(dirs)
+		err = MakeDirs(dirs)
 	}
 
 	return
@@ -39,7 +37,7 @@ func getDirsToMake(storeURL string) []string {
 	return []string{storeURL}
 }
 
-func makeDirs(directories []string) error {
+func MakeDirs(directories []string) error {
 	for _, directory := range directories {
 		err := os.MkdirAll(directory, 0755)
 		if err != nil {

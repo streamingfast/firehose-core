@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package firecore
+package tools
 
 import (
 	"bytes"
@@ -30,14 +30,14 @@ import (
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/firehose-core/tools"
+	firecore "github.com/streamingfast/firehose-core"
 	"go.uber.org/multierr"
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-func newToolsCompareBlocksCmd[B Block](chain *Chain[B]) *cobra.Command {
+func newToolsCompareBlocksCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "compare-blocks <reference_blocks_store> <current_blocks_store> [<block_range>]",
 		Short: "Checks for any differences between two block stores between a specified range. (To compare the likeness of two block ranges, for example)",
@@ -56,7 +56,7 @@ func newToolsCompareBlocksCmd[B Block](chain *Chain[B]) *cobra.Command {
 		`),
 		Args: cobra.ExactArgs(3),
 		RunE: runCompareBlocksE(chain),
-		Example: ExamplePrefixed(chain, "tools compare-blocks", `
+		Example: firecore.ExamplePrefixed(chain, "tools compare-blocks", `
 			# Run over full block range
 			reference_store/ current_store/ 0:16000000
 
@@ -72,7 +72,7 @@ func newToolsCompareBlocksCmd[B Block](chain *Chain[B]) *cobra.Command {
 	return cmd
 }
 
-func runCompareBlocksE[B Block](chain *Chain[B]) CommandExecutor {
+func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.CommandExecutor {
 	sanitizer := chain.Tools.GetSanitizeBlockForCompare()
 
 	return func(cmd *cobra.Command, args []string) error {
@@ -82,7 +82,7 @@ func runCompareBlocksE[B Block](chain *Chain[B]) CommandExecutor {
 		warnAboutExtraBlocks := sync.Once{}
 
 		ctx := cmd.Context()
-		blockRange, err := tools.GetBlockRangeFromArg(args[2])
+		blockRange, err := GetBlockRangeFromArg(args[2])
 		if err != nil {
 			return fmt.Errorf("parsing range: %w", err)
 		}
@@ -103,7 +103,7 @@ func runCompareBlocksE[B Block](chain *Chain[B]) CommandExecutor {
 			return fmt.Errorf("unable to create store at path %q: %w", args[1], err)
 		}
 
-		segments, err := blockRange.Split(segmentSize, tools.EndBoundaryExclusive)
+		segments, err := blockRange.Split(segmentSize, EndBoundaryExclusive)
 		if err != nil {
 			return fmt.Errorf("unable to split blockrage in segments: %w", err)
 		}
@@ -122,7 +122,7 @@ func runCompareBlocksE[B Block](chain *Chain[B]) CommandExecutor {
 				return dstore.StopIteration
 			}
 
-			if blockRange.Contains(uint64(fileStartBlock), tools.EndBoundaryExclusive) {
+			if blockRange.Contains(uint64(fileStartBlock), EndBoundaryExclusive) {
 				var wg sync.WaitGroup
 				var bundleErrLock sync.Mutex
 				var bundleReadErr error
@@ -195,17 +195,17 @@ func runCompareBlocksE[B Block](chain *Chain[B]) CommandExecutor {
 	}
 }
 
-func firehoseBlockToRef[B Block](b B) bstream.BlockRef {
+func firehoseBlockToRef[B firecore.Block](b B) bstream.BlockRef {
 	return bstream.NewBlockRef(b.GetFirehoseBlockID(), b.GetFirehoseBlockNumber())
 }
 
-func readBundle[B Block](
+func readBundle[B firecore.Block](
 	ctx context.Context,
 	filename string,
 	store dstore.Store,
 	fileStartBlock,
 	stopBlock uint64,
-	sanitizer SanitizeBlockForCompareFunc[B],
+	sanitizer firecore.SanitizeBlockForCompareFunc[B],
 	warnAboutExtraBlocks *sync.Once,
 ) ([]string, map[string]B, error) {
 	fileReader, err := store.OpenObject(ctx, filename)
@@ -247,7 +247,7 @@ func readBundle[B Block](
 }
 
 type state struct {
-	segments                   []tools.BlockRange
+	segments                   []BlockRange
 	currentSegmentIdx          int
 	blocksCountedInThisSegment int
 	differencesFound           int
@@ -256,10 +256,10 @@ type state struct {
 }
 
 func (s *state) process(blockNum uint64, isDifferent bool, isMissing bool) {
-	if !s.segments[s.currentSegmentIdx].Contains(blockNum, tools.EndBoundaryExclusive) { // moving forward
+	if !s.segments[s.currentSegmentIdx].Contains(blockNum, EndBoundaryExclusive) { // moving forward
 		s.print()
 		for i := s.currentSegmentIdx; i < len(s.segments); i++ {
-			if s.segments[i].Contains(blockNum, tools.EndBoundaryExclusive) {
+			if s.segments[i].Contains(blockNum, EndBoundaryExclusive) {
 				s.currentSegmentIdx = i
 				s.totalBlocksCounted += s.blocksCountedInThisSegment
 				s.differencesFound = 0

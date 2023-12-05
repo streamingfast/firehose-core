@@ -12,22 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package firecore
+package tools
 
 import (
 	"fmt"
+	"io"
+	"os"
+	"strconv"
+
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
+	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/jsonencoder"
 	"github.com/streamingfast/firehose-core/protoregistry"
-	"github.com/streamingfast/firehose-core/tools"
 	"google.golang.org/protobuf/proto"
-	"io"
-	"os"
-	"strconv"
 )
 
 var toolsPrintCmd = &cobra.Command{
@@ -48,7 +49,7 @@ var toolsPrintMergedBlocksCmd = &cobra.Command{
 }
 
 func init() {
-	toolsCmd.AddCommand(toolsPrintCmd)
+	ToolsCmd.AddCommand(toolsPrintCmd)
 
 	toolsPrintCmd.AddCommand(toolsPrintOneBlockCmd)
 	toolsPrintCmd.AddCommand(toolsPrintMergedBlocksCmd)
@@ -58,12 +59,12 @@ func init() {
 	toolsPrintCmd.PersistentFlags().Bool("transactions", false, "When in 'text' output mode, also print transactions summary")
 }
 
-func configureToolsPrintCmd[B Block](chain *Chain[B]) {
+func configureToolsPrintCmd[B firecore.Block](chain *firecore.Chain[B]) {
 	toolsPrintOneBlockCmd.RunE = createToolsPrintOneBlockE(chain)
 	toolsPrintMergedBlocksCmd.RunE = createToolsPrintMergedBlocksE(chain)
 }
 
-func createToolsPrintMergedBlocksE[B Block](chain *Chain[B]) CommandExecutor {
+func createToolsPrintMergedBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.CommandExecutor {
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
@@ -84,7 +85,7 @@ func createToolsPrintMergedBlocksE[B Block](chain *Chain[B]) CommandExecutor {
 		if err != nil {
 			return fmt.Errorf("invalid base block %q: %w", args[1], err)
 		}
-		blockBoundary := tools.RoundToBundleStartBlock(startBlock, 100)
+		blockBoundary := RoundToBundleStartBlock(startBlock, 100)
 
 		filename := fmt.Sprintf("%010d", blockBoundary)
 		reader, err := store.OpenObject(ctx, filename)
@@ -126,7 +127,7 @@ func createToolsPrintMergedBlocksE[B Block](chain *Chain[B]) CommandExecutor {
 	}
 }
 
-func createToolsPrintOneBlockE[B Block](chain *Chain[B]) CommandExecutor {
+func createToolsPrintOneBlockE[B firecore.Block](chain *firecore.Chain[B]) firecore.CommandExecutor {
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
@@ -214,7 +215,7 @@ func toolsPrintCmdGetOutputMode(cmd *cobra.Command) (PrintOutputMode, error) {
 	return out, nil
 }
 
-func displayBlock[B Block](pbBlock *pbbstream.Block, chain *Chain[B], outputMode PrintOutputMode, printTransactions bool, jencoder *jsonencoder.Encoder) error {
+func displayBlock[B firecore.Block](pbBlock *pbbstream.Block, chain *firecore.Chain[B], outputMode PrintOutputMode, printTransactions bool, jencoder *jsonencoder.Encoder) error {
 	if pbBlock == nil {
 		return fmt.Errorf("block is nil")
 	}

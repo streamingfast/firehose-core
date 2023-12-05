@@ -1,4 +1,4 @@
-package firecore
+package tools
 
 import (
 	"context"
@@ -11,19 +11,20 @@ import (
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dstore"
+	firecore "github.com/streamingfast/firehose-core"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func newToolsDownloadFromFirehoseCmd[B Block](chain *Chain[B], zlog *zap.Logger) *cobra.Command {
+func newToolsDownloadFromFirehoseCmd[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Logger) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "download-from-firehose <endpoint> <range> <destination>",
 		Short: "Download blocks from Firehose and save them to merged-blocks",
 		Args:  cobra.ExactArgs(4),
 		RunE:  createToolsDownloadFromFirehoseE(chain, zlog),
-		Example: ExamplePrefixed(chain, "tools download-from-firehose", `
+		Example: firecore.ExamplePrefixed(chain, "tools download-from-firehose", `
 			# Adjust <url> based on your actual network
 			mainnet.eth.streamingfast.io:443 1000 2000 ./output_dir
 		`),
@@ -34,7 +35,7 @@ func newToolsDownloadFromFirehoseCmd[B Block](chain *Chain[B], zlog *zap.Logger)
 	return cmd
 }
 
-func createToolsDownloadFromFirehoseE[B Block](chain *Chain[B], zlog *zap.Logger) func(cmd *cobra.Command, args []string) error {
+func createToolsDownloadFromFirehoseE[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Logger) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
@@ -110,7 +111,7 @@ func createToolsDownloadFromFirehoseE[B Block](chain *Chain[B], zlog *zap.Logger
 					return fmt.Errorf("unmarshal response block: %w", err)
 				}
 
-				if _, ok := block.(BlockLIBNumDerivable); !ok {
+				if _, ok := block.(firecore.BlockLIBNumDerivable); !ok {
 					// We must wrap the block in a BlockEnveloppe and "provide" the LIB number as itself minus 1 since
 					// there is nothing we can do more here to obtain the value sadly. For chain where the LIB can be
 					// derived from the Block itself, this code does **not** run (so it will have the correct value)
@@ -125,7 +126,7 @@ func createToolsDownloadFromFirehoseE[B Block](chain *Chain[B], zlog *zap.Logger
 						libNum = number
 					}
 
-					block = BlockEnveloppe{
+					block = firecore.BlockEnveloppe{
 						Block:  block,
 						LIBNum: libNum,
 					}

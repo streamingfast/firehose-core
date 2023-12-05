@@ -1,10 +1,11 @@
-package firecore
+package apps
 
 import (
 	"fmt"
 	"sync"
 
 	"github.com/spf13/cobra"
+	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/substreams/pipeline"
 	"github.com/streamingfast/substreams/wasm"
 )
@@ -19,7 +20,7 @@ func registerCommonSubstreamsFlags(cmd *cobra.Command) {
 	})
 }
 
-func getSubstreamsExtensions[B Block](chain *Chain[B]) ([]wasm.WASMExtensioner, []pipeline.PipelineOptioner, error) {
+func getSubstreamsExtensions[B firecore.Block](chain *firecore.Chain[B]) ([]wasm.WASMExtensioner, []pipeline.PipelineOptioner, error) {
 	var wasmExtensions []wasm.WASMExtensioner
 	var pipelineOptions []pipeline.PipelineOptioner
 
@@ -36,9 +37,4 @@ func getSubstreamsExtensions[B Block](chain *Chain[B]) ([]wasm.WASMExtensioner, 
 	}
 
 	return wasmExtensions, pipelineOptions, nil
-}
-
-type SubstreamsExtension struct {
-	PipelineOptioner pipeline.PipelineOptioner
-	WASMExtensioner  wasm.WASMExtensioner
 }

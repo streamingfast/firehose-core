@@ -12,11 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package firecore
+package tools
 
 import (
 	"fmt"
 	"strings"
+
+	"go.uber.org/zap"
+
+	firecore "github.com/streamingfast/firehose-core"
 
 	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
@@ -24,7 +28,6 @@ import (
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/firehose-core/tools"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 )
@@ -47,7 +50,7 @@ var toolsCheckMergedBlocksCmd = &cobra.Command{
 }
 
 func init() {
-	toolsCmd.AddCommand(toolsCheckCmd)
+	ToolsCmd.AddCommand(toolsCheckCmd)
 	toolsCheckCmd.AddCommand(toolsCheckForksCmd)
 	toolsCheckCmd.AddCommand(toolsCheckMergedBlocksCmd)
 
@@ -60,9 +63,9 @@ func init() {
 	toolsCheckForksCmd.Flags().Uint64("after-block", 0, "Only show forks that happened after this block number, if value is not 0")
 }
 
-func configureToolsCheckCmd[B Block](chain *Chain[B]) {
-	toolsCheckMergedBlocksCmd.RunE = createToolsCheckMergedBlocksE(chain)
-	toolsCheckMergedBlocksCmd.Example = ExamplePrefixed(chain, "tools check merged-blocks", `
+func configureToolsCheckCmd[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) {
+	toolsCheckMergedBlocksCmd.RunE = createToolsCheckMergedBlocksE(chain, rootLog)
+	toolsCheckMergedBlocksCmd.Example = firecore.ExamplePrefixed(chain, "tools check merged-blocks", `
 		"./sf-data/storage/merged-blocks"
 		"gs://<project>/<bucket>/<path>" -s
 		"s3://<project>/<bucket>/<path>" -f
@@ -72,12 +75,12 @@ func configureToolsCheckCmd[B Block](chain *Chain[B]) {
 	toolsCheckForksCmd.RunE = toolsCheckForksE
 }
 
-func createToolsCheckMergedBlocksE[B Block](chain *Chain[B]) CommandExecutor {
+func createToolsCheckMergedBlocksE[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) firecore.CommandExecutor {
 	return func(cmd *cobra.Command, args []string) error {
 		storeURL := args[0]
 		fileBlockSize := uint64(100)
 
-		blockRange, err := tools.GetBlockRangeFromFlag(cmd, "range")
+		blockRange, err := GetBlockRangeFromFlag(cmd, "range")
 		if err != nil {
 			return err
 		}

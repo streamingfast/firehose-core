@@ -1,4 +1,4 @@
-package firecore
+package apps
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dlauncher/launcher"
+	firecore "github.com/streamingfast/firehose-core"
 	nodeManager "github.com/streamingfast/firehose-core/node-manager"
 	nodeManagerApp "github.com/streamingfast/firehose-core/node-manager/app/node_manager"
 	"github.com/streamingfast/firehose-core/node-manager/metrics"
@@ -27,8 +28,8 @@ import (
 	"google.golang.org/grpc"
 )
 
-func registerReaderNodeApp[B Block](chain *Chain[B]) {
-	appLogger, appTracer := logging.PackageLogger("reader", chain.LoggerPackageID("reader"))
+func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) {
+	appLogger, appTracer := logging.PackageLogger("reader", "reader")
 
 	launcher.RegisterApp(rootLog, &launcher.AppDef{
 		ID:          "reader-node",
@@ -41,7 +42,7 @@ func registerReaderNodeApp[B Block](chain *Chain[B]) {
 			`))
 			cmd.Flags().String("reader-node-data-dir", "{data-dir}/reader/data", "Directory for node data")
 			cmd.Flags().Bool("reader-node-debug-firehose-logs", false, "[DEV] Prints firehose instrumentation logs to standard output, should be use for debugging purposes only")
-			cmd.Flags().String("reader-node-manager-api-addr", ReaderNodeManagerAPIAddr, "Acme node manager API address")
+			cmd.Flags().String("reader-node-manager-api-addr", firecore.ReaderNodeManagerAPIAddr, "Acme node manager API address")
 			cmd.Flags().Duration("reader-node-readiness-max-latency", 30*time.Second, "Determine the maximum head block latency at which the instance will be determined healthy. Some chains have more regular block production than others.")
 			cmd.Flags().String("reader-node-arguments", "", string(cli.Description(`
 				Defines the node arguments that will be passed to the node on execution. Supports templating, where we will replace certain sub-string with the appropriate value
@@ -55,7 +56,7 @@ func registerReaderNodeApp[B Block](chain *Chain[B]) {
 				Example: 'run blockchain -start {start-block-num} -end {stop-block-num}' may yield 'run blockchain -start 200 -end 500'
 			`)))
 			cmd.Flags().StringSlice("reader-node-backups", []string{}, "Repeatable, space-separated key=values definitions for backups. Example: 'type=gke-pvc-snapshot prefix= tag=v1 freq-blocks=1000 freq-time= project=myproj'")
-			cmd.Flags().String("reader-node-grpc-listen-addr", ReaderNodeGRPCAddr, "The gRPC listening address to use for serving real-time blocks")
+			cmd.Flags().String("reader-node-grpc-listen-addr", firecore.ReaderNodeGRPCAddr, "The gRPC listening address to use for serving real-time blocks")
 			cmd.Flags().Bool("reader-node-discard-after-stop-num", false, "Ignore remaining blocks being processed after stop num (only useful if we discard the reader data after reprocessing a chunk of blocks)")
 			cmd.Flags().String("reader-node-working-dir", "{data-dir}/reader/work", "Path where reader will stores its files")
 			cmd.Flags().Uint("reader-node-start-block-num", 0, "Blocks that were produced with smaller block number then the given block num are skipped")
@@ -75,7 +76,7 @@ func registerReaderNodeApp[B Block](chain *Chain[B]) {
 			sfDataDir := runtime.AbsDataDir
 
 			nodePath := viper.GetString("reader-node-path")
-			nodeDataDir := MustReplaceDataDir(sfDataDir, viper.GetString("reader-node-data-dir"))
+			nodeDataDir := firecore.MustReplaceDataDir(sfDataDir, viper.GetString("reader-node-data-dir"))
 
 			readinessMaxLatency := viper.GetDuration("reader-node-readiness-max-latency")
 			debugFirehose := viper.GetBool("reader-node-debug-firehose-logs")
@@ -93,10 +94,19 @@ func registerReaderNodeApp[B Block](chain *Chain[B]) {
 			ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 			defer cancel()
 
-			resolveStartBlockNum, err := UnsafeResolveReaderNodeStartBlock(ctx, startCmd, runtime, rootLog)
-			if err != nil {
-				return nil, fmt.Errorf("resolve start block: %w", err)
+			userDefined := viper.IsSet("reader-node-start-block-num")
+			startBlockNum := viper.GetUint64("reader-node-start-block-num")
+			firstStreamableBlock := viper.GetUint64("common-first-streamable-block")
+
+			resolveStartBlockNum := startBlockNum
+			if !userDefined {
+				resolveStartBlockNum, err = firecore.UnsafeResolveReaderNodeStartBlock(ctx, startBlockNum, firstStreamableBlock, runtime, rootLog)
+				if err != nil {
+					return nil, fmt.Errorf("resolve start block: %w", err)
+				}
+
 			}
+
 			stopBlockNum := viper.GetUint64("reader-node-stop-block-num")
 
 			hostname, _ := os.Hostname()
@@ -123,7 +133,7 @@ func registerReaderNodeApp[B Block](chain *Chain[B]) {
 
 			var bootstrapper operator.Bootstrapper
 			if chain.ReaderNodeBootstrapperFactory != nil {
-				bootstrapper, err = chain.ReaderNodeBootstrapperFactory(startCmd.Context(), appLogger, startCmd, nodeArguments, nodeArgumentResolver)
+				bootstrapper, err = chain.ReaderNodeBootstrapperFactory(StartCmd.Context(), appLogger, StartCmd, nodeArguments, nodeArgumentResolver)
 				if err != nil {
 					return nil, fmt.Errorf("new bootstrapper: %w", err)
 				}
@@ -157,8 +167,8 @@ func registerReaderNodeApp[B Block](chain *Chain[B]) {
 			}
 
 			blockStreamServer := blockstream.NewUnmanagedServer(blockstream.ServerOptionWithLogger(appLogger))
-			oneBlocksStoreURL := MustReplaceDataDir(sfDataDir, viper.GetString("common-one-block-store-url"))
-			workingDir := MustReplaceDataDir(sfDataDir, viper.GetString("reader-node-working-dir"))
+			oneBlocksStoreURL := firecore.MustReplaceDataDir(sfDataDir, viper.GetString("common-one-block-store-url"))
+			workingDir := firecore.MustReplaceDataDir(sfDataDir, viper.GetString("reader-node-working-dir"))
 			gprcListenAddr := viper.GetString("reader-node-grpc-listen-addr")
 			oneBlockFileSuffix := viper.GetString("reader-node-one-block-suffix")
 			blocksChanCapacity := viper.GetInt("reader-node-blocks-chan-capacity")
@@ -210,7 +220,7 @@ var variablesRegex = regexp.MustCompile(`\{(data-dir|node-data-dir|hostname|star
 // buildNodeArguments will resolve and split the given string into arguments, replacing the variables with the appropriate values.
 //
 // We are using a function for testing purposes, so that we can test arguments resolving and splitting correctly.
-func buildNodeArguments(in string, resolver ReaderNodeArgumentResolver) ([]string, error) {
+func buildNodeArguments(in string, resolver firecore.ReaderNodeArgumentResolver) ([]string, error) {
 	// Split arguments according to standard shell rules
 	nodeArguments, err := shellquote.Split(resolver(in))
 	if err != nil {
@@ -220,9 +230,7 @@ func buildNodeArguments(in string, resolver ReaderNodeArgumentResolver) ([]strin
 	return nodeArguments, nil
 }
 
-type ReaderNodeArgumentResolver = func(in string) string
-
-func createNodeArgumentsResolver(dataDir, nodeDataDir, hostname string, startBlockNum, stopBlockNum uint64) ReaderNodeArgumentResolver {
+func createNodeArgumentsResolver(dataDir, nodeDataDir, hostname string, startBlockNum, stopBlockNum uint64) firecore.ReaderNodeArgumentResolver {
 	return func(in string) string {
 		return variablesRegex.ReplaceAllStringFunc(in, func(match string) string {
 			switch match {

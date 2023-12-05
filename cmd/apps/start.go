@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package firecore
+package apps
 
 import (
 	"fmt"
@@ -25,16 +25,16 @@ import (
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dlauncher/launcher"
 	"github.com/streamingfast/dmetering"
+	firecore "github.com/streamingfast/firehose-core"
 	"go.uber.org/zap"
 )
 
-var startCmd = &cobra.Command{Use: "start", Args: cobra.ArbitraryArgs}
+var StartCmd = &cobra.Command{Use: "start", Args: cobra.ArbitraryArgs}
 
-func configureStartCmd[B Block](chain *Chain[B]) {
-	binaryName := chain.BinaryName()
+func ConfigureStartCmd[B firecore.Block](chain *firecore.Chain[B], binaryName string, rootLog *zap.Logger) {
 
-	startCmd.Short = fmt.Sprintf("Starts `%s` services all at once", binaryName)
-	startCmd.RunE = func(cmd *cobra.Command, args []string) (err error) {
+	StartCmd.Short = fmt.Sprintf("Starts `%s` services all at once", binaryName)
+	StartCmd.RunE = func(cmd *cobra.Command, args []string) (err error) {
 		cmd.SilenceUsage = true
 
 		dataDir := viper.GetString("global-data-dir")
@@ -43,7 +43,7 @@ func configureStartCmd[B Block](chain *Chain[B]) {
 		configFile := viper.GetString("global-config-file")
 		rootLog.Info(fmt.Sprintf("starting Firehose on %s with config file '%s'", chain.LongName, configFile))
 
-		err = start(dataDir, args)
+		err = start(dataDir, args, rootLog)
 		if err != nil {
 			return fmt.Errorf("unable to launch: %w", err)
 		}
@@ -53,13 +53,13 @@ func configureStartCmd[B Block](chain *Chain[B]) {
 	}
 }
 
-func start(dataDir string, args []string) (err error) {
+func start(dataDir string, args []string, rootLog *zap.Logger) (err error) {
 	dataDirAbs, err := filepath.Abs(dataDir)
 	if err != nil {
 		return fmt.Errorf("unable to setup directory structure: %w", err)
 	}
 
-	err = makeDirs([]string{dataDirAbs})
+	err = firecore.MakeDirs([]string{dataDirAbs})
 	if err != nil {
 		return err
 	}

@@ -1,29 +1,27 @@
-package firecore
+package tools
 
 import (
 	"fmt"
 	"io"
-	"strconv"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/firehose-core/tools"
+	firecore "github.com/streamingfast/firehose-core"
 	"go.uber.org/zap"
 )
 
-func newToolsUnmergeBlocksCmd[B Block](chain *Chain[B], zlog *zap.Logger) *cobra.Command {
+func newToolsFixBloatedMergedBlocks[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Logger) *cobra.Command {
 	return &cobra.Command{
-		Use:   "unmerge-blocks <src_merged_blocks_store> <dest_one_blocks_store> [<block_range>]",
-		Short: "Unmerges merged block files into one-block-files",
+		Use:   "fix-bloated-merged-blocks <src_merged_blocks_store> <dest_one_blocks_store> [<block_range>]",
+		Short: "Fixes 'corrupted' merged-blocks that contain extraneous or duplicate blocks. Some older versions of the merger may have produce such bloated merged-blocks. All merged-blocks files in given range will be rewritten, regardless of if they were corrupted.",
 		Args:  cobra.ExactArgs(3),
-		RunE:  runUnmergeBlocksE(zlog),
+		RunE:  runFixBloatedMergedBlocksE(zlog),
 	}
 }
 
-func runUnmergeBlocksE(zlog *zap.Logger) CommandExecutor {
+func runFixBloatedMergedBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
@@ -37,7 +35,7 @@ func runUnmergeBlocksE(zlog *zap.Logger) CommandExecutor {
 			return fmt.Errorf("unable to create destination store: %w", err)
 		}
 
-		blockRange, err := tools.GetBlockRangeFromArg(args[2])
+		blockRange, err := GetBlockRangeFromArg(args[2])
 		if err != nil {
 			return fmt.Errorf("parsing block range: %w", err)
 		}
@@ -68,6 +66,17 @@ func runUnmergeBlocksE(zlog *zap.Logger) CommandExecutor {
 				return fmt.Errorf("creating block reader: %w", err)
 			}
 
+			mergeWriter := &mergedBlocksWriter{
+				store:      destStore,
+				tweakBlock: func(b *pbbstream.Block) (*pbbstream.Block, error) { return b, nil },
+				logger:     zlog,
+			}
+
+			seen := make(map[string]bool)
+
+			var lastBlockID string
+			var lastBlockNum uint64
+
 			// iterate through the blocks in the file
 			for {
 				block, err := br.Read()
@@ -75,7 +84,7 @@ func runUnmergeBlocksE(zlog *zap.Logger) CommandExecutor {
 					break
 				}
 
-				if block.Number < uint64(blockRange.Start) {
+				if block.Number < uint64(startBlock) {
 					continue
 				}
 
@@ -83,38 +92,22 @@ func runUnmergeBlocksE(zlog *zap.Logger) CommandExecutor {
 					break
 				}
 
-				oneblockFilename := bstream.BlockFileNameWithSuffix(block, "extracted")
-				zlog.Debug("writing block", zap.Uint64("block_num", block.Number), zap.String("filename", oneblockFilename))
-
-				pr, pw := io.Pipe()
-
-				//write block data to pipe, and then close to signal end of data
-				go func(block *pbbstream.Block) {
-					var err error
-					defer func() {
-						pw.CloseWithError(err)
-					}()
-
-					bw, err := bstream.NewDBinBlockWriter(pw)
-					if err != nil {
-						zlog.Error("creating block writer", zap.Error(err))
-						return
-					}
-
-					err = bw.Write(block)
-					if err != nil {
-						zlog.Error("writing block", zap.Error(err))
-						return
-					}
-				}(block)
-
-				//read block data from pipe and write block data to dest store
-				err = destStore.WriteObject(ctx, oneblockFilename, pr)
-				if err != nil {
-					return fmt.Errorf("writing block %d to %s: %w", block.Number, oneblockFilename, err)
+				if seen[block.Id] {
+					zlog.Info("skipping seen block (source merged-blocks had duplicates, skipping)", zap.String("id", block.Id), zap.Uint64("num", block.Number))
+					continue
 				}
 
-				zlog.Info("wrote block", zap.Uint64("block_num", block.Number), zap.String("filename", oneblockFilename))
+				if lastBlockID != "" && block.ParentId != lastBlockID {
+					return fmt.Errorf("got an invalid sequence of blocks: block %q has previousId %s, previous block %d had ID %q, this endpoint is serving blocks out of order", block.String(), block.ParentId, lastBlockNum, lastBlockID)
+				}
+				lastBlockID = block.Id
+				lastBlockNum = block.Number
+
+				seen[block.Id] = true
+
+				if err := mergeWriter.ProcessBlock(block, nil); err != nil {
+					return fmt.Errorf("write to blockwriter: %w", err)
+				}
 			}
 
 			return nil
@@ -130,11 +123,4 @@ func runUnmergeBlocksE(zlog *zap.Logger) CommandExecutor {
 
 		return nil
 	}
-}
-
-func mustParseUint64(s string) uint64 {
-	i, err := strconv.Atoi(s)
-	cli.NoError(err, "Unable to parse %q as uint64", s)
-
-	return uint64(i)
 }

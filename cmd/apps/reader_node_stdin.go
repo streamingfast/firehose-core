@@ -12,20 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package firecore
+package apps
 
 import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/streamingfast/dlauncher/launcher"
+	firecore "github.com/streamingfast/firehose-core"
 	nodeManager "github.com/streamingfast/firehose-core/node-manager"
 	nodeReaderStdinApp "github.com/streamingfast/firehose-core/node-manager/app/node_reader_stdin"
 	"github.com/streamingfast/firehose-core/node-manager/metrics"
 	"github.com/streamingfast/firehose-core/node-manager/mindreader"
 	"github.com/streamingfast/logging"
+	"go.uber.org/zap"
 )
 
-func registerReaderNodeStdinApp[B Block](chain *Chain[B]) {
+func RegisterReaderNodeStdinApp[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) {
 	appLogger, appTracer := logging.PackageLogger("reader-node-stdin", chain.LoggerPackageID("reader-node-stdin"))
 
 	launcher.RegisterApp(rootLog, &launcher.AppDef{
@@ -35,7 +37,7 @@ func registerReaderNodeStdinApp[B Block](chain *Chain[B]) {
 		RegisterFlags: func(cmd *cobra.Command) error { return nil },
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
 			sfDataDir := runtime.AbsDataDir
-			archiveStoreURL := MustReplaceDataDir(sfDataDir, viper.GetString("common-one-block-store-url"))
+			archiveStoreURL := firecore.MustReplaceDataDir(sfDataDir, viper.GetString("common-one-block-store-url"))
 			consoleReaderFactory := func(lines chan string) (mindreader.ConsolerReader, error) {
 				return chain.ConsoleReaderFactory(lines, chain.BlockEncoder, appLogger, appTracer)
 			}
@@ -52,7 +54,7 @@ func registerReaderNodeStdinApp[B Block](chain *Chain[B]) {
 				MindReadBlocksChanCapacity: viper.GetInt("reader-node-blocks-chan-capacity"),
 				StartBlockNum:              viper.GetUint64("reader-node-start-block-num"),
 				StopBlockNum:               viper.GetUint64("reader-node-stop-block-num"),
-				WorkingDir:                 MustReplaceDataDir(sfDataDir, viper.GetString("reader-node-working-dir")),
+				WorkingDir:                 firecore.MustReplaceDataDir(sfDataDir, viper.GetString("reader-node-working-dir")),
 				OneBlockSuffix:             viper.GetString("reader-node-one-block-suffix"),
 			}, &nodeReaderStdinApp.Modules{
 				ConsoleReaderFactory:       consoleReaderFactory,

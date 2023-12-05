@@ -10,7 +10,7 @@ var globalFlagsHiddenOnChildCmd = []string{
 	"startup-delay",
 }
 
-func hideGlobalFlagsOnChildCmd(cmd *cobra.Command) {
+func HideGlobalFlagsOnChildCmd(cmd *cobra.Command) {
 	actual := cmd.HelpFunc()
 	cmd.SetHelpFunc(func(command *cobra.Command, strings []string) {
 		for _, flag := range globalFlagsHiddenOnChildCmd {

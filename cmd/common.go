@@ -12,24 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package firecore
+package cmd
 
 import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dlauncher/launcher"
+	firecore "github.com/streamingfast/firehose-core"
 	"go.uber.org/zap"
 )
 
-func registerCommonFlags[B Block](chain *Chain[B]) {
+func registerCommonFlags[B firecore.Block](chain *firecore.Chain[B]) {
 	launcher.RegisterCommonFlags = func(_ *zap.Logger, cmd *cobra.Command) error {
 		// Common stores configuration flags
-		cmd.Flags().String("common-one-block-store-url", OneBlockStoreURL, "[COMMON] Store URL to read/write one-block files")
-		cmd.Flags().String("common-merged-blocks-store-url", MergedBlocksStoreURL, "[COMMON] Store URL where to read/write merged blocks.")
-		cmd.Flags().String("common-forked-blocks-store-url", ForkedBlocksStoreURL, "[COMMON] Store URL where to read/write forked block files that we want to keep.")
-		cmd.Flags().String("common-live-blocks-addr", RelayerServingAddr, "[COMMON] gRPC endpoint to get real-time blocks.")
+		cmd.Flags().String("common-one-block-store-url", firecore.OneBlockStoreURL, "[COMMON] Store URL to read/write one-block files")
+		cmd.Flags().String("common-merged-blocks-store-url", firecore.MergedBlocksStoreURL, "[COMMON] Store URL where to read/write merged blocks.")
+		cmd.Flags().String("common-forked-blocks-store-url", firecore.ForkedBlocksStoreURL, "[COMMON] Store URL where to read/write forked block files that we want to keep.")
+		cmd.Flags().String("common-live-blocks-addr", firecore.RelayerServingAddr, "[COMMON] gRPC endpoint to get real-time blocks.")
 
-		cmd.Flags().String("common-index-store-url", IndexStoreURL, "[COMMON] Store URL where to read/write index files (if used on the chain).")
+		cmd.Flags().String("common-index-store-url", firecore.IndexStoreURL, "[COMMON] Store URL where to read/write index files (if used on the chain).")
 		cmd.Flags().IntSlice("common-index-block-sizes", []int{100000, 10000, 1000, 100}, "Index bundle sizes that that are considered valid when looking for block indexes")
 
 		cmd.Flags().Bool("common-blocks-cache-enabled", false, cli.FlagDescription(`
@@ -40,7 +41,7 @@ func registerCommonFlags[B Block](chain *Chain[B]) {
 			split in two portions, one keeping N total bytes of blocks of the most recently used blocks and the other one keeping the N earliest blocks as
 			requested by the various consumers of the cache.
 		`))
-		cmd.Flags().String("common-blocks-cache-dir", BlocksCacheDirectory, cli.FlagDescription(`
+		cmd.Flags().String("common-blocks-cache-dir", firecore.BlocksCacheDirectory, cli.FlagDescription(`
 			[COMMON] Blocks cache directory where all the block's bytes will be cached to disk instead of being kept in RAM.
 			This should be a disk that persists across restarts of the Firehose component to reduce the the strain on the disk
 			when restarting and streams reconnects. The size of disk must at least big (with a 10%% buffer) in bytes as the sum of flags'

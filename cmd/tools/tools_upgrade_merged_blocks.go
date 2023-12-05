@@ -1,4 +1,4 @@
-package firecore
+package tools
 
 import (
 	"context"
@@ -7,25 +7,25 @@ import (
 	"io"
 	"strconv"
 
-	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
+	firecore "github.com/streamingfast/firehose-core"
 	"go.uber.org/zap"
 )
 
-func NewToolsUpgradeMergedBlocksCmd[B Block](chain *Chain[B]) *cobra.Command {
+func NewToolsUpgradeMergedBlocksCmd[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) *cobra.Command {
 	return &cobra.Command{
 		Use:   "upgrade-merged-blocks <source> <destination> <range>",
 		Short: "From a merged-blocks source, rewrite blocks to a new merged-blocks destination, while applying all possible upgrades",
 		Args:  cobra.ExactArgs(4),
-		RunE:  getMergedBlockUpgrader(chain.Tools.MergedBlockUpgrader),
+		RunE:  getMergedBlockUpgrader(chain.Tools.MergedBlockUpgrader, rootLog),
 	}
 }
 
-func getMergedBlockUpgrader(tweakFunc func(block *pbbstream.Block) (*pbbstream.Block, error)) func(cmd *cobra.Command, args []string) error {
+func getMergedBlockUpgrader(tweakFunc func(block *pbbstream.Block) (*pbbstream.Block, error), rootLog *zap.Logger) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		source := args[0]
 		sourceStore, err := dstore.NewDBinStore(source)

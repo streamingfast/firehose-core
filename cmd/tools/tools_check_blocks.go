@@ -1,4 +1,4 @@
-package firecore
+package tools
 
 import (
 	"context"
@@ -9,11 +9,12 @@ import (
 	"regexp"
 	"strconv"
 
+	firecore "github.com/streamingfast/firehose-core"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/firehose-core/tools"
 	"go.uber.org/zap"
 )
 
@@ -28,7 +29,7 @@ const (
 	MaxUint64 = ^uint64(0)
 )
 
-func CheckMergedBlocks[B Block](ctx context.Context, chain *Chain[B], logger *zap.Logger, storeURL string, fileBlockSize uint64, blockRange tools.BlockRange, printDetails PrintDetails) error {
+func CheckMergedBlocks[B firecore.Block](ctx context.Context, chain *firecore.Chain[B], logger *zap.Logger, storeURL string, fileBlockSize uint64, blockRange BlockRange, printDetails PrintDetails) error {
 	readAllBlocks := printDetails != PrintNoDetails
 	fmt.Printf("Checking block holes on %s\n", storeURL)
 	if readAllBlocks {
@@ -49,7 +50,7 @@ func CheckMergedBlocks[B Block](ctx context.Context, chain *Chain[B], logger *za
 	// }
 
 	holeFound := false
-	expected = tools.RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize)
+	expected = RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize)
 	currentStartBlk := uint64(blockRange.Start)
 
 	blocksStore, err := dstore.NewDBinStore(storeURL)
@@ -82,11 +83,11 @@ func CheckMergedBlocks[B Block](ctx context.Context, chain *Chain[B], logger *za
 		if baseNum != expected {
 			// There is no previous valid block range if we are at the ever first seen file
 			if count > 1 {
-				fmt.Printf("✅ Range %s\n", tools.NewClosedRange(int64(currentStartBlk), uint64(tools.RoundToBundleEndBlock(expected-fileBlockSize, fileBlockSize))))
+				fmt.Printf("✅ Range %s\n", NewClosedRange(int64(currentStartBlk), uint64(RoundToBundleEndBlock(expected-fileBlockSize, fileBlockSize))))
 			}
 
 			// Otherwise, we do not follow last seen element (previous is `100 - 199` but we are `299 - 300`)
-			missingRange := tools.NewClosedRange(int64(expected), tools.RoundToBundleEndBlock(baseNum-fileBlockSize, fileBlockSize))
+			missingRange := NewClosedRange(int64(expected), RoundToBundleEndBlock(baseNum-fileBlockSize, fileBlockSize))
 			fmt.Printf("❌ Range %s (Missing, [%s])\n", missingRange, missingRange.ReprocRange())
 			currentStartBlk = baseNum
 
@@ -112,11 +113,11 @@ func CheckMergedBlocks[B Block](ctx context.Context, chain *Chain[B], logger *za
 		}
 
 		if count%10000 == 0 {
-			fmt.Printf("✅ Range %s\n", tools.NewClosedRange(int64(currentStartBlk), tools.RoundToBundleEndBlock(baseNum, fileBlockSize)))
+			fmt.Printf("✅ Range %s\n", NewClosedRange(int64(currentStartBlk), RoundToBundleEndBlock(baseNum, fileBlockSize)))
 			currentStartBlk = baseNum + fileBlockSize
 		}
 
-		if blockRange.IsClosed() && tools.RoundToBundleEndBlock(baseNum, fileBlockSize) >= *blockRange.Stop-1 {
+		if blockRange.IsClosed() && RoundToBundleEndBlock(baseNum, fileBlockSize) >= *blockRange.Stop-1 {
 			return dstore.StopIteration
 		}
 
@@ -134,9 +135,9 @@ func CheckMergedBlocks[B Block](ctx context.Context, chain *Chain[B], logger *za
 		zap.Uint64("highest_block_seen", highestBlockSeen),
 	)
 	if tfdb.lastLinkedBlock != nil && tfdb.lastLinkedBlock.Number < highestBlockSeen {
-		fmt.Printf("🔶 Range %s has issues with forks, last linkable block number: %d\n", tools.NewClosedRange(int64(currentStartBlk), uint64(highestBlockSeen)), tfdb.lastLinkedBlock.Number)
+		fmt.Printf("🔶 Range %s has issues with forks, last linkable block number: %d\n", NewClosedRange(int64(currentStartBlk), uint64(highestBlockSeen)), tfdb.lastLinkedBlock.Number)
 	} else {
-		fmt.Printf("✅ Range %s\n", tools.NewClosedRange(int64(currentStartBlk), uint64(highestBlockSeen)))
+		fmt.Printf("✅ Range %s\n", NewClosedRange(int64(currentStartBlk), uint64(highestBlockSeen)))
 	}
 
 	fmt.Println()
@@ -145,7 +146,7 @@ func CheckMergedBlocks[B Block](ctx context.Context, chain *Chain[B], logger *za
 	if blockRange.IsClosed() &&
 		(highestBlockSeen < uint64(*blockRange.Stop-1) ||
 			(lowestBlockSeen > uint64(blockRange.Start) && lowestBlockSeen > bstream.GetProtocolFirstStreamableBlock)) {
-		fmt.Printf("> 🔶 Incomplete range %s, started at block %s and stopped at block: %s\n", blockRange, tools.PrettyBlockNum(lowestBlockSeen), tools.PrettyBlockNum(highestBlockSeen))
+		fmt.Printf("> 🔶 Incomplete range %s, started at block %s and stopped at block: %s\n", blockRange, PrettyBlockNum(lowestBlockSeen), PrettyBlockNum(highestBlockSeen))
 	}
 
 	if holeFound {
@@ -164,13 +165,13 @@ type trackedForkDB struct {
 	unlinkableSegmentCount int
 }
 
-func validateBlockSegment[B Block](
+func validateBlockSegment[B firecore.Block](
 	ctx context.Context,
-	chain *Chain[B],
+	chain *firecore.Chain[B],
 	store dstore.Store,
 	segment string,
 	fileBlockSize uint64,
-	blockRange tools.BlockRange,
+	blockRange BlockRange,
 	printDetails PrintDetails,
 	tfdb *trackedForkDB,
 ) (lowestBlockSeen, highestBlockSeen uint64) {
@@ -287,13 +288,13 @@ func validateBlockSegment[B Block](
 	return
 }
 
-func WalkBlockPrefix(blockRange tools.BlockRange, fileBlockSize uint64) string {
+func WalkBlockPrefix(blockRange BlockRange, fileBlockSize uint64) string {
 	if blockRange.IsOpen() {
 		return ""
 	}
 
-	startString := fmt.Sprintf("%010d", tools.RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize))
-	endString := fmt.Sprintf("%010d", tools.RoundToBundleEndBlock(uint64(*blockRange.Stop-1), fileBlockSize)+1)
+	startString := fmt.Sprintf("%010d", RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize))
+	endString := fmt.Sprintf("%010d", RoundToBundleEndBlock(uint64(*blockRange.Stop-1), fileBlockSize)+1)
 
 	offset := 0
 	for i := 0; i < len(startString); i++ {

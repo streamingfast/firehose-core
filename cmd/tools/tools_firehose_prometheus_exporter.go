@@ -1,4 +1,4 @@
-package firecore
+package tools
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
+	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/logging"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
@@ -21,7 +22,7 @@ var lastBlockReceived time.Time
 var driftSec = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "firehose_healthcheck_drift", Help: "Time since the most recent block received (seconds)"}, []string{"endpoint"})
 
 // You should add your custom 'transforms' flags to this command in your init(), then parse them in transformsSetter
-func newToolsFirehosePrometheusExporterCmd[B Block](chain *Chain[B], zlog *zap.Logger, tracer logging.Tracer) *cobra.Command {
+func newToolsFirehosePrometheusExporterCmd[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Logger, tracer logging.Tracer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "firehose-prometheus-exporter <endpoint:port>",
 		Short: "stream blocks near the chain HEAD and report to prometheus",
@@ -34,7 +35,7 @@ func newToolsFirehosePrometheusExporterCmd[B Block](chain *Chain[B], zlog *zap.L
 	return cmd
 }
 
-func runPrometheusExporterE[B Block](chain *Chain[B], zlog *zap.Logger, tracer logging.Tracer) func(cmd *cobra.Command, args []string) error {
+func runPrometheusExporterE[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Logger, tracer logging.Tracer) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 

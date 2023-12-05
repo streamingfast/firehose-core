@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package firecore
+package apps
 
 import (
 	"fmt"
@@ -25,14 +25,16 @@ import (
 	"github.com/streamingfast/dauth"
 	discoveryservice "github.com/streamingfast/dgrpc/server/discovery-service"
 	"github.com/streamingfast/dlauncher/launcher"
+	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/logging"
 	app "github.com/streamingfast/substreams/app"
+	"go.uber.org/zap"
 )
 
 var ss1HeadBlockNumMetric = metricset.NewHeadBlockNumber("substreams-tier1")
 var ss1HeadTimeDriftmetric = metricset.NewHeadTimeDrift("substreams-tier1")
 
-func registerSubstreamsTier1App[B Block](chain *Chain[B]) {
+func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) {
 	appLogger, _ := logging.PackageLogger("substreams-tier1", "github.com/streamingfast/firehose-core/firehose-ethereum/substreams-tier1")
 
 	launcher.RegisterApp(rootLog, &launcher.AppDef{
@@ -40,8 +42,8 @@ func registerSubstreamsTier1App[B Block](chain *Chain[B]) {
 		Title:       "Substreams tier1 server",
 		Description: "Provides a substreams grpc endpoint",
 		RegisterFlags: func(cmd *cobra.Command) error {
-			cmd.Flags().String("substreams-tier1-grpc-listen-addr", SubstreamsTier1GRPCServingAddr, "Address on which the Substreams tier1 will listen, listen by default in plain text, appending a '*' to the end of the address make it listen in snake-oil (inscure) TLS")
-			cmd.Flags().String("substreams-tier1-subrequests-endpoint", SubstreamsTier2GRPCServingAddr, "Address on which the Substreans tier1 can reach the tier2")
+			cmd.Flags().String("substreams-tier1-grpc-listen-addr", firecore.SubstreamsTier1GRPCServingAddr, "Address on which the Substreams tier1 will listen, listen by default in plain text, appending a '*' to the end of the address make it listen in snake-oil (inscure) TLS")
+			cmd.Flags().String("substreams-tier1-subrequests-endpoint", firecore.SubstreamsTier2GRPCServingAddr, "Address on which the Substreans tier1 can reach the tier2")
 			// communication with tier2
 			cmd.Flags().String("substreams-tier1-discovery-service-url", "", "URL to configure the grpc discovery service, used for communication with tier2") //traffic-director://xds?vpc_network=vpc-global&use_xds_reds=true
 			cmd.Flags().Bool("substreams-tier1-subrequests-insecure", false, "Connect to tier2 without checking certificate validity")
@@ -62,7 +64,7 @@ func registerSubstreamsTier1App[B Block](chain *Chain[B]) {
 				return nil, fmt.Errorf("unable to initialize dauth: %w", err)
 			}
 
-			mergedBlocksStoreURL, oneBlocksStoreURL, forkedBlocksStoreURL, err := GetCommonStoresURLs(runtime.AbsDataDir)
+			mergedBlocksStoreURL, oneBlocksStoreURL, forkedBlocksStoreURL, err := firecore.GetCommonStoresURLs(runtime.AbsDataDir)
 			if err != nil {
 				return nil, err
 			}
@@ -72,7 +74,7 @@ func registerSubstreamsTier1App[B Block](chain *Chain[B]) {
 			rawServiceDiscoveryURL := viper.GetString("substreams-tier1-discovery-service-url")
 			grpcListenAddr := viper.GetString("substreams-tier1-grpc-listen-addr")
 
-			stateStoreURL := MustReplaceDataDir(sfDataDir, viper.GetString("substreams-state-store-url"))
+			stateStoreURL := firecore.MustReplaceDataDir(sfDataDir, viper.GetString("substreams-state-store-url"))
 			stateStoreDefaultTag := viper.GetString("substreams-state-store-default-tag")
 
 			stateBundleSize := viper.GetUint64("substreams-state-bundle-size")

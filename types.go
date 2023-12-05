@@ -169,3 +169,5 @@ type BlockIndexer[B Block] interface {
 // for the overall process. The returns [transform.Factory] will be used multiple times (one per request
 // requesting this transform).
 type BlockTransformerFactory func(indexStore dstore.Store, indexPossibleSizes []uint64) (*transform.Factory, error)
+
+type ReaderNodeArgumentResolver = func(in string) string

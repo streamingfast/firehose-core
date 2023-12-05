@@ -1,4 +1,4 @@
-package firecore
+package tools
 
 import (
 	"context"
@@ -6,8 +6,6 @@ import (
 	"io"
 	"strconv"
 	"strings"
-
-	"github.com/streamingfast/firehose-core/tools"
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 
@@ -43,13 +41,13 @@ func CheckMergedBlocksBatch(
 	sourceStoreURL string,
 	destStoreURL string,
 	fileBlockSize uint64,
-	blockRange tools.BlockRange,
+	blockRange BlockRange,
 ) error {
 	if !blockRange.IsResolved() {
 		return fmt.Errorf("check merged blocks can only work with fully resolved range, got %s", blockRange)
 	}
 
-	expected := tools.RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize)
+	expected := RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize)
 	fileBlockSize64 := uint64(fileBlockSize)
 
 	blocksStore, err := dstore.NewDBinStore(sourceStoreURL)
@@ -64,7 +62,7 @@ func CheckMergedBlocksBatch(
 		}
 	}
 
-	var firstFilename = fmt.Sprintf("%010d", tools.RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize))
+	var firstFilename = fmt.Sprintf("%010d", RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize))
 
 	lastSeenBlock := &blockRef{}
 
@@ -105,7 +103,7 @@ func CheckMergedBlocksBatch(
 					destStore.WriteObject(ctx, outputFile, strings.NewReader(""))
 				}
 			} else {
-				brokenSince := tools.RoundToBundleStartBlock(uint64(lastSeenBlock.num+1), 100)
+				brokenSince := RoundToBundleStartBlock(uint64(lastSeenBlock.num+1), 100)
 				for i := brokenSince; i <= baseNum; i += fileBlockSize64 {
 					fmt.Printf("found broken file %q, %s\n", filename, details)
 					if destStore != nil {
@@ -122,7 +120,7 @@ func CheckMergedBlocksBatch(
 			return err
 		}
 
-		if blockRange.IsClosed() && tools.RoundToBundleEndBlock(baseNum, fileBlockSize) >= *blockRange.Stop-1 {
+		if blockRange.IsClosed() && RoundToBundleEndBlock(baseNum, fileBlockSize) >= *blockRange.Stop-1 {
 			return dstore.StopIteration
 		}
 		expected = baseNum + fileBlockSize64

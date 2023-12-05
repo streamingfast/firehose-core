@@ -1,4 +1,4 @@
-package firecore
+package apps
 
 import (
 	"context"
@@ -10,16 +10,18 @@ import (
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	bstransform "github.com/streamingfast/bstream/transform"
 	"github.com/streamingfast/dlauncher/launcher"
+	firecore "github.com/streamingfast/firehose-core"
 	index_builder "github.com/streamingfast/firehose-core/index-builder/app/index-builder"
+	"go.uber.org/zap"
 )
 
-func registerIndexBuilderApp[B Block](chain *Chain[B]) {
+func RegisterIndexBuilderApp[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) {
 	launcher.RegisterApp(rootLog, &launcher.AppDef{
 		ID:          "index-builder",
 		Title:       "Index Builder",
 		Description: "App the builds indexes out of Firehose blocks",
 		RegisterFlags: func(cmd *cobra.Command) error {
-			cmd.Flags().String("index-builder-grpc-listen-addr", IndexBuilderServiceAddr, "Address to listen for grpc-based healthz check")
+			cmd.Flags().String("index-builder-grpc-listen-addr", firecore.IndexBuilderServiceAddr, "Address to listen for grpc-based healthz check")
 			cmd.Flags().Uint64("index-builder-index-size", 10000, "Size of index bundles that will be created")
 			cmd.Flags().Uint64("index-builder-start-block", 0, "Block number to start indexing")
 			cmd.Flags().Uint64("index-builder-stop-block", 0, "Block number to stop indexing")
@@ -29,12 +31,12 @@ func registerIndexBuilderApp[B Block](chain *Chain[B]) {
 			return nil
 		},
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
-			mergedBlocksStoreURL, _, _, err := GetCommonStoresURLs(runtime.AbsDataDir)
+			mergedBlocksStoreURL, _, _, err := firecore.GetCommonStoresURLs(runtime.AbsDataDir)
 			if err != nil {
 				return nil, err
 			}
 
-			indexStore, lookupIdxSizes, err := GetIndexStore(runtime.AbsDataDir)
+			indexStore, lookupIdxSizes, err := firecore.GetIndexStore(runtime.AbsDataDir)
 			if err != nil {
 				return nil, err
 			}

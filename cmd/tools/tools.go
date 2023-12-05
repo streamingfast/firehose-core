@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package firecore
+package tools
 
 import (
 	"fmt"
@@ -22,7 +22,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/streamingfast/cli/sflags"
+	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/firehose/client"
+	"github.com/streamingfast/logging"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -30,51 +32,53 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-var toolsCmd = &cobra.Command{Use: "tools", Short: "Developer tools for operators and developers"}
+var ToolsCmd = &cobra.Command{Use: "tools", Short: "Developer tools for operators and developers"}
 
-func configureToolsCmd[B Block](
-	chain *Chain[B],
+func ConfigureToolsCmd[B firecore.Block](
+	chain *firecore.Chain[B],
+	logger *zap.Logger,
+	tracer logging.Tracer,
 ) error {
-	configureToolsCheckCmd(chain)
+	configureToolsCheckCmd(chain, logger)
 	configureToolsPrintCmd(chain)
 
-	toolsCmd.AddCommand(newToolsCompareBlocksCmd(chain))
-	toolsCmd.AddCommand(newToolsDownloadFromFirehoseCmd(chain, rootLog))
-	toolsCmd.AddCommand(newToolsFirehoseClientCmd(chain, rootLog))
-	toolsCmd.AddCommand(newToolsFirehoseSingleBlockClientCmd(chain, rootLog, rootTracer))
-	toolsCmd.AddCommand(newToolsFirehosePrometheusExporterCmd(chain, rootLog, rootTracer))
-	toolsCmd.AddCommand(newToolsUnmergeBlocksCmd(chain, rootLog))
-	toolsCmd.AddCommand(newToolsFixBloatedMergedBlocks(chain, rootLog))
+	ToolsCmd.AddCommand(newToolsCompareBlocksCmd(chain))
+	ToolsCmd.AddCommand(newToolsDownloadFromFirehoseCmd(chain, logger))
+	ToolsCmd.AddCommand(newToolsFirehoseClientCmd(chain, logger))
+	ToolsCmd.AddCommand(newToolsFirehoseSingleBlockClientCmd(chain, logger, tracer))
+	ToolsCmd.AddCommand(newToolsFirehosePrometheusExporterCmd(chain, logger, tracer))
+	ToolsCmd.AddCommand(newToolsUnmergeBlocksCmd(chain, logger))
+	ToolsCmd.AddCommand(newToolsFixBloatedMergedBlocks(chain, logger))
 
 	if chain.Tools.MergedBlockUpgrader != nil {
-		toolsCmd.AddCommand(NewToolsUpgradeMergedBlocksCmd(chain))
+		ToolsCmd.AddCommand(NewToolsUpgradeMergedBlocksCmd(chain, logger))
 	}
 
 	if chain.Tools.RegisterExtraCmd != nil {
-		if err := chain.Tools.RegisterExtraCmd(chain, toolsCmd, rootLog, rootTracer); err != nil {
+		if err := chain.Tools.RegisterExtraCmd(chain, ToolsCmd, logger, tracer); err != nil {
 			return fmt.Errorf("registering extra tools command: %w", err)
 		}
 	}
 
 	var walkCmd func(node *cobra.Command)
 	walkCmd = func(node *cobra.Command) {
-		hideGlobalFlagsOnChildCmd(node)
+		firecore.HideGlobalFlagsOnChildCmd(node)
 		for _, child := range node.Commands() {
 			walkCmd(child)
 		}
 	}
-	walkCmd(toolsCmd)
+	walkCmd(ToolsCmd)
 
 	return nil
 }
 
-func addFirehoseStreamClientFlagsToSet[B Block](flags *pflag.FlagSet, chain *Chain[B]) {
+func addFirehoseStreamClientFlagsToSet[B firecore.Block](flags *pflag.FlagSet, chain *firecore.Chain[B]) {
 	addFirehoseFetchClientFlagsToSet(flags, chain)
 
 	flags.String("cursor", "", "Use this cursor with the request to resume your stream at the following block pointed by the cursor")
 }
 
-func addFirehoseFetchClientFlagsToSet[B Block](flags *pflag.FlagSet, chain *Chain[B]) {
+func addFirehoseFetchClientFlagsToSet[B firecore.Block](flags *pflag.FlagSet, chain *firecore.Chain[B]) {
 	flags.StringP("api-token-env-var", "a", "FIREHOSE_API_TOKEN", "Look for a JWT in this environment variable to authenticate against endpoint")
 	flags.String("compression", "none", "The HTTP compression: use either 'none', 'gzip' or 'zstd'")
 	flags.BoolP("plaintext", "p", false, "Use plaintext connection to Firehose")
@@ -91,7 +95,7 @@ type firehoseRequestInfo struct {
 	Transforms      []*anypb.Any
 }
 
-func getFirehoseFetchClientFromCmd[B Block](cmd *cobra.Command, logger *zap.Logger, endpoint string, chain *Chain[B]) (
+func getFirehoseFetchClientFromCmd[B firecore.Block](cmd *cobra.Command, logger *zap.Logger, endpoint string, chain *firecore.Chain[B]) (
 	firehoseClient pbfirehose.FetchClient,
 	connClose func() error,
 	requestInfo *firehoseRequestInfo,
@@ -100,7 +104,7 @@ func getFirehoseFetchClientFromCmd[B Block](cmd *cobra.Command, logger *zap.Logg
 	return getFirehoseClientFromCmd[B, pbfirehose.FetchClient](cmd, logger, "fetch-client", endpoint, chain)
 }
 
-func getFirehoseStreamClientFromCmd[B Block](cmd *cobra.Command, logger *zap.Logger, endpoint string, chain *Chain[B]) (
+func getFirehoseStreamClientFromCmd[B firecore.Block](cmd *cobra.Command, logger *zap.Logger, endpoint string, chain *firecore.Chain[B]) (
 	firehoseClient pbfirehose.StreamClient,
 	connClose func() error,
 	requestInfo *firehoseRequestInfo,
@@ -109,7 +113,7 @@ func getFirehoseStreamClientFromCmd[B Block](cmd *cobra.Command, logger *zap.Log
 	return getFirehoseClientFromCmd[B, pbfirehose.StreamClient](cmd, logger, "stream-client", endpoint, chain)
 }
 
-func getFirehoseClientFromCmd[B Block, C any](cmd *cobra.Command, logger *zap.Logger, kind string, endpoint string, chain *Chain[B]) (
+func getFirehoseClientFromCmd[B firecore.Block, C any](cmd *cobra.Command, logger *zap.Logger, kind string, endpoint string, chain *firecore.Chain[B]) (
 	firehoseClient C,
 	connClose func() error,
 	requestInfo *firehoseRequestInfo,

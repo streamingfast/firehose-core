@@ -1,4 +1,4 @@
-package firecore
+package apps
 
 import (
 	"testing"

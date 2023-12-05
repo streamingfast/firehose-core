@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package firecore
+package apps
 
 import (
 	"fmt"
@@ -23,14 +23,16 @@ import (
 	"github.com/spf13/viper"
 	discoveryservice "github.com/streamingfast/dgrpc/server/discovery-service"
 	"github.com/streamingfast/dlauncher/launcher"
+	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/logging"
-	app "github.com/streamingfast/substreams/app"
+	"github.com/streamingfast/substreams/app"
+	"go.uber.org/zap"
 )
 
 var ss2HeadBlockNumMetric = metricset.NewHeadBlockNumber("substreams-tier2")
 var ss2HeadTimeDriftmetric = metricset.NewHeadTimeDrift("substreams-tier2")
 
-func registerSubstreamsTier2App[B Block](chain *Chain[B]) {
+func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) {
 	appLogger, _ := logging.PackageLogger("substreams-tier2", "github.com/streamingfast/firehose-core/firehose-ethereum/substreams-tier2")
 
 	launcher.RegisterApp(rootLog, &launcher.AppDef{
@@ -38,7 +40,7 @@ func registerSubstreamsTier2App[B Block](chain *Chain[B]) {
 		Title:       "Substreams tier2 server",
 		Description: "Provides a substreams grpc endpoint",
 		RegisterFlags: func(cmd *cobra.Command) error {
-			cmd.Flags().String("substreams-tier2-grpc-listen-addr", SubstreamsTier2GRPCServingAddr, "Address on which the substreams tier2 will listen. Default is plain-text, appending a '*' to the end to jkkkj")
+			cmd.Flags().String("substreams-tier2-grpc-listen-addr", firecore.SubstreamsTier2GRPCServingAddr, "Address on which the substreams tier2 will listen. Default is plain-text, appending a '*' to the end to jkkkj")
 			cmd.Flags().String("substreams-tier2-discovery-service-url", "", "URL to advertise presence to the grpc discovery service") //traffic-director://xds?vpc_network=vpc-global&use_xds_reds=true
 			cmd.Flags().String("substreams-tier2-block-type", "", "fully qualified name of the block type to use for the substreams tier1 (i.e. sf.ethereum.v1.Block)")
 
@@ -48,7 +50,7 @@ func registerSubstreamsTier2App[B Block](chain *Chain[B]) {
 		},
 
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
-			mergedBlocksStoreURL, _, _, err := GetCommonStoresURLs(runtime.AbsDataDir)
+			mergedBlocksStoreURL, _, _, err := firecore.GetCommonStoresURLs(runtime.AbsDataDir)
 			if err != nil {
 				return nil, err
 			}
@@ -58,7 +60,7 @@ func registerSubstreamsTier2App[B Block](chain *Chain[B]) {
 			rawServiceDiscoveryURL := viper.GetString("substreams-tier2-discovery-service-url")
 			grpcListenAddr := viper.GetString("substreams-tier2-grpc-listen-addr")
 
-			stateStoreURL := MustReplaceDataDir(sfDataDir, viper.GetString("substreams-state-store-url"))
+			stateStoreURL := firecore.MustReplaceDataDir(sfDataDir, viper.GetString("substreams-state-store-url"))
 			stateStoreDefaultTag := viper.GetString("substreams-state-store-default-tag")
 
 			stateBundleSize := viper.GetUint64("substreams-state-bundle-size")

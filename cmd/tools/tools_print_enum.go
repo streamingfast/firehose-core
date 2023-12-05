@@ -4,7 +4,7 @@
 // Build Date:
 // Built By:
 
-package firecore
+package tools
 
 import (
 	"fmt"

@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package firecore
+package tools
 
 import (
 	"strconv"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli/sflags"
-	"github.com/streamingfast/firehose-core/tools"
 )
 
 var toolsCheckMergedBlocksBatchCmd = &cobra.Command{
@@ -46,7 +45,7 @@ func checkMergedBlocksBatchRunE(cmd *cobra.Command, args []string) error {
 	}
 	fileBlockSize := uint64(100)
 
-	blockRange := tools.BlockRange{
+	blockRange := BlockRange{
 		Start: int64(start),
 		Stop:  &stop,
 	}

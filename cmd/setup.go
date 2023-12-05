@@ -1,10 +1,12 @@
-package firecore
+package cmd
 
 import (
 	"fmt"
 	_ "net/http/pprof"
 	"os"
 	"strings"
+
+	"github.com/streamingfast/firehose-core/cmd/apps"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -19,8 +21,8 @@ func setupCmd(cmd *cobra.Command, binaryName string) error {
 	cmds := extractCmd(cmd)
 	subCommand := cmds[len(cmds)-1]
 
-	forceConfigOn := []*cobra.Command{startCmd}
-	logToFileOn := []*cobra.Command{startCmd}
+	forceConfigOn := []*cobra.Command{apps.StartCmd}
+	logToFileOn := []*cobra.Command{apps.StartCmd}
 
 	if configFile := viper.GetString("global-config-file"); configFile != "" {
 		exists, err := fileExists(configFile)
@@ -138,7 +140,7 @@ func getStartFlags() (byName map[string]*flagInfo) {
 		byName[flag.Name] = &flagInfo{flag.Name, sflags.MustGetViperKeyFromFlag(flag)}
 	})
 
-	startCmd.LocalFlags().VisitAll(func(flag *pflag.Flag) {
+	apps.StartCmd.LocalFlags().VisitAll(func(flag *pflag.Flag) {
 		byName[flag.Name] = &flagInfo{flag.Name, sflags.MustGetViperKeyFromFlag(flag)}
 	})
 

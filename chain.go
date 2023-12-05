@@ -11,6 +11,7 @@ import (
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/firehose-core/node-manager/mindreader"
 	"github.com/streamingfast/firehose-core/node-manager/operator"
+	"github.com/streamingfast/firehose-core/substreams"
 	"github.com/streamingfast/logging"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
@@ -149,7 +150,7 @@ type Chain[B Block] struct {
 	//
 	BlockEncoder BlockEncoder
 
-	RegisterSubstreamsExtensions func(chain *Chain[B]) ([]SubstreamsExtension, error)
+	RegisterSubstreamsExtensions func(chain *Chain[B]) ([]substreams.Extension, error)
 
 	// CoreBinaryEnabled is a flag that when set to true indicates that `firecore` binary is being run directly? (not through firexxx)
 	CoreBinaryEnabled bool

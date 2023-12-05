@@ -1,18 +1,18 @@
-package firecore
+package tools
 
 import (
 	"context"
 	"fmt"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli/sflags"
-	"github.com/streamingfast/firehose-core/tools"
+	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/jsonpb"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
 	"io"
 )
 
-func newToolsFirehoseClientCmd[B Block](chain *Chain[B], logger *zap.Logger) *cobra.Command {
+func newToolsFirehoseClientCmd[B firecore.Block](chain *firecore.Chain[B], logger *zap.Logger) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "firehose-client <endpoint> <range>",
 		Short: "Connects to a Firehose endpoint over gRPC and print block stream as JSON to terminal",
@@ -33,17 +33,17 @@ type respChan struct {
 	ch chan string
 }
 
-func getFirehoseClientE[B Block](chain *Chain[B], logger *zap.Logger) func(cmd *cobra.Command, args []string) error {
+func getFirehoseClientE[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-		firehoseClient, connClose, requestInfo, err := getFirehoseStreamClientFromCmd(cmd, logger, args[0], chain)
+		firehoseClient, connClose, requestInfo, err := getFirehoseStreamClientFromCmd(cmd, rootLog, args[0], chain)
 		if err != nil {
 			return err
 		}
 		defer connClose()
 
-		blockRange, err := tools.GetBlockRangeFromArg(args[1])
+		blockRange, err := GetBlockRangeFromArg(args[1])
 		if err != nil {
 			return fmt.Errorf("invalid range %q: %w", args[1], err)
 		}
