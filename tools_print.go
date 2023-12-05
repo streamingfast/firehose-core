@@ -15,28 +15,27 @@
 package firecore
 
 import (
-	"encoding/hex"
 	"fmt"
+	"github.com/go-json-experiment/json"
+	"github.com/go-json-experiment/json/jsontext"
+	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/desc/protoparse"
+	"github.com/jhump/protoreflect/dynamic"
+	"github.com/spf13/cobra"
+	"github.com/streamingfast/bstream"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/cli/sflags"
+	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/firehose-core/jsonencoder"
+	"github.com/streamingfast/firehose-core/protoregistry"
+	"github.com/streamingfast/firehose-core/tools"
+	"google.golang.org/protobuf/proto"
 	"io"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
-
-	"github.com/go-json-experiment/json"
-	"github.com/go-json-experiment/json/jsontext"
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/desc/protoparse"
-	"github.com/jhump/protoreflect/dynamic"
-	"github.com/mr-tron/base58"
-	"github.com/spf13/cobra"
-	"github.com/streamingfast/bstream"
-	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-	"github.com/streamingfast/cli/sflags"
-	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/firehose-core/tools"
-	"google.golang.org/protobuf/proto"
 )
 
 var toolsPrintCmd = &cobra.Command{
@@ -82,7 +81,6 @@ func createToolsPrintMergedBlocksE[B Block](chain *Chain[B]) CommandExecutor {
 		}
 
 		printTransactions := sflags.MustGetBool(cmd, "transactions")
-		protoPaths := sflags.MustGetStringSlice(cmd, "proto-paths")
 
 		storeURL := args[0]
 		store, err := dstore.NewDBinStore(storeURL)
@@ -110,9 +108,9 @@ func createToolsPrintMergedBlocksE[B Block](chain *Chain[B]) CommandExecutor {
 			return err
 		}
 
-		dPrinter, err := newDynamicPrinter(protoPaths)
+		jencoder, err := setupJsonEncoder(cmd)
 		if err != nil {
-			return fmt.Errorf("unable to create dynamic printer: %w", err)
+			return fmt.Errorf("unable to create json encoder: %w", err)
 		}
 
 		seenBlockCount := 0
@@ -128,7 +126,7 @@ func createToolsPrintMergedBlocksE[B Block](chain *Chain[B]) CommandExecutor {
 
 			seenBlockCount++
 
-			if err := displayBlock(block, chain, outputMode, printTransactions, dPrinter); err != nil {
+			if err := displayBlock(block, chain, outputMode, printTransactions, jencoder); err != nil {
 				// Error is ready to be passed to the user as-is
 				return err
 			}
@@ -151,7 +149,11 @@ func createToolsPrintOneBlockE[B Block](chain *Chain[B]) CommandExecutor {
 		}
 
 		printTransactions := sflags.MustGetBool(cmd, "transactions")
-		protoPaths := sflags.MustGetStringSlice(cmd, "proto-paths")
+
+		jencoder, err := setupJsonEncoder(cmd)
+		if err != nil {
+			return fmt.Errorf("unable to create json encoder: %w", err)
+		}
 
 		storeURL := args[0]
 		store, err := dstore.NewDBinStore(storeURL)
@@ -174,10 +176,6 @@ func createToolsPrintOneBlockE[B Block](chain *Chain[B]) CommandExecutor {
 			return fmt.Errorf("unable to find on block files: %w", err)
 		}
 
-		dPrinter, err := newDynamicPrinter(protoPaths)
-		if err != nil {
-			return fmt.Errorf("unable to create dynamic printer: %w", err)
-		}
 		for _, filepath := range files {
 			reader, err := store.OpenObject(ctx, filepath)
 			if err != nil {
@@ -200,7 +198,7 @@ func createToolsPrintOneBlockE[B Block](chain *Chain[B]) CommandExecutor {
 				return fmt.Errorf("reading block: %w", err)
 			}
 
-			if err := displayBlock(block, chain, outputMode, printTransactions, dPrinter); err != nil {
+			if err := displayBlock(block, chain, outputMode, printTransactions, jencoder); err != nil {
 				// Error is ready to be passed to the user as-is
 				return err
 			}
@@ -224,73 +222,45 @@ func toolsPrintCmdGetOutputMode(cmd *cobra.Command) (PrintOutputMode, error) {
 	return out, nil
 }
 
-func displayBlock[B Block](pbBlock *pbbstream.Block, chain *Chain[B], outputMode PrintOutputMode, printTransactions bool, dPrinter *dynamicPrinter) error {
+func displayBlock[B Block](pbBlock *pbbstream.Block, chain *Chain[B], outputMode PrintOutputMode, printTransactions bool, jencoder *jsonencoder.Encoder) error {
 	if pbBlock == nil {
 		return fmt.Errorf("block is nil")
 	}
 
-	switch outputMode {
-	case PrintOutputModeText:
-		err := printBlock(pbBlock, printTransactions, os.Stdout)
-		if err != nil {
+	if outputMode == PrintOutputModeText {
+		if err := printBStreamBlock(pbBlock, printTransactions, os.Stdout); err != nil {
 			return fmt.Errorf("pbBlock text printing: %w", err)
 		}
-
-	case PrintOutputModeJSON, PrintOutputModeJSONL:
-		var options []jsontext.Options
-		if outputMode == PrintOutputModeJSON {
-			options = append(options, jsontext.WithIndent("  "))
-		}
-		encoder := jsontext.NewEncoder(os.Stdout)
-
-		var marshallers *json.Marshalers
-		switch UnsafeJsonBytesEncoder {
-		case "hex":
-			marshallers = json.NewMarshalers(
-				json.MarshalFuncV2(func(encoder *jsontext.Encoder, t []byte, options json.Options) error {
-					return encoder.WriteToken(jsontext.String(hex.EncodeToString(t)))
-				}),
-			)
-		case "base58":
-			marshallers = json.NewMarshalers(
-				json.MarshalFuncV2(func(encoder *jsontext.Encoder, t []byte, options json.Options) error {
-					return encoder.WriteToken(jsontext.String(base58.Encode(t)))
-				}),
-			)
-		}
-
-		isLegacyBlock := pbBlock.Payload == nil
-		if chain.CoreBinaryEnabled {
-			// since we are running directly the firecore binary we will *NOT* use the BlockFactory
-
-			if isLegacyBlock {
-				return dPrinter.printBlock(legacyKindsToProtoType(pbBlock.PayloadKind), pbBlock.GetPayloadBuffer(), encoder, marshallers)
-			}
-
-			return dPrinter.printBlock(pbBlock.Payload.TypeUrl, pbBlock.Payload.Value, encoder, marshallers)
-
-		} else {
-			// since we are running via the chain specific binary (i.e. fireeth) we can use a BlockFactory
-			marshallableBlock := chain.BlockFactory()
-			if isLegacyBlock {
-				if err := proto.Unmarshal(pbBlock.GetPayloadBuffer(), marshallableBlock); err != nil {
-					return fmt.Errorf("unmarshal legacy block payload to protocol block: %w", err)
-				}
-			} else {
-				if err := pbBlock.Payload.UnmarshalTo(marshallableBlock); err != nil {
-					return fmt.Errorf("pbBlock payload unmarshal: %w", err)
-				}
-			}
-
-			err := json.MarshalEncode(encoder, marshallableBlock, json.WithMarshalers(marshallers))
-			if err != nil {
-				return fmt.Errorf("pbBlock JSON printing: json marshal: %w", err)
-			}
-		}
-
+		return nil
 	}
 
-	return nil
+	isLegacyBlock := pbBlock.Payload == nil
+	if !chain.CoreBinaryEnabled {
+		// since we are running via the chain specific binary (i.e. fireeth) we can use a BlockFactory
+		marshallableBlock := chain.BlockFactory()
+		if isLegacyBlock {
+			if err := proto.Unmarshal(pbBlock.GetPayloadBuffer(), marshallableBlock); err != nil {
+				return fmt.Errorf("unmarshal legacy block payload to protocol block: %w", err)
+			}
+		} else {
+			if err := pbBlock.Payload.UnmarshalTo(marshallableBlock); err != nil {
+				return fmt.Errorf("pbBlock payload unmarshal: %w", err)
+			}
+		}
+
+		err := jencoder.Marshal(marshallableBlock)
+		if err != nil {
+			return fmt.Errorf("pbBlock JSON printing: json marshal: %w", err)
+		}
+		return nil
+	}
+	// since we are running directly the firecore binary we will *NOT* use the BlockFactory
+
+	if isLegacyBlock {
+		return jencoder.MarshalLegacy(legacyKindsToProtoType(pbBlock.GetPayloadKind()), pbBlock.GetPayloadBuffer())
+	}
+
+	return jencoder.Marshal(pbBlock.Payload)
 }
 
 type dynamicPrinter struct {
@@ -305,24 +275,6 @@ func newDynamicPrinter(importPaths []string) (*dynamicPrinter, error) {
 	return &dynamicPrinter{
 		fileDescriptors: fileDescriptors,
 	}, nil
-}
-
-func (d *dynamicPrinter) printBlock(blkTypeURL string, blkPayload []byte, encoder *jsontext.Encoder, marshalers *json.Marshalers) error {
-	for _, fd := range d.fileDescriptors {
-		md := fd.FindSymbol(blkTypeURL)
-		if md != nil {
-			dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(md.(*desc.MessageDescriptor))
-			if err := dynMsg.Unmarshal(blkPayload); err != nil {
-				return fmt.Errorf("unmarshalling block: %w", err)
-			}
-			err := json.MarshalEncode(encoder, dynMsg, json.WithMarshalers(marshalers))
-			if err != nil {
-				return fmt.Errorf("pbBlock JSON printing: json marshal: %w", err)
-			}
-			return nil
-		}
-	}
-	return fmt.Errorf("no message descriptor in proto paths for type url %q", blkTypeURL)
 }
 
 func parseProtoFiles(importPaths []string) (fds []*desc.FileDescriptor, err error) {
@@ -380,7 +332,25 @@ func parseProtoFiles(importPaths []string) (fds []*desc.FileDescriptor, err erro
 
 }
 
-func printBlock(b *pbbstream.Block, printTransactions bool, out io.Writer) error {
+func (d *dynamicPrinter) printBlock(blkTypeURL string, blkPayload []byte, encoder *jsontext.Encoder, marshalers *json.Marshalers) error {
+	for _, fd := range d.fileDescriptors {
+		md := fd.FindSymbol(blkTypeURL)
+		if md != nil {
+			dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(md.(*desc.MessageDescriptor))
+			if err := dynMsg.Unmarshal(blkPayload); err != nil {
+				return fmt.Errorf("unmarshalling block: %w", err)
+			}
+			err := json.MarshalEncode(encoder, dynMsg, json.WithMarshalers(marshalers))
+			if err != nil {
+				return fmt.Errorf("pbBlock JSON printing: json marshal: %w", err)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("no message descriptor in proto paths for type url %q", blkTypeURL)
+}
+
+func printBStreamBlock(b *pbbstream.Block, printTransactions bool, out io.Writer) error {
 	_, err := out.Write(
 		[]byte(
 			fmt.Sprintf(
@@ -417,4 +387,17 @@ func legacyKindsToProtoType(protocol pbbstream.Protocol) string {
 		return "sf.cosmos.type.v1.Block"
 	}
 	panic("unaligned protocol")
+}
+
+func setupJsonEncoder(cmd *cobra.Command) (*jsonencoder.Encoder, error) {
+	protoPaths := sflags.MustGetStringSlice(cmd, "proto-paths")
+	pbregistry := protoregistry.New()
+	if err := pbregistry.RegisterFiles(protoPaths); err != nil {
+		return nil, fmt.Errorf("unable to create dynamic printer: %w", err)
+	}
+
+	options := []jsonencoder.Option{
+		jsonencoder.WithBytesAsHex(),
+	}
+	return jsonencoder.New(pbregistry, options...), nil
 }

@@ -3,14 +3,13 @@ package firecore
 import (
 	"context"
 	"fmt"
-	"io"
-
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/firehose-core/tools"
 	"github.com/streamingfast/jsonpb"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
+	"io"
 )
 
 func newToolsFirehoseClientCmd[B Block](chain *Chain[B], logger *zap.Logger) *cobra.Command {
@@ -23,6 +22,7 @@ func newToolsFirehoseClientCmd[B Block](chain *Chain[B], logger *zap.Logger) *co
 
 	addFirehoseStreamClientFlagsToSet(cmd.Flags(), chain)
 
+	cmd.Flags().StringSlice("proto-paths", []string{"~/.proto"}, "Paths to proto files to use for dynamic decoding of blocks")
 	cmd.Flags().Bool("final-blocks-only", false, "Only ask for final blocks")
 	cmd.Flags().Bool("print-cursor-only", false, "Skip block decoding, only print the step cursor (useful for performance testing)")
 
@@ -52,7 +52,7 @@ func getFirehoseClientE[B Block](chain *Chain[B], logger *zap.Logger) func(cmd *
 
 		request := &pbfirehose.Request{
 			StartBlockNum:   blockRange.Start,
-			StopBlockNum:    uint64(blockRange.GetStopBlockOr(0)),
+			StopBlockNum:    blockRange.GetStopBlockOr(0),
 			Transforms:      requestInfo.Transforms,
 			FinalBlocksOnly: requestInfo.FinalBlocksOnly,
 			Cursor:          requestInfo.Cursor,
@@ -108,6 +108,7 @@ func getFirehoseClientE[B Block](chain *Chain[B], logger *zap.Logger) func(cmd *
 
 			// async process the response
 			go func() {
+
 				line, err := jsonpb.MarshalToString(response)
 				if err != nil {
 					rootLog.Error("marshalling to string", zap.Error(err))
