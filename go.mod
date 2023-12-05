@@ -12,7 +12,7 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
-	github.com/streamingfast/bstream v0.0.2-0.20231123130020-ad84cce9666d
+	github.com/streamingfast/bstream v0.0.2-0.20231205161519-9f4f0971b0cc
 	github.com/streamingfast/cli v0.0.4-0.20230825151644-8cc84512cd80
 	github.com/streamingfast/dauth v0.0.0-20230929180355-921f9c9be330
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
@@ -115,7 +115,7 @@ require (
 	github.com/ipfs/boxo v0.8.0 // indirect
 	github.com/ipfs/go-cid v0.4.0 // indirect
 	github.com/ipfs/go-ipfs-api v0.6.0 // indirect
-	github.com/jhump/protoreflect v1.14.0 // indirect
+	github.com/jhump/protoreflect v1.14.0
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josephburnett/jd v1.7.1
 	github.com/josharian/intern v1.0.0 // indirect
@@ -224,4 +224,3 @@ replace (
 	github.com/ShinyTrinkets/overseer => github.com/streamingfast/overseer v0.2.1-0.20210326144022-ee491780e3ef
 	github.com/bytecodealliance/wasmtime-go/v4 => github.com/streamingfast/wasmtime-go/v4 v4.0.0-freemem3
 )
-

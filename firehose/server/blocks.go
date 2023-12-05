@@ -158,7 +158,7 @@ func (s *Server) Blocks(request *pbfirehose.Request, streamSrv pbfirehose.Stream
 			level = zap.InfoLevel
 		}
 
-		logger.Check(level, "stream sent block").Write(zap.Stringer("block", block), zap.Duration("duration", time.Since(start)))
+		logger.Check(level, "stream sent block").Write(zap.Uint64("block", block.Number), zap.Duration("duration", time.Since(start)))
 
 		return nil
 	})
@@ -221,7 +221,7 @@ func (s *Server) Blocks(request *pbfirehose.Request, streamSrv pbfirehose.Stream
 	}
 
 	ctx = s.initFunc(ctx, request)
-	str, err := s.streamFactory.New(ctx, handlerFunc, request, true, logger) // firehose always want decoded the blocks
+	str, err := s.streamFactory.New(ctx, handlerFunc, request, false, logger) // firehose always want decoded the blocks
 	if err != nil {
 		return err
 	}
