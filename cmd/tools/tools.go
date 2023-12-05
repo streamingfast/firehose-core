@@ -17,22 +17,19 @@ package tools
 import (
 	"fmt"
 
-	"github.com/streamingfast/firehose-core/cmd/tools/fix"
-	"github.com/streamingfast/firehose-core/cmd/tools/mergeblock"
-
-	"github.com/streamingfast/firehose-core/cmd/tools/compare"
-
 	"github.com/spf13/cobra"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/cmd/tools/check"
+	"github.com/streamingfast/firehose-core/cmd/tools/compare"
 	"github.com/streamingfast/firehose-core/cmd/tools/firehose"
+	"github.com/streamingfast/firehose-core/cmd/tools/fix"
+	"github.com/streamingfast/firehose-core/cmd/tools/mergeblock"
 	print2 "github.com/streamingfast/firehose-core/cmd/tools/print"
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 )
 
 var ToolsCmd = &cobra.Command{Use: "tools", Short: "Developer tools for operators and developers"}
-var MaxUint64 = ^uint64(0)
 
 func ConfigureToolsCmd[B firecore.Block](
 	chain *firecore.Chain[B],
