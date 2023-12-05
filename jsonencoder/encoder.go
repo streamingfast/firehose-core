@@ -1,25 +1,22 @@
 package jsonencoder
 
 import (
-	"fmt"
+	"bytes"
 	"os"
 
 	"github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
-	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/firehose-core/protoregistry"
 )
 
 type Encoder struct {
-	e           *jsontext.Encoder
-	files       *protoregistry.Files
-	marshallers []*json.Marshalers
+	protoRegistry *protoregistry.Registry
+	marshallers   []*json.Marshalers
 }
 
-func New(files *protoregistry.Files, opts ...Option) *Encoder {
+func New(files *protoregistry.Registry, opts ...Option) *Encoder {
 	e := &Encoder{
-		e:     jsontext.NewEncoder(os.Stdout),
-		files: files,
+		protoRegistry: files,
 	}
 
 	e.marshallers = []*json.Marshalers{
@@ -33,14 +30,14 @@ func New(files *protoregistry.Files, opts ...Option) *Encoder {
 }
 
 func (e *Encoder) Marshal(in any) error {
-	return json.MarshalEncode(e.e, in, json.WithMarshalers(json.NewMarshalers(e.marshallers...)))
+	return json.MarshalEncode(jsontext.NewEncoder(os.Stdout), in, json.WithMarshalers(json.NewMarshalers(e.marshallers...)))
 }
 
-func (e *Encoder) MarshalLegacy(protocol pbbstream.Protocol, value []byte) error {
-	msg, err := e.files.UnmarshallLegacy(protocol, value)
-	if err != nil {
-		return fmt.Errorf("unmarshalling proto any: %w", err)
+func (e *Encoder) MarshalToString(in any) (string, error) {
+	buf := bytes.NewBuffer(nil)
+	if err := json.MarshalEncode(jsontext.NewEncoder(buf), in, json.WithMarshalers(json.NewMarshalers(e.marshallers...))); err != nil {
+		return "", err
 	}
+	return buf.String(), nil
 
-	return json.MarshalEncode(e.e, msg, json.WithMarshalers(json.NewMarshalers(e.marshallers...)))
 }

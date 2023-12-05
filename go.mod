@@ -3,16 +3,19 @@ module github.com/streamingfast/firehose-core
 go 1.21
 
 require (
+	buf.build/gen/go/bufbuild/reflect/connectrpc/go v1.12.0-20230822193137-310c9c4845dd.1
+	buf.build/gen/go/bufbuild/reflect/protocolbuffers/go v1.31.0-20230822193137-310c9c4845dd.2
 	github.com/ShinyTrinkets/overseer v0.3.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/go-json-experiment/json v0.0.0-20231013223334-54c864be5b8d
+	github.com/iancoleman/strcase v0.2.0
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/mostynb/go-grpc-compression v1.1.17
 	github.com/prometheus/client_golang v1.16.0
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
-	github.com/streamingfast/bstream v0.0.2-0.20231205163051-ade2f311eca3
+	github.com/streamingfast/bstream v0.0.2-0.20231205185208-7e21cc7e64bc
 	github.com/streamingfast/cli v0.0.4-0.20230825151644-8cc84512cd80
 	github.com/streamingfast/dauth v0.0.0-20230929180355-921f9c9be330
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
@@ -37,6 +40,7 @@ require (
 )
 
 require (
+	connectrpc.com/connect v1.12.0 // indirect
 	github.com/bufbuild/protocompile v0.4.0 // indirect
 	github.com/google/s2a-go v0.1.4 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230711160842-782d3b101e98 // indirect
@@ -71,7 +75,7 @@ require (
 	github.com/bits-and-blooms/bitset v1.3.1 // indirect
 	github.com/blendle/zapdriver v1.3.2-0.20200203083823-9200777f8a3d // indirect
 	github.com/bobg/go-generics/v2 v2.1.1 // indirect
-	github.com/bufbuild/connect-go v1.10.0 // indirect
+	github.com/bufbuild/connect-go v1.10.0
 	github.com/bufbuild/connect-grpchealth-go v1.1.1 // indirect
 	github.com/bufbuild/connect-grpcreflect-go v1.0.0 // indirect
 	github.com/bufbuild/connect-opentelemetry-go v0.3.0 // indirect

@@ -18,8 +18,6 @@ const (
 	RangeBoundaryExclusive
 )
 
-var ErrInvalidRangeBoundary = fmt.Errorf("not a valid RangeBoundary, try [%s]", strings.Join(_RangeBoundaryNames, ", "))
-
 const _RangeBoundaryName = "InclusiveExclusive"
 
 var _RangeBoundaryNames = []string{
@@ -47,13 +45,6 @@ func (x RangeBoundary) String() string {
 	return fmt.Sprintf("RangeBoundary(%d)", x)
 }
 
-// IsValid provides a quick way to determine if the typed value is
-// part of the allowed enumerated values
-func (x RangeBoundary) IsValid() bool {
-	_, ok := _RangeBoundaryMap[x]
-	return ok
-}
-
 var _RangeBoundaryValue = map[string]RangeBoundary{
 	_RangeBoundaryName[0:9]:                   RangeBoundaryInclusive,
 	strings.ToLower(_RangeBoundaryName[0:9]):  RangeBoundaryInclusive,
@@ -70,7 +61,7 @@ func ParseRangeBoundary(name string) (RangeBoundary, error) {
 	if x, ok := _RangeBoundaryValue[strings.ToLower(name)]; ok {
 		return x, nil
 	}
-	return RangeBoundary(0), fmt.Errorf("%s is %w", name, ErrInvalidRangeBoundary)
+	return RangeBoundary(0), fmt.Errorf("%s is not a valid RangeBoundary, try [%s]", name, strings.Join(_RangeBoundaryNames, ", "))
 }
 
 // MarshalText implements the text marshaller method.

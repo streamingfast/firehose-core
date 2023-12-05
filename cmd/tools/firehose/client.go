@@ -8,8 +8,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli/sflags"
 	firecore "github.com/streamingfast/firehose-core"
+	"github.com/streamingfast/firehose-core/cmd/tools/print"
 	"github.com/streamingfast/firehose-core/types"
-	"github.com/streamingfast/jsonpb"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
 )
@@ -24,7 +24,7 @@ func NewToolsFirehoseClientCmd[B firecore.Block](chain *firecore.Chain[B], logge
 
 	addFirehoseStreamClientFlagsToSet(cmd.Flags(), chain)
 
-	cmd.Flags().StringSlice("proto-paths", []string{"~/.proto"}, "Paths to proto files to use for dynamic decoding of blocks")
+	cmd.Flags().StringSlice("proto-paths", []string{""}, "Paths to proto files to use for dynamic decoding of blocks")
 	cmd.Flags().Bool("final-blocks-only", false, "Only ask for final blocks")
 	cmd.Flags().Bool("print-cursor-only", false, "Skip block decoding, only print the step cursor (useful for performance testing)")
 
@@ -89,6 +89,11 @@ func getFirehoseClientE[B firecore.Block](chain *firecore.Chain[B], rootLog *zap
 			}()
 		}
 
+		jencoder, err := print.SetupJsonEncoder(cmd)
+		if err != nil {
+			return fmt.Errorf("unable to create json encoder: %w", err)
+		}
+
 		for {
 			response, err := stream.Recv()
 			if err != nil {
@@ -110,10 +115,11 @@ func getFirehoseClientE[B firecore.Block](chain *firecore.Chain[B], rootLog *zap
 
 			// async process the response
 			go func() {
-				line, err := jsonpb.MarshalToString(response)
+				line, err := jencoder.MarshalToString(response)
 				if err != nil {
 					rootLog.Error("marshalling to string", zap.Error(err))
 				}
+
 				resp.ch <- line
 			}()
 		}

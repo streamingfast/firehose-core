@@ -20,8 +20,6 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/streamingfast/firehose-core/types"
-
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
@@ -30,7 +28,7 @@ import (
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/jsonencoder"
 	"github.com/streamingfast/firehose-core/protoregistry"
-	"google.golang.org/protobuf/proto"
+	"github.com/streamingfast/firehose-core/types"
 )
 
 func NewToolsPrintCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra.Command {
@@ -55,7 +53,7 @@ func NewToolsPrintCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra.Command
 	toolsPrintCmd.AddCommand(toolsPrintMergedBlocksCmd)
 
 	toolsPrintCmd.PersistentFlags().StringP("output", "o", "text", "Output mode for block printing, either 'text', 'json' or 'jsonl'")
-	toolsPrintCmd.PersistentFlags().StringSlice("proto-paths", []string{"~/.proto"}, "Paths to proto files to use for dynamic decoding of blocks")
+	toolsPrintCmd.PersistentFlags().StringSlice("proto-paths", []string{""}, "Paths to proto files to use for dynamic decoding of blocks")
 	toolsPrintCmd.PersistentFlags().Bool("transactions", false, "When in 'text' output mode, also print transactions summary")
 
 	toolsPrintOneBlockCmd.RunE = createToolsPrintOneBlockE(chain)
@@ -101,7 +99,7 @@ func createToolsPrintMergedBlocksE[B firecore.Block](chain *firecore.Chain[B]) f
 			return err
 		}
 
-		jencoder, err := setupJsonEncoder(cmd)
+		jencoder, err := SetupJsonEncoder(cmd)
 		if err != nil {
 			return fmt.Errorf("unable to create json encoder: %w", err)
 		}
@@ -143,7 +141,7 @@ func createToolsPrintOneBlockE[B firecore.Block](chain *firecore.Chain[B]) firec
 
 		printTransactions := sflags.MustGetBool(cmd, "transactions")
 
-		jencoder, err := setupJsonEncoder(cmd)
+		jencoder, err := SetupJsonEncoder(cmd)
 		if err != nil {
 			return fmt.Errorf("unable to create json encoder: %w", err)
 		}
@@ -227,18 +225,12 @@ func displayBlock[B firecore.Block](pbBlock *pbbstream.Block, chain *firecore.Ch
 		return nil
 	}
 
-	isLegacyBlock := pbBlock.Payload == nil
 	if !chain.CoreBinaryEnabled {
 		// since we are running via the chain specific binary (i.e. fireeth) we can use a BlockFactory
 		marshallableBlock := chain.BlockFactory()
-		if isLegacyBlock {
-			if err := proto.Unmarshal(pbBlock.GetPayloadBuffer(), marshallableBlock); err != nil {
-				return fmt.Errorf("unmarshal legacy block payload to protocol block: %w", err)
-			}
-		} else {
-			if err := pbBlock.Payload.UnmarshalTo(marshallableBlock); err != nil {
-				return fmt.Errorf("pbBlock payload unmarshal: %w", err)
-			}
+
+		if err := pbBlock.Payload.UnmarshalTo(marshallableBlock); err != nil {
+			return fmt.Errorf("pbBlock payload unmarshal: %w", err)
 		}
 
 		err := encoder.Marshal(marshallableBlock)
@@ -247,12 +239,8 @@ func displayBlock[B firecore.Block](pbBlock *pbbstream.Block, chain *firecore.Ch
 		}
 		return nil
 	}
+
 	// since we are running directly the firecore binary we will *NOT* use the BlockFactory
-
-	if isLegacyBlock {
-		return encoder.MarshalLegacy(pbBlock.GetPayloadKind(), pbBlock.GetPayloadBuffer())
-	}
-
 	return encoder.Marshal(pbBlock.Payload)
 }
 
@@ -279,12 +267,16 @@ func PrintBStreamBlock(b *pbbstream.Block, printTransactions bool, out io.Writer
 	return nil
 }
 
-func setupJsonEncoder(cmd *cobra.Command) (*jsonencoder.Encoder, error) {
-	protoPaths := sflags.MustGetStringSlice(cmd, "proto-paths")
+func SetupJsonEncoder(cmd *cobra.Command) (*jsonencoder.Encoder, error) {
 	pbregistry := protoregistry.New()
-	if err := pbregistry.RegisterFiles(protoPaths); err != nil {
-		return nil, fmt.Errorf("unable to create dynamic printer: %w", err)
+	protoPaths := sflags.MustGetStringSlice(cmd, "proto-paths")
+	if len(protoPaths) > 0 {
+		if err := pbregistry.RegisterFiles(protoPaths); err != nil {
+			return nil, fmt.Errorf("unable to create dynamic printer: %w", err)
+		}
 	}
+
+	pbregistry.Extends(protoregistry.WellKnownRegistry)
 
 	options := []jsonencoder.Option{
 		jsonencoder.WithBytesAsHex(),

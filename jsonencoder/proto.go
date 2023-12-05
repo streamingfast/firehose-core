@@ -9,7 +9,7 @@ import (
 )
 
 func (e *Encoder) protoAny(encoder *jsontext.Encoder, t *anypb.Any, options json.Options) error {
-	msg, err := e.files.Unmarshall(t.TypeUrl, t.Value)
+	msg, err := e.protoRegistry.Unmarshall(t.TypeUrl, t.Value)
 	if err != nil {
 		return fmt.Errorf("unmarshalling proto any: %w", err)
 	}

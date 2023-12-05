@@ -2,30 +2,29 @@ package protoregistry
 
 import (
 	"fmt"
-	"sync"
-
-	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-
-	"github.com/jhump/protoreflect/dynamic"
+	"strings"
 
 	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/dynamic"
 )
 
-// GlobalFiles is a global registry of file descriptors.
-var GlobalFiles *Files = new(Files)
+// Generate the flags based on Go code in this project directly, this however
+// creates a chicken & egg problem if there is compilation error within the project
+// but to fix them we must re-generate it.
+//go:generate go run ./generator well_known.go protoregistry
 
-type Files struct {
-	sync.RWMutex
+type Registry struct {
 	filesDescriptors []*desc.FileDescriptor
 }
 
-func New() *Files {
-	return &Files{
+func New() *Registry {
+	f := &Registry{
 		filesDescriptors: []*desc.FileDescriptor{},
 	}
+	return f
 }
 
-func (r *Files) RegisterFiles(files []string) error {
+func (r *Registry) RegisterFiles(files []string) error {
 	fileDescriptors, err := parseProtoFiles(files)
 	if err != nil {
 		return fmt.Errorf("parsing proto files: %w", err)
@@ -34,9 +33,13 @@ func (r *Files) RegisterFiles(files []string) error {
 	return nil
 }
 
-func (r *Files) Unmarshall(typeURL string, value []byte) (*dynamic.Message, error) {
+func (r *Registry) RegisterFileDescriptor(f *desc.FileDescriptor) {
+	r.filesDescriptors = append(r.filesDescriptors, f)
+}
+
+func (r *Registry) Unmarshall(typeURL string, value []byte) (*dynamic.Message, error) {
 	for _, fd := range r.filesDescriptors {
-		md := fd.FindSymbol(typeURL)
+		md := fd.FindSymbol(cleanTypeURL(typeURL))
 		if md != nil {
 			dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(md.(*desc.MessageDescriptor))
 			if err := dynMsg.Unmarshal(value); err != nil {
@@ -48,22 +51,10 @@ func (r *Files) Unmarshall(typeURL string, value []byte) (*dynamic.Message, erro
 	return nil, fmt.Errorf("no message descriptor in registry for  type url: %s", typeURL)
 }
 
-func (r *Files) UnmarshallLegacy(protocol pbbstream.Protocol, value []byte) (*dynamic.Message, error) {
-	return r.Unmarshall(legacyKindsToProtoType(protocol), value)
+func (r *Registry) Extends(registry *Registry) {
+	r.filesDescriptors = append(r.filesDescriptors, registry.filesDescriptors...)
 }
 
-func legacyKindsToProtoType(protocol pbbstream.Protocol) string {
-	switch protocol {
-	case pbbstream.Protocol_EOS:
-		return "sf.antelope.type.v1.Block"
-	case pbbstream.Protocol_ETH:
-		return "sf.ethereum.type.v2.Block"
-	case pbbstream.Protocol_SOLANA:
-		return "sf.solana.type.v1.Block"
-	case pbbstream.Protocol_NEAR:
-		return "sf.near.type.v1.Block"
-	case pbbstream.Protocol_COSMOS:
-		return "sf.cosmos.type.v1.Block"
-	}
-	panic("unaligned protocol")
+func cleanTypeURL(in string) string {
+	return strings.Replace(in, "type.googleapis.com/", "", 1)
 }
