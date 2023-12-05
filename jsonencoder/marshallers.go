@@ -39,7 +39,6 @@ func setBytesEncoder(typeURL string) {
 	if strings.Contains(typeURL, "solana") {
 		dynamic.SetDefaultBytesRepresentation(dynamic.BytesAsBase58)
 		return
-	} else {
-		dynamic.SetDefaultBytesRepresentation(dynamic.BytesAsHex)
 	}
+	dynamic.SetDefaultBytesRepresentation(dynamic.BytesAsHex)
 }
