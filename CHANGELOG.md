@@ -8,10 +8,11 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v0.2.4
 
 * Fixed SF_TRACING feature (regression broke the ability to specify a tracing endpoint)
 * Firehose connections rate-limiting will now force a delay of between 1 and 4 seconds (random value)  before refusing a connection when under heavy load
+* Fixed substreams GRPC/Connect error codes not propagating correctly
 
 ## v0.2.3
 
