@@ -19,8 +19,8 @@ func (e *Encoder) anypb(encoder *jsontext.Encoder, t *anypb.Any, options json.Op
 	if err != nil {
 		return fmt.Errorf("unmarshalling proto any: %w", err)
 	}
-	setBytesEncoder(t.TypeUrl)
-	cnt, err := json.Marshal(msg, json.WithMarshalers(json.NewMarshalers(e.marshallers...)))
+
+	cnt, err := json.Marshal(msg, json.WithMarshalers(e.getMarshallers(t.TypeUrl)))
 	if err != nil {
 		return fmt.Errorf("json marshalling proto any: %w", err)
 	}
@@ -35,10 +35,18 @@ func (e *Encoder) hexBytes(encoder *jsontext.Encoder, t []byte, options json.Opt
 	return encoder.WriteToken(jsontext.String(hex.EncodeToString(t)))
 }
 
-func setBytesEncoder(typeURL string) {
+func (e *Encoder) getMarshallers(typeURL string) *json.Marshalers {
+	out := []*json.Marshalers{
+		json.MarshalFuncV2(e.anypb),
+	}
+
 	if strings.Contains(typeURL, "solana") {
 		dynamic.SetDefaultBytesRepresentation(dynamic.BytesAsBase58)
-		return
+		out = append(out, json.MarshalFuncV2(e.base58Bytes))
+		return json.NewMarshalers(out...)
 	}
+
 	dynamic.SetDefaultBytesRepresentation(dynamic.BytesAsHex)
+	out = append(out, json.MarshalFuncV2(e.hexBytes))
+	return json.NewMarshalers(out...)
 }
