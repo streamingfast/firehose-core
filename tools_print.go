@@ -16,11 +16,6 @@ package firecore
 
 import (
 	"fmt"
-	"github.com/go-json-experiment/json"
-	"github.com/go-json-experiment/json/jsontext"
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/desc/protoparse"
-	"github.com/jhump/protoreflect/dynamic"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
@@ -32,10 +27,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"io"
 	"os"
-	"os/user"
-	"path/filepath"
 	"strconv"
-	"strings"
 )
 
 var toolsPrintCmd = &cobra.Command{
@@ -257,97 +249,10 @@ func displayBlock[B Block](pbBlock *pbbstream.Block, chain *Chain[B], outputMode
 	// since we are running directly the firecore binary we will *NOT* use the BlockFactory
 
 	if isLegacyBlock {
-		return jencoder.MarshalLegacy(legacyKindsToProtoType(pbBlock.GetPayloadKind()), pbBlock.GetPayloadBuffer())
+		return jencoder.MarshalLegacy(pbBlock.GetPayloadKind(), pbBlock.GetPayloadBuffer())
 	}
 
 	return jencoder.Marshal(pbBlock.Payload)
-}
-
-type dynamicPrinter struct {
-	fileDescriptors []*desc.FileDescriptor
-}
-
-func newDynamicPrinter(importPaths []string) (*dynamicPrinter, error) {
-	fileDescriptors, err := parseProtoFiles(importPaths)
-	if err != nil {
-		return nil, fmt.Errorf("parsing proto files: %w", err)
-	}
-	return &dynamicPrinter{
-		fileDescriptors: fileDescriptors,
-	}, nil
-}
-
-func parseProtoFiles(importPaths []string) (fds []*desc.FileDescriptor, err error) {
-	usr, err := user.Current()
-	if err != nil {
-		return nil, fmt.Errorf("getting current user: %w", err)
-	}
-	userDir := usr.HomeDir
-
-	var ip []string
-	for _, importPath := range importPaths {
-		if importPath == "~" {
-			importPath = userDir
-		} else if strings.HasPrefix(importPath, "~/") {
-			importPath = filepath.Join(userDir, importPath[2:])
-		}
-
-		importPath, err = filepath.Abs(importPath)
-		if err != nil {
-			return nil, fmt.Errorf("getting absolute path for %q: %w", importPath, err)
-		}
-
-		if !strings.HasSuffix(importPath, "/") {
-			importPath += "/"
-		}
-		ip = append(ip, importPath)
-	}
-
-	parser := protoparse.Parser{
-		ImportPaths: ip,
-	}
-
-	var protoFiles []string
-	for _, importPath := range ip {
-		err := filepath.Walk(importPath,
-			func(path string, info os.FileInfo, err error) error {
-				if err != nil {
-					return err
-				}
-				if strings.HasSuffix(path, ".proto") && !info.IsDir() {
-					protoFiles = append(protoFiles, strings.TrimPrefix(path, importPath))
-				}
-				return nil
-			})
-		if err != nil {
-			return nil, fmt.Errorf("walking import path %q: %w", importPath, err)
-		}
-	}
-
-	fds, err = parser.ParseFiles(protoFiles...)
-	if err != nil {
-		return nil, fmt.Errorf("parsing proto files: %w", err)
-	}
-	return
-
-}
-
-func (d *dynamicPrinter) printBlock(blkTypeURL string, blkPayload []byte, encoder *jsontext.Encoder, marshalers *json.Marshalers) error {
-	for _, fd := range d.fileDescriptors {
-		md := fd.FindSymbol(blkTypeURL)
-		if md != nil {
-			dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(md.(*desc.MessageDescriptor))
-			if err := dynMsg.Unmarshal(blkPayload); err != nil {
-				return fmt.Errorf("unmarshalling block: %w", err)
-			}
-			err := json.MarshalEncode(encoder, dynMsg, json.WithMarshalers(marshalers))
-			if err != nil {
-				return fmt.Errorf("pbBlock JSON printing: json marshal: %w", err)
-			}
-			return nil
-		}
-	}
-	return fmt.Errorf("no message descriptor in proto paths for type url %q", blkTypeURL)
 }
 
 func printBStreamBlock(b *pbbstream.Block, printTransactions bool, out io.Writer) error {
@@ -371,22 +276,6 @@ func printBStreamBlock(b *pbbstream.Block, printTransactions bool, out io.Writer
 	}
 
 	return nil
-}
-
-func legacyKindsToProtoType(protocol pbbstream.Protocol) string {
-	switch protocol {
-	case pbbstream.Protocol_EOS:
-		return "sf.antelope.type.v1.Block"
-	case pbbstream.Protocol_ETH:
-		return "sf.ethereum.type.v2.Block"
-	case pbbstream.Protocol_SOLANA:
-		return "sf.solana.type.v1.Block"
-	case pbbstream.Protocol_NEAR:
-		return "sf.near.type.v1.Block"
-	case pbbstream.Protocol_COSMOS:
-		return "sf.cosmos.type.v1.Block"
-	}
-	panic("unaligned protocol")
 }
 
 func setupJsonEncoder(cmd *cobra.Command) (*jsonencoder.Encoder, error) {

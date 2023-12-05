@@ -108,7 +108,6 @@ func getFirehoseClientE[B Block](chain *Chain[B], logger *zap.Logger) func(cmd *
 
 			// async process the response
 			go func() {
-
 				line, err := jsonpb.MarshalToString(response)
 				if err != nil {
 					rootLog.Error("marshalling to string", zap.Error(err))

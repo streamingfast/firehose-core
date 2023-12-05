@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+
 	"github.com/streamingfast/firehose-core/protoregistry"
 
 	"github.com/go-json-experiment/json"
@@ -36,8 +38,8 @@ func (e *Encoder) Marshal(in any) error {
 	return json.MarshalEncode(e.e, in, json.WithMarshalers(json.NewMarshalers(e.marshallers...)))
 }
 
-func (e *Encoder) MarshalLegacy(typeURL string, value []byte) error {
-	msg, err := e.files.Unmarshall(typeURL, value)
+func (e *Encoder) MarshalLegacy(protocol pbbstream.Protocol, value []byte) error {
+	msg, err := e.files.UnmarshallLegacy(protocol, value)
 	if err != nil {
 		return fmt.Errorf("unmarshalling proto any: %w", err)
 	}

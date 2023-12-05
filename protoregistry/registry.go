@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+
 	"github.com/jhump/protoreflect/dynamic"
 
 	"github.com/jhump/protoreflect/desc"
@@ -44,4 +46,24 @@ func (r *Files) Unmarshall(typeURL string, value []byte) (*dynamic.Message, erro
 		}
 	}
 	return nil, fmt.Errorf("no message descriptor in registry for  type url: %s", typeURL)
+}
+
+func (r *Files) UnmarshallLegacy(protocol pbbstream.Protocol, value []byte) (*dynamic.Message, error) {
+	return r.Unmarshall(legacyKindsToProtoType(protocol), value)
+}
+
+func legacyKindsToProtoType(protocol pbbstream.Protocol) string {
+	switch protocol {
+	case pbbstream.Protocol_EOS:
+		return "sf.antelope.type.v1.Block"
+	case pbbstream.Protocol_ETH:
+		return "sf.ethereum.type.v2.Block"
+	case pbbstream.Protocol_SOLANA:
+		return "sf.solana.type.v1.Block"
+	case pbbstream.Protocol_NEAR:
+		return "sf.near.type.v1.Block"
+	case pbbstream.Protocol_COSMOS:
+		return "sf.cosmos.type.v1.Block"
+	}
+	panic("unaligned protocol")
 }

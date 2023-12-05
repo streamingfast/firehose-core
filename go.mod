@@ -37,6 +37,7 @@ require (
 )
 
 require (
+	github.com/bufbuild/protocompile v0.4.0 // indirect
 	github.com/google/s2a-go v0.1.4 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230711160842-782d3b101e98 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98 // indirect
@@ -223,4 +224,5 @@ require (
 replace (
 	github.com/ShinyTrinkets/overseer => github.com/streamingfast/overseer v0.2.1-0.20210326144022-ee491780e3ef
 	github.com/bytecodealliance/wasmtime-go/v4 => github.com/streamingfast/wasmtime-go/v4 v4.0.0-freemem3
+	github.com/jhump/protoreflect => github.com/streamingfast/protoreflect v0.0.0-20230414203421-018294174fdc
 )
