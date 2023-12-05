@@ -1,4 +1,4 @@
-package tools
+package check
 
 import (
 	"context"
@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-
 	"github.com/streamingfast/bstream"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/firehose-core/types"
 )
 
 type blockRef struct {
@@ -41,13 +41,13 @@ func CheckMergedBlocksBatch(
 	sourceStoreURL string,
 	destStoreURL string,
 	fileBlockSize uint64,
-	blockRange BlockRange,
+	blockRange types.BlockRange,
 ) error {
 	if !blockRange.IsResolved() {
 		return fmt.Errorf("check merged blocks can only work with fully resolved range, got %s", blockRange)
 	}
 
-	expected := RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize)
+	expected := types.RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize)
 	fileBlockSize64 := uint64(fileBlockSize)
 
 	blocksStore, err := dstore.NewDBinStore(sourceStoreURL)
@@ -62,7 +62,7 @@ func CheckMergedBlocksBatch(
 		}
 	}
 
-	var firstFilename = fmt.Sprintf("%010d", RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize))
+	var firstFilename = fmt.Sprintf("%010d", types.RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize))
 
 	lastSeenBlock := &blockRef{}
 
@@ -103,12 +103,15 @@ func CheckMergedBlocksBatch(
 					destStore.WriteObject(ctx, outputFile, strings.NewReader(""))
 				}
 			} else {
-				brokenSince := RoundToBundleStartBlock(uint64(lastSeenBlock.num+1), 100)
+				brokenSince := types.RoundToBundleStartBlock(uint64(lastSeenBlock.num+1), 100)
 				for i := brokenSince; i <= baseNum; i += fileBlockSize64 {
 					fmt.Printf("found broken file %q, %s\n", filename, details)
 					if destStore != nil {
 						outputFile := fmt.Sprintf("%010d.broken", i)
-						destStore.WriteObject(ctx, outputFile, strings.NewReader(""))
+						err := destStore.WriteObject(ctx, outputFile, strings.NewReader(""))
+						if err != nil {
+							return fmt.Errorf("unable to write broken file %q: %w", outputFile, err)
+						}
 					}
 				}
 			}
@@ -120,7 +123,7 @@ func CheckMergedBlocksBatch(
 			return err
 		}
 
-		if blockRange.IsClosed() && RoundToBundleEndBlock(baseNum, fileBlockSize) >= *blockRange.Stop-1 {
+		if blockRange.IsClosed() && types.RoundToBundleEndBlock(baseNum, fileBlockSize) >= *blockRange.Stop-1 {
 			return dstore.StopIteration
 		}
 		expected = baseNum + fileBlockSize64

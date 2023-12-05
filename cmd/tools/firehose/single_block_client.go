@@ -1,4 +1,4 @@
-package tools
+package firehose
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 )
 
 // You should add your custom 'transforms' flags to this command in your init(), then parse them in transformsSetter
-func newToolsFirehoseSingleBlockClientCmd[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Logger, tracer logging.Tracer) *cobra.Command {
+func NewToolsFirehoseSingleBlockClientCmd[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Logger, tracer logging.Tracer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "firehose-single-block-client {endpoint} {block_num|block_num:block_id|cursor}",
 		Short: "fetch a single block from firehose and print as JSON",

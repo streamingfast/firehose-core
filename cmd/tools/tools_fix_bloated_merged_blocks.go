@@ -9,6 +9,8 @@ import (
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
+	"github.com/streamingfast/firehose-core/cmd/tools/check"
+	"github.com/streamingfast/firehose-core/types"
 	"go.uber.org/zap"
 )
 
@@ -35,12 +37,12 @@ func runFixBloatedMergedBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 			return fmt.Errorf("unable to create destination store: %w", err)
 		}
 
-		blockRange, err := GetBlockRangeFromArg(args[2])
+		blockRange, err := types.GetBlockRangeFromArg(args[2])
 		if err != nil {
 			return fmt.Errorf("parsing block range: %w", err)
 		}
 
-		err = srcStore.Walk(ctx, WalkBlockPrefix(blockRange, 100), func(filename string) error {
+		err = srcStore.Walk(ctx, check.WalkBlockPrefix(blockRange, 100), func(filename string) error {
 			zlog.Debug("checking merged block file", zap.String("filename", filename))
 
 			startBlock := mustParseUint64(filename)
@@ -66,10 +68,10 @@ func runFixBloatedMergedBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 				return fmt.Errorf("creating block reader: %w", err)
 			}
 
-			mergeWriter := &mergedBlocksWriter{
-				store:      destStore,
-				tweakBlock: func(b *pbbstream.Block) (*pbbstream.Block, error) { return b, nil },
-				logger:     zlog,
+			mergeWriter := &firecore.MergedBlocksWriter{
+				Store:      destStore,
+				TweakBlock: func(b *pbbstream.Block) (*pbbstream.Block, error) { return b, nil },
+				Logger:     zlog,
 			}
 
 			seen := make(map[string]bool)
@@ -84,11 +86,11 @@ func runFixBloatedMergedBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 					break
 				}
 
-				if block.Number < uint64(startBlock) {
+				if block.Number < startBlock {
 					continue
 				}
 
-				if block.Number > uint64(blockRange.GetStopBlockOr(MaxUint64)) {
+				if block.Number > blockRange.GetStopBlockOr(MaxUint64) {
 					break
 				}
 

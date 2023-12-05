@@ -8,8 +8,6 @@ import (
 
 	"github.com/streamingfast/firehose-core/cmd/tools"
 
-	"github.com/streamingfast/firehose-core/cmd/apps"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -24,6 +22,8 @@ import (
 	dmeteringgrpc "github.com/streamingfast/dmetering/grpc"
 	dmeteringlogger "github.com/streamingfast/dmetering/logger"
 	firecore "github.com/streamingfast/firehose-core"
+	"github.com/streamingfast/firehose-core/cmd/apps"
+
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 )

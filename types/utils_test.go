@@ -1,4 +1,4 @@
-package tools
+package types
 
 import (
 	"testing"
@@ -57,7 +57,7 @@ func Test_readBlockRange(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseBlockRange(tt.args.blockRangeArg, tt.args.chainFirstStreamableBlock)
+			got, err := ParseBlockRange(tt.args.blockRangeArg, tt.args.chainFirstStreamableBlock)
 
 			if tt.assertion == nil {
 				tt.assertion = require.NoError

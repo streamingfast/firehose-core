@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tools
+package print
 
 import (
 	"fmt"
 	"io"
 	"os"
 	"strconv"
+
+	"github.com/streamingfast/firehose-core/types"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
@@ -31,25 +33,23 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var toolsPrintCmd = &cobra.Command{
-	Use:   "print",
-	Short: "Prints of one block or merged blocks file",
-}
+func NewToolsPrintCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra.Command {
+	toolsPrintCmd := &cobra.Command{
+		Use:   "print",
+		Short: "Prints of one block or merged blocks file",
+	}
 
-var toolsPrintOneBlockCmd = &cobra.Command{
-	Use:   "one-block <store> <block_num>",
-	Short: "Prints a block from a one-block file",
-	Args:  cobra.ExactArgs(2),
-}
+	toolsPrintOneBlockCmd := &cobra.Command{
+		Use:   "one-block <store> <block_num>",
+		Short: "Prints a block from a one-block file",
+		Args:  cobra.ExactArgs(2),
+	}
 
-var toolsPrintMergedBlocksCmd = &cobra.Command{
-	Use:   "merged-blocks <store> <start_block>",
-	Short: "Prints the content summary of a merged blocks file.",
-	Args:  cobra.ExactArgs(2),
-}
-
-func init() {
-	ToolsCmd.AddCommand(toolsPrintCmd)
+	toolsPrintMergedBlocksCmd := &cobra.Command{
+		Use:   "merged-blocks <store> <start_block>",
+		Short: "Prints the content summary of a merged blocks file.",
+		Args:  cobra.ExactArgs(2),
+	}
 
 	toolsPrintCmd.AddCommand(toolsPrintOneBlockCmd)
 	toolsPrintCmd.AddCommand(toolsPrintMergedBlocksCmd)
@@ -57,11 +57,11 @@ func init() {
 	toolsPrintCmd.PersistentFlags().StringP("output", "o", "text", "Output mode for block printing, either 'text', 'json' or 'jsonl'")
 	toolsPrintCmd.PersistentFlags().StringSlice("proto-paths", []string{"~/.proto"}, "Paths to proto files to use for dynamic decoding of blocks")
 	toolsPrintCmd.PersistentFlags().Bool("transactions", false, "When in 'text' output mode, also print transactions summary")
-}
 
-func configureToolsPrintCmd[B firecore.Block](chain *firecore.Chain[B]) {
 	toolsPrintOneBlockCmd.RunE = createToolsPrintOneBlockE(chain)
 	toolsPrintMergedBlocksCmd.RunE = createToolsPrintMergedBlocksE(chain)
+
+	return toolsPrintCmd
 }
 
 func createToolsPrintMergedBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.CommandExecutor {
@@ -85,7 +85,7 @@ func createToolsPrintMergedBlocksE[B firecore.Block](chain *firecore.Chain[B]) f
 		if err != nil {
 			return fmt.Errorf("invalid base block %q: %w", args[1], err)
 		}
-		blockBoundary := RoundToBundleStartBlock(startBlock, 100)
+		blockBoundary := types.RoundToBundleStartBlock(startBlock, 100)
 
 		filename := fmt.Sprintf("%010d", blockBoundary)
 		reader, err := store.OpenObject(ctx, filename)
@@ -215,13 +215,13 @@ func toolsPrintCmdGetOutputMode(cmd *cobra.Command) (PrintOutputMode, error) {
 	return out, nil
 }
 
-func displayBlock[B firecore.Block](pbBlock *pbbstream.Block, chain *firecore.Chain[B], outputMode PrintOutputMode, printTransactions bool, jencoder *jsonencoder.Encoder) error {
+func displayBlock[B firecore.Block](pbBlock *pbbstream.Block, chain *firecore.Chain[B], outputMode PrintOutputMode, printTransactions bool, encoder *jsonencoder.Encoder) error {
 	if pbBlock == nil {
 		return fmt.Errorf("block is nil")
 	}
 
 	if outputMode == PrintOutputModeText {
-		if err := printBStreamBlock(pbBlock, printTransactions, os.Stdout); err != nil {
+		if err := PrintBStreamBlock(pbBlock, printTransactions, os.Stdout); err != nil {
 			return fmt.Errorf("pbBlock text printing: %w", err)
 		}
 		return nil
@@ -241,7 +241,7 @@ func displayBlock[B firecore.Block](pbBlock *pbbstream.Block, chain *firecore.Ch
 			}
 		}
 
-		err := jencoder.Marshal(marshallableBlock)
+		err := encoder.Marshal(marshallableBlock)
 		if err != nil {
 			return fmt.Errorf("pbBlock JSON printing: json marshal: %w", err)
 		}
@@ -250,13 +250,13 @@ func displayBlock[B firecore.Block](pbBlock *pbbstream.Block, chain *firecore.Ch
 	// since we are running directly the firecore binary we will *NOT* use the BlockFactory
 
 	if isLegacyBlock {
-		return jencoder.MarshalLegacy(pbBlock.GetPayloadKind(), pbBlock.GetPayloadBuffer())
+		return encoder.MarshalLegacy(pbBlock.GetPayloadKind(), pbBlock.GetPayloadBuffer())
 	}
 
-	return jencoder.Marshal(pbBlock.Payload)
+	return encoder.Marshal(pbBlock.Payload)
 }
 
-func printBStreamBlock(b *pbbstream.Block, printTransactions bool, out io.Writer) error {
+func PrintBStreamBlock(b *pbbstream.Block, printTransactions bool, out io.Writer) error {
 	_, err := out.Write(
 		[]byte(
 			fmt.Sprintf(

@@ -1,4 +1,4 @@
-package tools
+package types
 
 import (
 	"fmt"
@@ -26,7 +26,7 @@ func PrettyBlockNum(b uint64) string {
 	return "#" + strings.ReplaceAll(humanize.Comma(int64(b)), ",", " ")
 }
 
-func parseBlockRange(input string, firstStreamableBlock uint64) (out BlockRange, err error) {
+func ParseBlockRange(input string, firstStreamableBlock uint64) (out BlockRange, err error) {
 	if input == "" || input == "-1" {
 		return NewOpenRange(-1), nil
 	}

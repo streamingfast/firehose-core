@@ -1,4 +1,4 @@
-package tools
+package firehose
 
 import (
 	"context"
@@ -22,7 +22,7 @@ var lastBlockReceived time.Time
 var driftSec = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "firehose_healthcheck_drift", Help: "Time since the most recent block received (seconds)"}, []string{"endpoint"})
 
 // You should add your custom 'transforms' flags to this command in your init(), then parse them in transformsSetter
-func newToolsFirehosePrometheusExporterCmd[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Logger, tracer logging.Tracer) *cobra.Command {
+func NewToolsFirehosePrometheusExporterCmd[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Logger, tracer logging.Tracer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "firehose-prometheus-exporter <endpoint:port>",
 		Short: "stream blocks near the chain HEAD and report to prometheus",

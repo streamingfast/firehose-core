@@ -12,15 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tools
+package check
 
 import (
 	"fmt"
 	"strings"
-
-	"go.uber.org/zap"
-
-	firecore "github.com/streamingfast/firehose-core"
 
 	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
@@ -28,29 +24,35 @@ import (
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
+	firecore "github.com/streamingfast/firehose-core"
+	"github.com/streamingfast/firehose-core/types"
+	"go.uber.org/zap"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 )
 
-var toolsCheckCmd = &cobra.Command{Use: "check", Short: "Various checks for deployment, data integrity & debugging"}
+func NewCheckCommand[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) *cobra.Command {
 
-var toolsCheckForksCmd = &cobra.Command{
-	Use:   "forks <forked-blocks-store-url>",
-	Short: "Reads all forked blocks you have and print longest linkable segments for each fork",
-	Args:  cobra.ExactArgs(1),
-}
+	toolsCheckCmd := &cobra.Command{Use: "check", Short: "Various checks for deployment, data integrity & debugging"}
 
-var toolsCheckMergedBlocksCmd = &cobra.Command{
-	// TODO: Not sure, it's now a required thing, but we could probably use the same logic as `start`
-	//       and avoid altogether passing the args. If this would also load the config and everything else,
-	//       that would be much more seamless!
-	Use:   "merged-blocks <store-url>",
-	Short: "Checks for any holes in merged blocks as well as ensuring merged blocks integrity",
-	Args:  cobra.ExactArgs(1),
-}
+	toolsCheckForksCmd := &cobra.Command{
+		Use:   "forks <forked-blocks-store-url>",
+		Short: "Reads all forked blocks you have and print longest linkable segments for each fork",
+		Args:  cobra.ExactArgs(1),
+	}
 
-func init() {
-	ToolsCmd.AddCommand(toolsCheckCmd)
+	var (
+		toolsCheckMergedBlocksCmd = &cobra.Command{
+			// TODO: Not sure, it's now a required thing, but we could probably use the same logic as `start`
+			//       and avoid altogether passing the args. If this would also load the config and everything else,
+			//       that would be much more seamless!
+			Use:   "merged-blocks <store-url>",
+			Short: "Checks for any holes in merged blocks as well as ensuring merged blocks integrity",
+			Args:  cobra.ExactArgs(1),
+		}
+	)
+
+	toolsCheckCmd.AddCommand(newCheckMergedBlockBatchCmd())
 	toolsCheckCmd.AddCommand(toolsCheckForksCmd)
 	toolsCheckCmd.AddCommand(toolsCheckMergedBlocksCmd)
 
@@ -61,9 +63,7 @@ func init() {
 
 	toolsCheckForksCmd.Flags().Uint64("min-depth", 1, "Only show forks that are at least this deep")
 	toolsCheckForksCmd.Flags().Uint64("after-block", 0, "Only show forks that happened after this block number, if value is not 0")
-}
 
-func configureToolsCheckCmd[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) {
 	toolsCheckMergedBlocksCmd.RunE = createToolsCheckMergedBlocksE(chain, rootLog)
 	toolsCheckMergedBlocksCmd.Example = firecore.ExamplePrefixed(chain, "tools check merged-blocks", `
 		"./sf-data/storage/merged-blocks"
@@ -73,6 +73,8 @@ func configureToolsCheckCmd[B firecore.Block](chain *firecore.Chain[B], rootLog 
 	`)
 
 	toolsCheckForksCmd.RunE = toolsCheckForksE
+
+	return toolsCheckCmd
 }
 
 func createToolsCheckMergedBlocksE[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) firecore.CommandExecutor {
@@ -80,7 +82,7 @@ func createToolsCheckMergedBlocksE[B firecore.Block](chain *firecore.Chain[B], r
 		storeURL := args[0]
 		fileBlockSize := uint64(100)
 
-		blockRange, err := GetBlockRangeFromFlag(cmd, "range")
+		blockRange, err := types.GetBlockRangeFromFlag(cmd, "range")
 		if err != nil {
 			return err
 		}

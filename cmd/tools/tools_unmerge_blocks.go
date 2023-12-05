@@ -5,6 +5,9 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/streamingfast/firehose-core/cmd/tools/check"
+	"github.com/streamingfast/firehose-core/types"
+
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
@@ -37,12 +40,12 @@ func runUnmergeBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 			return fmt.Errorf("unable to create destination store: %w", err)
 		}
 
-		blockRange, err := GetBlockRangeFromArg(args[2])
+		blockRange, err := types.GetBlockRangeFromArg(args[2])
 		if err != nil {
 			return fmt.Errorf("parsing block range: %w", err)
 		}
 
-		err = srcStore.Walk(ctx, WalkBlockPrefix(blockRange, 100), func(filename string) error {
+		err = srcStore.Walk(ctx, check.WalkBlockPrefix(blockRange, 100), func(filename string) error {
 			zlog.Debug("checking merged block file", zap.String("filename", filename))
 
 			startBlock := mustParseUint64(filename)

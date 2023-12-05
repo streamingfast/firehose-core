@@ -31,6 +31,8 @@ import (
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
+	"github.com/streamingfast/firehose-core/cmd/tools/check"
+	"github.com/streamingfast/firehose-core/types"
 	"go.uber.org/multierr"
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
@@ -82,7 +84,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 		warnAboutExtraBlocks := sync.Once{}
 
 		ctx := cmd.Context()
-		blockRange, err := GetBlockRangeFromArg(args[2])
+		blockRange, err := types.GetBlockRangeFromArg(args[2])
 		if err != nil {
 			return fmt.Errorf("parsing range: %w", err)
 		}
@@ -103,7 +105,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 			return fmt.Errorf("unable to create store at path %q: %w", args[1], err)
 		}
 
-		segments, err := blockRange.Split(segmentSize, EndBoundaryExclusive)
+		segments, err := blockRange.Split(segmentSize, types.EndBoundaryExclusive)
 		if err != nil {
 			return fmt.Errorf("unable to split blockrage in segments: %w", err)
 		}
@@ -111,7 +113,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 			segments: segments,
 		}
 
-		err = storeReference.Walk(ctx, WalkBlockPrefix(blockRange, 100), func(filename string) (err error) {
+		err = storeReference.Walk(ctx, check.WalkBlockPrefix(blockRange, 100), func(filename string) (err error) {
 			fileStartBlock, err := strconv.Atoi(filename)
 			if err != nil {
 				return fmt.Errorf("parsing filename: %w", err)
@@ -122,7 +124,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 				return dstore.StopIteration
 			}
 
-			if blockRange.Contains(uint64(fileStartBlock), EndBoundaryExclusive) {
+			if blockRange.Contains(uint64(fileStartBlock), types.EndBoundaryExclusive) {
 				var wg sync.WaitGroup
 				var bundleErrLock sync.Mutex
 				var bundleReadErr error
@@ -247,7 +249,7 @@ func readBundle[B firecore.Block](
 }
 
 type state struct {
-	segments                   []BlockRange
+	segments                   []types.BlockRange
 	currentSegmentIdx          int
 	blocksCountedInThisSegment int
 	differencesFound           int
@@ -256,10 +258,10 @@ type state struct {
 }
 
 func (s *state) process(blockNum uint64, isDifferent bool, isMissing bool) {
-	if !s.segments[s.currentSegmentIdx].Contains(blockNum, EndBoundaryExclusive) { // moving forward
+	if !s.segments[s.currentSegmentIdx].Contains(blockNum, types.EndBoundaryExclusive) { // moving forward
 		s.print()
 		for i := s.currentSegmentIdx; i < len(s.segments); i++ {
-			if s.segments[i].Contains(blockNum, EndBoundaryExclusive) {
+			if s.segments[i].Contains(blockNum, types.EndBoundaryExclusive) {
 				s.currentSegmentIdx = i
 				s.totalBlocksCounted += s.blocksCountedInThisSegment
 				s.differencesFound = 0

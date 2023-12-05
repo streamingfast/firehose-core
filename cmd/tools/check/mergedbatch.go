@@ -12,25 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tools
+package check
 
 import (
 	"strconv"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli/sflags"
+	"github.com/streamingfast/firehose-core/types"
 )
 
-var toolsCheckMergedBlocksBatchCmd = &cobra.Command{
-	Use:   "merged-blocks-batch <store-url> <start> <stop>",
-	Short: "Checks for any missing, disordered or duplicate blocks in merged blocks files",
-	Args:  cobra.ExactArgs(3),
-	RunE:  checkMergedBlocksBatchRunE,
-}
-
-func init() {
-	toolsCheckCmd.AddCommand(toolsCheckMergedBlocksBatchCmd)
+func newCheckMergedBlockBatchCmd() *cobra.Command {
+	var toolsCheckMergedBlocksBatchCmd = &cobra.Command{
+		Use:   "merged-blocks-batch <store-url> <start> <stop>",
+		Short: "Checks for any missing, disordered or duplicate blocks in merged blocks files",
+		Args:  cobra.ExactArgs(3),
+		RunE:  checkMergedBlocksBatchRunE,
+	}
 	toolsCheckMergedBlocksBatchCmd.PersistentFlags().String("output-to-store", "", "If non-empty, an empty file called <blocknum>.broken will be created for every problematic merged-blocks-file. This is a convenient way to gather the results from multiple parallel processes.")
+	return toolsCheckMergedBlocksBatchCmd
+
 }
 
 func checkMergedBlocksBatchRunE(cmd *cobra.Command, args []string) error {
@@ -45,7 +46,7 @@ func checkMergedBlocksBatchRunE(cmd *cobra.Command, args []string) error {
 	}
 	fileBlockSize := uint64(100)
 
-	blockRange := BlockRange{
+	blockRange := types.BlockRange{
 		Start: int64(start),
 		Stop:  &stop,
 	}

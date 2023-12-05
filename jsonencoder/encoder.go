@@ -4,12 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-
-	"github.com/streamingfast/firehose-core/protoregistry"
-
 	"github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/firehose-core/protoregistry"
 )
 
 type Encoder struct {

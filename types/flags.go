@@ -1,4 +1,4 @@
-package tools
+package types
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 )
 
 func GetBlockRangeFromArg(in string) (out BlockRange, err error) {
-	return parseBlockRange(in, bstream.GetProtocolFirstStreamableBlock)
+	return ParseBlockRange(in, bstream.GetProtocolFirstStreamableBlock)
 }
 
 func GetBlockRangeFromFlag(cmd *cobra.Command, flagName string) (out BlockRange, err error) {
@@ -25,7 +25,7 @@ func GetBlockRangeFromFlag(cmd *cobra.Command, flagName string) (out BlockRange,
 		return out, fmt.Errorf("accepting a single range for now, got %d", len(rawRanges))
 	}
 
-	out, err = parseBlockRange(rawRanges[0], bstream.GetProtocolFirstStreamableBlock)
+	out, err = ParseBlockRange(rawRanges[0], bstream.GetProtocolFirstStreamableBlock)
 	if err != nil {
 		return out, fmt.Errorf("decode range: %w", err)
 	}

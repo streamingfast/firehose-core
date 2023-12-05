@@ -1,8 +1,9 @@
-package tools
+package firehose
 
 import (
 	"context"
 	"fmt"
+
 	"io"
 	"strconv"
 	"time"
@@ -18,7 +19,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func newToolsDownloadFromFirehoseCmd[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Logger) *cobra.Command {
+func NewToolsDownloadFromFirehoseCmd[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Logger) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "download-from-firehose <endpoint> <range> <destination>",
 		Short: "Download blocks from Firehose and save them to merged-blocks",
@@ -68,10 +69,10 @@ func createToolsDownloadFromFirehoseE[B firecore.Block](chain *firecore.Chain[B]
 			return err
 		}
 
-		mergeWriter := &mergedBlocksWriter{
-			store:      store,
-			tweakBlock: func(b *pbbstream.Block) (*pbbstream.Block, error) { return b, nil },
-			logger:     zlog,
+		mergeWriter := &firecore.MergedBlocksWriter{
+			Store:      store,
+			TweakBlock: func(b *pbbstream.Block) (*pbbstream.Block, error) { return b, nil },
+			Logger:     zlog,
 		}
 
 		approximateLIBWarningIssued := false
