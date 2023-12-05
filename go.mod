@@ -12,7 +12,7 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
-	github.com/streamingfast/bstream v0.0.2-0.20231205161519-9f4f0971b0cc
+	github.com/streamingfast/bstream v0.0.2-0.20231205163051-ade2f311eca3
 	github.com/streamingfast/cli v0.0.4-0.20230825151644-8cc84512cd80
 	github.com/streamingfast/dauth v0.0.0-20230929180355-921f9c9be330
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c

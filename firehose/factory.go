@@ -139,7 +139,6 @@ func (sf *StreamFactory) New(
 	ctx context.Context,
 	handler bstream.Handler,
 	request *pbfirehose.Request,
-	decodeBlock bool,
 	logger *zap.Logger) (*stream.Stream, error) {
 
 	reqLogger := logger.With(
@@ -160,8 +159,6 @@ func (sf *StreamFactory) New(
 	}
 	if preprocFunc != nil {
 		options = append(options, stream.WithPreprocessFunc(preprocFunc, StreamMergedBlocksPreprocThreads))
-	} else if decodeBlock {
-		panic("not supported anymore")
 	}
 	if blockIndexProvider != nil {
 		reqLogger = reqLogger.With(zap.Bool("with_index_provider", true))

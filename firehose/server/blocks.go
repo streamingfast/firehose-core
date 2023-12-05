@@ -221,7 +221,7 @@ func (s *Server) Blocks(request *pbfirehose.Request, streamSrv pbfirehose.Stream
 	}
 
 	ctx = s.initFunc(ctx, request)
-	str, err := s.streamFactory.New(ctx, handlerFunc, request, false, logger) // firehose always want decoded the blocks
+	str, err := s.streamFactory.New(ctx, handlerFunc, request, logger)
 	if err != nil {
 		return err
 	}
