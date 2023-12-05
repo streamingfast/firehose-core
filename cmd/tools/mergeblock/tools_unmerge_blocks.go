@@ -1,9 +1,8 @@
-package tools
+package mergeblock
 
 import (
 	"fmt"
 	"io"
-	"strconv"
 
 	"github.com/streamingfast/firehose-core/cmd/tools/check"
 	"github.com/streamingfast/firehose-core/types"
@@ -11,13 +10,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
 	"go.uber.org/zap"
 )
 
-func newToolsUnmergeBlocksCmd[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Logger) *cobra.Command {
+func NewToolsUnmergeBlocksCmd[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Logger) *cobra.Command {
 	return &cobra.Command{
 		Use:   "unmerge-blocks <src_merged_blocks_store> <dest_one_blocks_store> [<block_range>]",
 		Short: "Unmerges merged block files into one-block-files",
@@ -48,9 +46,9 @@ func runUnmergeBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 		err = srcStore.Walk(ctx, check.WalkBlockPrefix(blockRange, 100), func(filename string) error {
 			zlog.Debug("checking merged block file", zap.String("filename", filename))
 
-			startBlock := mustParseUint64(filename)
+			startBlock := firecore.MustParseUint64(filename)
 
-			if startBlock > uint64(blockRange.GetStopBlockOr(MaxUint64)) {
+			if startBlock > uint64(blockRange.GetStopBlockOr(firecore.MaxUint64)) {
 				zlog.Debug("skipping merged block file", zap.String("reason", "past stop block"), zap.String("filename", filename))
 				return dstore.StopIteration
 			}
@@ -82,7 +80,7 @@ func runUnmergeBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 					continue
 				}
 
-				if block.Number > uint64(blockRange.GetStopBlockOr(MaxUint64)) {
+				if block.Number > blockRange.GetStopBlockOr(firecore.MaxUint64) {
 					break
 				}
 
@@ -133,11 +131,4 @@ func runUnmergeBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 
 		return nil
 	}
-}
-
-func mustParseUint64(s string) uint64 {
-	i, err := strconv.Atoi(s)
-	cli.NoError(err, "Unable to parse %q as uint64", s)
-
-	return uint64(i)
 }

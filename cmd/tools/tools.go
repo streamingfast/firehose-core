@@ -17,6 +17,11 @@ package tools
 import (
 	"fmt"
 
+	"github.com/streamingfast/firehose-core/cmd/tools/fix"
+	"github.com/streamingfast/firehose-core/cmd/tools/mergeblock"
+
+	"github.com/streamingfast/firehose-core/cmd/tools/compare"
+
 	"github.com/spf13/cobra"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/cmd/tools/check"
@@ -38,16 +43,16 @@ func ConfigureToolsCmd[B firecore.Block](
 	ToolsCmd.AddCommand(check.NewCheckCommand(chain, logger))
 	ToolsCmd.AddCommand(print2.NewToolsPrintCmd(chain))
 
-	ToolsCmd.AddCommand(newToolsCompareBlocksCmd(chain))
+	ToolsCmd.AddCommand(compare.NewToolsCompareBlocksCmd(chain))
 	ToolsCmd.AddCommand(firehose.NewToolsDownloadFromFirehoseCmd(chain, logger))
 	ToolsCmd.AddCommand(firehose.NewToolsFirehoseClientCmd(chain, logger))
 	ToolsCmd.AddCommand(firehose.NewToolsFirehoseSingleBlockClientCmd(chain, logger, tracer))
 	ToolsCmd.AddCommand(firehose.NewToolsFirehosePrometheusExporterCmd(chain, logger, tracer))
-	ToolsCmd.AddCommand(newToolsUnmergeBlocksCmd(chain, logger))
-	ToolsCmd.AddCommand(newToolsFixBloatedMergedBlocks(chain, logger))
+	ToolsCmd.AddCommand(mergeblock.NewToolsUnmergeBlocksCmd(chain, logger))
+	ToolsCmd.AddCommand(fix.NewToolsFixBloatedMergedBlocks(chain, logger))
 
 	if chain.Tools.MergedBlockUpgrader != nil {
-		ToolsCmd.AddCommand(NewToolsUpgradeMergedBlocksCmd(chain, logger))
+		ToolsCmd.AddCommand(mergeblock.NewToolsUpgradeMergedBlocksCmd(chain, logger))
 	}
 
 	if chain.Tools.RegisterExtraCmd != nil {

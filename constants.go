@@ -3,6 +3,7 @@ package firecore
 // Those are `var` and globally available so that some chains to keep backward-compatibility can
 // change them. This is not advertised and should **not** be used by new chain.
 var (
+	MaxUint64 = ^uint64(0)
 	// Common ports
 	MetricsListenAddr string = ":9102"
 

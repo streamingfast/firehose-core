@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/streamingfast/cli"
@@ -71,4 +72,11 @@ var Example = func(in string) string {
 
 func ExamplePrefixed[B Block](chain *Chain[B], prefix, in string) string {
 	return string(cli.ExamplePrefixed(chain.BinaryName()+" "+prefix, in))
+}
+
+func MustParseUint64(s string) uint64 {
+	i, err := strconv.Atoi(s)
+	cli.NoError(err, "Unable to parse %q as uint64", s)
+
+	return uint64(i)
 }

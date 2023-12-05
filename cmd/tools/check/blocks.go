@@ -9,15 +9,13 @@ import (
 	"regexp"
 	"strconv"
 
-	print2 "github.com/streamingfast/firehose-core/cmd/tools/print"
-
-	"github.com/streamingfast/firehose-core/types"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
+	print2 "github.com/streamingfast/firehose-core/cmd/tools/print"
+	"github.com/streamingfast/firehose-core/types"
 	"go.uber.org/zap"
 )
 
@@ -29,7 +27,6 @@ const (
 	PrintNoDetails PrintDetails = iota
 	PrintStats
 	PrintFull
-	MaxUint64 = ^uint64(0)
 )
 
 func CheckMergedBlocks[B firecore.Block](ctx context.Context, chain *firecore.Chain[B], logger *zap.Logger, storeURL string, fileBlockSize uint64, blockRange types.BlockRange, printDetails PrintDetails) error {
@@ -42,7 +39,7 @@ func CheckMergedBlocks[B firecore.Block](ctx context.Context, chain *firecore.Ch
 	var expected uint64
 	var count int
 	var highestBlockSeen uint64
-	lowestBlockSeen := MaxUint64
+	lowestBlockSeen := firecore.MaxUint64
 
 	if !blockRange.IsResolved() {
 		return fmt.Errorf("check merged blocks can only work with fully resolved range, got %s", blockRange)
@@ -178,7 +175,7 @@ func validateBlockSegment[B firecore.Block](
 	printDetails PrintDetails,
 	tfdb *trackedForkDB,
 ) (lowestBlockSeen, highestBlockSeen uint64) {
-	lowestBlockSeen = MaxUint64
+	lowestBlockSeen = firecore.MaxUint64
 	reader, err := store.OpenObject(ctx, segment)
 	if err != nil {
 		fmt.Printf("❌ Unable to read blocks segment %s: %s\n", segment, err)

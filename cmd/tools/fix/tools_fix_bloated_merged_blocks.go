@@ -1,4 +1,4 @@
-package tools
+package fix
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func newToolsFixBloatedMergedBlocks[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Logger) *cobra.Command {
+func NewToolsFixBloatedMergedBlocks[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Logger) *cobra.Command {
 	return &cobra.Command{
 		Use:   "fix-bloated-merged-blocks <src_merged_blocks_store> <dest_one_blocks_store> [<block_range>]",
 		Short: "Fixes 'corrupted' merged-blocks that contain extraneous or duplicate blocks. Some older versions of the merger may have produce such bloated merged-blocks. All merged-blocks files in given range will be rewritten, regardless of if they were corrupted.",
@@ -45,9 +45,9 @@ func runFixBloatedMergedBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 		err = srcStore.Walk(ctx, check.WalkBlockPrefix(blockRange, 100), func(filename string) error {
 			zlog.Debug("checking merged block file", zap.String("filename", filename))
 
-			startBlock := mustParseUint64(filename)
+			startBlock := firecore.MustParseUint64(filename)
 
-			if startBlock > uint64(blockRange.GetStopBlockOr(MaxUint64)) {
+			if startBlock > uint64(blockRange.GetStopBlockOr(firecore.MaxUint64)) {
 				zlog.Debug("skipping merged block file", zap.String("reason", "past stop block"), zap.String("filename", filename))
 				return dstore.StopIteration
 			}
@@ -90,7 +90,7 @@ func runFixBloatedMergedBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 					continue
 				}
 
-				if block.Number > blockRange.GetStopBlockOr(MaxUint64) {
+				if block.Number > blockRange.GetStopBlockOr(firecore.MaxUint64) {
 					break
 				}
 

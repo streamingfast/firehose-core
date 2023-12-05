@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tools
+package compare
 
 import (
 	"bytes"
@@ -39,7 +39,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-func newToolsCompareBlocksCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra.Command {
+func NewToolsCompareBlocksCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "compare-blocks <reference_blocks_store> <current_blocks_store> [<block_range>]",
 		Short: "Checks for any differences between two block stores between a specified range. (To compare the likeness of two block ranges, for example)",
@@ -93,7 +93,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 			return fmt.Errorf("invalid block range, you must provide a closed range fully resolved (no negative value)")
 		}
 
-		stopBlock := uint64(blockRange.GetStopBlockOr(MaxUint64))
+		stopBlock := blockRange.GetStopBlockOr(firecore.MaxUint64)
 
 		// Create stores
 		storeReference, err := dstore.NewDBinStore(args[0])
@@ -281,7 +281,7 @@ func (s *state) process(blockNum uint64, isDifferent bool, isMissing bool) {
 }
 
 func (s *state) print() {
-	endBlock := fmt.Sprintf("%d", s.segments[s.currentSegmentIdx].GetStopBlockOr(MaxUint64))
+	endBlock := fmt.Sprintf("%d", s.segments[s.currentSegmentIdx].GetStopBlockOr(firecore.MaxUint64))
 
 	if s.totalBlocksCounted == 0 {
 		fmt.Printf("✖ No blocks were found at all for segment %d - %s\n", s.segments[s.currentSegmentIdx].Start, endBlock)
