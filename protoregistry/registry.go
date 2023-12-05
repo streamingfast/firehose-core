@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"google.golang.org/protobuf/types/known/anypb"
+
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 )
@@ -37,18 +39,18 @@ func (r *Registry) RegisterFileDescriptor(f *desc.FileDescriptor) {
 	r.filesDescriptors = append(r.filesDescriptors, f)
 }
 
-func (r *Registry) Unmarshall(typeURL string, value []byte) (*dynamic.Message, error) {
+func (r *Registry) Unmarshall(t *anypb.Any) (*dynamic.Message, error) {
 	for _, fd := range r.filesDescriptors {
-		md := fd.FindSymbol(cleanTypeURL(typeURL))
+		md := fd.FindSymbol(cleanTypeURL(t.TypeUrl))
 		if md != nil {
 			dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(md.(*desc.MessageDescriptor))
-			if err := dynMsg.Unmarshal(value); err != nil {
+			if err := dynMsg.Unmarshal(t.Value); err != nil {
 				return nil, fmt.Errorf("unmarshalling proto: %w", err)
 			}
 			return dynMsg, nil
 		}
 	}
-	return nil, fmt.Errorf("no message descriptor in registry for  type url: %s", typeURL)
+	return nil, fmt.Errorf("no message descriptor in registry for  type url: %s", t.TypeUrl)
 }
 
 func (r *Registry) Extends(registry *Registry) {

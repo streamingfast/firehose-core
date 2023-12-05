@@ -67,7 +67,7 @@ func main() {
 		for _, file := range fileDescriptorSet.Msg.FileDescriptorSet.File {
 			cnt, err := proto.Marshal(file)
 			if err != nil {
-				log.Fatalf("failed to marshall proto file %s: %v", file.Name, err)
+				log.Fatalf("failed to marshall proto file %s: %v", file.GetName(), err)
 				return
 			}
 			name := ""

@@ -14,17 +14,12 @@ type Encoder struct {
 	marshallers   []*json.Marshalers
 }
 
-func New(files *protoregistry.Registry, opts ...Option) *Encoder {
+func New(files *protoregistry.Registry) *Encoder {
 	e := &Encoder{
 		protoRegistry: files,
 	}
-
 	e.marshallers = []*json.Marshalers{
-		json.MarshalFuncV2(e.protoAny),
-	}
-
-	for _, opt := range opts {
-		opt(e)
+		json.MarshalFuncV2(e.anypb),
 	}
 	return e
 }

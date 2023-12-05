@@ -277,9 +277,5 @@ func SetupJsonEncoder(cmd *cobra.Command) (*jsonencoder.Encoder, error) {
 	}
 
 	pbregistry.Extends(protoregistry.WellKnownRegistry)
-
-	options := []jsonencoder.Option{
-		jsonencoder.WithBytesAsHex(),
-	}
-	return jsonencoder.New(pbregistry, options...), nil
+	return jsonencoder.New(pbregistry), nil
 }
