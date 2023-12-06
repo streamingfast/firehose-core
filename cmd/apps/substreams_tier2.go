@@ -42,7 +42,6 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 		RegisterFlags: func(cmd *cobra.Command) error {
 			cmd.Flags().String("substreams-tier2-grpc-listen-addr", firecore.SubstreamsTier2GRPCServingAddr, "Address on which the substreams tier2 will listen. Default is plain-text, appending a '*' to the end to jkkkj")
 			cmd.Flags().String("substreams-tier2-discovery-service-url", "", "URL to advertise presence to the grpc discovery service") //traffic-director://xds?vpc_network=vpc-global&use_xds_reds=true
-			cmd.Flags().String("substreams-tier2-block-type", "", "fully qualified name of the block type to use for the substreams tier1 (i.e. sf.ethereum.v1.Block)")
 
 			// all substreams
 			registerCommonSubstreamsFlags(cmd)
@@ -64,11 +63,6 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 			stateStoreDefaultTag := viper.GetString("substreams-state-store-default-tag")
 
 			stateBundleSize := viper.GetUint64("substreams-state-bundle-size")
-			substreamsBlockType := viper.GetString("substreams-tier2-block-type")
-
-			if substreamsBlockType == "" {
-				return nil, fmt.Errorf("substreams-tier2-block-type is required")
-			}
 
 			tracing := os.Getenv("SUBSTREAMS_TRACING") == "modules_exec"
 
@@ -96,7 +90,6 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 					StateStoreURL:        stateStoreURL,
 					StateStoreDefaultTag: stateStoreDefaultTag,
 					StateBundleSize:      stateBundleSize,
-					BlockType:            substreamsBlockType,
 
 					WASMExtensions:  wasmExtensions,
 					PipelineOptions: pipelineOptioner,
