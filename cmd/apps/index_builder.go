@@ -73,7 +73,11 @@ func RegisterIndexBuilderApp[B firecore.Block](chain *firecore.Chain[B], rootLog
 			}
 
 			handler := bstream.HandlerFunc(func(blk *pbbstream.Block, _ interface{}) error {
-				return indexer.ProcessBlock(any(blk).(B))
+				var b = chain.BlockFactory()
+				if err := blk.Payload.UnmarshalTo(b); err != nil {
+					return err
+				}
+				return indexer.ProcessBlock(any(b).(B))
 			})
 
 			app := index_builder.New(&index_builder.Config{
