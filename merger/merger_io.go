@@ -185,9 +185,14 @@ func fixLegacyBlock(in []byte) ([]byte, error) {
 		return in, nil
 	}
 
-	blk, err := dbinReader.Read()
+	reader, err := bstream.NewDBinBlockReader(bytes.NewReader(in))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating block reader in fixLegacyBlock: %w", err)
+	}
+
+	blk, err := reader.Read()
+	if err != nil {
+		return nil, fmt.Errorf("reading block in fixLegacyBlock: %w", err)
 	}
 
 	out := new(bytes.Buffer)
@@ -195,8 +200,9 @@ func fixLegacyBlock(in []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if err := writer.Write(blk); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("writing block in fixLegacyBlock: %w", err)
 	}
 	return out.Bytes(), nil
 

@@ -16,42 +16,78 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func setPbBlock(obf *bstream.OneBlockFile) {
+	//pbb := &pbbstream.Block{
+	//	Number: obf.Num,
+	//}
+	//out, err := proto.Marshal(pbb)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//obf.MemoizeData = out
+}
+
 var block98 = func() *bstream.OneBlockFile {
-	return bstream.MustNewOneBlockFile("0000000098-0000000000000098a-0000000000000097a-96-suffix")
+	obf := bstream.MustNewOneBlockFile("0000000098-0000000000000098a-0000000000000097a-96-suffix")
+	setPbBlock(obf)
+	return obf
 }
 var block99 = func() *bstream.OneBlockFile {
-	return bstream.MustNewOneBlockFile("0000000099-0000000000000099a-0000000000000098a-97-suffix")
+	obf := bstream.MustNewOneBlockFile("0000000099-0000000000000099a-0000000000000098a-97-suffix")
+	setPbBlock(obf)
+	return obf
+
 }
 var block100 = func() *bstream.OneBlockFile {
-	return bstream.MustNewOneBlockFile("0000000100-0000000000000100a-0000000000000099a-98-suffix")
+	obf := bstream.MustNewOneBlockFile("0000000100-0000000000000100a-0000000000000099a-98-suffix")
+	setPbBlock(obf)
+	return obf
 }
 var block101 = func() *bstream.OneBlockFile {
-	return bstream.MustNewOneBlockFile("0000000101-0000000000000101a-0000000000000100a-99-suffix")
+	obf := bstream.MustNewOneBlockFile("0000000101-0000000000000101a-0000000000000100a-99-suffix")
+	setPbBlock(obf)
+	return obf
 }
 var block102Final100 = func() *bstream.OneBlockFile {
-	return bstream.MustNewOneBlockFile("0000000102-0000000000000102a-0000000000000101a-100-suffix")
+	obf := bstream.MustNewOneBlockFile("0000000102-0000000000000102a-0000000000000101a-100-suffix")
+	setPbBlock(obf)
+	return obf
 }
 var block103Final101 = func() *bstream.OneBlockFile {
-	return bstream.MustNewOneBlockFile("0000000103-0000000000000103a-0000000000000102a-101-suffix")
+	obf := bstream.MustNewOneBlockFile("0000000103-0000000000000103a-0000000000000102a-101-suffix")
+	setPbBlock(obf)
+	return obf
 }
 var block104Final102 = func() *bstream.OneBlockFile {
-	return bstream.MustNewOneBlockFile("0000000104-0000000000000104a-0000000000000103a-102-suffix")
+	obf := bstream.MustNewOneBlockFile("0000000104-0000000000000104a-0000000000000103a-102-suffix")
+	setPbBlock(obf)
+	return obf
 }
 var block105Final103 = func() *bstream.OneBlockFile {
-	return bstream.MustNewOneBlockFile("0000000105-0000000000000105a-0000000000000104a-103-suffix")
+	obf := bstream.MustNewOneBlockFile("0000000105-0000000000000105a-0000000000000104a-103-suffix")
+	setPbBlock(obf)
+	return obf
 }
 var block106Final104 = func() *bstream.OneBlockFile {
-	return bstream.MustNewOneBlockFile("0000000106-0000000000000106a-0000000000000105a-104-suffix")
+	obf := bstream.MustNewOneBlockFile("0000000106-0000000000000106a-0000000000000105a-104-suffix")
+	setPbBlock(obf)
+	return obf
 }
 
 var block507Final106 = func() *bstream.OneBlockFile {
-	return bstream.MustNewOneBlockFile("0000000507-0000000000000507a-0000000000000106a-106-suffix")
+	obf := bstream.MustNewOneBlockFile("0000000507-0000000000000507a-0000000000000106a-106-suffix")
+	setPbBlock(obf)
+	return obf
 }
 var block608Final507 = func() *bstream.OneBlockFile {
-	return bstream.MustNewOneBlockFile("0000000608-0000000000000608a-0000000000000507a-507-suffix")
+	obf := bstream.MustNewOneBlockFile("0000000608-0000000000000608a-0000000000000507a-507-suffix")
+	setPbBlock(obf)
+	return obf
 }
 var block609Final608 = func() *bstream.OneBlockFile {
-	return bstream.MustNewOneBlockFile("0000000609-0000000000000607a-0000000000000608a-608-suffix")
+	obf := bstream.MustNewOneBlockFile("0000000609-0000000000000609a-0000000000000608a-608-suffix")
+	setPbBlock(obf)
+	return obf
 }
 
 func TestNewBundler(t *testing.T) {

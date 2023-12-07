@@ -15,11 +15,17 @@
 package merger
 
 import (
+	"bytes"
 	"context"
 	"io"
-	"strings"
 	"testing"
 	"time"
+
+	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/streamingfast/firehose-core/test"
+
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
@@ -57,7 +63,7 @@ func TestNewDstore(t *testing.T) {
 	require.False(t, ok)
 }
 
-func newDStoreIO(
+func newTestDStoreIO(
 	oneBlocksStore dstore.Store,
 	mergedBlocksStore dstore.Store,
 ) IOInterface {
@@ -81,7 +87,25 @@ func TestMergerIO_MergeUploadPerfect(t *testing.T) {
 		if len(filesRead) == 2 {
 			close(done)
 		}
-		return io.NopCloser(strings.NewReader(string(testOneBlockHeader))), nil
+
+		tb := &test.Block{
+			Number: 9999,
+		}
+		anyB, err := anypb.New(tb)
+		require.NoError(t, err)
+
+		pbb := &pbbstream.Block{
+			Number:  9999,
+			Payload: anyB,
+		}
+		out := new(bytes.Buffer)
+		w, err := bstream.NewDBinBlockWriter(out)
+		require.NoError(t, err)
+
+		err = w.Write(pbb)
+		require.NoError(t, err)
+
+		return io.NopCloser(out), nil
 	}
 	mergedBlocksStore := dstore.NewMockStore(
 		func(base string, f io.Reader) (err error) {
@@ -91,7 +115,7 @@ func TestMergerIO_MergeUploadPerfect(t *testing.T) {
 		},
 	)
 
-	mio := newDStoreIO(oneBlockStore, mergedBlocksStore)
+	mio := newTestDStoreIO(oneBlockStore, mergedBlocksStore)
 
 	err := mio.MergeAndStore(context.Background(), 100, files)
 	require.NoError(t, err)
@@ -130,7 +154,25 @@ func TestMergerIO_MergeUploadFiltered(t *testing.T) {
 		if len(filesRead) == 2 {
 			close(done)
 		}
-		return io.NopCloser(strings.NewReader(string(testOneBlockHeader))), nil
+		tb := &test.Block{
+			Number: 9999,
+		}
+		anyB, err := anypb.New(tb)
+		require.NoError(t, err)
+
+		pbb := &pbbstream.Block{
+			Number:  9999,
+			Payload: anyB,
+		}
+		out := new(bytes.Buffer)
+		w, err := bstream.NewDBinBlockWriter(out)
+		require.NoError(t, err)
+
+		err = w.Write(pbb)
+		require.NoError(t, err)
+
+		return io.NopCloser(out), nil
+
 	}
 	mergedBlocksStore := dstore.NewMockStore(
 		func(base string, f io.Reader) (err error) {
@@ -140,7 +182,7 @@ func TestMergerIO_MergeUploadFiltered(t *testing.T) {
 		},
 	)
 
-	mio := newDStoreIO(oneBlockStore, mergedBlocksStore)
+	mio := newTestDStoreIO(oneBlockStore, mergedBlocksStore)
 
 	err := mio.MergeAndStore(context.Background(), 100, files)
 	require.NoError(t, err)
@@ -167,7 +209,7 @@ func TestMergerIO_MergeUploadNoFiles(t *testing.T) {
 
 	oneBlockStore := dstore.NewMockStore(nil)
 	mergedBlocksStore := dstore.NewMockStore(nil)
-	mio := newDStoreIO(oneBlockStore, mergedBlocksStore)
+	mio := newTestDStoreIO(oneBlockStore, mergedBlocksStore)
 
 	err := mio.MergeAndStore(context.Background(), 114, files)
 	require.Error(t, err)
@@ -181,7 +223,7 @@ func TestMergerIO_MergeUploadFilteredToZero(t *testing.T) {
 	}
 	oneBlockStore := dstore.NewMockStore(nil)
 	mergedBlocksStore := dstore.NewMockStore(nil)
-	mio := newDStoreIO(oneBlockStore, mergedBlocksStore)
+	mio := newTestDStoreIO(oneBlockStore, mergedBlocksStore)
 
 	b100.MemoizeData = append(testOneBlockHeader, []byte{0x0, 0x1, 0x2, 0x3}...)
 	b101.MemoizeData = append(testOneBlockHeader, []byte{0x0, 0x1, 0x2, 0x3}...)
