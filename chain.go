@@ -3,27 +3,21 @@ package firecore
 import (
 	"context"
 	"fmt"
-	"io"
 	"runtime/debug"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/streamingfast/bstream"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/firehose-core/node-manager/mindreader"
+	"github.com/streamingfast/firehose-core/node-manager/operator"
+	"github.com/streamingfast/firehose-core/substreams"
 	"github.com/streamingfast/logging"
-	"github.com/streamingfast/node-manager/mindreader"
-	"github.com/streamingfast/node-manager/operator"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/anypb"
 )
-
-// BlockPrinterFunc takes a chain agnostic [block] and prints it to a human readable form.
-//
-// See [ToolsConfig#BlockPrinter] for extra details about expected printing.
-type BlockPrinterFunc func(block *bstream.Block, alsoPrintTransactions bool, out io.Writer) error
 
 // SanitizeBlockForCompareFunc takes a chain agnostic [block] and transforms it in-place, removing fields
 // that should not be compared.
@@ -50,21 +44,6 @@ type Chain[B Block] struct {
 	//
 	// The [LongName] **must** be non-empty.
 	LongName string
-
-	// Protocol is exactly 3 characters long that is going to identify your chain when writing blocks
-	// to file. The written file contains an header and a part of this header is the protocol value.
-	//
-	// The [Protocol] **must** be non-empty and exactly 3 characters long all upper case.
-	Protocol string
-
-	// ProtocolVersion is the version of the protocol that is used to write blocks to file. This value
-	// is used in the header of the written file. It should be changed each time the Protobuf model change
-	// to become backward incompatible. This usually should be accompagnied by a change in the Protobuf
-	// block model of the chain. For example for Ethereum we would go from `sf.ethereum.v1.Block` to
-	// `sf.ethereum.v2.Block` and the [ProtocolVersion] would be incremented from `1` to `2`.
-	//
-	// The [ProtocolVersion] **must** be positive and non-zero and should be incremented each time the Protobuf model change.
-	ProtocolVersion int32
 
 	// ExecutableName is the name of the binary that is used to launch a syncing full node for this chain. For example,
 	// on Ethereum, the binary by default is `geth`. This is used by the `reader-node` app to specify the
@@ -107,8 +86,6 @@ type Chain[B Block] struct {
 	//
 	// The [BlockFactory] **must** be non-nil and must return a non-nil [proto.Message].
 	BlockFactory func() Block
-
-	BlockAcceptedVersions []int32
 
 	// ConsoleReaderFactory is the function that should return the `ConsoleReader` that knowns
 	// how to transform your your chain specific Firehose instrumentation logs into the proper
@@ -173,37 +150,10 @@ type Chain[B Block] struct {
 	//
 	BlockEncoder BlockEncoder
 
-	//
-	RegisterSubstreamsExtensions func(chain *Chain[B]) ([]SubstreamsExtension, error)
+	RegisterSubstreamsExtensions func(chain *Chain[B]) ([]substreams.Extension, error)
 }
 
 type ToolsConfig[B Block] struct {
-	// BlockPrinter represents a printing function that render a chain specific human readable
-	// form of the receive chain agnostic [bstream.Block]. This block is expected to be rendered as
-	// a single line for example on Ethereum rendering of a single block looks like:
-	//
-	// ```
-	// Block #24924194 (01d6d349fbd3fa419182a2f0cf0b00714e101286650c239de8923caef6134b6c) 62 transactions, 607 calls
-	// ```
-	//
-	// If the [alsoPrintTransactions] argument is true, each transaction of the block should also be printed, following
-	// directly the block line. Each transaction should also be on a single line, usually prefixed with a `- ` to make
-	// the rendering more appealing.
-	//
-	// For example on Ethereum rendering with [alsoPrintTransactions] being `true` looks like:
-	//
-	// ```
-	// Block #24924194 (01d6d349fbd3fa419182a2f0cf0b00714e101286650c239de8923caef6134b6c) 62 transactions, 607 calls
-	// - Transaction 0xc7e04240d6f2cc5f382c478fd0a0b5c493463498c64b31477b95bded8cd12ab4 (10 calls)
-	// - Transaction 0xc7d8a698351eb1ac64acb76c8bf898365bb639865271add95d2c81650b2bd98c (4 calls)
-	// ```
-	//
-	// The `out` parameter is used to write to the correct location. You can use [fmt.Fprintf] and [fmt.Fprintln]
-	// and use `out` as the output writer in your implementation.
-	//
-	// The [BlockPrinter] is optional, if nil, a default block printer will be used. It's important to note
-	// that the default block printer error out if `alsoPrintTransactions` is true.
-	BlockPrinter BlockPrinterFunc
 
 	// SanitizeBlockForCompare is a function that takes a chain agnostic [block] and transforms it in-place, removing fields
 	// that should not be compared.
@@ -237,7 +187,7 @@ type ToolsConfig[B Block] struct {
 	// to upgrade from one version to another of the merged blocks.
 	//
 	// The [MergedBlockUpgrader] is optional and not specifying it disables command `fire<chain> tools upgrade-merged-blocks`.
-	MergedBlockUpgrader func(block *bstream.Block) (*bstream.Block, error)
+	MergedBlockUpgrader func(block *pbbstream.Block) (*pbbstream.Block, error)
 }
 
 // GetSanitizeBlockForCompare returns the [SanitizeBlockForCompare] value if defined, otherwise a no-op sanitizer.
@@ -267,7 +217,6 @@ type TransformFlags struct {
 func (c *Chain[B]) Validate() {
 	c.ShortName = strings.ToLower(strings.TrimSpace(c.ShortName))
 	c.LongName = strings.TrimSpace(c.LongName)
-	c.Protocol = strings.ToLower(c.Protocol)
 	c.ExecutableName = strings.TrimSpace(c.ExecutableName)
 
 	var err error
@@ -282,14 +231,6 @@ func (c *Chain[B]) Validate() {
 
 	if c.LongName == "" {
 		err = multierr.Append(err, fmt.Errorf("field 'LongName' must be non-empty"))
-	}
-
-	if len(c.Protocol) != 3 {
-		err = multierr.Append(err, fmt.Errorf("field 'Protocol' must be non-empty and have exactly 3 characters"))
-	}
-
-	if c.ProtocolVersion <= 0 {
-		err = multierr.Append(err, fmt.Errorf("field 'ProtocolVersion' must be positive and non-zero"))
 	}
 
 	if c.ExecutableName == "" {
@@ -349,11 +290,6 @@ func (c *Chain[B]) Validate() {
 // **Caveats** Two chain in the same Go binary will not work today as `bstream` uses global
 // variables to store configuration which presents multiple chain to exist in the same process.
 func (c *Chain[B]) Init() {
-	if c.BlockAcceptedVersions == nil {
-		c.BlockAcceptedVersions = []int32{c.ProtocolVersion}
-	}
-
-	InitBstream(c.Protocol, c.ProtocolVersion, c.BlockAcceptedVersions, func() proto.Message { return c.BlockFactory() })
 
 	c.BlockEncoder = NewBlockEncoder()
 }
@@ -410,24 +346,4 @@ func findSetting(key string, settings []debug.BuildSetting) (value string) {
 	}
 
 	return ""
-}
-
-func (c *Chain[B]) BlockPrinter() BlockPrinterFunc {
-	if c.Tools == nil || c.Tools.BlockPrinter == nil {
-		return defaultBlockPrinter
-	}
-
-	return c.Tools.BlockPrinter
-}
-
-func defaultBlockPrinter(block *bstream.Block, alsoPrintTransactions bool, out io.Writer) error {
-	if alsoPrintTransactions {
-		return fmt.Errorf("transactions is not supported by the default block printer")
-	}
-
-	if _, err := fmt.Fprintf(out, "Block #%d (%s)\n", block.Number, block.Id); err != nil {
-		return err
-	}
-
-	return nil
 }

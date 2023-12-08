@@ -8,7 +8,7 @@ This repository contains all the boilerplate code that is required to maintain t
 
 Firehose maintenance cost comes from two sides. First, there is the chain integration that needs to be maintained. This is done within the chain's code directly by the chain's core developers. The second side of things is the maintenance of the Golang part of the Firehose stack.
 
-Each chain creates its own Firehose Golang repository named `firehose-<chain>`. [Firehose-acme repository](https://github.com/streamingfast/firehose-acme) acts as an example of this. Firehose is composed of multiple smaller components that can be run independently and each of them has a set of CLI flags and other configuration parameters.
+Each chain creates its own Firehose Golang repository named `firehose-<chain>`. [Firehose-acme repository](https://github.com/streamingfast/firehose-core/firehose-acme) acts as an example of this. Firehose is composed of multiple smaller components that can be run independently and each of them has a set of CLI flags and other configuration parameters.
 
 The initial "Acme" template we had contained a lot of boilerplate code to properly configure and run the Firehose Golang stack. This meant that if we needed to add a new feature that required a new flag or change a flag default value or any kind of improvements, chain integrators that were maintaining their `firehose-<chain>` repository were in the obligation of tracking changes made in `firehose-acme` and apply those back on their repository by hand.
 
@@ -33,4 +33,4 @@ When bumping `firehose-core` to a breaking version, details of such upgrade will
 
 ### Build & CI
 
-The build and CI files are maintained for now in https://github.com/streamingfast/firehose-acme directly and should be updated manually from time to time from there.
+The build and CI files are maintained for now in https://github.com/streamingfast/firehose-core/firehose-acme directly and should be updated manually from time to time from there.

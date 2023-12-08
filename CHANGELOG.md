@@ -8,6 +8,42 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## v1.0.0
+
+This is a major release.
+
+### Operators
+
+> [!IMPORTANT]
+> When upgrading your stack to firehose-core v1.0.0, be sure to upgrade all components simultaneously because the block encapsulation format has changed.
+> Blocks that are merged using the new merger will not be readable by previous versions.
+
+### Added
+
+* New binary `firecore` which can run all firehose components (`reader`, `reader-stdin`, `merger`, `relayer`, `firehose`, `substreams-tier1|2`) in a chain-agnostic way. This is not mandatory (it can still be used as a library) but strongly suggested when possible.
+
+* Current Limitations on Ethereum:
+  - The firecore `firehose` app does not support transforms (filters, header-only --for graph-node compatibility--) so you will want to continue running this app from `fireeth`
+  - The firecore `substreams` apps do not support eth_calls so you will want to continue running them from `fireeth`
+  - The firecore `reader` does not support the block format output by the current geth firehose instrumentation, so you will want to continue running it from `fireeth`
+
+* New BlockPoller library to facilitate the implementation of rpc-poller-based chains, taking care of managing reorgs
+
+* Considering that firehose-core is chain-agnostic, it's not aware of the different of the different block types. To be able to use tools around block decoding/printing, 
+  there are two ways to provide the type definition:
+  1. the 'protoregistry' package contains well-known block type definitions (ethereum, near, solana, bitcoin...), you won't need to provide anything in those cases.
+  2. for other types, you can provide additional protobuf files using `--proto-path` flag
+
+### Changed
+
+* Merged blocks storage format has been changed. Current blocks will continue to be decoded, but new merged blocks will not be readable by previous software versions.
+* The code from the following repositories have been merged into this repo. They will soon be archived.
+  * github.com/streamingfast/node-manager
+  * github.com/streamingfast/merger
+  * github.com/streamingfast/relayer
+  * github.com/streamingfast/firehose
+  * github.com/streamingfast/index-builder
+
 ## v0.2.4
 
 * Fixed SF_TRACING feature (regression broke the ability to specify a tracing endpoint)

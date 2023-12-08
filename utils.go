@@ -4,16 +4,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/streamingfast/cli"
-	"go.uber.org/zap"
 )
 
+var RunningFromFirecore = false
+
 func mkdirStorePathIfLocal(storeURL string) (err error) {
-	rootLog.Debug("creating directory and its parent(s)", zap.String("directory", storeURL))
 	if dirs := getDirsToMake(storeURL); len(dirs) > 0 {
-		err = makeDirs(dirs)
+		err = MakeDirs(dirs)
 	}
 
 	return
@@ -39,7 +40,7 @@ func getDirsToMake(storeURL string) []string {
 	return []string{storeURL}
 }
 
-func makeDirs(directories []string) error {
+func MakeDirs(directories []string) error {
 	for _, directory := range directories {
 		err := os.MkdirAll(directory, 0755)
 		if err != nil {
@@ -73,4 +74,11 @@ var Example = func(in string) string {
 
 func ExamplePrefixed[B Block](chain *Chain[B], prefix, in string) string {
 	return string(cli.ExamplePrefixed(chain.BinaryName()+" "+prefix, in))
+}
+
+func MustParseUint64(s string) uint64 {
+	i, err := strconv.Atoi(s)
+	cli.NoError(err, "Unable to parse %q as uint64", s)
+
+	return uint64(i)
 }
