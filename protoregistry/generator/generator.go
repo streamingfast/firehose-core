@@ -39,7 +39,7 @@ func main() {
 
 	authToken := os.Getenv("BUFBUILD_AUTH_TOKEN")
 	if authToken == "" {
-		log.Fatalf("Please set the BUFBUILD_AUTH_TOKEN environment variable, to generate well known registry")
+		log.Fatalf("You must set the BUFBUILD_AUTH_TOKEN environment variable to generate well known registry. See https://buf.build/docs/bsr/authentication")
 		return
 	}
 

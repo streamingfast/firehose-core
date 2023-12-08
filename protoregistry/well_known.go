@@ -62,7 +62,6 @@ func init() {
 	fdmap, err := desc.CreateFileDescriptors(files)
 	if err != nil {
 		panic(fmt.Errorf("failed to create file descriptor map: %w", err))
-		return
 	}
 
 	for _, fd := range fdmap {
