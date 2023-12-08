@@ -151,9 +151,6 @@ type Chain[B Block] struct {
 	BlockEncoder BlockEncoder
 
 	RegisterSubstreamsExtensions func(chain *Chain[B]) ([]substreams.Extension, error)
-
-	// CoreBinaryEnabled is a flag that when set to true indicates that `firecore` binary is being run directly? (not through firexxx)
-	CoreBinaryEnabled bool
 }
 
 type ToolsConfig[B Block] struct {

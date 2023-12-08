@@ -225,7 +225,7 @@ func displayBlock[B firecore.Block](pbBlock *pbbstream.Block, chain *firecore.Ch
 		return nil
 	}
 
-	if !chain.CoreBinaryEnabled {
+	if !firecore.RunningFromFirecore {
 		// since we are running via the chain specific binary (i.e. fireeth) we can use a BlockFactory
 		marshallableBlock := chain.BlockFactory()
 

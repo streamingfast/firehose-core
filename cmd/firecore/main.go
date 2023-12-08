@@ -7,6 +7,7 @@ import (
 )
 
 func main() {
+	firecore.RunningFromFirecore = true
 	fhCMD.Main(&firecore.Chain[*pbbstream.Block]{
 		ShortName:            "core",      //used to compose the binary name
 		LongName:             "CORE",      //only used to compose cmd title and description
@@ -14,7 +15,6 @@ func main() {
 		FullyQualifiedModule: "github.com/streamingfast/firehose-core",
 		Version:              version,
 		BlockFactory:         func() firecore.Block { return new(pbbstream.Block) },
-		CoreBinaryEnabled:    true,
 		ConsoleReaderFactory: firecore.NewConsoleReader,
 		Tools:                &firecore.ToolsConfig[*pbbstream.Block]{},
 	})
