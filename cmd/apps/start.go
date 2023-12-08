@@ -15,6 +15,7 @@
 package apps
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -26,6 +27,7 @@ import (
 	"github.com/streamingfast/dlauncher/launcher"
 	"github.com/streamingfast/dmetering"
 	firecore "github.com/streamingfast/firehose-core"
+	tracing "github.com/streamingfast/sf-tracing"
 	"go.uber.org/zap"
 )
 
@@ -93,6 +95,15 @@ func start(dataDir string, args []string, rootLog *zap.Logger) (err error) {
 	if len(args) == 0 {
 		apps = launcher.ParseAppsFromArgs(launcher.Config["start"].Args, runByDefault)
 	}
+
+	serviceName := "firecore"
+	if len(apps) == 1 {
+		serviceName = serviceName + "/" + apps[0]
+	}
+	if err := tracing.SetupOpenTelemetry(context.Background(), serviceName); err != nil {
+		return err
+	}
+
 	rootLog.Info(fmt.Sprintf("launching applications: %s", strings.Join(apps, ",")))
 	if err = launch.Launch(apps); err != nil {
 		return err

@@ -44,6 +44,12 @@ This is a major release.
   * github.com/streamingfast/firehose
   * github.com/streamingfast/index-builder
 
+## v0.2.4
+
+* Fixed SF_TRACING feature (regression broke the ability to specify a tracing endpoint)
+* Firehose connections rate-limiting will now force a delay of between 1 and 4 seconds (random value)  before refusing a connection when under heavy load
+* Fixed substreams GRPC/Connect error codes not propagating correctly
+
 ## v0.2.3
 
 ### Fixed
