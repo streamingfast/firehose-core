@@ -3,4 +3,4 @@
 /dist
 .envrc
 .env
-/firecore
+.DS_Store

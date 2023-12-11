@@ -29,6 +29,19 @@ type parseCtx struct {
 	protoMessageType      string
 }
 
+func (p *parseCtx) setProtoMessageType(typeURL string) {
+	if strings.HasPrefix(typeURL, "type.googleapis.com/") {
+		p.protoMessageType = typeURL
+		return
+	}
+	if strings.Contains(typeURL, "/") {
+		panic(fmt.Sprintf("invalid type url %q, expecting type.googleapis.com/", typeURL))
+		return
+	}
+	p.protoMessageType = "type.googleapis.com/" + typeURL
+	return
+}
+
 type ConsoleReader struct {
 	lines  chan string
 	close  func()
@@ -161,7 +174,7 @@ func (ctx *parseCtx) readInit(line string) error {
 	}
 
 	ctx.readerProtocolVersion = chunks[0]
-	ctx.protoMessageType = chunks[1]
+	ctx.setProtoMessageType(chunks[1])
 
 	return nil
 }

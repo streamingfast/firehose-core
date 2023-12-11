@@ -16,7 +16,7 @@ import (
 func Test_Ctx_readBlock(t *testing.T) {
 	ctx := &parseCtx{
 		readerProtocolVersion: "1.0",
-		protoMessageType:      "sf.ethereum.type.v2.Block",
+		protoMessageType:      "type.googleapis.com/sf.ethereum.type.v2.Block",
 	}
 
 	blockHash := "d2836a703a02f3ca2a13f05efe26fc48c6fa0db0d754a49e56b066d3b7d54659"
