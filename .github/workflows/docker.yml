@@ -5,7 +5,7 @@ on:
     tags:
       - "v*"
     branches:
-      - "block_any"
+      - "develop"
   workflow_dispatch:
 
 env:
@@ -37,11 +37,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get repo name
-        id: extract_repo_name
+      - name: Get go pseudohash
+        id: extract_pseudohash
         shell: bash
         run: |
-          echo "REPO_NAME=$(basename ${{ github.repository }})" >> $GITHUB_ENV
+          echo "GO_PSEUDOHASH=$(go list -f '{{.Version}}' -m github.com/streamingfast/firehose-core@${{ github.sha }})" > $GITHUB_ENV
 
       - name: Generate docker tags/labels from github build context
         id: meta
@@ -51,6 +51,7 @@ jobs:
           tags: |
             type=ref,event=tag
             type=sha,prefix=,enable=true
+            type=raw,value=${{ env.GO_PSEUDOHASH }}
             type=raw,enable=${{ github.ref == 'refs/heads/develop' }},value=develop
           flavor: |
             latest=${{ startsWith(github.ref, 'refs/tags/') }}
@@ -59,6 +60,8 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
+          build-args: |
+            VERSION=${{ github.event.ref }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
