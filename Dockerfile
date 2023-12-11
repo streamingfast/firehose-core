@@ -6,7 +6,7 @@ RUN go mod download
 
 COPY . ./
 
-RUN go build ./cmd/firecore
+RUN go build -v -ldflags "-X main.version=${VERSION}" ./cmd/firecore
 
 ####
 
