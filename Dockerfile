@@ -7,6 +7,7 @@ RUN go mod download
 COPY . ./
 
 ARG VERSION="dev"
+RUN apk --no-cache add git
 RUN go build -v -ldflags "-X main.version=${VERSION}" ./cmd/firecore
 
 ####
