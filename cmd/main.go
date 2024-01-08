@@ -112,7 +112,7 @@ func Main[B firecore.Block](chain *firecore.Chain[B]) {
 		chain.RegisterExtraStartFlags(apps.StartCmd.Flags())
 	}
 
-	apps.ConfigureStartCmd(chain, "", rootLog)
+	apps.ConfigureStartCmd(chain, binaryName, rootLog)
 
 	if err := tools.ConfigureToolsCmd(chain, rootLog, rootTracer); err != nil {
 		exitWithError("registering tools command", err)
