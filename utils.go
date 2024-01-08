@@ -10,8 +10,6 @@ import (
 	"github.com/streamingfast/cli"
 )
 
-var RunningFromFirecore = false
-
 func mkdirStorePathIfLocal(storeURL string) (err error) {
 	if dirs := getDirsToMake(storeURL); len(dirs) > 0 {
 		err = MakeDirs(dirs)

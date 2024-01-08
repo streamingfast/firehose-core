@@ -7,6 +7,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// UnsafeRunningFromFirecore is used internally and should not be altered.
+var UnsafeRunningFromFirecore = false
+
 // UnsafeResolveReaderNodeStartBlock is a function that resolved the reader node start block num, by default it simply
 // returns the value of the 'reader-node-start-block-num'. However, the function may be overwritten in certain chains
 // to perform a more complex resolution logic.

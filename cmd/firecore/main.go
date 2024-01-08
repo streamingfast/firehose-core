@@ -7,7 +7,8 @@ import (
 )
 
 func main() {
-	firecore.RunningFromFirecore = true
+	firecore.UnsafeRunningFromFirecore = true
+
 	fhCMD.Main(&firecore.Chain[*pbbstream.Block]{
 		ShortName:            "core",      //used to compose the binary name
 		LongName:             "CORE",      //only used to compose cmd title and description
