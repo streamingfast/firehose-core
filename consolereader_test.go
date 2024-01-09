@@ -89,5 +89,4 @@ func Test_GetNext(t *testing.T) {
 	require.Equal(t, "55de88c909fa368ae1e93b6b8ffb3fbb12e64aefec1d4a1fcc27ae7633de2f81", block.ParentId)
 	require.Equal(t, uint64(18570800), block.LibNum)
 	require.Equal(t, int32(time.Unix(0, 1699992393935935000).Nanosecond()), block.Timestamp.Nanos)
-
 }
