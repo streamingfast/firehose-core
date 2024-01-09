@@ -143,6 +143,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 						stopBlock,
 						sanitizer,
 						&warnAboutExtraBlocks,
+						chain.BlockFactory,
 					)
 					if err != nil {
 						bundleErrLock.Lock()
@@ -154,7 +155,15 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					_, currentBlocks, err = readBundle(ctx, filename, storeCurrent, uint64(fileStartBlock), stopBlock, sanitizer, &warnAboutExtraBlocks)
+					_, currentBlocks, err = readBundle(ctx,
+						filename,
+						storeCurrent,
+						uint64(fileStartBlock),
+						stopBlock,
+						sanitizer,
+						&warnAboutExtraBlocks,
+						chain.BlockFactory,
+					)
 					if err != nil {
 						bundleErrLock.Lock()
 						bundleReadErr = multierr.Append(bundleReadErr, err)
@@ -209,6 +218,7 @@ func readBundle[B firecore.Block](
 	stopBlock uint64,
 	sanitizer firecore.SanitizeBlockForCompareFunc[B],
 	warnAboutExtraBlocks *sync.Once,
+	blockFactory func() firecore.Block,
 ) ([]string, map[string]B, error) {
 	fileReader, err := store.OpenObject(ctx, filename)
 	if err != nil {
@@ -240,7 +250,12 @@ func readBundle[B firecore.Block](
 			continue
 		}
 
-		curBlockPB := sanitizer(any(curBlock).(B))
+		b := blockFactory()
+		if err = curBlock.Payload.UnmarshalTo(b); err != nil {
+			break
+		}
+
+		curBlockPB := sanitizer(b.(B))
 		blockHashes = append(blockHashes, curBlock.Id)
 		blocksMap[curBlock.Id] = curBlockPB
 	}
