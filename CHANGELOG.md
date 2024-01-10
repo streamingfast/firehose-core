@@ -10,7 +10,12 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+* Changed `reader` logger back to `reader-node` to fit with the app's name which is `reader-node`.
+
+* Fix `-c ""` not working properly when no arguments are present when invoking `start` command.
+
 * Fix 'tools compare-blocks' that would fail on new format
+
 * Fix substreams to correctly delete `.partial` files when serving a request that is not on a boundary
 * Add Antelope types to the protoregistry.
 
@@ -35,7 +40,7 @@ This is a major release.
 
 * New BlockPoller library to facilitate the implementation of rpc-poller-based chains, taking care of managing reorgs
 
-* Considering that firehose-core is chain-agnostic, it's not aware of the different of the different block types. To be able to use tools around block decoding/printing, 
+* Considering that firehose-core is chain-agnostic, it's not aware of the different of the different block types. To be able to use tools around block decoding/printing,
   there are two ways to provide the type definition:
   1. the 'protoregistry' package contains well-known block type definitions (ethereum, near, solana, bitcoin...), you won't need to provide anything in those cases.
   2. for other types, you can provide additional protobuf files using `--proto-path` flag

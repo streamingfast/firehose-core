@@ -21,9 +21,9 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dlauncher/launcher"
 	"github.com/streamingfast/dmetering"
 	firecore "github.com/streamingfast/firehose-core"
@@ -39,13 +39,13 @@ func ConfigureStartCmd[B firecore.Block](chain *firecore.Chain[B], binaryName st
 	StartCmd.RunE = func(cmd *cobra.Command, args []string) (err error) {
 		cmd.SilenceUsage = true
 
-		dataDir := viper.GetString("global-data-dir")
+		dataDir := sflags.MustGetString(cmd, "data-dir")
 		rootLog.Debug(fmt.Sprintf("%s binary started", binaryName), zap.String("data_dir", dataDir))
 
-		configFile := viper.GetString("global-config-file")
+		configFile := sflags.MustGetString(cmd, "config-file")
 		rootLog.Info(fmt.Sprintf("starting Firehose on %s with config file '%s'", chain.LongName, configFile))
 
-		err = start(dataDir, args, rootLog)
+		err = start(cmd, dataDir, args, rootLog)
 		if err != nil {
 			return fmt.Errorf("unable to launch: %w", err)
 		}
@@ -55,7 +55,7 @@ func ConfigureStartCmd[B firecore.Block](chain *firecore.Chain[B], binaryName st
 	}
 }
 
-func start(dataDir string, args []string, rootLog *zap.Logger) (err error) {
+func start(cmd *cobra.Command, dataDir string, args []string, rootLog *zap.Logger) (err error) {
 	dataDirAbs, err := filepath.Abs(dataDir)
 	if err != nil {
 		return fmt.Errorf("unable to setup directory structure: %w", err)
@@ -70,14 +70,14 @@ func start(dataDir string, args []string, rootLog *zap.Logger) (err error) {
 		AbsDataDir: dataDirAbs,
 	}
 
-	bstream.GetProtocolFirstStreamableBlock = uint64(viper.GetInt("common-first-streamable-block"))
+	bstream.GetProtocolFirstStreamableBlock = sflags.MustGetUint64(cmd, "common-first-streamable-block")
 
 	err = bstream.ValidateRegistry()
 	if err != nil {
 		return fmt.Errorf("protocol specific hooks not configured correctly: %w", err)
 	}
 
-	eventEmitter, err := dmetering.New(viper.GetString("common-metering-plugin"), rootLog)
+	eventEmitter, err := dmetering.New(sflags.MustGetString(cmd, "common-metering-plugin"), rootLog)
 	if err != nil {
 		return fmt.Errorf("unable to initialize dmetering: %w", err)
 	}
@@ -89,10 +89,12 @@ func start(dataDir string, args []string, rootLog *zap.Logger) (err error) {
 	launch := launcher.NewLauncher(rootLog, modules)
 	rootLog.Debug("launcher created")
 
-	runByDefault := func(app string) bool { return true }
+	runByDefault := func(app string) bool {
+		return app != "reader-node-stdin"
+	}
 
 	apps := launcher.ParseAppsFromArgs(args, runByDefault)
-	if len(args) == 0 {
+	if len(args) == 0 && launcher.Config != nil && launcher.Config["start"] != nil {
 		apps = launcher.ParseAppsFromArgs(launcher.Config["start"].Args, runByDefault)
 	}
 
@@ -109,7 +111,7 @@ func start(dataDir string, args []string, rootLog *zap.Logger) (err error) {
 		return err
 	}
 
-	signalHandler, _, _ := cli.SetupSignalHandler(viper.GetDuration("common-system-shutdown-signal-delay"), rootLog)
+	signalHandler, _, _ := cli.SetupSignalHandler(sflags.MustGetDuration(cmd, "common-system-shutdown-signal-delay"), rootLog)
 	select {
 	case <-signalHandler:
 		rootLog.Info("received termination signal, quitting")
