@@ -12,6 +12,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 * Fix 'tools compare-blocks' that would fail on new format
 * Fix substreams to correctly delete `.partial` files when serving a request that is not on a boundary
+* Add Antelope types to the protoregistry.
 
 ## v1.0.0
 
