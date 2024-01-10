@@ -29,7 +29,7 @@ import (
 )
 
 func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) {
-	appLogger, appTracer := logging.PackageLogger("reader", "reader")
+	appLogger, appTracer := logging.PackageLogger("reader-node", "reader-node")
 
 	launcher.RegisterApp(rootLog, &launcher.AppDef{
 		ID:          "reader-node",
