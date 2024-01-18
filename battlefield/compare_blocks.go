@@ -3,7 +3,6 @@ package battlefield
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 
@@ -18,12 +17,12 @@ func CompareBlockFiles(referenceBlockFile, otherBlockFile string, processFileCon
 		zap.String("other_block_file", otherBlockFile),
 	)
 
-	refCnt, err := ioutil.ReadFile(referenceBlockFile)
+	refCnt, err := os.ReadFile(referenceBlockFile)
 	if err != nil {
 		return false, fmt.Errorf("unable to read block file %q: %w", referenceBlockFile, err)
 	}
 
-	otherCnt, err := ioutil.ReadFile(otherBlockFile)
+	otherCnt, err := os.ReadFile(otherBlockFile)
 	if err != nil {
 		return false, fmt.Errorf("unable to read block file %q: %w", otherBlockFile, err)
 	}
