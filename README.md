@@ -1,6 +1,6 @@
 ## Firehose Integrators Tool Kit
 
-This repository contains all the boilerplate code that is required to maintain the Golang part of the Firehose stack for chain integrators. This repository can be seen as an Integrator Tool Kit for developers maintaining Firehose for a specific chain. It's essentially a chain-agnostic shared library that is used to avoid duplication across all projects and ease maintenance work for the teams. It contains **no** chain-specific code and everything that is chain-specific must be provided.
+This repository contains all the code that is required to maintain the Golang part of the Firehose stack for chain integrators. This repository can be seen as an Integrator Tool Kit for developers maintaining Firehose for a specific chain. It's essentially a chain-agnostic shared library that is used to avoid duplication across all projects and ease maintenance work for the teams. It contains **no** chain-specific code and everything that is chain-specific must be provided.
 
 > **Note** This repository is **only** useful for maintainers of `firehose-<chain>` repositories and new integrators looking to integrate Firehose into a new chain. If you are a developer using Firehose or Substreams technology, this repository is not for you.
 
@@ -33,4 +33,4 @@ When bumping `firehose-core` to a breaking version, details of such upgrade will
 
 ### Build & CI
 
-The build and CI files are maintained for now in https://github.com/streamingfast/firehose-core/firehose-acme directly and should be updated manually from time to time from there.
+The build and CI files are maintained for now in https://github.com/streamingfast/firehose-acme directly and should be updated manually from time to time from there.
