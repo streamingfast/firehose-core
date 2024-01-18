@@ -578,8 +578,8 @@ github.com/spf13/pflag v1.0.5/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An
 github.com/spf13/viper v1.15.0 h1:js3yy885G8xwJa6iOISGFwd+qlUo5AvyXb7CiihdtiU=
 github.com/spf13/viper v1.15.0/go.mod h1:fFcTBJxvhhzSJiZy8n+PeW6t8l+KeT/uTARa0jHOQLA=
 github.com/stoewer/go-strcase v1.2.0/go.mod h1:IBiWB2sKIp3wVVQ3Y035++gc+knqhUQag1KpM8ahLw8=
-github.com/streamingfast/bstream v0.0.2-0.20231211192436-01f6a005b0e4 h1:WFXOC6fg2k9CuxUhbgtH7IYOZvu0CEPXuGRitS74YwQ=
-github.com/streamingfast/bstream v0.0.2-0.20231211192436-01f6a005b0e4/go.mod h1:08GVb+DXyz6jVNIsbf+2zlaC81UeEGu5o1h49KrSR3Y=
+github.com/streamingfast/bstream v0.0.2-0.20240118123300-2bc69dde3598 h1:fCQ+m6x3DZmf0er9vYcjBqqyQ+NOwVogHWSlATZsgfU=
+github.com/streamingfast/bstream v0.0.2-0.20240118123300-2bc69dde3598/go.mod h1:08GVb+DXyz6jVNIsbf+2zlaC81UeEGu5o1h49KrSR3Y=
 github.com/streamingfast/cli v0.0.4-0.20230825151644-8cc84512cd80 h1:UxJUTcEVkdZy8N77E3exz0iNlgQuxl4m220GPvzdZ2s=
 github.com/streamingfast/cli v0.0.4-0.20230825151644-8cc84512cd80/go.mod h1:QxjVH73Lkqk+mP8bndvhMuQDUINfkgsYhdCH/5TJFKI=
 github.com/streamingfast/dauth v0.0.0-20231120142446-843f4e045cc2 h1:g4mG6ZCy3/XtcsZXfOHrQOsjVGoX9uTc/QlemaPV4EE=
@@ -621,8 +621,6 @@ github.com/streamingfast/shutter v1.5.0 h1:NpzDYzj0HVpSiDJVO/FFSL6QIK/YKOxY0gJAt
 github.com/streamingfast/shutter v1.5.0/go.mod h1:B/T6efqdeMGbGwjzPS1ToXzYZI4kDzI5/u4I+7qbjY8=
 github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0 h1:Y15G1Z4fpEdm2b+/70owI7TLuXadlqBtGM7rk4Hxrzk=
 github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0/go.mod h1:/Rnz2TJvaShjUct0scZ9kKV2Jr9/+KBAoWy4UMYxgv4=
-github.com/streamingfast/substreams v1.2.1-0.20231212145050-217d8cf08d42 h1:uI8Hqc97DciVzZ7gZLNxHSGMeJMF3B5nAAxJ70JS6G4=
-github.com/streamingfast/substreams v1.2.1-0.20231212145050-217d8cf08d42/go.mod h1:fCC3pGTYMi0N4VhJjdJPQydefJpY+tsY9BzWxDi152k=
 github.com/streamingfast/substreams v1.2.1-0.20231221200849-a355c5063d0c h1:tpwdanGNJjYCBRbqxGzoXRrz0VWa+Mjeb0OJt/aMOx8=
 github.com/streamingfast/substreams v1.2.1-0.20231221200849-a355c5063d0c/go.mod h1:fCC3pGTYMi0N4VhJjdJPQydefJpY+tsY9BzWxDi152k=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=

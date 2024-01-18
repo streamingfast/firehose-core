@@ -52,7 +52,7 @@ var _RangeBoundaryValue = map[string]RangeBoundary{
 	strings.ToLower(_RangeBoundaryName[9:18]): RangeBoundaryExclusive,
 }
 
-// ParseRangeBoundary attempts to convert a string to a RangeBoundary.
+// ParseRangeBoundary attempts to convert a string to a RangeBoundary
 func ParseRangeBoundary(name string) (RangeBoundary, error) {
 	if x, ok := _RangeBoundaryValue[name]; ok {
 		return x, nil
@@ -64,12 +64,12 @@ func ParseRangeBoundary(name string) (RangeBoundary, error) {
 	return RangeBoundary(0), fmt.Errorf("%s is not a valid RangeBoundary, try [%s]", name, strings.Join(_RangeBoundaryNames, ", "))
 }
 
-// MarshalText implements the text marshaller method.
+// MarshalText implements the text marshaller method
 func (x RangeBoundary) MarshalText() ([]byte, error) {
 	return []byte(x.String()), nil
 }
 
-// UnmarshalText implements the text unmarshaller method.
+// UnmarshalText implements the text unmarshaller method
 func (x *RangeBoundary) UnmarshalText(text []byte) error {
 	name := string(text)
 	tmp, err := ParseRangeBoundary(name)
