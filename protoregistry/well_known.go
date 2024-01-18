@@ -2,14 +2,13 @@
 package protoregistry
 
 import (
-	"fmt"
 	"encoding/hex"
+	"fmt"
 
 	"github.com/jhump/protoreflect/desc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
-
 
 var WellKnownRegistry = NewEmpty()
 
