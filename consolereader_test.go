@@ -8,13 +8,18 @@ import (
 	"time"
 
 	"github.com/streamingfast/firehose-core/test"
+	"github.com/streamingfast/logging"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
+var zlogTest, tracerTest = logging.PackageLogger("test", "github.com/streamingfast/firehose-core/firecore")
+
 func Test_Ctx_readBlock(t *testing.T) {
-	ctx := &parseCtx{
+	reader := &ConsoleReader{
+		logger: zlogTest,
+		tracer: tracerTest,
+
 		readerProtocolVersion: "1.0",
 		protoMessageType:      "type.googleapis.com/sf.ethereum.type.v2.Block",
 	}
@@ -48,7 +53,7 @@ func Test_Ctx_readBlock(t *testing.T) {
 		base64.StdEncoding.EncodeToString(anypbBlock.Value),
 	)
 
-	block, err := ctx.readBlock(line)
+	block, err := reader.readBlock(line)
 	require.NoError(t, err)
 
 	require.Equal(t, blockNumber, block.Number)
@@ -62,17 +67,9 @@ func Test_Ctx_readBlock(t *testing.T) {
 
 }
 
-type tracer struct {
-}
-
-func (t *tracer) Enabled() bool {
-	return false
-}
-
 func Test_GetNext(t *testing.T) {
 	lines := make(chan string, 2)
-	reader, err := NewConsoleReader(lines, NewBlockEncoder(), zap.NewNop(), &tracer{})
-	require.NoError(t, err)
+	reader := newConsoleReader(lines, zlogTest, tracerTest)
 
 	initLine := "FIRE INIT 1.0 sf.ethereum.type.v2.Block"
 	blockLine := "FIRE BLOCK 18571000 d2836a703a02f3ca2a13f05efe26fc48c6fa0db0d754a49e56b066d3b7d54659 18570999 55de88c909fa368ae1e93b6b8ffb3fbb12e64aefec1d4a1fcc27ae7633de2f81 18570800 1699992393935935000 Ci10eXBlLmdvb2dsZWFwaXMuY29tL3NmLmV0aGVyZXVtLnR5cGUudjIuQmxvY2sSJxIg0oNqcDoC88oqE/Be/ib8SMb6DbDXVKSeVrBm07fVRlkY+L3tCA=="

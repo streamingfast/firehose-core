@@ -10,6 +10,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+* The `firecore.ConsoleReader` gained the ability to print stats as it ingest blocks.
+
+* The `firecore.ConsoleReader` has been made stricter by ensuring Firehose chain exchange protocol is respected.
+
 * Changed `reader` logger back to `reader-node` to fit with the app's name which is `reader-node`.
 
 * Fix `-c ""` not working properly when no arguments are present when invoking `start` command.

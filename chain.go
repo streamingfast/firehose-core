@@ -233,7 +233,7 @@ func (c *Chain[B]) Validate() {
 		err = multierr.Append(err, fmt.Errorf("field 'LongName' must be non-empty"))
 	}
 
-	if c.ExecutableName == "" {
+	if c.ExecutableName == "" && !UnsafeAllowExecutableNameToBeEmpty {
 		err = multierr.Append(err, fmt.Errorf("field 'ExecutableName' must be non-empty"))
 	}
 
