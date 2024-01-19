@@ -252,6 +252,7 @@ func readBundle[B firecore.Block](
 
 		b := blockFactory()
 		if err = curBlock.Payload.UnmarshalTo(b); err != nil {
+			fmt.Println("Error unmarshalling block", curBlock.Number, ":", err)
 			break
 		}
 
