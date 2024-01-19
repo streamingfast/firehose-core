@@ -3,7 +3,7 @@ package firecore
 import (
 	"context"
 
-	"github.com/streamingfast/dlauncher/launcher"
+	"github.com/streamingfast/firehose-core/launcher"
 	"go.uber.org/zap"
 )
 

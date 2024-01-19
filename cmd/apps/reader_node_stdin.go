@@ -17,8 +17,8 @@ package apps
 import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/streamingfast/dlauncher/launcher"
 	firecore "github.com/streamingfast/firehose-core"
+	"github.com/streamingfast/firehose-core/launcher"
 	nodeManager "github.com/streamingfast/firehose-core/node-manager"
 	nodeReaderStdinApp "github.com/streamingfast/firehose-core/node-manager/app/node_reader_stdin"
 	"github.com/streamingfast/firehose-core/node-manager/metrics"

@@ -22,8 +22,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	discoveryservice "github.com/streamingfast/dgrpc/server/discovery-service"
-	"github.com/streamingfast/dlauncher/launcher"
 	firecore "github.com/streamingfast/firehose-core"
+	"github.com/streamingfast/firehose-core/launcher"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/app"
 	"go.uber.org/zap"
@@ -98,6 +98,8 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 
 					GRPCListenAddr:      grpcListenAddr,
 					ServiceDiscoveryURL: serviceDiscoveryURL,
+				}, &app.Tier2Modules{
+					CheckPendingShutDown: runtime.IsPendingShutdown,
 				}), nil
 		},
 	})

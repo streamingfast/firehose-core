@@ -24,9 +24,9 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
-	"github.com/streamingfast/dlauncher/launcher"
 	"github.com/streamingfast/dmetering"
 	firecore "github.com/streamingfast/firehose-core"
+	"github.com/streamingfast/firehose-core/launcher"
 	tracing "github.com/streamingfast/sf-tracing"
 	"go.uber.org/zap"
 )
@@ -34,7 +34,6 @@ import (
 var StartCmd = &cobra.Command{Use: "start", Args: cobra.ArbitraryArgs}
 
 func ConfigureStartCmd[B firecore.Block](chain *firecore.Chain[B], binaryName string, rootLog *zap.Logger) {
-
 	StartCmd.Short = fmt.Sprintf("Starts `%s` services all at once", binaryName)
 	StartCmd.RunE = func(cmd *cobra.Command, args []string) (err error) {
 		cmd.SilenceUsage = true
@@ -66,10 +65,6 @@ func start(cmd *cobra.Command, dataDir string, args []string, rootLog *zap.Logge
 		return err
 	}
 
-	modules := &launcher.Runtime{
-		AbsDataDir: dataDirAbs,
-	}
-
 	bstream.GetProtocolFirstStreamableBlock = sflags.MustGetUint64(cmd, "common-first-streamable-block")
 
 	err = bstream.ValidateRegistry()
@@ -86,7 +81,7 @@ func start(cmd *cobra.Command, dataDir string, args []string, rootLog *zap.Logge
 	}()
 	dmetering.SetDefaultEmitter(eventEmitter)
 
-	launch := launcher.NewLauncher(rootLog, modules)
+	launch := launcher.NewLauncher(rootLog, dataDirAbs)
 	rootLog.Debug("launcher created")
 
 	runByDefault := func(app string) bool {
@@ -111,7 +106,12 @@ func start(cmd *cobra.Command, dataDir string, args []string, rootLog *zap.Logge
 		return err
 	}
 
-	signalHandler, _, _ := cli.SetupSignalHandler(sflags.MustGetDuration(cmd, "common-system-shutdown-signal-delay"), rootLog)
+	signalHandler, hasBeenSignaled, _ := cli.SetupSignalHandler(sflags.MustGetDuration(cmd, "common-system-shutdown-signal-delay"), rootLog)
+
+	// We need to pass the signal handler so that runtime.IsPendingShutdown() is properly
+	// linked to the signal handler, otherwise, it will always return false.
+	launch.SwitchHasBeenSignaledAtomic(hasBeenSignaled)
+
 	select {
 	case <-signalHandler:
 		rootLog.Info("received termination signal, quitting")

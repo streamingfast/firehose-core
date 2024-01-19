@@ -24,8 +24,8 @@ import (
 	"github.com/spf13/viper"
 	"github.com/streamingfast/dauth"
 	discoveryservice "github.com/streamingfast/dgrpc/server/discovery-service"
-	"github.com/streamingfast/dlauncher/launcher"
 	firecore "github.com/streamingfast/firehose-core"
+	"github.com/streamingfast/firehose-core/launcher"
 	"github.com/streamingfast/logging"
 	app "github.com/streamingfast/substreams/app"
 	"go.uber.org/zap"
@@ -129,6 +129,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 					Authenticator:         authenticator,
 					HeadTimeDriftMetric:   ss1HeadTimeDriftmetric,
 					HeadBlockNumberMetric: ss1HeadBlockNumMetric,
+					CheckPendingShutDown:  runtime.IsPendingShutdown,
 				}), nil
 		},
 	})

@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/streamingfast/cli/sflags"
-	"github.com/streamingfast/dlauncher/launcher"
+	"github.com/streamingfast/firehose-core/launcher"
 )
 
 func setupCmd(cmd *cobra.Command, binaryName string) error {

@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/streamingfast/dlauncher/launcher"
+	"github.com/streamingfast/firehose-core/launcher"
 	"github.com/streamingfast/firehose-core/merger/app/merger"
 	"go.uber.org/zap"
 )

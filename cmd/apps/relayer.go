@@ -5,8 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/streamingfast/dlauncher/launcher"
 	firecore "github.com/streamingfast/firehose-core"
+	"github.com/streamingfast/firehose-core/launcher"
 	"github.com/streamingfast/firehose-core/relayer/app/relayer"
 	"go.uber.org/zap"
 )
