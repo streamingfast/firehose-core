@@ -15,7 +15,7 @@ import (
 )
 
 func (e *Encoder) anypb(encoder *jsontext.Encoder, t *anypb.Any, options json.Options) error {
-	msg, err := e.protoRegistry.Unmarshall(t)
+	msg, err := e.protoRegistry.Unmarshal(t)
 	if err != nil {
 		return fmt.Errorf("unmarshalling proto any: %w", err)
 	}
