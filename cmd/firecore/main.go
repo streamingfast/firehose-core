@@ -8,11 +8,11 @@ import (
 
 func main() {
 	firecore.UnsafeRunningFromFirecore = true
+	firecore.UnsafeAllowExecutableNameToBeEmpty = true
 
 	fhCMD.Main(&firecore.Chain[*pbbstream.Block]{
-		ShortName:            "core",      //used to compose the binary name
-		LongName:             "CORE",      //only used to compose cmd title and description
-		ExecutableName:       "fire-core", //only used to set default value of reader-node-path, we should not provide a default value anymore ...
+		ShortName:            "core",
+		LongName:             "CORE", //only used to compose cmd title and description
 		FullyQualifiedModule: "github.com/streamingfast/firehose-core",
 		Version:              version,
 		BlockFactory:         func() firecore.Block { return new(pbbstream.Block) },

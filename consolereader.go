@@ -8,13 +8,14 @@ import (
 	"strings"
 	"time"
 
-	"google.golang.org/protobuf/types/known/timestamppb"
-
+	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/firehose-core/node-manager/mindreader"
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const FirePrefix = "FIRE "
@@ -24,47 +25,76 @@ const InitLogPrefixLen = len(InitLogPrefix)
 const BlockLogPrefix = "BLOCK "
 const BlockLogPrefixLen = len(BlockLogPrefix)
 
-type parseCtx struct {
-	readerProtocolVersion string
-	protoMessageType      string
-}
-
-func (p *parseCtx) setProtoMessageType(typeURL string) {
-	if strings.HasPrefix(typeURL, "type.googleapis.com/") {
-		p.protoMessageType = typeURL
-		return
-	}
-	if strings.Contains(typeURL, "/") {
-		panic(fmt.Sprintf("invalid type url %q, expecting type.googleapis.com/", typeURL))
-		return
-	}
-	p.protoMessageType = "type.googleapis.com/" + typeURL
-	return
+type ParsingStats struct {
 }
 
 type ConsoleReader struct {
 	lines  chan string
-	close  func()
 	done   chan interface{}
 	logger *zap.Logger
 	tracer logging.Tracer
-	ctx    *parseCtx
+
+	// Parsing context
+	readerProtocolVersion string
+	protoMessageType      string
+	lastBlock             bstream.BlockRef
+	lastParentBlock       bstream.BlockRef
+	lib                   uint64
+
+	blockRate *dmetrics.AvgRatePromCounter
 }
 
 func NewConsoleReader(lines chan string, blockEncoder BlockEncoder, logger *zap.Logger, tracer logging.Tracer) (mindreader.ConsolerReader, error) {
-	reader := &ConsoleReader{
+	reader := newConsoleReader(lines, logger, tracer)
+
+	delayBetweenStats := 30 * time.Second
+	if tracer.Enabled() {
+		delayBetweenStats = 5 * time.Second
+	}
+
+	go func() {
+		defer reader.blockRate.Stop()
+
+		for {
+			select {
+			case <-reader.done:
+				return
+			case <-time.After(delayBetweenStats):
+				reader.printStats()
+			}
+		}
+	}()
+
+	return reader, nil
+}
+
+func newConsoleReader(lines chan string, logger *zap.Logger, tracer logging.Tracer) *ConsoleReader {
+	return &ConsoleReader{
 		lines:  lines,
-		close:  func() {},
 		done:   make(chan interface{}),
-		ctx:    &parseCtx{},
 		logger: logger,
 		tracer: tracer,
+
+		blockRate: dmetrics.MustNewAvgRateFromPromCounter(ConsoleReaderBlockReadCount, 1*time.Second, 30*time.Second, "blocks"),
 	}
-	return reader, nil
 }
 
 func (r *ConsoleReader) Done() <-chan interface{} {
 	return r.done
+}
+
+func (r *ConsoleReader) Close() error {
+	r.blockRate.SyncNow()
+	r.printStats()
+
+	r.logger.Info("console reader done")
+	close(r.done)
+
+	return nil
+}
+
+func (r *ConsoleReader) printStats() {
+	r.logger.Info("console reader stats", zap.Stringer("block_rate", r.blockRate), zap.Stringer("last_block", r.lastBlock), zap.Stringer("last_parent_block", r.lastParentBlock), zap.Uint64("lib", r.lib))
 }
 
 func (r *ConsoleReader) ReadBlock() (out *pbbstream.Block, err error) {
@@ -77,7 +107,6 @@ func (r *ConsoleReader) ReadBlock() (out *pbbstream.Block, err error) {
 }
 
 func (r *ConsoleReader) next() (out *pbbstream.Block, err error) {
-
 	for line := range r.lines {
 		if !strings.HasPrefix(line, "FIRE ") {
 			continue
@@ -86,10 +115,11 @@ func (r *ConsoleReader) next() (out *pbbstream.Block, err error) {
 		line = line[FirePrefixLen:]
 
 		switch {
-		case strings.HasPrefix(line, InitLogPrefix):
-			err = r.ctx.readInit(line[InitLogPrefixLen:])
 		case strings.HasPrefix(line, BlockLogPrefix):
-			out, err = r.ctx.readBlock(line[BlockLogPrefixLen:])
+			out, err = r.readBlock(line[BlockLogPrefixLen:])
+
+		case strings.HasPrefix(line, InitLogPrefix):
+			err = r.readInit(line[InitLogPrefixLen:])
 		default:
 			if r.tracer.Enabled() {
 				r.logger.Debug("skipping unknown Firehose log line", zap.String("line", line))
@@ -107,15 +137,48 @@ func (r *ConsoleReader) next() (out *pbbstream.Block, err error) {
 		}
 	}
 
-	r.logger.Info("lines channel has been closed")
-	close(r.done)
+	r.Close()
+
 	return nil, io.EOF
 }
 
 // Formats
+// [READER_PROTOCOL_VERSION] sf.ethereum.type.v2.Block
+func (r *ConsoleReader) readInit(line string) error {
+	chunks, err := splitInBoundedChunks(line, 2)
+	if err != nil {
+		return fmt.Errorf("split: %s", err)
+	}
+
+	r.readerProtocolVersion = chunks[0]
+
+	switch r.readerProtocolVersion {
+	// Implementation of RPC poller were set to use 1.0 so we keep support for it for now
+	case "1.0", "3.0":
+		r.logger.Info("console reader protocol version set", zap.String("version", r.readerProtocolVersion))
+
+	default:
+		return fmt.Errorf("major version of Firehose exchange protocol is unsupported (expected: one of [1.0, 3.0], found %s), you are most probably running an incompatible version of the Firehose aware node client/node poller", r.readerProtocolVersion)
+	}
+
+	protobufFullyQualifiedName := chunks[1]
+	if protobufFullyQualifiedName == "" {
+		return fmt.Errorf("protobuf fully qualified name is empty, it must be set to a valid Protobuf fully qualified message type representing your block format")
+	}
+
+	r.setProtoMessageType(protobufFullyQualifiedName)
+
+	return nil
+}
+
+// Formats
 // [block_num:342342342] [block_hash] [parent_num] [parent_hash] [lib:123123123] [timestamp:unix_nano] B64ENCODED_any
-func (ctx *parseCtx) readBlock(line string) (out *pbbstream.Block, err error) {
-	chunks, err := SplitInBoundedChunks(line, 7)
+func (r *ConsoleReader) readBlock(line string) (out *pbbstream.Block, err error) {
+	if r.readerProtocolVersion == "" {
+		return nil, fmt.Errorf("reader protocol version not set, did you forget to send the 'FIRE INIT <reader_protocol_version> <protobuf_fully_qualified_type>' line?")
+	}
+
+	chunks, err := splitInBoundedChunks(line, 7)
 	if err != nil {
 		return nil, fmt.Errorf("splitting block log line: %w", err)
 	}
@@ -147,9 +210,12 @@ func (ctx *parseCtx) readBlock(line string) (out *pbbstream.Block, err error) {
 	timestamp := time.Unix(0, int64(timestampUnixNano))
 
 	payload, err := base64.StdEncoding.DecodeString(chunks[6])
+	if err != nil {
+		return nil, fmt.Errorf("decoding payload %q: %w", chunks[6], err)
+	}
 
 	blockPayload := &anypb.Any{
-		TypeUrl: ctx.protoMessageType,
+		TypeUrl: r.protoMessageType,
 		Value:   payload,
 	}
 
@@ -163,25 +229,30 @@ func (ctx *parseCtx) readBlock(line string) (out *pbbstream.Block, err error) {
 		Payload:   blockPayload,
 	}
 
+	ConsoleReaderBlockReadCount.Inc()
+	r.lastBlock = bstream.NewBlockRef(blockHash, blockNum)
+	r.lastParentBlock = bstream.NewBlockRef(parentHash, parentNum)
+	r.lib = libNum
+
 	return block, nil
 }
 
-// [READER_PROTOCOL_VERSION] sf.ethereum.type.v2.Block
-func (ctx *parseCtx) readInit(line string) error {
-	chunks, err := SplitInBoundedChunks(line, 2)
-	if err != nil {
-		return fmt.Errorf("split: %s", err)
+func (r *ConsoleReader) setProtoMessageType(typeURL string) {
+	if strings.HasPrefix(typeURL, "type.googleapis.com/") {
+		r.protoMessageType = typeURL
+		return
 	}
 
-	ctx.readerProtocolVersion = chunks[0]
-	ctx.setProtoMessageType(chunks[1])
+	if strings.Contains(typeURL, "/") {
+		panic(fmt.Sprintf("invalid type url %q, expecting type.googleapis.com/", typeURL))
+	}
 
-	return nil
+	r.protoMessageType = "type.googleapis.com/" + typeURL
 }
 
-// SplitInBoundedChunks splits the line in `count` chunks and returns the slice `chunks[1:count]` (so exclusive end),
+// splitInBoundedChunks splits the line in `count` chunks and returns the slice `chunks[1:count]` (so exclusive end),
 // but will accumulate all trailing chunks within the last (for free-form strings, or JSON objects)
-func SplitInBoundedChunks(line string, count int) ([]string, error) {
+func splitInBoundedChunks(line string, count int) ([]string, error) {
 	chunks := strings.SplitN(line, " ", count)
 	if len(chunks) != count {
 		return nil, fmt.Errorf("%d fields required but found %d fields for line %q", count, len(chunks), line)

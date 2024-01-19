@@ -42,6 +42,12 @@ type ConsolerReader interface {
 	Done() <-chan interface{}
 }
 
+type CloseableConsoleReader interface {
+	ConsolerReader
+
+	Close() error
+}
+
 type ConsolerReaderFactory func(lines chan string) (ConsolerReader, error)
 
 type MindReaderPlugin struct {
@@ -171,7 +177,11 @@ func (p *MindReaderPlugin) Launch() {
 	if err != nil {
 		p.Shutdown(err)
 	}
+
 	p.consoleReader = consoleReader
+	if closer, ok := consoleReader.(CloseableConsoleReader); ok {
+		p.OnTerminating(func(_ error) { closer.Close() })
+	}
 
 	p.zlogger.Debug("starting archiver")
 	p.archiver.Start(ctx)

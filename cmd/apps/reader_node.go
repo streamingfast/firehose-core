@@ -76,6 +76,10 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 			sfDataDir := runtime.AbsDataDir
 
 			nodePath := viper.GetString("reader-node-path")
+			if nodePath == "" {
+				return nil, fmt.Errorf("the configuration value 'reader-node-path' cannot be empty, it must points to a Firehose aware blockchain node client or a Firehose aware poller, don't forget to set the 'reader-node-arguments' flag to pass the appropriate arguments to the node")
+			}
+
 			nodeDataDir := firecore.MustReplaceDataDir(sfDataDir, viper.GetString("reader-node-data-dir"))
 
 			readinessMaxLatency := viper.GetDuration("reader-node-readiness-max-latency")
