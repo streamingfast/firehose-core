@@ -39,7 +39,7 @@ func (r *Registry) RegisterFileDescriptor(f *desc.FileDescriptor) {
 	r.filesDescriptors = append(r.filesDescriptors, f)
 }
 
-func (r *Registry) Unmarshall(t *anypb.Any) (*dynamic.Message, error) {
+func (r *Registry) Unmarshal(t *anypb.Any) (*dynamic.Message, error) {
 	for _, fd := range r.filesDescriptors {
 		md := fd.FindSymbol(cleanTypeURL(t.TypeUrl))
 		if md != nil {
