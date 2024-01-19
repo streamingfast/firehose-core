@@ -112,9 +112,9 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 		processState := &state{
 			segments: segments,
 		}
-
 		err = storeReference.Walk(ctx, check.WalkBlockPrefix(blockRange, 100), func(filename string) (err error) {
 			fileStartBlock, err := strconv.Atoi(filename)
+
 			if err != nil {
 				return fmt.Errorf("parsing filename: %w", err)
 			}
@@ -145,6 +145,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 						&warnAboutExtraBlocks,
 						chain.BlockFactory,
 					)
+
 					if err != nil {
 						bundleErrLock.Lock()
 						bundleReadErr = multierr.Append(bundleReadErr, err)
@@ -155,6 +156,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
+
 					_, currentBlocks, err = readBundle(ctx,
 						filename,
 						storeCurrent,
@@ -164,6 +166,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 						&warnAboutExtraBlocks,
 						chain.BlockFactory,
 					)
+
 					if err != nil {
 						bundleErrLock.Lock()
 						bundleReadErr = multierr.Append(bundleReadErr, err)
@@ -233,7 +236,9 @@ func readBundle[B firecore.Block](
 	var blockHashes []string
 	blocksMap := make(map[string]B)
 	for {
+
 		curBlock, err := blockReader.Read()
+
 		if err == io.EOF {
 			break
 		}
@@ -243,6 +248,7 @@ func readBundle[B firecore.Block](
 		if curBlock.Number >= stopBlock {
 			break
 		}
+
 		if curBlock.Number < fileStartBlock {
 			warnAboutExtraBlocks.Do(func() {
 				fmt.Printf("Warn: Bundle file %s contains block %d, preceding its start_block. This 'feature' is not used anymore and extra blocks like this one will be ignored during compare\n", store.ObjectURL(filename), curBlock.Number)
@@ -252,11 +258,12 @@ func readBundle[B firecore.Block](
 
 		b := blockFactory()
 		if err = curBlock.Payload.UnmarshalTo(b); err != nil {
-			fmt.Println("Error unmarshalling block", curBlock.Number, ":", err)
+			return nil, nil, fmt.Errorf("unmarshalling block: %w", err)
 			break
 		}
 
 		curBlockPB := sanitizer(b.(B))
+
 		blockHashes = append(blockHashes, curBlock.Id)
 		blocksMap[curBlock.Id] = curBlockPB
 	}
@@ -378,6 +385,7 @@ func Compare(reference, current proto.Message, ignoreUnknown bool) (isEqual bool
 	}
 
 	if !proto.Equal(reference, current) {
+
 		ref, err := json.MarshalIndent(reference, "", " ")
 		cli.NoError(err, "marshal JSON reference")
 
