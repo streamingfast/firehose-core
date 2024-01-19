@@ -70,6 +70,7 @@ func NewToolsCompareBlocksCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra
 	flags := cmd.PersistentFlags()
 	flags.Bool("diff", false, "When activated, difference is displayed for each block with a difference")
 	flags.Bool("include-unknown-fields", false, "When activated, the 'unknown fields' in the protobuf message will also be compared. These would not generate any difference when unmarshalled with the current protobuf definition.")
+	flags.Bool("ignore-error-when-JSON-matches", false, "When activated, the reader will ignore error if the JSON representation of the block matches (which results in an empty diff file).")
 
 	return cmd
 }
@@ -80,6 +81,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 	return func(cmd *cobra.Command, args []string) error {
 		displayDiff := sflags.MustGetBool(cmd, "diff")
 		ignoreUnknown := !sflags.MustGetBool(cmd, "include-unknown-fields")
+		ignoreEmptyDiff := sflags.MustGetBool(cmd, "ignore-error-when-JSON-matches")
 		segmentSize := uint64(100000)
 		warnAboutExtraBlocks := sync.Once{}
 
@@ -186,6 +188,12 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 					if existsInCurrent {
 						var differences []string
 						isEqual, differences = Compare(referenceBlock, currentBlock, ignoreUnknown)
+
+						if ignoreEmptyDiff && len(differences) == 0 {
+							fmt.Printf("JSON representation of blocks referenceBlock %s identical, but not protobuf def, blocks are considered equal\n", firehoseBlockToRef(referenceBlock))
+							isEqual = true
+						}
+
 						if !isEqual {
 							fmt.Printf("- Block %s is different\n", firehoseBlockToRef(referenceBlock))
 							if displayDiff {
