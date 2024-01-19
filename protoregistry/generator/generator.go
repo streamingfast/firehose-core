@@ -75,7 +75,12 @@ func main() {
 			if file.Name != nil {
 				name = *file.Name
 			}
-			protofiles = append(protofiles, ProtoFile{name, cnt})
+
+			protofiles = append(protofiles, ProtoFile{
+				Name:                  name,
+				Data:                  cnt,
+				BufRegistryPackageURL: buildBufRegistryPackageURL(wellKnownProtoRepo, deferPtr(file.Package, ""), fileDescriptorSet.Msg.Version),
+			})
 		}
 		// avoid hitting the buf.build rate limit
 		time.Sleep(1 * time.Second)
@@ -109,9 +114,15 @@ func main() {
 	fmt.Println("Done creating well known registry")
 }
 
+func buildBufRegistryPackageURL(module string, fullyQualifiedPackage string, revision string) string {
+	// Example full URL is https://buf.build/streamingfast/firehose-near/docs/146e2ae8bd9b49e29b132b8627f29a70:sf.near.type.v1
+	return fmt.Sprintf("https://%s/docs/%s:%s", module, revision, fullyQualifiedPackage)
+}
+
 type ProtoFile struct {
-	Name string
-	Data []byte
+	Name                  string
+	Data                  []byte
+	BufRegistryPackageURL string
 }
 
 func templateFunctions() template.FuncMap {
@@ -123,4 +134,12 @@ func templateFunctions() template.FuncMap {
 			return hex.EncodeToString(in)
 		},
 	}
+}
+
+func deferPtr[T any](in *T, orValue T) T {
+	if in == nil {
+		return orValue
+	}
+
+	return *in
 }
