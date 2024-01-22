@@ -29,7 +29,7 @@ require (
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	github.com/streamingfast/pbgo v0.0.6-0.20231208140754-ed2bd10b96ee
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.3.2-0.20240119045851-7de579a236d2
+	github.com/streamingfast/substreams v1.3.2-0.20240122120515-89758b320871
 	github.com/stretchr/testify v1.8.4
 	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.10.0
