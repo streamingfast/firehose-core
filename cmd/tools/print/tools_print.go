@@ -129,11 +129,6 @@ func createToolsPrintOneBlockE[B firecore.Block](chain *firecore.Chain[B]) firec
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		if _, ok := chain.BlockFactory().(*pbbstream.Block); ok {
-			//todo: fix this with buf registry
-			return fmt.Errorf("this tool only works with blocks that are not of type *pbbstream.Block")
-		}
-
 		outputMode, err := toolsPrintCmdGetOutputMode(cmd)
 		if err != nil {
 			return fmt.Errorf("invalid 'output' flag: %w", err)
