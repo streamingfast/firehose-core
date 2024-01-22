@@ -264,10 +264,10 @@ func PrintBStreamBlock(b *pbbstream.Block, printTransactions bool, out io.Writer
 }
 
 func SetupJsonEncoder(cmd *cobra.Command, chainFileDescriptor protoreflect.FileDescriptor) (*jsonencoder.Encoder, error) {
-	pbregistry, err := protoregistry.New(chainFileDescriptor, sflags.MustGetStringSlice(cmd, "proto-paths")...)
+	err := protoregistry.Register(chainFileDescriptor, sflags.MustGetStringSlice(cmd, "proto-paths")...)
 	if err != nil {
 		return nil, fmt.Errorf("new registry: %w", err)
 	}
 
-	return jsonencoder.New(pbregistry), nil
+	return jsonencoder.New(), nil
 }

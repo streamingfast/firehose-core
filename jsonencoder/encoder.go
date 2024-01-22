@@ -6,17 +6,13 @@ import (
 
 	"github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
-	"github.com/streamingfast/firehose-core/protoregistry"
 )
 
 type Encoder struct {
-	protoRegistry *protoregistry.Registry
 }
 
-func New(registry *protoregistry.Registry) *Encoder {
-	return &Encoder{
-		protoRegistry: registry,
-	}
+func New() *Encoder {
+	return &Encoder{}
 }
 
 func (e *Encoder) Marshal(in any) error {

@@ -1,8 +1,0 @@
-syntax = "proto3";
-
-package sf.ethereum.type.v2;
-
-message Block {
-  bytes hash_custom = 2;
-  uint64 number_custom = 3;
-}
