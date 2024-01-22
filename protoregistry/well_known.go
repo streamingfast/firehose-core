@@ -10,7 +10,7 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
-var WellKnownRegistry = New()
+var WellKnownRegistry = NewEmpty()
 
 func init() {
 	protoFiles := []string{
