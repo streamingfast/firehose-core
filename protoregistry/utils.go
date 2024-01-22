@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-func parseProtoFiles(importPaths []string) (fds []*desc.FileDescriptor, err error) {
+func parseProtoFiles(importPaths []string) (fds []protoreflect.FileDescriptor, err error) {
 	userDir, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("get user home dir: %w", err)
@@ -56,9 +56,13 @@ func parseProtoFiles(importPaths []string) (fds []*desc.FileDescriptor, err erro
 		}
 	}
 
-	fds, err = parser.ParseFiles(protoFiles...)
+	parsed, err := parser.ParseFiles(protoFiles...)
 	if err != nil {
 		return nil, fmt.Errorf("parsing proto files: %w", err)
+	}
+
+	for _, fd := range parsed {
+		fds = append(fds, fd.UnwrapFile())
 	}
 	return
 
