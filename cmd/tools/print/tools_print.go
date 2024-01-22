@@ -29,6 +29,7 @@ import (
 	"github.com/streamingfast/firehose-core/jsonencoder"
 	"github.com/streamingfast/firehose-core/protoregistry"
 	"github.com/streamingfast/firehose-core/types"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 func NewToolsPrintCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra.Command {
@@ -99,7 +100,7 @@ func createToolsPrintMergedBlocksE[B firecore.Block](chain *firecore.Chain[B]) f
 			return err
 		}
 
-		jencoder, err := SetupJsonEncoder(cmd)
+		jencoder, err := SetupJsonEncoder(cmd, chain.BlockFactory().ProtoReflect().Descriptor().ParentFile())
 		if err != nil {
 			return fmt.Errorf("unable to create json encoder: %w", err)
 		}
@@ -136,7 +137,7 @@ func createToolsPrintOneBlockE[B firecore.Block](chain *firecore.Chain[B]) firec
 
 		printTransactions := sflags.MustGetBool(cmd, "transactions")
 
-		jencoder, err := SetupJsonEncoder(cmd)
+		jencoder, err := SetupJsonEncoder(cmd, chain.BlockFactory().ProtoReflect().Descriptor().ParentFile())
 		if err != nil {
 			return fmt.Errorf("unable to create json encoder: %w", err)
 		}
@@ -262,15 +263,11 @@ func PrintBStreamBlock(b *pbbstream.Block, printTransactions bool, out io.Writer
 	return nil
 }
 
-func SetupJsonEncoder(cmd *cobra.Command) (*jsonencoder.Encoder, error) {
-	pbregistry := protoregistry.New()
-	protoPaths := sflags.MustGetStringSlice(cmd, "proto-paths")
-	if len(protoPaths) > 0 {
-		if err := pbregistry.RegisterFiles(protoPaths); err != nil {
-			return nil, fmt.Errorf("unable to create dynamic printer: %w", err)
-		}
+func SetupJsonEncoder(cmd *cobra.Command, chainFileDescriptor protoreflect.FileDescriptor) (*jsonencoder.Encoder, error) {
+	pbregistry, err := protoregistry.New(chainFileDescriptor, sflags.MustGetStringSlice(cmd, "proto-paths")...)
+	if err != nil {
+		return nil, fmt.Errorf("new registry: %w", err)
 	}
 
-	pbregistry.Extends(protoregistry.WellKnownRegistry)
 	return jsonencoder.New(pbregistry), nil
 }

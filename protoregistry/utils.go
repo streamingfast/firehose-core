@@ -3,7 +3,6 @@ package protoregistry
 import (
 	"fmt"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strings"
 
@@ -12,11 +11,10 @@ import (
 )
 
 func parseProtoFiles(importPaths []string) (fds []*desc.FileDescriptor, err error) {
-	usr, err := user.Current()
+	userDir, err := os.UserHomeDir()
 	if err != nil {
-		return nil, fmt.Errorf("getting current user: %w", err)
+		return nil, fmt.Errorf("get user home dir: %w", err)
 	}
-	userDir := usr.HomeDir
 
 	var ip []string
 	for _, importPath := range importPaths {

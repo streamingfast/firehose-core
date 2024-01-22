@@ -13,9 +13,9 @@ type Encoder struct {
 	protoRegistry *protoregistry.Registry
 }
 
-func New(files *protoregistry.Registry) *Encoder {
+func New(registry *protoregistry.Registry) *Encoder {
 	return &Encoder{
-		protoRegistry: files,
+		protoRegistry: registry,
 	}
 }
 

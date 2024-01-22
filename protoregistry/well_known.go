@@ -11,7 +11,7 @@ import (
 )
 
 
-var WellKnownRegistry = New()
+var WellKnownRegistry = NewEmpty()
 
 func init() {
 	protoFiles := []string{

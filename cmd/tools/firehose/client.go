@@ -89,7 +89,7 @@ func getFirehoseClientE[B firecore.Block](chain *firecore.Chain[B], rootLog *zap
 			}()
 		}
 
-		jencoder, err := print.SetupJsonEncoder(cmd)
+		jencoder, err := print.SetupJsonEncoder(cmd, chain.BlockFactory().ProtoReflect().Descriptor().ParentFile())
 		if err != nil {
 			return fmt.Errorf("unable to create json encoder: %w", err)
 		}

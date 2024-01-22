@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/jhump/protoreflect/desc"
@@ -19,7 +20,37 @@ type Registry struct {
 	filesDescriptors []*desc.FileDescriptor
 }
 
-func New() *Registry {
+// New creates a new Registry first populated with the well-known types
+// and then with the proto files passed as arguments. This means the
+// precendence of the proto files is higher than the well-known types.
+func New(chainFileDescriptor protoreflect.FileDescriptor, protoPaths ...string) (*Registry, error) {
+	f := NewEmpty()
+
+	// Proto paths have the highest precedence, so we register them first
+	if len(protoPaths) > 0 {
+		if err := f.RegisterFiles(protoPaths); err != nil {
+			return nil, fmt.Errorf("register proto files: %w", err)
+		}
+	}
+
+	// Chain file descriptor has the second highest precedence, it always
+	// override built-in types if defined.
+	if chainFileDescriptor != nil {
+		chainFileDesc, err := desc.WrapFile(chainFileDescriptor)
+		if err != nil {
+			return nil, fmt.Errorf("wrap file descriptor: %w", err)
+		}
+
+		f.filesDescriptors = append(f.filesDescriptors, chainFileDesc)
+	}
+
+	// Last are well known types, they have the lowest precedence
+	f.Extends(WellKnownRegistry)
+
+	return f, nil
+}
+
+func NewEmpty() *Registry {
 	f := &Registry{
 		filesDescriptors: []*desc.FileDescriptor{},
 	}
@@ -27,6 +58,10 @@ func New() *Registry {
 }
 
 func (r *Registry) RegisterFiles(files []string) error {
+	if len(files) == 0 {
+		return nil
+	}
+
 	fileDescriptors, err := parseProtoFiles(files)
 	if err != nil {
 		return fmt.Errorf("parsing proto files: %w", err)
