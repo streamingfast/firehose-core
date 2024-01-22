@@ -5,10 +5,9 @@ import (
 	"strings"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/dynamicpb"
 	"google.golang.org/protobuf/types/known/anypb"
-
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/dynamic"
 )
 
 // Generate the flags based on Go code in this project directly, this however
@@ -16,48 +15,34 @@ import (
 // but to fix them we must re-generate it.
 //go:generate go run ./generator well_known.go protoregistry
 
-type Registry struct {
-	filesDescriptors []*desc.FileDescriptor
-}
-
-// New creates a new Registry first populated with the well-known types
-// and then with the proto files passed as arguments. This means the
-// precendence of the proto files is higher than the well-known types.
-func New(chainFileDescriptor protoreflect.FileDescriptor, protoPaths ...string) (*Registry, error) {
-	f := NewEmpty()
+func Register(chainFileDescriptor protoreflect.FileDescriptor, protoPaths ...string) error {
 
 	// Proto paths have the highest precedence, so we register them first
 	if len(protoPaths) > 0 {
-		if err := f.RegisterFiles(protoPaths); err != nil {
-			return nil, fmt.Errorf("register proto files: %w", err)
+		if err := RegisterFiles(protoPaths); err != nil {
+			return fmt.Errorf("register proto files: %w", err)
 		}
 	}
 
 	// Chain file descriptor has the second highest precedence, it always
 	// override built-in types if defined.
 	if chainFileDescriptor != nil {
-		chainFileDesc, err := desc.WrapFile(chainFileDescriptor)
+		err := RegisterFileDescriptor(chainFileDescriptor)
 		if err != nil {
-			return nil, fmt.Errorf("wrap file descriptor: %w", err)
+			return fmt.Errorf("register chain file descriptor: %w", err)
 		}
-
-		f.filesDescriptors = append(f.filesDescriptors, chainFileDesc)
 	}
 
 	// Last are well known types, they have the lowest precedence
-	f.Extends(WellKnownRegistry)
-
-	return f, nil
-}
-
-func NewEmpty() *Registry {
-	f := &Registry{
-		filesDescriptors: []*desc.FileDescriptor{},
+	fds, err := GetWellKnownFileDescriptors()
+	if err != nil {
+		return fmt.Errorf("getting well known file descriptors: %w", err)
 	}
-	return f
+	return RegisterFileDescriptors(fds)
+
 }
 
-func (r *Registry) RegisterFiles(files []string) error {
+func RegisterFiles(files []string) error {
 	if len(files) == 0 {
 		return nil
 	}
@@ -66,30 +51,38 @@ func (r *Registry) RegisterFiles(files []string) error {
 	if err != nil {
 		return fmt.Errorf("parsing proto files: %w", err)
 	}
-	r.filesDescriptors = append(r.filesDescriptors, fileDescriptors...)
+
+	return RegisterFileDescriptors(fileDescriptors)
+}
+func RegisterFileDescriptors(fds []protoreflect.FileDescriptor) error {
+	for _, fd := range fds {
+		err := RegisterFileDescriptor(fd)
+		if err != nil {
+			return fmt.Errorf("registering proto file: %w", err)
+		}
+	}
+	return nil
+}
+func RegisterFileDescriptor(fd protoreflect.FileDescriptor) error {
+	if err := protoregistry.GlobalFiles.RegisterFile(fd); err != nil {
+		return fmt.Errorf("registering proto file: %w", err)
+	}
 	return nil
 }
 
-func (r *Registry) RegisterFileDescriptor(f *desc.FileDescriptor) {
-	r.filesDescriptors = append(r.filesDescriptors, f)
-}
-
-func (r *Registry) Unmarshal(t *anypb.Any) (*dynamic.Message, error) {
-	for _, fd := range r.filesDescriptors {
-		md := fd.FindSymbol(cleanTypeURL(t.TypeUrl))
-		if md != nil {
-			dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(md.(*desc.MessageDescriptor))
-			if err := dynMsg.Unmarshal(t.Value); err != nil {
-				return nil, fmt.Errorf("unmarshalling proto: %w", err)
-			}
-			return dynMsg, nil
-		}
+func Unmarshal(a *anypb.Any) (*dynamicpb.Message, error) {
+	messageType, err := protoregistry.GlobalTypes.FindMessageByURL(a.TypeUrl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find message type: %v", err)
 	}
-	return nil, fmt.Errorf("no message descriptor in registry for  type url: %s", t.TypeUrl)
-}
 
-func (r *Registry) Extends(registry *Registry) {
-	r.filesDescriptors = append(r.filesDescriptors, registry.filesDescriptors...)
+	message := dynamicpb.NewMessage(messageType.Descriptor())
+	err = a.UnmarshalTo(message)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal message: %v", err)
+	}
+
+	return nil, fmt.Errorf("no message descriptor in registry for  type url: %s", a.TypeUrl)
 }
 
 func cleanTypeURL(in string) string {
