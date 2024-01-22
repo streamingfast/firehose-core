@@ -9,9 +9,9 @@ import (
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	bstransform "github.com/streamingfast/bstream/transform"
-	"github.com/streamingfast/dlauncher/launcher"
 	firecore "github.com/streamingfast/firehose-core"
 	index_builder "github.com/streamingfast/firehose-core/index-builder/app/index-builder"
+	"github.com/streamingfast/firehose-core/launcher"
 	"go.uber.org/zap"
 )
 

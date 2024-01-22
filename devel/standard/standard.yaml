@@ -1,0 +1,22 @@
+start:
+  args:
+  - reader-node
+  - merger
+  - relayer
+  - firehose
+  - substreams-tier1
+  - substreams-tier2
+  flags:
+    # Specifies the path to the binary, we assume you did
+    # `go install github.com/streamingfast/dummy-blockchain@latest` (and that you have value
+    # of `go env GOPATH` in your environment).
+    reader-node-path: "dummy-blockchain"
+    reader-node-data-dir: "{data-dir}/reader-node"
+
+    # Flags that will be added to the dummy chain process command
+    reader-node-arguments:
+      start
+      --tracer=firehose
+      --store-dir="{node-data-dir}"
+      --block-rate=1200
+      --genesis-height=0

@@ -6,6 +6,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -29,10 +30,11 @@ type ParsingStats struct {
 }
 
 type ConsoleReader struct {
-	lines  chan string
-	done   chan interface{}
-	logger *zap.Logger
-	tracer logging.Tracer
+	lines     chan string
+	done      chan interface{}
+	closeOnce sync.Once
+	logger    *zap.Logger
+	tracer    logging.Tracer
 
 	// Parsing context
 	readerProtocolVersion string
@@ -84,17 +86,36 @@ func (r *ConsoleReader) Done() <-chan interface{} {
 }
 
 func (r *ConsoleReader) Close() error {
-	r.blockRate.SyncNow()
-	r.printStats()
+	r.closeOnce.Do(func() {
+		r.blockRate.SyncNow()
+		r.printStats()
 
-	r.logger.Info("console reader done")
-	close(r.done)
+		r.logger.Info("console reader done")
+		close(r.done)
+	})
 
 	return nil
 }
 
+type blockRefView struct {
+	ref bstream.BlockRef
+}
+
+func (v blockRefView) String() string {
+	if v.ref == nil {
+		return "<unset>"
+	}
+
+	return v.ref.String()
+}
+
 func (r *ConsoleReader) printStats() {
-	r.logger.Info("console reader stats", zap.Stringer("block_rate", r.blockRate), zap.Stringer("last_block", r.lastBlock), zap.Stringer("last_parent_block", r.lastParentBlock), zap.Uint64("lib", r.lib))
+	r.logger.Info("console reader stats",
+		zap.Stringer("block_rate", r.blockRate),
+		zap.Stringer("last_block", blockRefView{r.lastBlock}),
+		zap.Stringer("last_parent_block", blockRefView{r.lastParentBlock}),
+		zap.Uint64("lib", r.lib),
+	)
 }
 
 func (r *ConsoleReader) ReadBlock() (out *pbbstream.Block, err error) {

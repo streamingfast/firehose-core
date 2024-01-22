@@ -10,11 +10,11 @@ import (
 	"github.com/streamingfast/bstream/transform"
 	"github.com/streamingfast/dauth"
 	discoveryservice "github.com/streamingfast/dgrpc/server/discovery-service"
-	"github.com/streamingfast/dlauncher/launcher"
 	"github.com/streamingfast/dmetrics"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/firehose/app/firehose"
 	"github.com/streamingfast/firehose-core/firehose/server"
+	"github.com/streamingfast/firehose-core/launcher"
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 )
@@ -100,6 +100,7 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 				HeadTimeDriftMetric:   headTimeDriftmetric,
 				HeadBlockNumberMetric: headBlockNumMetric,
 				TransformRegistry:     registry,
+				CheckPendingShutdown:  runtime.IsPendingShutdown,
 			}), nil
 		},
 	})

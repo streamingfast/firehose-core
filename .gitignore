@@ -4,3 +4,4 @@
 .envrc
 .env
 .DS_Store
+firehose-data*
