@@ -1,6 +1,7 @@
 package protoregistry
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -33,13 +34,13 @@ func Register(chainFileDescriptor protoreflect.FileDescriptor, protoPaths ...str
 		}
 	}
 
-	// Last are well known types, they have the lowest precedence
-	fds, err := GetWellKnownFileDescriptors()
+	//Last are well known types, they have the lowest precedence
+	err := RegisterWellKnownFileDescriptors()
 	if err != nil {
-		return fmt.Errorf("getting well known file descriptors: %w", err)
+		return fmt.Errorf("registering well known file descriptors: %w", err)
 	}
-	return RegisterFileDescriptors(fds)
 
+	return nil
 }
 
 func RegisterFiles(files []string) error {
@@ -64,9 +65,36 @@ func RegisterFileDescriptors(fds []protoreflect.FileDescriptor) error {
 	return nil
 }
 func RegisterFileDescriptor(fd protoreflect.FileDescriptor) error {
-	if err := protoregistry.GlobalFiles.RegisterFile(fd); err != nil {
-		return fmt.Errorf("registering proto file: %w", err)
+	path := fd.Path()
+	_, err := protoregistry.GlobalFiles.FindFileByPath(path)
+
+	if err != nil {
+		if errors.Is(err, protoregistry.NotFound) {
+			// Register the new file descriptor.
+			if err := protoregistry.GlobalFiles.RegisterFile(fd); err != nil {
+				return fmt.Errorf("registering proto file: %w", err)
+			}
+
+			// Create a new MessageType using the registered FileDescriptor
+			msgCount := fd.Messages().Len()
+			for i := 0; i < msgCount; i++ {
+				messageType := fd.Messages().Get(i)
+				if messageType == nil {
+					return fmt.Errorf("message type not found in the registered file")
+				}
+
+				dmt := dynamicpb.NewMessageType(messageType) // Register the MessageType
+				err := protoregistry.GlobalTypes.RegisterMessage(dmt)
+				if err != nil {
+					return fmt.Errorf("registering message type: %w", err)
+				}
+			}
+			return nil
+		}
+		return fmt.Errorf("finding file by path: %w", err)
 	}
+
+	//that mean we already have this file registered, we need to check if we have the message type registered
 	return nil
 }
 
@@ -82,7 +110,7 @@ func Unmarshal(a *anypb.Any) (*dynamicpb.Message, error) {
 		return nil, fmt.Errorf("failed to unmarshal message: %v", err)
 	}
 
-	return nil, fmt.Errorf("no message descriptor in registry for  type url: %s", a.TypeUrl)
+	return message, nil
 }
 
 func cleanTypeURL(in string) string {

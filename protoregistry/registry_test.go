@@ -3,12 +3,10 @@ package protoregistry
 import (
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
-	"google.golang.org/protobuf/reflect/protoregistry"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -32,41 +30,65 @@ func TestUnmarshal(t *testing.T) {
 			name:    "chain alone",
 			typeURL: "sf.acme.type.v1.Block",
 			want: func(tt *testing.T, out *dynamicpb.Message) {
-				assert.Equal(tt, "", out.Get(out.Descriptor().Fields().ByName("hash")))
-				assert.Equal(tt, uint64(0), out.Get(out.Descriptor().Fields().ByName("num")))
+				h := out.Get(out.Descriptor().Fields().ByName("hash")).String()
+				blockNum := out.Get(out.Descriptor().Fields().ByName("num")).Uint()
+				assert.Equal(tt, "", h)
+				assert.Equal(tt, uint64(0), blockNum)
 			},
 			assertion: require.NoError,
 		},
-		//{
-		//	name:       "overriding built-in chain with proto path",
-		//	protoPaths: []string{"testdata/override_acme"},
-		//	typeURL:    "sf.acme.type.v1.Block",
-		//	want: func(tt *testing.T, out *dynamicpb.Message) {
-		//		// If you reach this point following a panic in the Go test, the reason there
-		//		// is a panic here is because the override_ethereum.proto file is taking
-		//		// precedence over the ethereum.proto file, which is not what we want.
-		//		assert.Equal(tt, "", out.GetFieldByName("hash_custom"))
-		//		assert.Equal(tt, uint64(0), out.GetFieldByName("num_custom"))
-		//	},
-		//	assertion: require.NoError,
-		//},
-		//{
-		//	name:       "overridding well-know chain (ethereum) with proto path",
-		//	protoPaths: []string{"testdata/override_ethereum"},
-		//	typeURL:    "sf.ethereum.type.v2.Block",
-		//	value:      []byte{0x18, 0x0a},
-		//	want: func(tt *testing.T, out *dynamicpb.Message) {
-		//		// If you reach this point following a panic in the Go test, the reason there
-		//		// is a panic here is because the override_ethereum.proto file is taking
-		//		// precedence over the ethereum.proto file, which is not what we want.
-		//		assert.Equal(tt, uint64(10), out.GetFieldByName("number_custom"))
-		//	},
-		//	assertion: require.NoError,
-		//},
+		{
+			name:       "overriding built-in chain with proto path",
+			protoPaths: []string{"testdata/override_acme"},
+			typeURL:    "sf.acme.type.v1.Block",
+			want: func(tt *testing.T, out *dynamicpb.Message) {
+				// If you reach this point following a panic in the Go test, the reason there
+				// is a panic here is because the override_ethereum.proto file is taking
+				// precedence over the ethereum.proto file, which is not what we want.
+				h := out.Get(out.Descriptor().Fields().ByName("hash_custom")).String()
+				blockNum := out.Get(out.Descriptor().Fields().ByName("num_custom")).Uint()
+				assert.Equal(tt, "", h)
+				assert.Equal(tt, uint64(0), blockNum)
+			},
+			assertion: require.NoError,
+		},
+		{
+			name:    "well-know chain (ethereum)",
+			typeURL: "sf.ethereum.type.v2.Block",
+			value:   []byte{0x18, 0x0a},
+			want: func(tt *testing.T, out *dynamicpb.Message) {
+				// If you reach this point following a panic in the Go test, the reason there
+				// is a panic here is because the override_ethereum.proto file is taking
+				// precedence over the ethereum.proto file, which is not what we want.
+				cn := out.Get(out.Descriptor().Fields().ByName("number")).Uint()
+				assert.Equal(tt, uint64(10), cn)
+			},
+			assertion: require.NoError,
+		},
+		{
+			name:       "overridding well-know chain (ethereum) with proto path",
+			protoPaths: []string{"testdata/override"},
+			typeURL:    "sf.ethereum.type.v2.Block",
+			value:      []byte{0x18, 0x0a},
+			want: func(tt *testing.T, out *dynamicpb.Message) {
+				// If you reach this point following a panic in the Go test, the reason there
+				// is a panic here is because the override_ethereum.proto file is taking
+				// precedence over the ethereum.proto file, which is not what we want.
+				cn := out.Get(out.Descriptor().Fields().ByName("number_custom")).Uint()
+				assert.Equal(tt, uint64(10), cn)
+			},
+			assertion: require.NoError,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mustRegistry(t, acme, tt.protoPaths...)
+
+			protoregistry.GlobalFiles = &protoregistry.Files{}
+			protoregistry.GlobalTypes = &protoregistry.Types{}
+
+			err := Register(acme, tt.protoPaths...)
+			require.NoError(t, err)
+
 			a := &anypb.Any{TypeUrl: "type.googleapis.com/" + tt.typeURL, Value: tt.value}
 			out, err := Unmarshal(a)
 			tt.assertion(t, err)
@@ -75,17 +97,6 @@ func TestUnmarshal(t *testing.T) {
 		})
 	}
 }
-
-func mustRegistry(t *testing.T, chainFileDescriptor protoreflect.FileDescriptor, protoPaths ...string) {
-	t.Helper()
-
-	err := RegisterFiles(protoPaths)
-	require.NoError(t, err)
-	err = RegisterFileDescriptor(chainFileDescriptor)
-	require.NoError(t, err)
-	spew.Dump(protoregistry.GlobalTypes)
-}
-
 func readTestProto(t *testing.T, file string) protoreflect.FileDescriptor {
 	t.Helper()
 

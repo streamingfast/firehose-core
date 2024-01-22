@@ -5,17 +5,16 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jhump/protoreflect/dynamic"
-
-	"github.com/mr-tron/base58"
-
 	"github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
+	"github.com/jhump/protoreflect/dynamic"
+	"github.com/mr-tron/base58"
+	"github.com/streamingfast/firehose-core/protoregistry"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func (e *Encoder) anypb(encoder *jsontext.Encoder, t *anypb.Any, options json.Options) error {
-	msg, err := e.protoRegistry.Unmarshal(t)
+	msg, err := protoregistry.Unmarshal(t)
 	if err != nil {
 		return fmt.Errorf("unmarshalling proto any: %w", err)
 	}
