@@ -2,6 +2,7 @@ package jsonencoder
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 
 	"github.com/go-json-experiment/json"
@@ -16,7 +17,11 @@ func New() *Encoder {
 }
 
 func (e *Encoder) Marshal(in any) error {
-	return json.MarshalEncode(jsontext.NewEncoder(os.Stdout), in, json.WithMarshalers(e.getMarshallers("")))
+	err := json.MarshalEncode(jsontext.NewEncoder(os.Stdout), in, json.WithMarshalers(e.getMarshallers("")))
+	if err != nil {
+		return fmt.Errorf("marshalling and encoding block to json: %w", err)
+	}
+	return nil
 }
 
 func (e *Encoder) MarshalToString(in any) (string, error) {

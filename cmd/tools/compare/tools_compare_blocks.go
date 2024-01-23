@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/davecgh/go-spew/spew"
+
 	jd "github.com/josephburnett/jd/lib"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
@@ -70,7 +72,6 @@ func NewToolsCompareBlocksCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra
 	flags := cmd.PersistentFlags()
 	flags.Bool("diff", false, "When activated, difference is displayed for each block with a difference")
 	flags.Bool("include-unknown-fields", false, "When activated, the 'unknown fields' in the protobuf message will also be compared. These would not generate any difference when unmarshalled with the current protobuf definition.")
-	flags.Bool("ignore-error-when-JSON-matches", false, "When activated, the reader will ignore error if the JSON representation of the block matches (which results in an empty diff file).")
 
 	return cmd
 }
@@ -81,7 +82,6 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 	return func(cmd *cobra.Command, args []string) error {
 		displayDiff := sflags.MustGetBool(cmd, "diff")
 		ignoreUnknown := !sflags.MustGetBool(cmd, "include-unknown-fields")
-		ignoreEmptyDiff := sflags.MustGetBool(cmd, "ignore-error-when-JSON-matches")
 		segmentSize := uint64(100000)
 		warnAboutExtraBlocks := sync.Once{}
 
@@ -114,9 +114,9 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 		processState := &state{
 			segments: segments,
 		}
+
 		err = storeReference.Walk(ctx, check.WalkBlockPrefix(blockRange, 100), func(filename string) (err error) {
 			fileStartBlock, err := strconv.Atoi(filename)
-
 			if err != nil {
 				return fmt.Errorf("parsing filename: %w", err)
 			}
@@ -147,7 +147,6 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 						&warnAboutExtraBlocks,
 						chain.BlockFactory,
 					)
-
 					if err != nil {
 						bundleErrLock.Lock()
 						bundleReadErr = multierr.Append(bundleReadErr, err)
@@ -158,7 +157,6 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-
 					_, currentBlocks, err = readBundle(ctx,
 						filename,
 						storeCurrent,
@@ -168,7 +166,6 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 						&warnAboutExtraBlocks,
 						chain.BlockFactory,
 					)
-
 					if err != nil {
 						bundleErrLock.Lock()
 						bundleReadErr = multierr.Append(bundleReadErr, err)
@@ -188,12 +185,6 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 					if existsInCurrent {
 						var differences []string
 						isEqual, differences = Compare(referenceBlock, currentBlock, ignoreUnknown)
-
-						if ignoreEmptyDiff && len(differences) == 0 {
-							fmt.Printf("JSON representation of blocks referenceBlock %s identical, but not protobuf def, blocks are considered equal\n", firehoseBlockToRef(referenceBlock))
-							isEqual = true
-						}
-
 						if !isEqual {
 							fmt.Printf("- Block %s is different\n", firehoseBlockToRef(referenceBlock))
 							if displayDiff {
@@ -244,9 +235,7 @@ func readBundle[B firecore.Block](
 	var blockHashes []string
 	blocksMap := make(map[string]B)
 	for {
-
 		curBlock, err := blockReader.Read()
-
 		if err == io.EOF {
 			break
 		}
@@ -256,7 +245,6 @@ func readBundle[B firecore.Block](
 		if curBlock.Number >= stopBlock {
 			break
 		}
-
 		if curBlock.Number < fileStartBlock {
 			warnAboutExtraBlocks.Do(func() {
 				fmt.Printf("Warn: Bundle file %s contains block %d, preceding its start_block. This 'feature' is not used anymore and extra blocks like this one will be ignored during compare\n", store.ObjectURL(filename), curBlock.Number)
@@ -266,12 +254,10 @@ func readBundle[B firecore.Block](
 
 		b := blockFactory()
 		if err = curBlock.Payload.UnmarshalTo(b); err != nil {
-			return nil, nil, fmt.Errorf("unmarshalling block: %w", err)
 			break
 		}
 
 		curBlockPB := sanitizer(b.(B))
-
 		blockHashes = append(blockHashes, curBlock.Id)
 		blocksMap[curBlock.Id] = curBlockPB
 	}
@@ -391,6 +377,7 @@ func Compare(reference, current proto.Message, ignoreUnknown bool) (isEqual bool
 			}
 		}
 	}
+	spew.Dump(reference)
 
 	if !proto.Equal(reference, current) {
 
