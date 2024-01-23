@@ -5,15 +5,14 @@ import (
 	"fmt"
 	"strings"
 
-	"google.golang.org/protobuf/types/dynamicpb"
-
-	"google.golang.org/protobuf/reflect/protoreflect"
-
 	"github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/mr-tron/base58"
 	"github.com/streamingfast/firehose-core/protoregistry"
+	"google.golang.org/protobuf/encoding/protowire"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/dynamicpb"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -33,6 +32,13 @@ func (e *Encoder) dynamicpbMessage(encoder *jsontext.Encoder, msg *dynamicpb.Mes
 	mapMsg := map[string]any{}
 
 	//mapMsg["__unknown_fields__"] = hex.EncodeToString(msg.GetUnknown())
+	x := msg.GetUnknown()
+	fieldNumber, ofType, l := protowire.ConsumeField(x)
+	if l > 0 {
+		var unknownValue []byte
+		unknownValue = x[:l]
+		mapMsg[fmt.Sprintf("__unknown_fields_%d_with_type_%d__", fieldNumber, ofType)] = hex.EncodeToString(unknownValue)
+	}
 
 	msg.Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
 		if fd.IsList() {

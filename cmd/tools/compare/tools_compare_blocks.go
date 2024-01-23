@@ -19,16 +19,11 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"reflect"
 	"strconv"
 	"sync"
 
 	jd "github.com/josephburnett/jd/lib"
-
-	"github.com/streamingfast/firehose-core/jsonencoder"
-
-	"github.com/davecgh/go-spew/spew"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/cli"
@@ -36,6 +31,7 @@ import (
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/cmd/tools/check"
+	"github.com/streamingfast/firehose-core/jsonencoder"
 	"github.com/streamingfast/firehose-core/protoregistry"
 	"github.com/streamingfast/firehose-core/types"
 	"go.uber.org/multierr"
@@ -381,22 +377,6 @@ func Compare(reference proto.Message, current proto.Message, includeUnknownField
 		}
 	}
 
-	fileRef, err := os.Create("/Users/arnaudberger/t/reference.txt")
-	if err != nil {
-		panic(err)
-	}
-	defer fileRef.Close()
-
-	spew.Fdump(fileRef, reference)
-
-	fileCur, err := os.Create("/Users/arnaudberger/t/current.txt")
-	if err != nil {
-		panic(err)
-	}
-	defer fileCur.Close()
-
-	spew.Fdump(fileCur, current)
-
 	if !proto.Equal(reference, current) {
 
 		encoder := jsonencoder.New()
@@ -407,18 +387,6 @@ func Compare(reference proto.Message, current proto.Message, includeUnknownField
 		currentAsJSON, err := encoder.MarshalToString(current)
 		cli.NoError(err, "marshal JSON current")
 
-		//
-		//opts := protojson.MarshalOptions{
-		//	Multiline: true,
-		//	Indent:    "  ",
-		//}
-		//
-		//ref, err := opts.Marshal(reference)
-		//cli.NoError(err, "marshal JSON reference")
-		//
-		//cur, err := opts.Marshal(reference)
-		//cli.NoError(err, "marshal JSON current")
-		//
 		r, err := jd.ReadJsonString(referenceAsJSON)
 		cli.NoError(err, "read JSON reference")
 
