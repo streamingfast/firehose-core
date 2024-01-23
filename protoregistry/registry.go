@@ -101,7 +101,7 @@ func RegisterFileDescriptor(fd protoreflect.FileDescriptor) error {
 func Unmarshal(a *anypb.Any) (*dynamicpb.Message, error) {
 	messageType, err := protoregistry.GlobalTypes.FindMessageByURL(a.TypeUrl)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find message type: %v", err)
+		return nil, fmt.Errorf("failed to find message type %q: %v", a.TypeUrl, err)
 	}
 
 	message := dynamicpb.NewMessage(messageType.Descriptor())
