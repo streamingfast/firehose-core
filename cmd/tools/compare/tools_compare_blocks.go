@@ -21,7 +21,6 @@ import (
 	"reflect"
 	"strconv"
 	"sync"
-	"time"
 
 	jd "github.com/josephburnett/jd/lib"
 	"github.com/spf13/cobra"
@@ -336,37 +335,27 @@ func Compare(reference proto.Message, current proto.Message, includeUnknownField
 	//todo: handle includeUnknownFields parameter
 	if !proto.Equal(reference, current) {
 
-		start := time.Now()
 		//todo: turn on or off the unknown fields json output
 		//todo: receive encoder as parameter
 		encoder := jsonencoder.New()
 
-		rS := time.Now()
 		referenceAsJSON, err := encoder.MarshalToString(reference)
 		cli.NoError(err, "marshal JSON reference")
-		fmt.Println("reference marshal took", time.Since(rS))
 
-		cS := time.Now()
 		currentAsJSON, err := encoder.MarshalToString(current)
 		cli.NoError(err, "marshal JSON current")
-		fmt.Println("current marshal took", time.Since(cS))
 
-		drS := time.Now()
 		r, err := jd.ReadJsonString(referenceAsJSON)
 		cli.NoError(err, "read JSON reference")
 
 		c, err := jd.ReadJsonString(currentAsJSON)
 		cli.NoError(err, "read JSON current")
 
-		fmt.Println("diff read took", time.Since(drS))
-
-		diffS := time.Now()
 		//todo: manage better output off differences
 		if diff := r.Diff(c).Render(); diff != "" {
-			//differences = append(differences, diff)
+			differences = append(differences, diff)
 		}
-		fmt.Println("diff took", time.Since(diffS))
-		fmt.Println("total time", time.Since(start))
+
 	}
 
 	return differences
