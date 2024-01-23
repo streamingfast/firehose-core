@@ -15,7 +15,6 @@
 package compare
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -35,9 +34,7 @@ import (
 	"github.com/streamingfast/firehose-core/protoregistry"
 	"github.com/streamingfast/firehose-core/types"
 	"go.uber.org/multierr"
-	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
 )
 
@@ -334,51 +331,54 @@ func Compare(reference proto.Message, current proto.Message, includeUnknownField
 		return false, []string{fmt.Sprintf("reference block is invalid protobuf message, but current block is valid")}
 	}
 
-	if !includeUnknownFields {
-		referenceMsg.SetUnknown(nil)
-		currentMsg.SetUnknown(nil)
-		reference = referenceMsg.Interface().(proto.Message)
-		current = currentMsg.Interface().(proto.Message)
-	} else {
-		x := referenceMsg.GetUnknown()
-		y := currentMsg.GetUnknown()
+	//if !includeUnknownFields {
+	//	referenceMsg.SetUnknown(nil)
+	//	currentMsg.SetUnknown(nil)
+	//	reference = referenceMsg.Interface().(proto.Message)
+	//	current = currentMsg.Interface().(proto.Message)
+	//} else {
+	//	x := referenceMsg.GetUnknown()
+	//	y := currentMsg.GetUnknown()
+	//
+	//	if !bytes.Equal(x, y) {
+	//		// from https://github.com/protocolbuffers/protobuf-go/tree/v1.28.1/proto
+	//		mx := make(map[protoreflect.FieldNumber]protoreflect.RawFields)
+	//		my := make(map[protoreflect.FieldNumber]protoreflect.RawFields)
+	//		for len(x) > 0 {
+	//			fnum, _, n := protowire.ConsumeField(x)
+	//			mx[fnum] = append(mx[fnum], x[:n]...)
+	//			x = x[n:]
+	//		}
+	//		for len(y) > 0 {
+	//			fnum, _, n := protowire.ConsumeField(y)
+	//			my[fnum] = append(my[fnum], y[:n]...)
+	//			y = y[n:]
+	//		}
+	//		for k, v := range mx {
+	//			vv, ok := my[k]
+	//			if !ok {
+	//				differences = append(differences, fmt.Sprintf("reference block contains unknown protobuf field number %d (%x), but current block does not", k, v))
+	//				continue
+	//			}
+	//			if !bytes.Equal(v, vv) {
+	//				differences = append(differences, fmt.Sprintf("unknown protobuf field number %d has different values. Reference: %x, current: %x", k, v, vv))
+	//			}
+	//		}
+	//		for k := range my {
+	//			v, ok := my[k]
+	//			if !ok {
+	//				differences = append(differences, fmt.Sprintf("current block contains unknown protobuf field number %d (%x), but reference block does not", k, v))
+	//				continue
+	//			}
+	//		}
+	//	}
+	//}
 
-		if !bytes.Equal(x, y) {
-			// from https://github.com/protocolbuffers/protobuf-go/tree/v1.28.1/proto
-			mx := make(map[protoreflect.FieldNumber]protoreflect.RawFields)
-			my := make(map[protoreflect.FieldNumber]protoreflect.RawFields)
-			for len(x) > 0 {
-				fnum, _, n := protowire.ConsumeField(x)
-				mx[fnum] = append(mx[fnum], x[:n]...)
-				x = x[n:]
-			}
-			for len(y) > 0 {
-				fnum, _, n := protowire.ConsumeField(y)
-				my[fnum] = append(my[fnum], y[:n]...)
-				y = y[n:]
-			}
-			for k, v := range mx {
-				vv, ok := my[k]
-				if !ok {
-					differences = append(differences, fmt.Sprintf("reference block contains unknown protobuf field number %d (%x), but current block does not", k, v))
-					continue
-				}
-				if !bytes.Equal(v, vv) {
-					differences = append(differences, fmt.Sprintf("unknown protobuf field number %d has different values. Reference: %x, current: %x", k, v, vv))
-				}
-			}
-			for k := range my {
-				v, ok := my[k]
-				if !ok {
-					differences = append(differences, fmt.Sprintf("current block contains unknown protobuf field number %d (%x), but reference block does not", k, v))
-					continue
-				}
-			}
-		}
-	}
-
+	//todo: handle includeUnknownFields parameter
+	//todo: I think we should only compare json since the unknown fields are not part of the json output
 	if !proto.Equal(reference, current) {
 
+		//todo: turn on or off the unknown fields json output
 		encoder := jsonencoder.New()
 
 		referenceAsJSON, err := encoder.MarshalToString(reference)
