@@ -237,7 +237,12 @@ func displayBlock[B firecore.Block](pbBlock *pbbstream.Block, chain *firecore.Ch
 	}
 
 	// since we are running directly the firecore binary we will *NOT* use the BlockFactory
-	return encoder.Marshal(pbBlock.Payload)
+	err := encoder.Marshal(pbBlock.Payload)
+	if err != nil {
+		return fmt.Errorf("marshalling block to json: %w", err)
+	}
+
+	return nil
 }
 
 func PrintBStreamBlock(b *pbbstream.Block, printTransactions bool, out io.Writer) error {
