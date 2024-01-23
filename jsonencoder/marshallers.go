@@ -32,7 +32,7 @@ func (e *Encoder) anypb(encoder *jsontext.Encoder, t *anypb.Any, options json.Op
 func (e *Encoder) dynamicpbMessage(encoder *jsontext.Encoder, msg *dynamicpb.Message, options json.Options) error {
 	mapMsg := map[string]any{}
 
-	//mapMsg["__unknown_fields__"] = hex.EncodeToString(msg.GetUnknown())
+	//todo: make Unknown field optional
 	x := msg.GetUnknown()
 	fieldNumber, ofType, l := protowire.ConsumeField(x)
 	if l > 0 {
