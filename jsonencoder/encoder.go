@@ -10,14 +10,17 @@ import (
 )
 
 type Encoder struct {
+	marshallers *json.Marshalers
 }
 
 func New() *Encoder {
-	return &Encoder{}
+	e := &Encoder{}
+	e.setMarshallers("")
+	return e
 }
 
 func (e *Encoder) Marshal(in any) error {
-	err := json.MarshalEncode(jsontext.NewEncoder(os.Stdout), in, json.WithMarshalers(e.getMarshallers("")))
+	err := json.MarshalEncode(jsontext.NewEncoder(os.Stdout), in, json.WithMarshalers(e.marshallers))
 	if err != nil {
 		return fmt.Errorf("marshalling and encoding block to json: %w", err)
 	}
@@ -26,7 +29,7 @@ func (e *Encoder) Marshal(in any) error {
 
 func (e *Encoder) MarshalToString(in any) (string, error) {
 	buf := bytes.NewBuffer(nil)
-	if err := json.MarshalEncode(jsontext.NewEncoder(buf), in, json.WithMarshalers(e.getMarshallers(""))); err != nil {
+	if err := json.MarshalEncode(jsontext.NewEncoder(buf), in, json.WithMarshalers(e.marshallers)); err != nil {
 		return "", err
 	}
 	return buf.String(), nil
