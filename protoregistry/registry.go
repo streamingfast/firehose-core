@@ -101,7 +101,7 @@ func RegisterFileDescriptor(fd protoreflect.FileDescriptor) error {
 func Unmarshal(a *anypb.Any) (*dynamicpb.Message, error) {
 	messageType, err := protoregistry.GlobalTypes.FindMessageByURL(a.TypeUrl)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find message type %q: %v", a.TypeUrl, err)
+		return nil, fmt.Errorf("failed to find message '%s': %v", urlToMessageFullName(a.TypeUrl), err)
 	}
 
 	message := dynamicpb.NewMessage(messageType.Descriptor())
@@ -113,6 +113,11 @@ func Unmarshal(a *anypb.Any) (*dynamicpb.Message, error) {
 	return message, nil
 }
 
-func cleanTypeURL(in string) string {
-	return strings.Replace(in, "type.googleapis.com/", "", 1)
+func urlToMessageFullName(url string) protoreflect.FullName {
+	message := protoreflect.FullName(url)
+	if i := strings.LastIndexByte(url, '/'); i >= 0 {
+		message = message[i+len("/"):]
+	}
+
+	return message
 }
