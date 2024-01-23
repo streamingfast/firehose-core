@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"strconv"
 	"sync"
+	"time"
 
 	jd "github.com/josephburnett/jd/lib"
 	"github.com/spf13/cobra"
@@ -179,9 +180,9 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 					var isEqual bool
 					if existsInCurrent {
 						var differences []string
-						isEqual, differences = Compare(referenceBlock, currentBlock, includeUnknownFields)
+						differences = Compare(referenceBlock, currentBlock, includeUnknownFields)
 
-						if !isEqual {
+						if len(differences) > 0 {
 							fmt.Printf("- Block %d is different\n", referenceBlockNum)
 							if displayDiff {
 								for _, diff := range differences {
@@ -314,89 +315,58 @@ func (s *state) print() {
 	fmt.Printf("✖ Segment %d - %s has %d different blocks and %d missing blocks (%d blocks counted)\n", s.segments[s.currentSegmentIdx].Start, endBlock, s.differencesFound, s.missingBlocks, s.totalBlocksCounted)
 }
 
-func Compare(reference proto.Message, current proto.Message, includeUnknownFields bool) (isEqual bool, differences []string) {
+func Compare(reference proto.Message, current proto.Message, includeUnknownFields bool) (differences []string) {
 	if reference == nil && current == nil {
-		return true, nil
+		return nil
 	}
 	if reflect.TypeOf(reference).Kind() == reflect.Ptr && reference == current {
-		return true, nil
+		return nil
 	}
 
 	referenceMsg := reference.ProtoReflect()
 	currentMsg := current.ProtoReflect()
 	if referenceMsg.IsValid() && !currentMsg.IsValid() {
-		return false, []string{fmt.Sprintf("reference block is valid protobuf message, but current block is invalid")}
+		return []string{fmt.Sprintf("reference block is valid protobuf message, but current block is invalid")}
 	}
 	if !referenceMsg.IsValid() && currentMsg.IsValid() {
-		return false, []string{fmt.Sprintf("reference block is invalid protobuf message, but current block is valid")}
+		return []string{fmt.Sprintf("reference block is invalid protobuf message, but current block is valid")}
 	}
 
-	//if !includeUnknownFields {
-	//	referenceMsg.SetUnknown(nil)
-	//	currentMsg.SetUnknown(nil)
-	//	reference = referenceMsg.Interface().(proto.Message)
-	//	current = currentMsg.Interface().(proto.Message)
-	//} else {
-	//	x := referenceMsg.GetUnknown()
-	//	y := currentMsg.GetUnknown()
-	//
-	//	if !bytes.Equal(x, y) {
-	//		// from https://github.com/protocolbuffers/protobuf-go/tree/v1.28.1/proto
-	//		mx := make(map[protoreflect.FieldNumber]protoreflect.RawFields)
-	//		my := make(map[protoreflect.FieldNumber]protoreflect.RawFields)
-	//		for len(x) > 0 {
-	//			fnum, _, n := protowire.ConsumeField(x)
-	//			mx[fnum] = append(mx[fnum], x[:n]...)
-	//			x = x[n:]
-	//		}
-	//		for len(y) > 0 {
-	//			fnum, _, n := protowire.ConsumeField(y)
-	//			my[fnum] = append(my[fnum], y[:n]...)
-	//			y = y[n:]
-	//		}
-	//		for k, v := range mx {
-	//			vv, ok := my[k]
-	//			if !ok {
-	//				differences = append(differences, fmt.Sprintf("reference block contains unknown protobuf field number %d (%x), but current block does not", k, v))
-	//				continue
-	//			}
-	//			if !bytes.Equal(v, vv) {
-	//				differences = append(differences, fmt.Sprintf("unknown protobuf field number %d has different values. Reference: %x, current: %x", k, v, vv))
-	//			}
-	//		}
-	//		for k := range my {
-	//			v, ok := my[k]
-	//			if !ok {
-	//				differences = append(differences, fmt.Sprintf("current block contains unknown protobuf field number %d (%x), but reference block does not", k, v))
-	//				continue
-	//			}
-	//		}
-	//	}
-	//}
-
 	//todo: handle includeUnknownFields parameter
-	//todo: I think we should only compare json since the unknown fields are not part of the json output
 	if !proto.Equal(reference, current) {
 
+		start := time.Now()
 		//todo: turn on or off the unknown fields json output
+		//todo: receive encoder as parameter
 		encoder := jsonencoder.New()
 
+		rS := time.Now()
 		referenceAsJSON, err := encoder.MarshalToString(reference)
 		cli.NoError(err, "marshal JSON reference")
+		fmt.Println("reference marshal took", time.Since(rS))
 
+		cS := time.Now()
 		currentAsJSON, err := encoder.MarshalToString(current)
 		cli.NoError(err, "marshal JSON current")
+		fmt.Println("current marshal took", time.Since(cS))
 
+		drS := time.Now()
 		r, err := jd.ReadJsonString(referenceAsJSON)
 		cli.NoError(err, "read JSON reference")
 
 		c, err := jd.ReadJsonString(currentAsJSON)
 		cli.NoError(err, "read JSON current")
 
+		fmt.Println("diff read took", time.Since(drS))
+
+		diffS := time.Now()
+		//todo: manage better output off differences
 		if diff := r.Diff(c).Render(); diff != "" {
-			differences = append(differences, diff)
+			//differences = append(differences, diff)
 		}
-		return false, differences
+		fmt.Println("diff took", time.Since(diffS))
+		fmt.Println("total time", time.Since(start))
 	}
-	return true, nil
+
+	return differences
 }
