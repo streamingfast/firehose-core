@@ -24,8 +24,11 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/davecgh/go-spew/spew"
 	jd "github.com/josephburnett/jd/lib"
+
+	"github.com/streamingfast/firehose-core/jsonencoder"
+
+	"github.com/davecgh/go-spew/spew"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/cli"
@@ -36,7 +39,6 @@ import (
 	"github.com/streamingfast/firehose-core/protoregistry"
 	"github.com/streamingfast/firehose-core/types"
 	"go.uber.org/multierr"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -378,7 +380,6 @@ func Compare(reference proto.Message, current proto.Message, includeUnknownField
 			}
 		}
 	}
-	spew.Dump(reference)
 
 	fileRef, err := os.Create("/Users/arnaudberger/t/reference.txt")
 	if err != nil {
@@ -397,21 +398,31 @@ func Compare(reference proto.Message, current proto.Message, includeUnknownField
 	spew.Fdump(fileCur, current)
 
 	if !proto.Equal(reference, current) {
-		opts := protojson.MarshalOptions{
-			Multiline: true,
-			Indent:    "  ",
-		}
 
-		ref, err := opts.Marshal(reference)
+		encoder := jsonencoder.New()
+
+		referenceAsJSON, err := encoder.MarshalToString(reference)
 		cli.NoError(err, "marshal JSON reference")
 
-		cur, err := opts.Marshal(reference)
+		currentAsJSON, err := encoder.MarshalToString(current)
 		cli.NoError(err, "marshal JSON current")
 
-		r, err := jd.ReadJsonString(string(ref))
+		//
+		//opts := protojson.MarshalOptions{
+		//	Multiline: true,
+		//	Indent:    "  ",
+		//}
+		//
+		//ref, err := opts.Marshal(reference)
+		//cli.NoError(err, "marshal JSON reference")
+		//
+		//cur, err := opts.Marshal(reference)
+		//cli.NoError(err, "marshal JSON current")
+		//
+		r, err := jd.ReadJsonString(referenceAsJSON)
 		cli.NoError(err, "read JSON reference")
 
-		c, err := jd.ReadJsonString(string(cur))
+		c, err := jd.ReadJsonString(currentAsJSON)
 		cli.NoError(err, "read JSON current")
 
 		if diff := r.Diff(c).Render(); diff != "" {
