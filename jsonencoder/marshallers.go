@@ -29,32 +29,10 @@ func (e *Encoder) anypb(encoder *jsontext.Encoder, t *anypb.Any, options json.Op
 	return encoder.WriteValue(cnt)
 }
 
-func toValue(msg *dynamicpb.Message) map[string]any {
-	mapMsg := map[string]any{}
-	msg.Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
-		var value any
-		if fd.IsList() {
-			out := make([]any, v.List().Len())
-			for i := 0; i < v.List().Len(); i++ {
-				out[i] = v.List().Get(i)
-			}
-			value = out
-		} else if fd.Kind() == protoreflect.MessageKind {
-
-		} else {
-			value = v.Interface()
-		}
-
-		mapMsg[string(fd.Name())] = value
-		return true
-	})
-	return mapMsg
-}
-
 func (e *Encoder) dynamicpbMessage(encoder *jsontext.Encoder, msg *dynamicpb.Message, options json.Options) error {
 	mapMsg := map[string]any{}
 
-	mapMsg["__unknown_fields__"] = hex.EncodeToString(msg.GetUnknown())
+	//mapMsg["__unknown_fields__"] = hex.EncodeToString(msg.GetUnknown())
 
 	msg.Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
 		if fd.IsList() {
