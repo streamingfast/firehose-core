@@ -332,6 +332,7 @@ func Compare(reference proto.Message, current proto.Message, includeUnknownField
 		return []string{fmt.Sprintf("reference block is invalid protobuf message, but current block is valid")}
 	}
 
+	//todo: check if there is a equals that do not compare unknown fields
 	//todo: handle includeUnknownFields parameter
 	if !proto.Equal(reference, current) {
 
