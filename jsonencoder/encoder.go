@@ -10,11 +10,23 @@ import (
 )
 
 type Encoder struct {
-	marshallers *json.Marshalers
+	marshallers          *json.Marshalers
+	IncludeUnknownFields bool
 }
 
-func New() *Encoder {
-	e := &Encoder{}
+type EncoderOption func(*Encoder)
+
+func WithoutUnknownFields() EncoderOption {
+	return func(e *Encoder) {
+		e.IncludeUnknownFields = false
+	}
+}
+func New(includeUnknownFields ...EncoderOption) *Encoder {
+	e := &Encoder{IncludeUnknownFields: true}
+
+	for _, opt := range includeUnknownFields {
+		opt(e)
+	}
 	e.setMarshallers("")
 	return e
 }

@@ -32,13 +32,14 @@ func (e *Encoder) anypb(encoder *jsontext.Encoder, t *anypb.Any, options json.Op
 func (e *Encoder) dynamicpbMessage(encoder *jsontext.Encoder, msg *dynamicpb.Message, options json.Options) error {
 	mapMsg := map[string]any{}
 
-	//todo: make Unknown field optional
-	x := msg.GetUnknown()
-	fieldNumber, ofType, l := protowire.ConsumeField(x)
-	if l > 0 {
-		var unknownValue []byte
-		unknownValue = x[:l]
-		mapMsg[fmt.Sprintf("__unknown_fields_%d_with_type_%d__", fieldNumber, ofType)] = hex.EncodeToString(unknownValue)
+	if e.IncludeUnknownFields {
+		x := msg.GetUnknown()
+		fieldNumber, ofType, l := protowire.ConsumeField(x)
+		if l > 0 {
+			var unknownValue []byte
+			unknownValue = x[:l]
+			mapMsg[fmt.Sprintf("__unknown_fields_%d_with_type_%d__", fieldNumber, ofType)] = hex.EncodeToString(unknownValue)
+		}
 	}
 
 	msg.Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
