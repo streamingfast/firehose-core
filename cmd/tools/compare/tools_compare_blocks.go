@@ -38,6 +38,11 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 )
 
+type BlockDifferences struct {
+	BlockNumber uint64
+	Differences []string
+}
+
 func NewToolsCompareBlocksCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "compare-blocks <reference_blocks_store> <current_blocks_store> [<block_range>]",
@@ -77,7 +82,7 @@ func NewToolsCompareBlocksCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra
 func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.CommandExecutor {
 	return func(cmd *cobra.Command, args []string) error {
 		displayDiff := sflags.MustGetBool(cmd, "diff")
-		includeUnknownFields := !sflags.MustGetBool(cmd, "include-unknown-fields")
+		includeUnknownFields := sflags.MustGetBool(cmd, "include-unknown-fields")
 		protoPaths := sflags.MustGetStringSlice(cmd, "proto-paths")
 		segmentSize := uint64(100000)
 		warnAboutExtraBlocks := sync.Once{}
@@ -171,27 +176,42 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 					return fmt.Errorf("reading bundles: %w", bundleReadErr)
 				}
 
+				blockDifferencesChan := make(chan BlockDifferences, len(referenceBlockHashes))
+
 				for _, referenceBlockHash := range referenceBlockHashes {
-					referenceBlock := referenceBlocks[referenceBlockHash]
-					currentBlock, existsInCurrent := currentBlocks[referenceBlockHash]
-					referenceBlockNum := referenceBlock.Get(referenceBlock.Descriptor().Fields().ByName("slot")).Uint()
+					wg.Add(1)
+					go func(hash string) {
+						defer wg.Done()
+						referenceBlock := referenceBlocks[hash]
+						currentBlock, existsInCurrent := currentBlocks[hash]
+						referenceBlockNum := referenceBlock.Get(referenceBlock.Descriptor().Fields().ByName("slot")).Uint()
 
-					var isEqual bool
-					if existsInCurrent {
-						var differences []string
-						differences = Compare(referenceBlock, currentBlock, includeUnknownFields)
+						var isDifferent bool
 
-						if len(differences) > 0 {
-							fmt.Printf("- Block %d is different\n", referenceBlockNum)
-							if displayDiff {
-								for _, diff := range differences {
-									fmt.Println("  · ", diff)
-								}
+						if existsInCurrent {
+							var differences []string
+							differences = Compare(referenceBlock, currentBlock, includeUnknownFields)
+
+							isDifferent = len(differences) > 0
+
+							if isDifferent {
+								blockDifferencesChan <- BlockDifferences{BlockNumber: referenceBlockNum, Differences: differences}
 							}
 						}
-					}
-					processState.process(referenceBlockNum, !isEqual, !existsInCurrent)
+						processState.process(referenceBlockNum, isDifferent, !existsInCurrent)
+					}(referenceBlockHash)
+				}
 
+				wg.Wait()
+				close(blockDifferencesChan)
+
+				for blockDifferences := range blockDifferencesChan {
+					fmt.Printf("- Block %d is different\n", blockDifferences.BlockNumber)
+					if displayDiff {
+						for _, diff := range blockDifferences.Differences {
+							fmt.Println("  · ", diff)
+						}
+					}
 				}
 			}
 			return nil
@@ -244,6 +264,7 @@ func readBundle(
 			continue
 		}
 
+		//todo: handle correctly the chainFileDescriptor
 		err = protoregistry.Register(nil, protoPaths...)
 
 		if err != nil {
@@ -332,12 +353,12 @@ func Compare(reference proto.Message, current proto.Message, includeUnknownField
 	}
 
 	//todo: check if there is a equals that do not compare unknown fields
-	//todo: handle includeUnknownFields parameter
 	if !proto.Equal(reference, current) {
-
-		//todo: turn on or off the unknown fields json output
-		//todo: receive encoder as parameter
-		encoder := jsonencoder.New()
+		var opts []jsonencoder.EncoderOption
+		if !includeUnknownFields {
+			opts = append(opts, jsonencoder.WithoutUnknownFields())
+		}
+		encoder := jsonencoder.New(opts...)
 
 		referenceAsJSON, err := encoder.MarshalToString(reference)
 		cli.NoError(err, "marshal JSON reference")
