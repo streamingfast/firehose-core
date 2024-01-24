@@ -8,9 +8,9 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.1.0
 
-* Update `substreams` and `dgrpc` to latest versions to reduce logging
+* Updated `substreams` and `dgrpc` to latest versions to reduce logging.
 
 * Tools printing Firehose `Block` model to JSON now have `--proto-paths` take higher precedence over well-known types and even the chain itself, the order is `--proto-paths` > `chain` > `well-known` (so `well-known` is lookup last).
 
@@ -28,10 +28,11 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 * Fix `-c ""` not working properly when no arguments are present when invoking `start` command.
 
-* Fix 'tools compare-blocks' that would fail on new format
+* Fix `tools compare-blocks` that would fail on new format.
 
-* Fix substreams to correctly delete `.partial` files when serving a request that is not on a boundary
-* Add Antelope types to the protoregistry.
+* Fix `substreams` to correctly delete `.partial` files when serving a request that is not on a boundary.
+
+* Add Antelope types to the blockchain's known types.
 
 ## v1.0.0
 
