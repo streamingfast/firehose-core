@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
 	"github.com/jhump/protoreflect/dynamic"
@@ -90,6 +92,10 @@ func (e *Encoder) dynamicpbMessage(encoder *jsontext.Encoder, msg *dynamicpb.Mes
 		})
 
 		return true
+	})
+
+	slices.SortFunc(kvl, func(a, b *kv) bool {
+		return a.key < b.key
 	})
 
 	cnt, err := json.Marshal(kvl, json.WithMarshalers(e.marshallers))
