@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"reflect"
 	"strconv"
 	"sync"
@@ -116,6 +117,11 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 			segments: segments,
 		}
 
+		registry, err := protoregistry.NewRegistry(nil, protoPaths...)
+		if err != nil {
+			return fmt.Errorf("creating registry: %w", err)
+		}
+
 		err = storeReference.Walk(ctx, check.WalkBlockPrefix(blockRange, 100), func(filename string) (err error) {
 			fileStartBlock, err := strconv.Atoi(filename)
 			if err != nil {
@@ -145,7 +151,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 						uint64(fileStartBlock),
 						stopBlock,
 						&warnAboutExtraBlocks,
-						protoPaths,
+						registry,
 					)
 					if err != nil {
 						bundleErrLock.Lock()
@@ -163,7 +169,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 						uint64(fileStartBlock),
 						stopBlock,
 						&warnAboutExtraBlocks,
-						protoPaths,
+						registry,
 					)
 					if err != nil {
 						bundleErrLock.Lock()
@@ -183,15 +189,13 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 						defer wg.Done()
 						referenceBlock := referenceBlocks[hash]
 						currentBlock, existsInCurrent := currentBlocks[hash]
-						fmt.Println("referenceBlockSlot", referenceBlock.Get(referenceBlock.Descriptor().Fields().ByName("slot")).Uint())
-						fmt.Println("currentBlockSlot", currentBlock.Get(currentBlock.Descriptor().Fields().ByName("slot")).Uint())
 						referenceBlockNum := referenceBlock.Get(referenceBlock.Descriptor().Fields().ByName("slot")).Uint()
 
 						var isDifferent bool
-
+						fmt.Println("Registry", registry)
 						if existsInCurrent {
 							var differences []string
-							differences = Compare(referenceBlock, currentBlock, includeUnknownFields)
+							differences = Compare(referenceBlock, currentBlock, includeUnknownFields, registry)
 
 							isDifferent = len(differences) > 0
 
@@ -229,7 +233,7 @@ func readBundle(
 	fileStartBlock,
 	stopBlock uint64,
 	warnAboutExtraBlocks *sync.Once,
-	protoPaths []string,
+	registry *protoregistry.Registry,
 ) ([]string, map[string]*dynamicpb.Message, error) {
 	fileReader, err := store.OpenObject(ctx, filename)
 	if err != nil {
@@ -261,13 +265,7 @@ func readBundle(
 			continue
 		}
 
-		//todo: handle correctly the chainFileDescriptor
-		err = protoregistry.Register(nil, protoPaths...)
-
-		if err != nil {
-			return nil, nil, fmt.Errorf("protoregistry registry failed: %w", err)
-		}
-		curBlockPB, err := protoregistry.Unmarshal(curBlock.Payload)
+		curBlockPB, err := registry.Unmarshal(curBlock.Payload)
 
 		if err != nil {
 			return nil, nil, fmt.Errorf("unmarshalling block: %w", err)
@@ -332,7 +330,7 @@ func (s *state) print() {
 	fmt.Printf("✖ Segment %d - %s has %d different blocks and %d missing blocks (%d blocks counted)\n", s.segments[s.currentSegmentIdx].Start, endBlock, s.differencesFound, s.missingBlocks, s.totalBlocksCounted)
 }
 
-func Compare(reference proto.Message, current proto.Message, includeUnknownFields bool) (differences []string) {
+func Compare(reference proto.Message, current proto.Message, includeUnknownFields bool, registry *protoregistry.Registry) (differences []string) {
 	if reference == nil && current == nil {
 		return nil
 	}
@@ -355,7 +353,7 @@ func Compare(reference proto.Message, current proto.Message, includeUnknownField
 		if !includeUnknownFields {
 			opts = append(opts, jsonencoder.WithoutUnknownFields())
 		}
-		encoder := jsonencoder.New(opts...)
+		encoder := jsonencoder.New(registry, opts...)
 
 		referenceAsJSON, err := encoder.MarshalToString(reference)
 		cli.NoError(err, "marshal JSON reference")
@@ -371,6 +369,28 @@ func Compare(reference proto.Message, current proto.Message, includeUnknownField
 
 		//todo: manage better output off differences
 		if diff := r.Diff(c).Render(); diff != "" {
+			referenceWriter, err := os.Create("/Users/arnaudberger/t/reference.json")
+			if err != nil {
+				fmt.Println(err)
+			}
+			currentWriter, err := os.Create("/Users/arnaudberger/t/current.json")
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			_, err = referenceWriter.WriteString(referenceAsJSON)
+			if err != nil {
+				fmt.Println(err)
+			}
+			_, err = currentWriter.WriteString(currentAsJSON)
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			referenceWriter.Close()
+			currentWriter.Close()
+
+			panic("diff")
 			differences = append(differences, diff)
 		}
 
