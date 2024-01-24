@@ -183,6 +183,8 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 						defer wg.Done()
 						referenceBlock := referenceBlocks[hash]
 						currentBlock, existsInCurrent := currentBlocks[hash]
+						fmt.Println("referenceBlockSlot", referenceBlock.Get(referenceBlock.Descriptor().Fields().ByName("slot")).Uint())
+						fmt.Println("currentBlockSlot", currentBlock.Get(currentBlock.Descriptor().Fields().ByName("slot")).Uint())
 						referenceBlockNum := referenceBlock.Get(referenceBlock.Descriptor().Fields().ByName("slot")).Uint()
 
 						var isDifferent bool
@@ -206,6 +208,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 						}
 						processState.process(referenceBlockNum, isDifferent, !existsInCurrent)
 					}(referenceBlockHash)
+					wg.Wait()
 				}
 			}
 			return nil
