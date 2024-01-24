@@ -176,8 +176,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 					return fmt.Errorf("reading bundles: %w", bundleReadErr)
 				}
 
-				blockDifferencesChan := make(chan BlockDifferences, len(referenceBlockHashes))
-
+				outLock := sync.Mutex{}
 				for _, referenceBlockHash := range referenceBlockHashes {
 					wg.Add(1)
 					go func(hash string) {
@@ -195,23 +194,18 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 							isDifferent = len(differences) > 0
 
 							if isDifferent {
-								blockDifferencesChan <- BlockDifferences{BlockNumber: referenceBlockNum, Differences: differences}
+								outLock.Lock()
+								fmt.Printf("- Block %d is different\n", referenceBlockNum)
+								if displayDiff {
+									for _, diff := range differences {
+										fmt.Println("  · ", diff)
+									}
+								}
+								outLock.Unlock()
 							}
 						}
 						processState.process(referenceBlockNum, isDifferent, !existsInCurrent)
 					}(referenceBlockHash)
-				}
-
-				wg.Wait()
-				close(blockDifferencesChan)
-
-				for blockDifferences := range blockDifferencesChan {
-					fmt.Printf("- Block %d is different\n", blockDifferences.BlockNumber)
-					if displayDiff {
-						for _, diff := range blockDifferences.Differences {
-							fmt.Println("  · ", diff)
-						}
-					}
 				}
 			}
 			return nil
