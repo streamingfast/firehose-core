@@ -31,8 +31,8 @@ import (
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/cmd/tools/check"
-	"github.com/streamingfast/firehose-core/jsonencoder"
-	"github.com/streamingfast/firehose-core/protoregistry"
+	"github.com/streamingfast/firehose-core/json"
+	fcproto "github.com/streamingfast/firehose-core/proto"
 	"github.com/streamingfast/firehose-core/types"
 	"go.uber.org/multierr"
 	"google.golang.org/protobuf/proto"
@@ -117,7 +117,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 			segments: segments,
 		}
 
-		registry, err := protoregistry.NewRegistry(nil, protoPaths...)
+		registry, err := fcproto.NewRegistry(nil, protoPaths...)
 		if err != nil {
 			return fmt.Errorf("creating registry: %w", err)
 		}
@@ -233,7 +233,7 @@ func readBundle(
 	fileStartBlock,
 	stopBlock uint64,
 	warnAboutExtraBlocks *sync.Once,
-	registry *protoregistry.Registry,
+	registry *fcproto.Registry,
 ) ([]string, map[string]*dynamicpb.Message, error) {
 	fileReader, err := store.OpenObject(ctx, filename)
 	if err != nil {
@@ -330,7 +330,7 @@ func (s *state) print() {
 	fmt.Printf("✖ Segment %d - %s has %d different blocks and %d missing blocks (%d blocks counted)\n", s.segments[s.currentSegmentIdx].Start, endBlock, s.differencesFound, s.missingBlocks, s.totalBlocksCounted)
 }
 
-func Compare(reference proto.Message, current proto.Message, includeUnknownFields bool, registry *protoregistry.Registry) (differences []string) {
+func Compare(reference proto.Message, current proto.Message, includeUnknownFields bool, registry *fcproto.Registry) (differences []string) {
 	if reference == nil && current == nil {
 		return nil
 	}
@@ -349,11 +349,11 @@ func Compare(reference proto.Message, current proto.Message, includeUnknownField
 
 	//todo: check if there is a equals that do not compare unknown fields
 	if !proto.Equal(reference, current) {
-		var opts []jsonencoder.EncoderOption
+		var opts []json.EncoderOption
 		if !includeUnknownFields {
-			opts = append(opts, jsonencoder.WithoutUnknownFields())
+			opts = append(opts, json.WithoutUnknownFields())
 		}
-		encoder := jsonencoder.New(registry, opts...)
+		encoder := json.New(registry, opts...)
 
 		referenceAsJSON, err := encoder.MarshalToString(reference)
 		cli.NoError(err, "marshal JSON reference")

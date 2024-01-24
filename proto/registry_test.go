@@ -1,4 +1,4 @@
-package protoregistry
+package proto
 
 import (
 	"testing"
@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -82,10 +81,6 @@ func TestUnmarshal(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
-			protoregistry.GlobalFiles = &protoregistry.Files{}
-			protoregistry.GlobalTypes = &protoregistry.Types{}
-
 			registry, err := NewRegistry(acme, tt.protoPaths...)
 			require.NoError(t, err)
 

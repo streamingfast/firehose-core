@@ -26,8 +26,8 @@ import (
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
-	"github.com/streamingfast/firehose-core/jsonencoder"
-	"github.com/streamingfast/firehose-core/protoregistry"
+	fcjson "github.com/streamingfast/firehose-core/json"
+	"github.com/streamingfast/firehose-core/proto"
 	"github.com/streamingfast/firehose-core/types"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -209,7 +209,7 @@ func toolsPrintCmdGetOutputMode(cmd *cobra.Command) (PrintOutputMode, error) {
 	return out, nil
 }
 
-func displayBlock[B firecore.Block](pbBlock *pbbstream.Block, chain *firecore.Chain[B], outputMode PrintOutputMode, printTransactions bool, encoder *jsonencoder.Encoder) error {
+func displayBlock[B firecore.Block](pbBlock *pbbstream.Block, chain *firecore.Chain[B], outputMode PrintOutputMode, printTransactions bool, encoder *fcjson.Marshaller) error {
 	if pbBlock == nil {
 		return fmt.Errorf("block is nil")
 	}
@@ -268,11 +268,11 @@ func PrintBStreamBlock(b *pbbstream.Block, printTransactions bool, out io.Writer
 	return nil
 }
 
-func SetupJsonEncoder(cmd *cobra.Command, chainFileDescriptor protoreflect.FileDescriptor) (*jsonencoder.Encoder, error) {
-	registry, err := protoregistry.NewRegistry(chainFileDescriptor, sflags.MustGetStringSlice(cmd, "proto-paths")...)
+func SetupJsonEncoder(cmd *cobra.Command, chainFileDescriptor protoreflect.FileDescriptor) (*fcjson.Marshaller, error) {
+	registry, err := proto.NewRegistry(chainFileDescriptor, sflags.MustGetStringSlice(cmd, "proto-paths")...)
 	if err != nil {
 		return nil, fmt.Errorf("new registry: %w", err)
 	}
 
-	return jsonencoder.New(registry), nil
+	return fcjson.New(registry), nil
 }

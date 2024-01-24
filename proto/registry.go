@@ -1,4 +1,4 @@
-package protoregistry
+package proto
 
 import (
 	"errors"
