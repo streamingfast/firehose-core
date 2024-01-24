@@ -258,7 +258,7 @@ func (p *MindReaderPlugin) consumeReadFlow(blocks <-chan *pbbstream.Block) {
 
 		err := p.archiver.StoreBlock(ctx, block)
 		if err != nil {
-			p.zlogger.Error("failed storing block in archiver, shutting down and trying to send next blocks individually. You will need to reprocess over this range.", zap.Error(err), zap.Stringer("received_block", block))
+			p.zlogger.Error("failed storing block in archiver, shutting down and trying to send next blocks individually. You will need to reprocess over this range.", zap.Error(err), zap.String("received_block", block.Id), zap.Uint64("received_block_num", block.Number))
 
 			if !p.IsTerminating() {
 				go p.Shutdown(fmt.Errorf("archiver store block failed: %w", err))
