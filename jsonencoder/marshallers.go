@@ -29,8 +29,35 @@ func (e *Encoder) anypb(encoder *jsontext.Encoder, t *anypb.Any, options json.Op
 	return encoder.WriteValue(cnt)
 }
 
+type kvlist []*kv
+type kv struct {
+	key   string
+	value any
+}
+
+func (e *Encoder) encodeKVList(encoder *jsontext.Encoder, t kvlist, options json.Options) error {
+	if err := encoder.WriteToken(jsontext.ObjectStart); err != nil {
+		return err
+	}
+	for _, kv := range t {
+		if err := encoder.WriteToken(jsontext.String(kv.key)); err != nil {
+			return err
+		}
+
+		cnt, err := json.Marshal(kv.value, json.WithMarshalers(e.marshallers))
+		if err != nil {
+			return fmt.Errorf("json marshalling of value : %w", err)
+		}
+
+		if err := encoder.WriteValue(cnt); err != nil {
+			return err
+		}
+	}
+	return encoder.WriteToken(jsontext.ObjectEnd)
+}
+
 func (e *Encoder) dynamicpbMessage(encoder *jsontext.Encoder, msg *dynamicpb.Message, options json.Options) error {
-	mapMsg := map[string]any{}
+	var kvl kvlist
 
 	if e.IncludeUnknownFields {
 		x := msg.GetUnknown()
@@ -38,7 +65,10 @@ func (e *Encoder) dynamicpbMessage(encoder *jsontext.Encoder, msg *dynamicpb.Mes
 		if l > 0 {
 			var unknownValue []byte
 			unknownValue = x[:l]
-			mapMsg[fmt.Sprintf("__unknown_fields_%d_with_type_%d__", fieldNumber, ofType)] = hex.EncodeToString(unknownValue)
+			kvl = append(kvl, &kv{
+				key:   fmt.Sprintf("__unknown_fields_%d_with_type_%d__", fieldNumber, ofType),
+				value: hex.EncodeToString(unknownValue),
+			})
 		}
 	}
 
@@ -48,14 +78,21 @@ func (e *Encoder) dynamicpbMessage(encoder *jsontext.Encoder, msg *dynamicpb.Mes
 			for i := 0; i < v.List().Len(); i++ {
 				out[i] = v.List().Get(i).Interface()
 			}
-			mapMsg[string(fd.Name())] = out
+			kvl = append(kvl, &kv{
+				key:   string(fd.Name()),
+				value: out,
+			})
 			return true
 		}
-		mapMsg[string(fd.Name())] = v.Interface()
+		kvl = append(kvl, &kv{
+			key:   string(fd.Name()),
+			value: v.Interface(),
+		})
+
 		return true
 	})
 
-	cnt, err := json.Marshal(mapMsg, json.WithMarshalers(e.marshallers))
+	cnt, err := json.Marshal(kvl, json.WithMarshalers(e.marshallers))
 	if err != nil {
 		return fmt.Errorf("json marshalling proto any: %w", err)
 	}
@@ -74,6 +111,7 @@ func (e *Encoder) setMarshallers(typeURL string) {
 	out := []*json.Marshalers{
 		json.MarshalFuncV2(e.anypb),
 		json.MarshalFuncV2(e.dynamicpbMessage),
+		json.MarshalFuncV2(e.encodeKVList),
 	}
 
 	if strings.Contains(typeURL, "solana") {
