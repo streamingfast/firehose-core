@@ -349,11 +349,11 @@ func Compare(reference proto.Message, current proto.Message, includeUnknownField
 
 	//todo: check if there is a equals that do not compare unknown fields
 	if !proto.Equal(reference, current) {
-		var opts []json.EncoderOption
+		var opts []json.MarshallerOption
 		if !includeUnknownFields {
 			opts = append(opts, json.WithoutUnknownFields())
 		}
-		encoder := json.New(registry, opts...)
+		encoder := json.NewMarshaller(registry, opts...)
 
 		referenceAsJSON, err := encoder.MarshalToString(reference)
 		cli.NoError(err, "marshal JSON reference")

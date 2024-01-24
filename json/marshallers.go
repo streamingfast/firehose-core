@@ -5,11 +5,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
-	"github.com/jhump/protoreflect/dynamic"
 	"github.com/mr-tron/base58"
 	"github.com/streamingfast/firehose-core/proto"
 	"golang.org/x/exp/slices"
@@ -19,69 +17,84 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
+type kvList []*kv
+type kv struct {
+	key   string
+	value any
+}
+
 type Marshaller struct {
 	marshallers          *json.Marshalers
 	includeUnknownFields bool
 	registry             *proto.Registry
+	bytesEncoderFunc     func(encoder *jsontext.Encoder, t []byte, options json.Options) error
 }
 
-type EncoderOption func(*Marshaller)
+type MarshallerOption func(*Marshaller)
 
-func WithoutUnknownFields() EncoderOption {
+func WithoutUnknownFields() MarshallerOption {
 	return func(e *Marshaller) {
 		e.includeUnknownFields = false
 	}
 }
-func New(registry *proto.Registry, includeUnknownFields ...EncoderOption) *Marshaller {
-	e := &Marshaller{
-		includeUnknownFields: true,
-		registry:             registry,
+func WithBytesEncoderFunc(f func(encoder *jsontext.Encoder, t []byte, options json.Options) error) MarshallerOption {
+	return func(e *Marshaller) {
+		e.bytesEncoderFunc = f
 	}
-
-	for _, opt := range includeUnknownFields {
-		opt(e)
-	}
-	e.setMarshallers("")
-	return e
 }
 
-func (e *Marshaller) Marshal(in any) error {
-	err := json.MarshalEncode(jsontext.NewEncoder(os.Stdout), in, json.WithMarshalers(e.marshallers))
+func NewMarshaller(registry *proto.Registry, options ...MarshallerOption) *Marshaller {
+	m := &Marshaller{
+		includeUnknownFields: true,
+		registry:             registry,
+		bytesEncoderFunc:     ToHex,
+	}
+
+	for _, opt := range options {
+		opt(m)
+	}
+
+	m.marshallers = json.NewMarshalers(
+		json.MarshalFuncV2(m.anypb),
+		json.MarshalFuncV2(m.dynamicpbMessage),
+		json.MarshalFuncV2(m.encodeKVList),
+		json.MarshalFuncV2(m.bytesEncoderFunc),
+	)
+
+	return m
+}
+
+func (m *Marshaller) Marshal(in any) error {
+	err := json.MarshalEncode(jsontext.NewEncoder(os.Stdout), in, json.WithMarshalers(m.marshallers))
 	if err != nil {
 		return fmt.Errorf("marshalling and encoding block to json: %w", err)
 	}
 	return nil
 }
 
-func (e *Marshaller) MarshalToString(in any) (string, error) {
+func (m *Marshaller) MarshalToString(in any) (string, error) {
 	buf := bytes.NewBuffer(nil)
-	if err := json.MarshalEncode(jsontext.NewEncoder(buf), in, json.WithMarshalers(e.marshallers)); err != nil {
+	if err := json.MarshalEncode(jsontext.NewEncoder(buf), in, json.WithMarshalers(m.marshallers)); err != nil {
 		return "", err
 	}
 	return buf.String(), nil
 
 }
 
-func (e *Marshaller) anypb(encoder *jsontext.Encoder, t *anypb.Any, options json.Options) error {
-	msg, err := e.registry.Unmarshal(t)
+func (m *Marshaller) anypb(encoder *jsontext.Encoder, t *anypb.Any, options json.Options) error {
+	msg, err := m.registry.Unmarshal(t)
 	if err != nil {
 		return fmt.Errorf("unmarshalling proto any: %w", err)
 	}
-	e.setMarshallers(t.TypeUrl)
-	cnt, err := json.Marshal(msg, json.WithMarshalers(e.marshallers))
+
+	cnt, err := json.Marshal(msg, json.WithMarshalers(m.marshallers))
 	if err != nil {
 		return fmt.Errorf("json marshalling proto any: %w", err)
 	}
 	return encoder.WriteValue(cnt)
 }
 
-type kvlist []*kv
-type kv struct {
-	key   string
-	value any
-}
-
-func (e *Marshaller) encodeKVList(encoder *jsontext.Encoder, t kvlist, options json.Options) error {
+func (m *Marshaller) encodeKVList(encoder *jsontext.Encoder, t kvList, options json.Options) error {
 	if err := encoder.WriteToken(jsontext.ObjectStart); err != nil {
 		return err
 	}
@@ -90,7 +103,7 @@ func (e *Marshaller) encodeKVList(encoder *jsontext.Encoder, t kvlist, options j
 			return err
 		}
 
-		cnt, err := json.Marshal(kv.value, json.WithMarshalers(e.marshallers))
+		cnt, err := json.Marshal(kv.value, json.WithMarshalers(m.marshallers))
 		if err != nil {
 			return fmt.Errorf("json marshalling of value : %w", err)
 		}
@@ -102,10 +115,10 @@ func (e *Marshaller) encodeKVList(encoder *jsontext.Encoder, t kvlist, options j
 	return encoder.WriteToken(jsontext.ObjectEnd)
 }
 
-func (e *Marshaller) dynamicpbMessage(encoder *jsontext.Encoder, msg *dynamicpb.Message, options json.Options) error {
-	var kvl kvlist
+func (m *Marshaller) dynamicpbMessage(encoder *jsontext.Encoder, msg *dynamicpb.Message, options json.Options) error {
+	var kvl kvList
 
-	if e.includeUnknownFields {
+	if m.includeUnknownFields {
 		x := msg.GetUnknown()
 		fieldNumber, ofType, l := protowire.ConsumeField(x)
 		if l > 0 {
@@ -142,37 +155,17 @@ func (e *Marshaller) dynamicpbMessage(encoder *jsontext.Encoder, msg *dynamicpb.
 		return a.key < b.key
 	})
 
-	cnt, err := json.Marshal(kvl, json.WithMarshalers(e.marshallers))
+	cnt, err := json.Marshal(kvl, json.WithMarshalers(m.marshallers))
 	if err != nil {
 		return fmt.Errorf("json marshalling proto any: %w", err)
 	}
 	return encoder.WriteValue(cnt)
 }
 
-func (e *Marshaller) base58Bytes(encoder *jsontext.Encoder, t []byte, options json.Options) error {
+func ToBase58(encoder *jsontext.Encoder, t []byte, options json.Options) error {
 	return encoder.WriteToken(jsontext.String(base58.Encode(t)))
 }
 
-func (e *Marshaller) hexBytes(encoder *jsontext.Encoder, t []byte, options json.Options) error {
+func ToHex(encoder *jsontext.Encoder, t []byte, options json.Options) error {
 	return encoder.WriteToken(jsontext.String(hex.EncodeToString(t)))
-}
-
-func (e *Marshaller) setMarshallers(typeURL string) {
-	out := []*json.Marshalers{
-		json.MarshalFuncV2(e.anypb),
-		json.MarshalFuncV2(e.dynamicpbMessage),
-		json.MarshalFuncV2(e.encodeKVList),
-	}
-
-	if strings.Contains(typeURL, "solana") {
-		dynamic.SetDefaultBytesRepresentation(dynamic.BytesAsBase58)
-		out = append(out, json.MarshalFuncV2(e.base58Bytes))
-		e.marshallers = json.NewMarshalers(out...)
-		return
-	}
-
-	dynamic.SetDefaultBytesRepresentation(dynamic.BytesAsHex)
-	out = append(out, json.MarshalFuncV2(e.hexBytes))
-	e.marshallers = json.NewMarshalers(out...)
-	return
 }

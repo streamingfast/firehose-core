@@ -15,13 +15,12 @@ import (
 	"text/template"
 	"time"
 
-	"google.golang.org/protobuf/proto"
-
 	"buf.build/gen/go/bufbuild/reflect/connectrpc/go/buf/reflect/v1beta1/reflectv1beta1connect"
 	reflectv1beta1 "buf.build/gen/go/bufbuild/reflect/protocolbuffers/go/buf/reflect/v1beta1"
 	connect "connectrpc.com/connect"
 	"github.com/iancoleman/strcase"
 	"github.com/streamingfast/cli"
+	"google.golang.org/protobuf/proto"
 )
 
 //go:embed *.gotmpl
@@ -77,10 +76,17 @@ func main() {
 				name = *file.Name
 			}
 
+			bytesEncoding := "hex"
+
+			if strings.Contains(name, "solana") {
+				bytesEncoding = "base58"
+			}
+
 			protofiles = append(protofiles, ProtoFile{
 				Name:                  name,
 				Data:                  cnt,
 				BufRegistryPackageURL: buildBufRegistryPackageURL(wellKnownProtoRepo, deferPtr(file.Package, ""), fileDescriptorSet.Msg.Version),
+				BytesEncoding:         bytesEncoding,
 			})
 		}
 		// avoid hitting the buf.build rate limit
@@ -124,6 +130,7 @@ type ProtoFile struct {
 	Name                  string
 	Data                  []byte
 	BufRegistryPackageURL string
+	BytesEncoding         string
 }
 
 func templateFunctions() template.FuncMap {
