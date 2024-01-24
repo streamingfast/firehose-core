@@ -86,11 +86,11 @@ func TestUnmarshal(t *testing.T) {
 			protoregistry.GlobalFiles = &protoregistry.Files{}
 			protoregistry.GlobalTypes = &protoregistry.Types{}
 
-			err := Register(acme, tt.protoPaths...)
+			registry, err := NewRegistry(acme, tt.protoPaths...)
 			require.NoError(t, err)
 
 			a := &anypb.Any{TypeUrl: "type.googleapis.com/" + tt.typeURL, Value: tt.value}
-			out, err := Unmarshal(a)
+			out, err := registry.Unmarshal(a)
 			tt.assertion(t, err)
 
 			tt.want(t, out)

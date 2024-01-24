@@ -5,15 +5,13 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"google.golang.org/protobuf/reflect/protoregistry"
-
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
-func RegisterWellKnownFileDescriptors() error {
+func RegisterWellKnownFileDescriptors(registry *Registry) error {
 	protoFiles := []string{
 		// google/protobuf/timestamp.proto (https://buf.build/streamingfast/firehose-ethereum/docs/d869cb39aae947ecb0c7df6a1db2b61f:google.protobuf)
 		"0a1f676f6f676c652f70726f746f6275662f74696d657374616d702e70726f746f120f676f6f676c652e70726f746f627566223b0a0954696d657374616d7012180a077365636f6e647318012001280352077365636f6e647312140a056e616e6f7318022001280552056e616e6f734285010a13636f6d2e676f6f676c652e70726f746f627566420e54696d657374616d7050726f746f50015a32676f6f676c652e676f6c616e672e6f72672f70726f746f6275662f74797065732f6b6e6f776e2f74696d657374616d707062f80101a20203475042aa021e476f6f676c652e50726f746f6275662e57656c6c4b6e6f776e5479706573620670726f746f33",
@@ -56,11 +54,11 @@ func RegisterWellKnownFileDescriptors() error {
 	}
 
 	for _, protoFile := range protoFiles {
-		fd, err := protoToFileDescriptor(protoFile)
+		fd, err := protoToFileDescriptor(registry, protoFile)
 		if err != nil {
 			return fmt.Errorf("generating proto file: %w", err)
 		}
-		err = RegisterFileDescriptor(fd)
+		err = registry.RegisterFileDescriptor(fd)
 		if err != nil {
 			return fmt.Errorf("registering file descriptor: %w", err)
 		}
@@ -69,7 +67,7 @@ func RegisterWellKnownFileDescriptors() error {
 	return nil
 }
 
-func protoToFileDescriptor(in string) (protoreflect.FileDescriptor, error) {
+func protoToFileDescriptor(registry *Registry, in string) (protoreflect.FileDescriptor, error) {
 	protoBytes, err := hex.DecodeString(in)
 	if err != nil {
 		panic(fmt.Errorf("failed to hex decode payload: %w", err))
@@ -80,7 +78,7 @@ func protoToFileDescriptor(in string) (protoreflect.FileDescriptor, error) {
 		return nil, fmt.Errorf("failed to unmarshal file descriptor: %w", err)
 	}
 
-	fd, err := protodesc.NewFile(fileDescriptorProto, protoregistry.GlobalFiles)
+	fd, err := protodesc.NewFile(fileDescriptorProto, registry.Files)
 	if err != nil {
 		return nil, fmt.Errorf("creating new file descriptor: %w", err)
 

@@ -11,7 +11,6 @@ import (
 	"github.com/go-json-experiment/json/jsontext"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/mr-tron/base58"
-	"github.com/streamingfast/firehose-core/protoregistry"
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
@@ -19,7 +18,7 @@ import (
 )
 
 func (e *Encoder) anypb(encoder *jsontext.Encoder, t *anypb.Any, options json.Options) error {
-	msg, err := protoregistry.Unmarshal(t)
+	msg, err := e.registry.Unmarshal(t)
 	if err != nil {
 		return fmt.Errorf("unmarshalling proto any: %w", err)
 	}
@@ -61,7 +60,7 @@ func (e *Encoder) encodeKVList(encoder *jsontext.Encoder, t kvlist, options json
 func (e *Encoder) dynamicpbMessage(encoder *jsontext.Encoder, msg *dynamicpb.Message, options json.Options) error {
 	var kvl kvlist
 
-	if e.IncludeUnknownFields {
+	if e.includeUnknownFields {
 		x := msg.GetUnknown()
 		fieldNumber, ofType, l := protowire.ConsumeField(x)
 		if l > 0 {

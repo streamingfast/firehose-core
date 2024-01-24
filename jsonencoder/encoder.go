@@ -5,24 +5,30 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/streamingfast/firehose-core/protoregistry"
+
 	"github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
 )
 
 type Encoder struct {
 	marshallers          *json.Marshalers
-	IncludeUnknownFields bool
+	includeUnknownFields bool
+	registry             *protoregistry.Registry
 }
 
 type EncoderOption func(*Encoder)
 
 func WithoutUnknownFields() EncoderOption {
 	return func(e *Encoder) {
-		e.IncludeUnknownFields = false
+		e.includeUnknownFields = false
 	}
 }
-func New(includeUnknownFields ...EncoderOption) *Encoder {
-	e := &Encoder{IncludeUnknownFields: true}
+func New(registry *protoregistry.Registry, includeUnknownFields ...EncoderOption) *Encoder {
+	e := &Encoder{
+		includeUnknownFields: true,
+		registry:             registry,
+	}
 
 	for _, opt := range includeUnknownFields {
 		opt(e)
