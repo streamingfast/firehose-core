@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"reflect"
 	"strconv"
 	"sync"
@@ -372,28 +371,6 @@ func Compare(reference proto.Message, current proto.Message, includeUnknownField
 
 		//todo: manage better output off differences
 		if diff := r.Diff(c).Render(); diff != "" {
-			referenceWriter, err := os.Create("/Users/arnaudberger/t/reference.json")
-			if err != nil {
-				fmt.Println(err)
-			}
-			currentWriter, err := os.Create("/Users/arnaudberger/t/current.json")
-			if err != nil {
-				fmt.Println(err)
-			}
-
-			_, err = referenceWriter.WriteString(referenceAsJSON)
-			if err != nil {
-				fmt.Println(err)
-			}
-			_, err = currentWriter.WriteString(currentAsJSON)
-			if err != nil {
-				fmt.Println(err)
-			}
-
-			referenceWriter.Close()
-			currentWriter.Close()
-
-			panic("boum" /*referenceMsg.Get(referenceMsg.Descriptor().Fields().ByName("slot")).Uint()*/)
 			differences = append(differences, diff)
 		}
 
