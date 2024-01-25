@@ -139,12 +139,13 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 				var bundleReadErr error
 				var referenceBlockHashes []string
 				var referenceBlocks map[string]*dynamicpb.Message
+				var referenceBlocksNum map[string]uint64
 				var currentBlocks map[string]*dynamicpb.Message
 
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					referenceBlockHashes, referenceBlocks, err = readBundle(
+					referenceBlockHashes, referenceBlocks, referenceBlocksNum, err = readBundle(
 						ctx,
 						filename,
 						storeReference,
@@ -163,7 +164,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					_, currentBlocks, err = readBundle(ctx,
+					_, currentBlocks, _, err = readBundle(ctx,
 						filename,
 						storeCurrent,
 						uint64(fileStartBlock),
@@ -189,10 +190,9 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 						defer wg.Done()
 						referenceBlock := referenceBlocks[hash]
 						currentBlock, existsInCurrent := currentBlocks[hash]
-						referenceBlockNum := referenceBlock.Get(referenceBlock.Descriptor().Fields().ByName("slot")).Uint()
+						referenceBlockNum := referenceBlocksNum[hash]
 
 						var isDifferent bool
-						fmt.Println("Registry", registry)
 						if existsInCurrent {
 							var differences []string
 							differences = Compare(referenceBlock, currentBlock, includeUnknownFields, registry)
@@ -234,26 +234,31 @@ func readBundle(
 	stopBlock uint64,
 	warnAboutExtraBlocks *sync.Once,
 	registry *fcproto.Registry,
-) ([]string, map[string]*dynamicpb.Message, error) {
+) ([]string, map[string]*dynamicpb.Message, map[string]uint64, error) {
 	fileReader, err := store.OpenObject(ctx, filename)
+
+	fmt.Println("store", store)
+	fmt.Println("fileReader", fileReader)
+
 	if err != nil {
-		return nil, nil, fmt.Errorf("creating reader: %w", err)
+		return nil, nil, nil, fmt.Errorf("creating reader: %w", err)
 	}
 
 	blockReader, err := bstream.NewDBinBlockReader(fileReader)
 	if err != nil {
-		return nil, nil, fmt.Errorf("creating block reader: %w", err)
+		return nil, nil, nil, fmt.Errorf("creating block reader: %w", err)
 	}
 
 	var blockHashes []string
 	blocksMap := make(map[string]*dynamicpb.Message)
+	blockNumMap := make(map[string]uint64)
 	for {
 		curBlock, err := blockReader.Read()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return nil, nil, fmt.Errorf("reading blocks: %w", err)
+			return nil, nil, nil, fmt.Errorf("reading blocks: %w", err)
 		}
 		if curBlock.Number >= stopBlock {
 			break
@@ -268,13 +273,14 @@ func readBundle(
 		curBlockPB, err := registry.Unmarshal(curBlock.Payload)
 
 		if err != nil {
-			return nil, nil, fmt.Errorf("unmarshalling block: %w", err)
+			return nil, nil, nil, fmt.Errorf("unmarshalling block: %w", err)
 		}
 		blockHashes = append(blockHashes, curBlock.Id)
+		blockNumMap[curBlock.Id] = curBlock.Number
 		blocksMap[curBlock.Id] = curBlockPB
 	}
 
-	return blockHashes, blocksMap, nil
+	return blockHashes, blocksMap, blockNumMap, nil
 }
 
 type state struct {
@@ -390,7 +396,7 @@ func Compare(reference proto.Message, current proto.Message, includeUnknownField
 			referenceWriter.Close()
 			currentWriter.Close()
 
-			panic("diff")
+			panic("boum" /*referenceMsg.Get(referenceMsg.Descriptor().Fields().ByName("slot")).Uint()*/)
 			differences = append(differences, diff)
 		}
 
