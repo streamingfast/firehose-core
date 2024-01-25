@@ -237,9 +237,6 @@ func readBundle(
 ) ([]string, map[string]*dynamicpb.Message, map[string]uint64, error) {
 	fileReader, err := store.OpenObject(ctx, filename)
 
-	fmt.Println("store", store)
-	fmt.Println("fileReader", fileReader)
-
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("creating reader: %w", err)
 	}
