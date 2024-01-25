@@ -25,6 +25,49 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
+func (s *Server) BlockMeta(ctx context.Context, request *pbfirehose.BlockMetaRequest) (*pbfirehose.BlockMetaResponse, error) {
+	var blockNum uint64
+	var blockHash string
+	switch ref := request.Reference.(type) {
+	case *pbfirehose.BlockMetaRequest_ByBlockHash:
+		return nil, status.Error(codes.Unimplemented, "by block hash not implemented")
+
+	case *pbfirehose.BlockMetaRequest_ByBlockHashAndNumber:
+		blockNum = ref.ByBlockHashAndNumber.Num
+		blockHash = ref.ByBlockHashAndNumber.Hash
+	case *pbfirehose.BlockMetaRequest_ByCursor:
+		cur, err := bstream.CursorFromOpaque(ref.ByCursor.Cursor)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		blockNum = cur.Block.Num()
+		blockHash = cur.Block.ID()
+	case *pbfirehose.BlockMetaRequest_ByBlockNumber:
+		blockNum = ref.ByBlockNumber.Num
+	}
+
+	// FIXME: Optimize, do not load block payload at all from the read block.
+	blk, err := s.blockGetter.Get(ctx, blockNum, blockHash, s.logger)
+	if err != nil {
+		if _, ok := status.FromError(err); ok {
+			return nil, err
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if blk == nil {
+		return nil, status.Errorf(codes.NotFound, "block %s not found", bstream.NewBlockRef(blockHash, blockNum))
+	}
+
+	return &pbfirehose.BlockMetaResponse{
+		Number:               blk.Number,
+		Hash:                 blk.Id,
+		ParentNumber:         blk.ParentNum,
+		ParentHash:           blk.ParentId,
+		LastFinalBlockNumber: blk.LibNum,
+		Timestamp:            blk.Timestamp,
+	}, nil
+}
+
 func (s *Server) Block(ctx context.Context, request *pbfirehose.SingleBlockRequest) (*pbfirehose.SingleBlockResponse, error) {
 	var blockNum uint64
 	var blockHash string
