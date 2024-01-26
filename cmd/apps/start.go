@@ -29,6 +29,7 @@ import (
 	"github.com/streamingfast/firehose-core/launcher"
 	tracing "github.com/streamingfast/sf-tracing"
 	"go.uber.org/zap"
+	"golang.org/x/exp/slices"
 )
 
 var StartCmd = &cobra.Command{Use: "start", Args: cobra.ArbitraryArgs}
@@ -85,7 +86,8 @@ func start(cmd *cobra.Command, dataDir string, args []string, rootLog *zap.Logge
 	rootLog.Debug("launcher created")
 
 	runByDefault := func(app string) bool {
-		return app != "reader-node-stdin"
+		appsNotRunningByDefault := []string{"block-meta", "reader-node-stdin"}
+		return !slices.Contains(appsNotRunningByDefault, app)
 	}
 
 	apps := launcher.ParseAppsFromArgs(args, runByDefault)

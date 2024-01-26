@@ -16,7 +16,7 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
-	github.com/streamingfast/bstream v0.0.2-0.20231211192436-01f6a005b0e4
+	github.com/streamingfast/bstream v0.0.2-0.20240126213849-967cb5709af1
 	github.com/streamingfast/cli v0.0.4-0.20230825151644-8cc84512cd80
 	github.com/streamingfast/dauth v0.0.0-20231120142446-843f4e045cc2
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
@@ -27,7 +27,7 @@ require (
 	github.com/streamingfast/dstore v0.1.1-0.20230620124109-3924b3b36c77
 	github.com/streamingfast/jsonpb v0.0.0-20210811021341-3670f0aa02d0
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
-	github.com/streamingfast/pbgo v0.0.6-0.20231208140754-ed2bd10b96ee
+	github.com/streamingfast/pbgo v0.0.6-0.20240126214028-e57a3692caee
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
 	github.com/streamingfast/substreams v1.3.2
 	github.com/stretchr/testify v1.8.4
@@ -229,5 +229,3 @@ replace (
 	github.com/bytecodealliance/wasmtime-go/v4 => github.com/streamingfast/wasmtime-go/v4 v4.0.0-freemem3
 	github.com/jhump/protoreflect => github.com/streamingfast/protoreflect v0.0.0-20231205191344-4b629d20ce8d
 )
-
-replace github.com/streamingfast/pbgo => /Users/maoueh/work/sf/pbgo

@@ -4,26 +4,24 @@ import (
 	"context"
 	"fmt"
 
-	index_builder "github.com/streamingfast/firehose-core/index-builder"
-
-	"github.com/streamingfast/dgrpc"
-	"github.com/streamingfast/firehose-core/index-builder/metrics"
-
-	"go.uber.org/zap"
-
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dstore"
+	index_builder "github.com/streamingfast/firehose-core/index-builder"
+	"github.com/streamingfast/firehose-core/index-builder/metrics"
 	"github.com/streamingfast/shutter"
+	"go.uber.org/zap"
 	pbhealth "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 type Config struct {
-	BlockHandler       bstream.Handler
-	StartBlockResolver func(ctx context.Context) (uint64, error)
-	EndBlock           uint64
-	BlockStorePath     string
-	GRPCListenAddr     string
+	BlockHandler         bstream.Handler
+	StartBlockResolver   func(ctx context.Context) (uint64, error)
+	EndBlock             uint64
+	MergedBlocksStoreURL string
+	ForkedBlocksStoreURL string
+	GRPCListenAddr       string
 }
 
 type App struct {
@@ -40,7 +38,7 @@ func New(config *Config) *App {
 }
 
 func (a *App) Run() error {
-	blockStore, err := dstore.NewDBinStore(a.config.BlockStorePath)
+	blockStore, err := dstore.NewDBinStore(a.config.MergedBlocksStoreURL)
 	if err != nil {
 		return err
 	}
@@ -51,6 +49,9 @@ func (a *App) Run() error {
 	})
 
 	startBlock, err := a.config.StartBlockResolver(ctx)
+	if err != nil {
+		return fmt.Errorf("resolve start block: %w", err)
+	}
 
 	indexBuilder := index_builder.NewIndexBuilder(
 		zlog,

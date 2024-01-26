@@ -8,9 +8,8 @@ import (
 	"os"
 	"time"
 
-	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-
 	"github.com/streamingfast/bstream"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetering"
@@ -26,46 +25,62 @@ import (
 )
 
 func (s *Server) BlockMeta(ctx context.Context, request *pbfirehose.BlockMetaRequest) (*pbfirehose.BlockMetaResponse, error) {
-	var blockNum uint64
-	var blockHash string
+	var byNumber *uint64
+	var byHash *string
+
 	switch ref := request.Reference.(type) {
 	case *pbfirehose.BlockMetaRequest_ByBlockHash:
-		return nil, status.Error(codes.Unimplemented, "by block hash not implemented")
-
+		byHash = &ref.ByBlockHash.Hash
 	case *pbfirehose.BlockMetaRequest_ByBlockHashAndNumber:
-		blockNum = ref.ByBlockHashAndNumber.Num
-		blockHash = ref.ByBlockHashAndNumber.Hash
+		byHash = &ref.ByBlockHashAndNumber.Hash
 	case *pbfirehose.BlockMetaRequest_ByCursor:
 		cur, err := bstream.CursorFromOpaque(ref.ByCursor.Cursor)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
-		blockNum = cur.Block.Num()
-		blockHash = cur.Block.ID()
+		id := cur.Block.ID()
+		byHash = &id
 	case *pbfirehose.BlockMetaRequest_ByBlockNumber:
-		blockNum = ref.ByBlockNumber.Num
+		byNumber = &ref.ByBlockNumber.Num
 	}
 
-	// FIXME: Optimize, do not load block payload at all from the read block.
-	blk, err := s.blockGetter.Get(ctx, blockNum, blockHash, s.logger)
+	var meta *pbbstream.BlockMeta
+	var err error
+	switch {
+	case byHash != nil:
+		meta, err = s.blockMetaGetter.GetByHash(ctx, *byHash, s.logger)
+	case byNumber != nil:
+		meta, err = s.blockMetaGetter.GetByNum(ctx, *byNumber, s.logger)
+	default:
+		return nil, status.Error(codes.Internal, "neither by hash nor by number is specified, there is a logic error in the server")
+	}
+
 	if err != nil {
 		if _, ok := status.FromError(err); ok {
 			return nil, err
 		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if blk == nil {
-		return nil, status.Errorf(codes.NotFound, "block %s not found", bstream.NewBlockRef(blockHash, blockNum))
+
+	if meta == nil {
+		return nil, status.Errorf(codes.NotFound, "block %s not found", byReferenceString(byHash, byNumber))
 	}
 
 	return &pbfirehose.BlockMetaResponse{
-		Number:               blk.Number,
-		Hash:                 blk.Id,
-		ParentNumber:         blk.ParentNum,
-		ParentHash:           blk.ParentId,
-		LastFinalBlockNumber: blk.LibNum,
-		Timestamp:            blk.Timestamp,
+		Number:               meta.Number,
+		Hash:                 meta.Id,
+		ParentNumber:         meta.ParentNum,
+		ParentHash:           meta.ParentId,
+		LastFinalBlockNumber: meta.LibNum,
+		Timestamp:            meta.Timestamp,
 	}, nil
+}
+
+func byReferenceString(byHash *string, byNumber *uint64) string {
+	if byHash != nil {
+		return *byHash
+	}
+	return fmt.Sprintf("%d", *byNumber)
 }
 
 func (s *Server) Block(ctx context.Context, request *pbfirehose.SingleBlockRequest) (*pbfirehose.SingleBlockResponse, error) {

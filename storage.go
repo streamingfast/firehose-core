@@ -37,6 +37,16 @@ func GetCommonStoresURLs(dataDir string) (mergedBlocksStoreURL, oneBlocksStoreUR
 	return
 }
 
+func GetBlockMetaStoreURL(dataDir string) (blockMetaStoreURL string, err error) {
+	blockMetaStoreURL = MustReplaceDataDir(dataDir, viper.GetString("common-block-meta-store-url"))
+
+	if err = mkdirStorePathIfLocal(blockMetaStoreURL); err != nil {
+		return
+	}
+
+	return
+}
+
 func GetIndexStore(dataDir string) (indexStore dstore.Store, possibleIndexSizes []uint64, err error) {
 	indexStoreURL := MustReplaceDataDir(dataDir, viper.GetString("common-index-store-url"))
 

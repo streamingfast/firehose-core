@@ -41,7 +41,9 @@ type ConsoleReader struct {
 	protoMessageType      string
 	lastBlock             bstream.BlockRef
 	lastParentBlock       bstream.BlockRef
-	lib                   uint64
+	lastBlockTimestamp    time.Time
+
+	lib uint64
 
 	blockRate *dmetrics.AvgRatePromCounter
 }
@@ -109,10 +111,19 @@ func (v blockRefView) String() string {
 	return v.ref.String()
 }
 
+type blockRefViewTimestamp struct {
+	ref       bstream.BlockRef
+	timestamp time.Time
+}
+
+func (v blockRefViewTimestamp) String() string {
+	return fmt.Sprintf("%s @ %s", blockRefView{v.ref}, v.timestamp.Local().Format(time.RFC822Z))
+}
+
 func (r *ConsoleReader) printStats() {
 	r.logger.Info("console reader stats",
 		zap.Stringer("block_rate", r.blockRate),
-		zap.Stringer("last_block", blockRefView{r.lastBlock}),
+		zap.Stringer("last_block", blockRefViewTimestamp{r.lastBlock, r.lastBlockTimestamp}),
 		zap.Stringer("last_parent_block", blockRefView{r.lastParentBlock}),
 		zap.Uint64("lib", r.lib),
 	)
@@ -253,6 +264,7 @@ func (r *ConsoleReader) readBlock(line string) (out *pbbstream.Block, err error)
 	ConsoleReaderBlockReadCount.Inc()
 	r.lastBlock = bstream.NewBlockRef(blockHash, blockNum)
 	r.lastParentBlock = bstream.NewBlockRef(parentHash, parentNum)
+	r.lastBlockTimestamp = timestamp
 	r.lib = libNum
 
 	return block, nil

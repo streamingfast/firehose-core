@@ -24,7 +24,7 @@ var headBlockNumMetric = metricset.NewHeadBlockNumber("firehose")
 var headTimeDriftmetric = metricset.NewHeadTimeDrift("firehose")
 
 func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) {
-	appLogger, _ := logging.PackageLogger("firehose", "firehose")
+	appLogger, appTracer := logging.PackageLogger("firehose", "firehose")
 
 	launcher.RegisterApp(rootLog, &launcher.AppDef{
 		ID:          "firehose",
@@ -48,6 +48,11 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 			mergedBlocksStoreURL, oneBlocksStoreURL, forkedBlocksStoreURL, err := firecore.GetCommonStoresURLs(runtime.AbsDataDir)
 			if err != nil {
 				return nil, err
+			}
+
+			blockMetaStoreURL, err := firecore.GetBlockMetaStoreURL(runtime.AbsDataDir)
+			if err != nil {
+				return nil, fmt.Errorf("get block meta store url: %w", err)
 			}
 
 			rawServiceDiscoveryURL := viper.GetString("firehose-discovery-service-url")
@@ -86,10 +91,11 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 				serverOptions = append(serverOptions, server.WithLeakyBucketLimiter(limiterSize, limiterRefillRate))
 			}
 
-			return firehose.New(appLogger, &firehose.Config{
+			return firehose.New(appLogger, appTracer, &firehose.Config{
 				MergedBlocksStoreURL:    mergedBlocksStoreURL,
 				OneBlocksStoreURL:       oneBlocksStoreURL,
 				ForkedBlocksStoreURL:    forkedBlocksStoreURL,
+				BlockMetaStoreURL:       blockMetaStoreURL,
 				BlockStreamAddr:         viper.GetString("common-live-blocks-addr"),
 				GRPCListenAddr:          viper.GetString("firehose-grpc-listen-addr"),
 				GRPCShutdownGracePeriod: 1 * time.Second,
