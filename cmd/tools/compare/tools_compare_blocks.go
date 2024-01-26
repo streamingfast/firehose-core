@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"reflect"
 	"strconv"
 	"sync"
@@ -73,6 +74,7 @@ func NewToolsCompareBlocksCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra
 
 	flags := cmd.PersistentFlags()
 	flags.Bool("diff", false, "When activated, difference is displayed for each block with a difference")
+	flags.String("bytes-encoding", "hex", "Encoding for bytes fields, either 'hex' or 'base58'")
 	flags.Bool("include-unknown-fields", false, "When activated, the 'unknown fields' in the protobuf message will also be compared. These would not generate any difference when unmarshalled with the current protobuf definition.")
 	flags.StringSlice("proto-paths", []string{""}, "Paths to proto files to use for dynamic decoding of blocks")
 
@@ -84,6 +86,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 		displayDiff := sflags.MustGetBool(cmd, "diff")
 		includeUnknownFields := sflags.MustGetBool(cmd, "include-unknown-fields")
 		protoPaths := sflags.MustGetStringSlice(cmd, "proto-paths")
+		bytesEncoding := sflags.MustGetString(cmd, "bytes-encoding")
 		segmentSize := uint64(100000)
 		warnAboutExtraBlocks := sync.Once{}
 		ctx := cmd.Context()
@@ -194,7 +197,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 						var isDifferent bool
 						if existsInCurrent {
 							var differences []string
-							differences = Compare(referenceBlock, currentBlock, includeUnknownFields, registry)
+							differences = Compare(referenceBlock, currentBlock, includeUnknownFields, registry, bytesEncoding)
 
 							isDifferent = len(differences) > 0
 
@@ -332,7 +335,7 @@ func (s *state) print() {
 	fmt.Printf("✖ Segment %d - %s has %d different blocks and %d missing blocks (%d blocks counted)\n", s.segments[s.currentSegmentIdx].Start, endBlock, s.differencesFound, s.missingBlocks, s.totalBlocksCounted)
 }
 
-func Compare(reference proto.Message, current proto.Message, includeUnknownFields bool, registry *fcproto.Registry) (differences []string) {
+func Compare(reference proto.Message, current proto.Message, includeUnknownFields bool, registry *fcproto.Registry, bytesEncoding string) (differences []string) {
 	if reference == nil && current == nil {
 		return nil
 	}
@@ -355,6 +358,11 @@ func Compare(reference proto.Message, current proto.Message, includeUnknownField
 		if !includeUnknownFields {
 			opts = append(opts, json.WithoutUnknownFields())
 		}
+
+		if bytesEncoding == "base58" {
+			opts = append(opts, json.WithBytesEncoderFunc(json.ToBase58))
+		}
+
 		encoder := json.NewMarshaller(registry, opts...)
 
 		referenceAsJSON, err := encoder.MarshalToString(reference)
@@ -369,8 +377,26 @@ func Compare(reference proto.Message, current proto.Message, includeUnknownField
 		c, err := jd.ReadJsonString(currentAsJSON)
 		cli.NoError(err, "read JSON current")
 
+		//Get the r and the c and print them within a file for further analysis
+
+		referenceWriter, err := os.Create("/Users/arnaudberger/t/reference.json")
+		if err != nil {
+			fmt.Println(err)
+		}
+		defer referenceWriter.Close()
+		currentWriter, err := os.Create("/Users/arnaudberger/t/current.json")
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		defer currentWriter.Close()
+
+		referenceWriter.WriteString(referenceAsJSON)
+		currentWriter.WriteString(currentAsJSON)
+
 		//todo: manage better output off differences
 		if diff := r.Diff(c).Render(); diff != "" {
+
 			differences = append(differences, diff)
 		}
 
