@@ -20,6 +20,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -117,6 +119,12 @@ func (b *Bundler) Reset(nextBase uint64, lib bstream.BlockRef) {
 		b.enforceNextBlockOnBoundary = false // we don't need to check first block because we know it will be linked to lib
 	} else {
 		b.enforceNextBlockOnBoundary = true
+	}
+	if fin := os.Getenv("FORCE_FINALITY_AFTER_BLOCKS"); fin != "" {
+		fin64, err := strconv.ParseInt(fin, 10, 64)
+		if err == nil {
+			options = append(options, forkable.WithForceFinalityAfter(uint64(fin64)))
+		}
 	}
 	b.forkable = forkable.New(b, options...)
 
