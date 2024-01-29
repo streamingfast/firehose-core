@@ -10,7 +10,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 # UNRELEASED
 
-* Added `FORCE_FINALITY_AFTER_BLOCKS` environment variable to allow goerli merger to keep progressing after (ex: 200 blocks), even if the consensus chain is currently not finalizing any epoch.
+* Added `FORCE_FINALITY_AFTER_BLOCKS` environment variable to override block finality information at the reader/poller level. This allows an operator to pretend that finality is still progressing, N blocks behind HEAD, in the case where a beacon chain fails to do so and is intended as a workaround for deprecated chains like Goerli.
 
 ## v1.1.0
 
