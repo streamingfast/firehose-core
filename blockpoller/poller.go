@@ -8,7 +8,7 @@ import (
 	"github.com/streamingfast/bstream/forkable"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/derr"
-	"github.com/streamingfast/firehose-core/utils"
+	"github.com/streamingfast/firehose-core/internal/utils"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
 )
