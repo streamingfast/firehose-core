@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"testing"
@@ -66,9 +67,10 @@ func TestTweakBlockFinality(t *testing.T) {
 		},
 	}
 
-	// Run test cases
-	for _, tc := range testCases {
-		TweakBlockFinality(tc.blk, tc.maxDistanceToBlock)
-		assert.Equal(t, tc.expectedLibNum, tc.blk.LibNum)
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			TweakBlockFinality(tc.blk, tc.maxDistanceToBlock)
+			assert.Equal(t, tc.expectedLibNum, tc.blk.LibNum)
+		})
 	}
 }
