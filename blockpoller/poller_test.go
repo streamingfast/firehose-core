@@ -121,7 +121,7 @@ func TestForkHandler_run(t *testing.T) {
 			},
 		},
 		{
-			name:       "with skipping blocks",
+			name:       "with skipping optimisticlyPolledBlocks",
 			startBlock: blk("100a", "99a", 100).AsRef(),
 			blocks: []*TestBlock{
 				tb("100a", "99a", 100),
@@ -157,7 +157,7 @@ func TestForkHandler_run(t *testing.T) {
 			f := New(blockFetcher, blockFinalizer)
 			f.forkDB = forkable.NewForkDB()
 
-			err := f.run(tt.startBlock)
+			err := f.run(tt.startBlock, 1)
 			if !errors.Is(err, TestErrCompleteDone) {
 				require.NoError(t, err)
 			}

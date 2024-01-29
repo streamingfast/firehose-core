@@ -47,13 +47,13 @@ func (b *TestBlockFetcher) PollingInterval() time.Duration {
 	return 0
 }
 
-func (b *TestBlockFetcher) Fetch(_ context.Context, blkNum uint64) (*pbbstream.Block, error) {
+func (b *TestBlockFetcher) Fetch(_ context.Context, blkNum uint64) (*pbbstream.Block, bool, error) {
 	if len(b.blocks) == 0 {
 		assert.Fail(b.t, fmt.Sprintf("should not have fetched block %d", blkNum))
 	}
 
 	if b.idx >= uint64(len(b.blocks)) {
-		return nil, derr.NewFatalError(TestErrCompleteDone)
+		return nil, false, derr.NewFatalError(TestErrCompleteDone)
 	}
 
 	if blkNum != b.blocks[b.idx].expect.Number {
@@ -62,12 +62,12 @@ func (b *TestBlockFetcher) Fetch(_ context.Context, blkNum uint64) (*pbbstream.B
 
 	blkToSend := b.blocks[b.idx].send
 	b.idx++
-	return blkToSend, nil
+	return blkToSend, false, nil
 }
 
 func (b *TestBlockFetcher) check(t *testing.T) {
 	t.Helper()
-	require.Equal(b.t, uint64(len(b.blocks)), b.idx, "we should have fetched all %d blocks, only fired %d blocks", len(b.blocks), b.idx)
+	require.Equal(b.t, uint64(len(b.blocks)), b.idx, "we should have fetched all %d optimisticlyPolledBlocks, only fired %d optimisticlyPolledBlocks", len(b.blocks), b.idx)
 }
 
 var _ BlockHandler = &TestBlockFinalizer{}
@@ -108,7 +108,7 @@ func (t *TestBlockFinalizer) Handle(blk *pbbstream.Block) error {
 
 func (b *TestBlockFinalizer) check(t *testing.T) {
 	t.Helper()
-	require.Equal(b.t, uint64(len(b.fireBlocks)), b.idx, "we should have fired all %d blocks, only fired %d blocks", len(b.fireBlocks), b.idx)
+	require.Equal(b.t, uint64(len(b.fireBlocks)), b.idx, "we should have fired all %d optimisticlyPolledBlocks, only fired %d optimisticlyPolledBlocks", len(b.fireBlocks), b.idx)
 }
 
 var _ BlockHandler = &TestNoopBlockFinalizer{}

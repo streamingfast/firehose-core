@@ -8,6 +8,7 @@ import (
 	"github.com/streamingfast/bstream/forkable"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/derr"
+	"github.com/streamingfast/dhammer"
 	"github.com/streamingfast/firehose-core/internal/utils"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
@@ -35,6 +36,8 @@ type BlockPoller struct {
 	forkDB       *forkable.ForkDB
 
 	logger *zap.Logger
+
+	optimisticallyPolledBlocks map[uint64]*BlockItem
 }
 
 func New(
@@ -59,37 +62,57 @@ func New(
 	return b
 }
 
-func (p *BlockPoller) Run(ctx context.Context, startBlockNum uint64) error {
+func (p *BlockPoller) Run(ctx context.Context, startBlockNum uint64, numberOfBlockToFetch int) error {
 	p.startBlockNumGate = startBlockNum
 	p.logger.Info("starting poller",
 		zap.Uint64("start_block_num", startBlockNum),
+		zap.Uint64("resolved_start_block_num", resolveStartBlockNum),
 	)
 	p.blockHandler.Init()
-	startBlock, err := p.blockFetcher.Fetch(ctx, startBlockNum)
-	if err != nil {
-		return fmt.Errorf("unable to fetch start block %d: %w", startBlockNum, err)
+
+	for {
+		startBlock, skip, err := p.blockFetcher.Fetch(ctx, startBlockNum)
+		if err != nil {
+			return fmt.Errorf("unable to fetch start block %d: %w", startBlockNum, err)
+		}
+		if skip {
+			resolveStartBlockNum++
+			continue
+		}
+		return p.run(startBlock.AsRef(), numberOfBlockToFetch)
 	}
 
-	return p.run(startBlock.AsRef())
 }
 
-func (p *BlockPoller) run(resolvedStartBlock bstream.BlockRef) (err error) {
-
+func (p *BlockPoller) run(resolvedStartBlock bstream.BlockRef, numberOfBlockToFetch int) (err error) {
 	p.forkDB, resolvedStartBlock, err = initState(resolvedStartBlock, p.stateStorePath, p.ignoreCursor, p.logger)
 	if err != nil {
 		return fmt.Errorf("unable to initialize cursor: %w", err)
 	}
 
 	currentCursor := &cursor{state: ContinuousSegState, logger: p.logger}
-	blkIter := resolvedStartBlock.Num()
+	blockToFetch := resolvedStartBlock.Num()
+	var hashToFetch *string
 	for {
 		if p.IsTerminating() {
 			p.logger.Info("block poller is terminating")
 		}
 
-		blkIter, err = p.processBlock(currentCursor, blkIter)
+		p.logger.Info("about to fetch block", zap.Uint64("block_to_fetch", blockToFetch))
+		var fetchedBlock *pbbstream.Block
+		if hashToFetch != nil {
+			fetchedBlock, err = p.fetchBlockWithHash(blockToFetch, *hashToFetch)
+		} else {
+			fetchedBlock, err = p.fetchBlock(blockToFetch, numberOfBlockToFetch)
+		}
+
 		if err != nil {
-			return fmt.Errorf("unable to fetch  block %d: %w", blkIter, err)
+			return fmt.Errorf("unable to fetch  block %d: %w", blockToFetch, err)
+		}
+
+		blockToFetch, hashToFetch, err = p.processBlock(currentCursor, fetchedBlock)
+		if err != nil {
+			return fmt.Errorf("unable to fetch  block %d: %w", blockToFetch, err)
 		}
 
 		if p.IsTerminating() {
@@ -98,68 +121,170 @@ func (p *BlockPoller) run(resolvedStartBlock bstream.BlockRef) (err error) {
 	}
 }
 
-func (p *BlockPoller) processBlock(currentState *cursor, blkNum uint64) (uint64, error) {
-	if blkNum < p.forkDB.LIBNum() {
-		panic(fmt.Errorf("unexpected error block %d is below the current LIB num %d. There should be no re-org above the current LIB num", blkNum, p.forkDB.LIBNum()))
+func (p *BlockPoller) processBlock(currentState *cursor, block *pbbstream.Block) (uint64, *string, error) {
+	p.logger.Info("processing block", zap.Stringer("block", block.AsRef()), zap.Uint64("lib_num", block.LibNum))
+	if block.Number < p.forkDB.LIBNum() {
+		panic(fmt.Errorf("unexpected error block %d is below the current LIB num %d. There should be no re-org above the current LIB num", block.Number, p.forkDB.LIBNum()))
 	}
 
 	// On the first run, we will fetch the blk for the `startBlockRef`, since we have a `Ref` it stands
 	// to reason that we may already have the block. We could potentially optimize this
-	blk, err := p.fetchBlock(blkNum)
-	if err != nil {
-		return 0, fmt.Errorf("unable to fetch  block %d: %w", blkNum, err)
-	}
 
-	seenBlk, seenParent := p.forkDB.AddLink(blk.AsRef(), blk.ParentId, newBlock(blk))
+	seenBlk, seenParent := p.forkDB.AddLink(block.AsRef(), block.ParentId, newBlock(block))
 
-	currentState.addBlk(blk, seenBlk, seenParent)
+	currentState.addBlk(block, seenBlk, seenParent)
 
 	blkCompleteSegNum := currentState.getBlkSegmentNum()
-	blocks, reachLib := p.forkDB.CompleteSegment(blkCompleteSegNum)
+	completeSegment, reachLib := p.forkDB.CompleteSegment(blkCompleteSegNum)
 	p.logger.Debug("checked if block is complete segment",
 		zap.Uint64("blk_num", blkCompleteSegNum.Num()),
-		zap.Int("segment_len", len(blocks)),
+		zap.Int("segment_len", len(completeSegment)),
 		zap.Bool("reached_lib", reachLib),
 	)
 
 	if reachLib {
 		currentState.blkIsConnectedToLib()
-		err = p.fireCompleteSegment(blocks)
+		err := p.fireCompleteSegment(completeSegment)
 		if err != nil {
-			return 0, fmt.Errorf("firing complete segment: %w", err)
+			return 0, nil, fmt.Errorf("firing complete segment: %w", err)
 		}
 
 		// since the block is linkable to the current lib
 		// we can safely set the new lib to the current block's Lib
 		// the assumption here is that teh Lib the Block we received from the block fetcher ir ALWAYS CORRECT
-		p.logger.Debug("setting lib", zap.Stringer("blk", blk.AsRef()), zap.Uint64("lib_num", blk.LibNum))
-		p.forkDB.SetLIB(blk.AsRef(), blk.LibNum)
+		p.logger.Debug("setting lib", zap.Stringer("blk", block.AsRef()), zap.Uint64("lib_num", block.LibNum))
+		p.forkDB.SetLIB(block.AsRef(), block.LibNum)
 		p.forkDB.PurgeBeforeLIB(0)
 
-		err := p.saveState(blocks)
+		err = p.saveState(completeSegment)
 		if err != nil {
-			return 0, fmt.Errorf("saving state: %w", err)
+			return 0, nil, fmt.Errorf("saving state: %w", err)
 		}
 
-		return nextBlkInSeg(blocks), nil
+		nextBlockNum := nextBlkInSeg(completeSegment)
+		return nextBlockNum, nil, nil
 	}
 
 	currentState.blkIsNotConnectedToLib()
-	return prevBlkInSeg(blocks), nil
+
+	prevBlockNum, prevBlockHash := prevBlockInSegment(completeSegment)
+	return prevBlockNum, prevBlockHash, nil
 }
 
-func (p *BlockPoller) fetchBlock(blkNum uint64) (blk *pbbstream.Block, err error) {
-	var out *pbbstream.Block
-	err = derr.Retry(p.fetchBlockRetryCount, func(ctx context.Context) error {
-		out, err = p.blockFetcher.Fetch(ctx, blkNum)
+type BlockItem struct {
+	blockNumber uint64
+	block       *pbbstream.Block
+	skipped     bool
+}
+
+func (p *BlockPoller) loadNextBlocks(blockNumber uint64, numberOfBlockToFetch int) error {
+	p.optimisticallyPolledBlocks = map[uint64]*BlockItem{}
+
+	nailer := dhammer.NewNailer(10, func(ctx context.Context, blockToFetch uint64) (*BlockItem, error) {
+		var blockItem *BlockItem
+		err := derr.Retry(p.fetchBlockRetryCount, func(ctx context.Context) error {
+			b, skip, err := p.blockFetcher.Fetch(ctx, blockToFetch)
+			if err != nil {
+				return fmt.Errorf("unable to fetch  block %d: %w", blockToFetch, err)
+			}
+			if skip {
+				blockItem = &BlockItem{
+					blockNumber: blockToFetch,
+					block:       nil,
+					skipped:     true,
+				}
+				return nil
+			}
+
+			blockItem = &BlockItem{
+				blockNumber: blockToFetch,
+				block:       b,
+				skipped:     false,
+			}
+			return nil
+
+		})
+
 		if err != nil {
-			return fmt.Errorf("unable to fetch  block %d: %w", blkNum, err)
+			return nil, fmt.Errorf("failed to fetch block with retries %d: %w", blockToFetch, err)
+		}
+
+		return blockItem, err
+	})
+
+	ctx := context.Background()
+	nailer.Start(ctx)
+
+	done := make(chan interface{}, 1)
+	go func() {
+		for blockItem := range nailer.Out {
+			p.optimisticallyPolledBlocks[blockItem.blockNumber] = blockItem
+		}
+
+		close(done)
+	}()
+
+	for i := 0; i < numberOfBlockToFetch; i++ {
+		b := blockNumber + uint64(i)
+		nailer.Push(ctx, b)
+	}
+	nailer.Close()
+
+	<-done
+
+	if nailer.Err() != nil {
+		return fmt.Errorf("failed optimistically fetch blocks starting at %d: %w", blockNumber, nailer.Err())
+	}
+
+	return nil
+}
+
+func (p *BlockPoller) fetchBlock(blockNumber uint64, numberOfBlockToFetch int) (*pbbstream.Block, error) {
+	for {
+		blockItem, found := p.optimisticallyPolledBlocks[blockNumber]
+		if !found {
+			err := p.loadNextBlocks(blockNumber, numberOfBlockToFetch)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load next blocks: %w", err)
+			}
+			continue //that will retry the current block after loading the more blocks
+		}
+		if blockItem.skipped {
+			blockNumber++
+			continue
+		}
+
+		p.logger.Info("block was optimistically polled", zap.Uint64("block_num", blockNumber))
+		return blockItem.block, nil
+	}
+}
+
+func (p *BlockPoller) fetchBlockWithHash(blkNum uint64, hash string) (*pbbstream.Block, error) {
+	_ = hash //todo: hash will be used to fetch block from  cache
+
+	p.optimisticallyPolledBlocks = map[uint64]*BlockItem{}
+
+	var out *pbbstream.Block
+	var skipped bool
+	err := derr.Retry(p.fetchBlockRetryCount, func(ctx context.Context) error {
+		//todo: get block from cache
+		var fetchErr error
+		out, skipped, fetchErr = p.blockFetcher.Fetch(ctx, blkNum)
+		if fetchErr != nil {
+			return fmt.Errorf("unable to fetch  block %d: %w", blkNum, fetchErr)
+		}
+		if skipped {
+			return nil
 		}
 		return nil
 	})
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch block with retries %d: %w", blkNum, err)
+	}
+
+	if skipped {
+		return nil, fmt.Errorf("block %d was skipped and sould not have been requested", blkNum)
 	}
 
 	if p.forceFinalityAfterBlocks != nil {
@@ -198,14 +323,15 @@ func (p *BlockPoller) fire(blk *block) (bool, error) {
 
 func nextBlkInSeg(blocks []*forkable.Block) uint64 {
 	if len(blocks) == 0 {
-		panic(fmt.Errorf("the blocks segments should never be empty"))
+		panic(fmt.Errorf("the optimisticlyPolledBlocks segments should never be empty"))
 	}
 	return blocks[len(blocks)-1].BlockNum + 1
 }
 
-func prevBlkInSeg(blocks []*forkable.Block) uint64 {
+func prevBlockInSegment(blocks []*forkable.Block) (uint64, *string) {
 	if len(blocks) == 0 {
-		panic(fmt.Errorf("the blocks segments should never be empty"))
+		panic(fmt.Errorf("the optimisticlyPolledBlocks segments should never be empty"))
 	}
-	return blocks[0].Object.(*block).ParentNum
+	blockObject := blocks[0].Object.(*block)
+	return blockObject.ParentNum, &blockObject.ParentId
 }
