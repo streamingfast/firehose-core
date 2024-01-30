@@ -47,6 +47,10 @@ func (b *TestBlockFetcher) PollingInterval() time.Duration {
 	return 0
 }
 
+func (b *TestBlockFetcher) IsBlockAvailable(requestedSlot uint64) bool {
+	return true
+}
+
 func (b *TestBlockFetcher) Fetch(_ context.Context, blkNum uint64) (*pbbstream.Block, bool, error) {
 	if len(b.blocks) == 0 {
 		assert.Fail(b.t, fmt.Sprintf("should not have fetched block %d", blkNum))

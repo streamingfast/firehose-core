@@ -177,7 +177,7 @@ type BlockItem struct {
 	skipped     bool
 }
 
-func (p *BlockPoller) loadNextBlocks(blockNumber uint64, numberOfBlockToFetch int) error {
+func (p *BlockPoller) loadNextBlocks(requestedBlock uint64, numberOfBlockToFetch int) error {
 	p.optimisticallyPolledBlocks = map[uint64]*BlockItem{}
 
 	nailer := dhammer.NewNailer(10, func(ctx context.Context, blockToFetch uint64) (*BlockItem, error) {
@@ -224,16 +224,32 @@ func (p *BlockPoller) loadNextBlocks(blockNumber uint64, numberOfBlockToFetch in
 		close(done)
 	}()
 
+	didTriggerFetch := false
 	for i := 0; i < numberOfBlockToFetch; i++ {
-		b := blockNumber + uint64(i)
-		nailer.Push(ctx, b)
+		b := requestedBlock + uint64(i)
+
+		//only fetch block if it is available on chain
+		if p.blockFetcher.IsBlockAvailable(b) {
+			didTriggerFetch = true
+			nailer.Push(ctx, b)
+		} else {
+			//if this block is not available, we can assume that the next blocks are not available as well
+			break
+		}
 	}
+
+	if !didTriggerFetch {
+		//if we did not trigger any fetch, we fetch the requested block
+		// Fetcher should return the block when available (this will be a blocking call until the block is available)
+		nailer.Push(ctx, requestedBlock)
+	}
+
 	nailer.Close()
 
 	<-done
 
 	if nailer.Err() != nil {
-		return fmt.Errorf("failed optimistically fetch blocks starting at %d: %w", blockNumber, nailer.Err())
+		return fmt.Errorf("failed optimistically fetch blocks starting at %d: %w", requestedBlock, nailer.Err())
 	}
 
 	return nil
