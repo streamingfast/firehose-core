@@ -195,7 +195,7 @@ func (p *BlockPoller) loadNextBlocks(requestedBlock uint64, numberOfBlockToFetch
 				}
 				return nil
 			}
-
+			//todo: add block to cache
 			blockItem = &BlockItem{
 				blockNumber: blockToFetch,
 				block:       b,
@@ -230,6 +230,7 @@ func (p *BlockPoller) loadNextBlocks(requestedBlock uint64, numberOfBlockToFetch
 
 		//only fetch block if it is available on chain
 		if p.blockFetcher.IsBlockAvailable(b) {
+			p.logger.Info("optimistically fetching block", zap.Uint64("block_num", b))
 			didTriggerFetch = true
 			nailer.Push(ctx, b)
 		} else {
