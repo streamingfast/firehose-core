@@ -86,7 +86,7 @@ func start(cmd *cobra.Command, dataDir string, args []string, rootLog *zap.Logge
 	rootLog.Debug("launcher created")
 
 	runByDefault := func(app string) bool {
-		appsNotRunningByDefault := []string{"block-meta", "reader-node-stdin"}
+		appsNotRunningByDefault := []string{"reader-node-stdin"}
 		return !slices.Contains(appsNotRunningByDefault, app)
 	}
 

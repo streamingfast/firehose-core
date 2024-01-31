@@ -1,6 +1,5 @@
 start:
   args:
-  - block-meta
   - reader-node
   - merger
   - relayer

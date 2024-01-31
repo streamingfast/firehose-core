@@ -96,7 +96,6 @@ func Main[B firecore.Block](chain *firecore.Chain[B]) {
 	})(rootCmd.PersistentFlags())
 
 	registerCommonFlags(chain)
-	apps.RegisterBlockMetaApp(chain, rootLog)
 	apps.RegisterReaderNodeApp(chain, rootLog)
 	apps.RegisterReaderNodeStdinApp(chain, rootLog)
 	apps.RegisterMergerApp(rootLog)
@@ -187,9 +186,6 @@ func registerCommonFlags[B firecore.Block](chain *firecore.Chain[B]) {
 		cmd.Flags().Int("common-blocks-cache-max-entry-by-age-bytes", 21474836480, cli.FlagDescription(`
 			[COMMON] Blocks cache max size in bytes of the earliest used blocks, after the limit is reached, blocks are evicted from the cache.
 		`))
-
-		// Block meta
-		cmd.Flags().String("common-block-meta-store-url", firecore.BlockMetaStoreURL, "[COMMON] Store URL where to read/write blocks metadata needed by Firehose to provide the 'BlockMeta' gRPC call.")
 
 		cmd.Flags().Int("common-first-streamable-block", int(chain.FirstStreamableBlock), "[COMMON] First streamable block of the chain")
 

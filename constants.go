@@ -8,7 +8,6 @@ var (
 	MetricsListenAddr string = ":9102"
 
 	// Firehose chain specific port
-	BlockMetaServiceAddr           string = ":10008"
 	IndexBuilderServiceAddr        string = ":10009"
 	ReaderNodeGRPCAddr             string = ":10010"
 	ReaderNodeManagerAPIAddr       string = ":10011"
@@ -20,7 +19,6 @@ var (
 
 	// Data storage default locations
 	BlocksCacheDirectory string = "file://{data-dir}/storage/blocks-cache"
-	BlockMetaStoreURL    string = "file://{data-dir}/storage/block-meta"
 	MergedBlocksStoreURL string = "file://{data-dir}/storage/merged-blocks"
 	OneBlockStoreURL     string = "file://{data-dir}/storage/one-blocks"
 	ForkedBlocksStoreURL string = "file://{data-dir}/storage/forked-blocks"

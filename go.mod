@@ -27,7 +27,7 @@ require (
 	github.com/streamingfast/dstore v0.1.1-0.20230620124109-3924b3b36c77
 	github.com/streamingfast/jsonpb v0.0.0-20210811021341-3670f0aa02d0
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
-	github.com/streamingfast/pbgo v0.0.6-0.20240126214028-e57a3692caee
+	github.com/streamingfast/pbgo v0.0.6-0.20240131193313-6b88bc7139db
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
 	github.com/streamingfast/substreams v1.3.2
 	github.com/stretchr/testify v1.8.4

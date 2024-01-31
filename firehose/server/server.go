@@ -31,7 +31,6 @@ type Server struct {
 	streamFactory     *firecore.StreamFactory
 	transformRegistry *transform.Registry
 	blockGetter       *firehose.BlockGetter
-	blockMetaGetter   *firehose.BlockMetaGetter
 
 	initFunc     func(context.Context, *pbfirehoseV2.Request) context.Context
 	postHookFunc func(context.Context, *pbfirehoseV2.Response)
@@ -57,7 +56,6 @@ func New(
 	transformRegistry *transform.Registry,
 	streamFactory *firecore.StreamFactory,
 	blockGetter *firehose.BlockGetter,
-	blockMetaGetter *firehose.BlockMetaGetter,
 	logger *zap.Logger,
 	authenticator dauth.Authenticator,
 	isReady func(context.Context) bool,
@@ -130,7 +128,6 @@ func New(
 		Server:            grpcServer,
 		transformRegistry: transformRegistry,
 		blockGetter:       blockGetter,
-		blockMetaGetter:   blockMetaGetter,
 		streamFactory:     streamFactory,
 		listenAddr:        strings.ReplaceAll(listenAddr, "*", ""),
 		initFunc:          initFunc,

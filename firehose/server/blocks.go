@@ -24,65 +24,6 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func (s *Server) BlockMeta(ctx context.Context, request *pbfirehose.BlockMetaRequest) (*pbfirehose.BlockMetaResponse, error) {
-	var byNumber *uint64
-	var byHash *string
-
-	switch ref := request.Reference.(type) {
-	case *pbfirehose.BlockMetaRequest_ByBlockHash:
-		byHash = &ref.ByBlockHash.Hash
-	case *pbfirehose.BlockMetaRequest_ByBlockHashAndNumber:
-		byHash = &ref.ByBlockHashAndNumber.Hash
-	case *pbfirehose.BlockMetaRequest_ByCursor:
-		cur, err := bstream.CursorFromOpaque(ref.ByCursor.Cursor)
-		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
-		}
-		id := cur.Block.ID()
-		byHash = &id
-	case *pbfirehose.BlockMetaRequest_ByBlockNumber:
-		byNumber = &ref.ByBlockNumber.Num
-	}
-
-	var meta *pbbstream.BlockMeta
-	var err error
-	switch {
-	case byHash != nil:
-		meta, err = s.blockMetaGetter.GetByHash(ctx, *byHash, s.logger)
-	case byNumber != nil:
-		meta, err = s.blockMetaGetter.GetByNum(ctx, *byNumber, s.logger)
-	default:
-		return nil, status.Error(codes.Internal, "neither by hash nor by number is specified, there is a logic error in the server")
-	}
-
-	if err != nil {
-		if _, ok := status.FromError(err); ok {
-			return nil, err
-		}
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	if meta == nil {
-		return nil, status.Errorf(codes.NotFound, "block %s not found", byReferenceString(byHash, byNumber))
-	}
-
-	return &pbfirehose.BlockMetaResponse{
-		Number:               meta.Number,
-		Hash:                 meta.Id,
-		ParentNumber:         meta.ParentNum,
-		ParentHash:           meta.ParentId,
-		LastFinalBlockNumber: meta.LibNum,
-		Timestamp:            meta.Timestamp,
-	}, nil
-}
-
-func byReferenceString(byHash *string, byNumber *uint64) string {
-	if byHash != nil {
-		return *byHash
-	}
-	return fmt.Sprintf("%d", *byNumber)
-}
-
 func (s *Server) Block(ctx context.Context, request *pbfirehose.SingleBlockRequest) (*pbfirehose.SingleBlockResponse, error) {
 	var blockNum uint64
 	var blockHash string

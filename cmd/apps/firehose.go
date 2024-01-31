@@ -50,11 +50,6 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 				return nil, err
 			}
 
-			blockMetaStoreURL, err := firecore.GetBlockMetaStoreURL(runtime.AbsDataDir)
-			if err != nil {
-				return nil, fmt.Errorf("get block meta store url: %w", err)
-			}
-
 			rawServiceDiscoveryURL := viper.GetString("firehose-discovery-service-url")
 			var serviceDiscoveryURL *url.URL
 			if rawServiceDiscoveryURL != "" {
@@ -95,7 +90,6 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 				MergedBlocksStoreURL:    mergedBlocksStoreURL,
 				OneBlocksStoreURL:       oneBlocksStoreURL,
 				ForkedBlocksStoreURL:    forkedBlocksStoreURL,
-				BlockMetaStoreURL:       blockMetaStoreURL,
 				BlockStreamAddr:         viper.GetString("common-live-blocks-addr"),
 				GRPCListenAddr:          viper.GetString("firehose-grpc-listen-addr"),
 				GRPCShutdownGracePeriod: 1 * time.Second,
