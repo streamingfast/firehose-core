@@ -8,6 +8,10 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## v1.1.2
+
+* Added `Arweave` to known list of Block model.
+
 ## v1.1.1
 
 * Added `FORCE_FINALITY_AFTER_BLOCKS` environment variable to override block finality information at the reader/poller level. This allows an operator to pretend that finality is still progressing, N blocks behind HEAD, in the case where a beacon chain fails to do so and is intended as a workaround for deprecated chains like Goerli.
