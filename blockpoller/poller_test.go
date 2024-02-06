@@ -169,24 +169,6 @@ func TestForkHandler_run(t *testing.T) {
 	}
 }
 
-func TestForkHandler_resolveStartBlock(t *testing.T) {
-	tests := []struct {
-		startBlockNum     uint64
-		finalizedBlockNum uint64
-		expected          uint64
-	}{
-		{90, 100, 90},
-		{100, 100, 100},
-		{110, 100, 100},
-	}
-
-	for _, test := range tests {
-		t.Run("", func(t *testing.T) {
-			assert.Equal(t, test.expected, resolveStartBlock(test.startBlockNum, test.finalizedBlockNum))
-		})
-	}
-}
-
 func TestForkHandler_fire(t *testing.T) {
 	tests := []struct {
 		name          string

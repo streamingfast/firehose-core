@@ -59,21 +59,15 @@ func New(
 	return b
 }
 
-func (p *BlockPoller) Run(ctx context.Context, startBlockNum uint64, chainLatestFinalizeBlock bstream.BlockRef) error {
+func (p *BlockPoller) Run(ctx context.Context, startBlockNum uint64) error {
 	p.startBlockNumGate = startBlockNum
-	resolveStartBlockNum := resolveStartBlock(startBlockNum, chainLatestFinalizeBlock.Num())
 	p.logger.Info("starting poller",
 		zap.Uint64("start_block_num", startBlockNum),
-		zap.Stringer("chain_latest_finalize_block", chainLatestFinalizeBlock),
-		zap.Uint64("resolved_start_block_num", resolveStartBlockNum),
 	)
-
 	p.blockHandler.Init()
-
-	startBlock, err := p.blockFetcher.Fetch(ctx, resolveStartBlockNum)
+	startBlock, err := p.blockFetcher.Fetch(ctx, startBlockNum)
 	if err != nil {
-
-		return fmt.Errorf("unable to fetch start block %d: %w", resolveStartBlockNum, err)
+		return fmt.Errorf("unable to fetch start block %d: %w", startBlockNum, err)
 	}
 
 	return p.run(startBlock.AsRef())
@@ -214,11 +208,4 @@ func prevBlkInSeg(blocks []*forkable.Block) uint64 {
 		panic(fmt.Errorf("the blocks segments should never be empty"))
 	}
 	return blocks[0].Object.(*block).ParentNum
-}
-
-func resolveStartBlock(startBlockNum, chainLatestFinalizeBlock uint64) uint64 {
-	if chainLatestFinalizeBlock < startBlockNum {
-		return chainLatestFinalizeBlock
-	}
-	return startBlockNum
 }
