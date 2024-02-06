@@ -66,7 +66,6 @@ func (p *BlockPoller) Run(ctx context.Context, startBlockNum uint64, numberOfBlo
 	p.startBlockNumGate = startBlockNum
 	p.logger.Info("starting poller",
 		zap.Uint64("start_block_num", startBlockNum),
-		zap.Uint64("resolved_start_block_num", resolveStartBlockNum),
 	)
 	p.blockHandler.Init()
 
@@ -76,12 +75,11 @@ func (p *BlockPoller) Run(ctx context.Context, startBlockNum uint64, numberOfBlo
 			return fmt.Errorf("unable to fetch start block %d: %w", startBlockNum, err)
 		}
 		if skip {
-			resolveStartBlockNum++
+			startBlockNum++
 			continue
 		}
 		return p.run(startBlock.AsRef(), numberOfBlockToFetch)
 	}
-
 }
 
 func (p *BlockPoller) run(resolvedStartBlock bstream.BlockRef, numberOfBlockToFetch int) (err error) {
