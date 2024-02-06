@@ -59,29 +59,25 @@ func New(
 	return b
 }
 
-func (p *BlockPoller) Run(ctx context.Context, startBlockNum uint64, chainLatestFinalizeBlock bstream.BlockRef, numberOfBlockToFetch int) error {
+func (p *BlockPoller) Run(ctx context.Context, startBlockNum uint64, numberOfBlockToFetch int) error {
 	p.startBlockNumGate = startBlockNum
-	resolveStartBlockNum := resolveStartBlock(startBlockNum, chainLatestFinalizeBlock.Num())
 	p.logger.Info("starting poller",
 		zap.Uint64("start_block_num", startBlockNum),
-		zap.Stringer("chain_latest_finalize_block", chainLatestFinalizeBlock),
-		zap.Uint64("resolved_start_block_num", resolveStartBlockNum),
 	)
 
 	p.blockHandler.Init()
 
 	for {
-		startBlock, skip, err := p.blockFetcher.Fetch(ctx, resolveStartBlockNum)
+		startBlock, skip, err := p.blockFetcher.Fetch(ctx, startBlockNum)
 		if err != nil {
-			return fmt.Errorf("unable to fetch start block %d: %w", resolveStartBlockNum, err)
+			return fmt.Errorf("unable to fetch start block %d: %w", startBlockNum, err)
 		}
 		if skip {
-			resolveStartBlockNum++
+			startBlockNum++
 			continue
 		}
 		return p.run(startBlock.AsRef(), numberOfBlockToFetch)
 	}
-
 }
 
 func (p *BlockPoller) run(resolvedStartBlock bstream.BlockRef, numberOfBlockToFetch int) (err error) {
