@@ -273,6 +273,7 @@ func (p *BlockPoller) fetchBlock(blockNumber uint64, numberOfBlockToFetch int) (
 }
 
 func (p *BlockPoller) fetchBlockWithHash(blkNum uint64, hash string) (*pbbstream.Block, error) {
+	p.logger.Info("fetching block with hash", zap.Uint64("block_num", blkNum), zap.String("hash", hash))
 	_ = hash //todo: hash will be used to fetch block from  cache
 
 	p.optimisticallyPolledBlocks = map[uint64]*BlockItem{}
