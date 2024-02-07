@@ -8,9 +8,8 @@ import (
 	"os"
 	"time"
 
-	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-
 	"github.com/streamingfast/bstream"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetering"
@@ -147,7 +146,7 @@ func (s *Server) Blocks(request *pbfirehose.Request, streamSrv pbfirehose.Stream
 		start := time.Now()
 		err := streamSrv.Send(resp)
 		if err != nil {
-			logger.Info("stream send error", zap.Stringer("block", block), zap.Error(err))
+			logger.Info("stream send error", zap.Uint64("block_num", block.Number), zap.String("block_id", block.Id), zap.Error(err))
 			return NewErrSendBlock(err)
 		}
 
@@ -160,7 +159,7 @@ func (s *Server) Blocks(request *pbfirehose.Request, streamSrv pbfirehose.Stream
 			level = zap.InfoLevel
 		}
 
-		logger.Check(level, "stream sent block").Write(zap.Uint64("block", block.Number), zap.Duration("duration", time.Since(start)))
+		logger.Check(level, "stream sent block").Write(zap.Uint64("block_num", block.Number), zap.String("block_id", block.Id), zap.Duration("duration", time.Since(start)))
 
 		return nil
 	})

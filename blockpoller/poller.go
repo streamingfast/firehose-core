@@ -9,6 +9,7 @@ import (
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dhammer"
+	"github.com/streamingfast/firehose-core/internal/utils"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
 )
@@ -24,10 +25,11 @@ func newBlock(block2 *pbbstream.Block) *block {
 
 type BlockPoller struct {
 	*shutter.Shutter
-	startBlockNumGate    uint64
-	fetchBlockRetryCount uint64
-	stateStorePath       string
-	ignoreCursor         bool
+	startBlockNumGate        uint64
+	fetchBlockRetryCount     uint64
+	stateStorePath           string
+	ignoreCursor             bool
+	forceFinalityAfterBlocks *uint64
 
 	blockFetcher BlockFetcher
 	blockHandler BlockHandler
@@ -45,11 +47,12 @@ func New(
 ) *BlockPoller {
 
 	b := &BlockPoller{
-		Shutter:              shutter.New(),
-		blockFetcher:         blockFetcher,
-		blockHandler:         blockHandler,
-		fetchBlockRetryCount: 4,
-		logger:               zap.NewNop(),
+		Shutter:                  shutter.New(),
+		blockFetcher:             blockFetcher,
+		blockHandler:             blockHandler,
+		fetchBlockRetryCount:     4,
+		logger:                   zap.NewNop(),
+		forceFinalityAfterBlocks: utils.GetEnvForceFinalityAfterBlocks(),
 	}
 
 	for _, opt := range opts {
@@ -64,7 +67,6 @@ func (p *BlockPoller) Run(ctx context.Context, startBlockNum uint64, numberOfBlo
 	p.logger.Info("starting poller",
 		zap.Uint64("start_block_num", startBlockNum),
 	)
-
 	p.blockHandler.Init()
 
 	for {
@@ -301,6 +303,10 @@ func (p *BlockPoller) fetchBlockWithHash(blkNum uint64, hash string) (*pbbstream
 		return nil, fmt.Errorf("block %d was skipped and sould not have been requested", blkNum)
 	}
 
+	if p.forceFinalityAfterBlocks != nil {
+		utils.TweakBlockFinality(out, *p.forceFinalityAfterBlocks)
+	}
+
 	return out, nil
 }
 
@@ -344,11 +350,4 @@ func prevBlockInSegment(blocks []*forkable.Block) (uint64, *string) {
 	}
 	blockObject := blocks[0].Object.(*block)
 	return blockObject.ParentNum, &blockObject.ParentId
-}
-
-func resolveStartBlock(startBlockNum, chainLatestFinalizeBlock uint64) uint64 {
-	if chainLatestFinalizeBlock < startBlockNum {
-		return chainLatestFinalizeBlock
-	}
-	return startBlockNum
 }

@@ -6,9 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/streamingfast/firehose-core/firehose"
-	"github.com/streamingfast/firehose-core/firehose/rate"
-
 	_ "github.com/mostynb/go-grpc-compression/zstd"
 	"github.com/streamingfast/bstream/transform"
 	"github.com/streamingfast/dauth"
@@ -17,6 +14,9 @@ import (
 	"github.com/streamingfast/dgrpc/server/factory"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dmetrics"
+	firecore "github.com/streamingfast/firehose-core"
+	"github.com/streamingfast/firehose-core/firehose"
+	"github.com/streamingfast/firehose-core/firehose/rate"
 	pbfirehoseV1 "github.com/streamingfast/pbgo/sf/firehose/v1"
 	pbfirehoseV2 "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -28,7 +28,7 @@ import (
 )
 
 type Server struct {
-	streamFactory     *firehose.StreamFactory
+	streamFactory     *firecore.StreamFactory
 	transformRegistry *transform.Registry
 	blockGetter       *firehose.BlockGetter
 
@@ -54,7 +54,7 @@ func WithLeakyBucketLimiter(size int, dripRate time.Duration) Option {
 
 func New(
 	transformRegistry *transform.Registry,
-	streamFactory *firehose.StreamFactory,
+	streamFactory *firecore.StreamFactory,
 	blockGetter *firehose.BlockGetter,
 	logger *zap.Logger,
 	authenticator dauth.Authenticator,
@@ -63,7 +63,7 @@ func New(
 	serviceDiscoveryURL *url.URL,
 	opts ...Option,
 ) *Server {
-	initFunc := func(ctx context.Context, request *pbfirehoseV2.Request) context.Context {
+	initFunc := func(ctx context.Context, _ *pbfirehoseV2.Request) context.Context {
 		//////////////////////////////////////////////////////////////////////
 		ctx = dmetering.WithBytesMeter(ctx)
 		ctx = withRequestMeter(ctx)

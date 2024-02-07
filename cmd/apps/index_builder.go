@@ -81,11 +81,11 @@ func RegisterIndexBuilderApp[B firecore.Block](chain *firecore.Chain[B], rootLog
 			})
 
 			app := index_builder.New(&index_builder.Config{
-				BlockHandler:       handler,
-				StartBlockResolver: startBlockResolver,
-				EndBlock:           stopBlockNum,
-				BlockStorePath:     mergedBlocksStoreURL,
-				GRPCListenAddr:     viper.GetString("index-builder-grpc-listen-addr"),
+				BlockHandler:         handler,
+				StartBlockResolver:   startBlockResolver,
+				EndBlock:             stopBlockNum,
+				MergedBlocksStoreURL: mergedBlocksStoreURL,
+				GRPCListenAddr:       viper.GetString("index-builder-grpc-listen-addr"),
 			})
 
 			return app, nil

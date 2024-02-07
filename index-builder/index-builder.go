@@ -6,11 +6,11 @@ import (
 	"fmt"
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	firecore "github.com/streamingfast/firehose-core"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/firehose-core/firehose"
 	"github.com/streamingfast/firehose-core/index-builder/metrics"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"github.com/streamingfast/shutter"
@@ -55,7 +55,7 @@ func (app *IndexBuilder) launch() error {
 	startBlockNum := app.startBlockNum
 	stopBlockNum := app.stopBlockNum
 
-	streamFactory := firehose.NewStreamFactory(
+	streamFactory := firecore.NewStreamFactory(
 		app.blocksStore,
 		nil,
 		nil,

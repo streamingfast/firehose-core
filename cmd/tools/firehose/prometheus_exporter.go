@@ -93,7 +93,7 @@ func runPrometheusExporterE[B firecore.Block](chain *firecore.Chain[B], zlog *za
 				}
 
 				if cursor, err := bstream.CursorFromOpaque(response.Cursor); err == nil {
-					zlog.Info("Got block", zap.Stringer("block", cursor.Block))
+					zlog.Info("Got block", zap.String("block", cursor.Block.ID()), zap.Uint64("block_num", cursor.Block.Num()))
 
 					lastBlockLock.Lock()
 					lastBlockReceived = time.Now()

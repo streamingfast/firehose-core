@@ -38,11 +38,11 @@ func (w *MergedBlocksWriter) ProcessBlock(blk *pbbstream.Block, obj interface{})
 			return fmt.Errorf("received unexpected block %s (not a boundary, not the first streamable block %d)", blk, bstream.GetProtocolFirstStreamableBlock)
 		}
 		w.LowBlockNum = LowBoundary(blk.Number)
-		w.Logger.Debug("setting initial boundary to %d upon seeing block %s", zap.Uint64("low_boundary", w.LowBlockNum), zap.Stringer("blk", blk))
+		w.Logger.Debug("setting initial boundary to %d upon seeing block %s", zap.Uint64("low_boundary", w.LowBlockNum), zap.Uint64("blk_num", blk.Number))
 	}
 
 	if blk.Number > w.LowBlockNum+99 {
-		w.Logger.Debug("bundling because we saw block %s from next bundle (%d was not seen, it must not exist on this chain)", zap.Stringer("blk", blk), zap.Uint64("last_bundle_block", w.LowBlockNum+99))
+		w.Logger.Debug("bundling because we saw block %s from next bundle (%d was not seen, it must not exist on this chain)", zap.Uint64("blk_num", blk.Number), zap.Uint64("last_bundle_block", w.LowBlockNum+99))
 		if err := w.writeBundle(); err != nil {
 			return err
 		}

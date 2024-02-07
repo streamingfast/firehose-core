@@ -20,3 +20,4 @@ start:
       --store-dir="{node-data-dir}"
       --block-rate=1200
       --genesis-height=0
+      --genesis-block-burst=1000

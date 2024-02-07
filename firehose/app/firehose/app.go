@@ -20,19 +20,20 @@ import (
 	"net/url"
 	"time"
 
-	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
 	"github.com/streamingfast/bstream/hub"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/bstream/transform"
 	"github.com/streamingfast/dauth"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dstore"
+	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/firehose"
 	"github.com/streamingfast/firehose-core/firehose/metrics"
 	"github.com/streamingfast/firehose-core/firehose/server"
+	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
@@ -70,15 +71,17 @@ type App struct {
 	config  *Config
 	modules *Modules
 	logger  *zap.Logger
+	tracer  logging.Tracer
 	isReady *atomic.Bool
 }
 
-func New(logger *zap.Logger, config *Config, modules *Modules) *App {
+func New(logger *zap.Logger, tracer logging.Tracer, config *Config, modules *Modules) *App {
 	return &App{
 		Shutter: shutter.New(),
 		config:  config,
 		modules: modules,
 		logger:  logger,
+		tracer:  tracer,
 
 		isReady: atomic.NewBool(false),
 	}
@@ -145,7 +148,7 @@ func (a *App) Run() error {
 		go forkableHub.Run()
 	}
 
-	streamFactory := firehose.NewStreamFactory(
+	streamFactory := firecore.NewStreamFactory(
 		mergedBlocksStore,
 		forkedBlocksStore,
 		forkableHub,

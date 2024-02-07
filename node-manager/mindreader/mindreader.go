@@ -27,6 +27,7 @@ import (
 	"github.com/streamingfast/bstream/blockstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/firehose-core/internal/utils"
 	nodeManager "github.com/streamingfast/firehose-core/node-manager"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
@@ -53,10 +54,11 @@ type ConsolerReaderFactory func(lines chan string) (ConsolerReader, error)
 type MindReaderPlugin struct {
 	*shutter.Shutter
 
-	archiver             *Archiver // transformed blocks are sent to Archiver
-	consoleReaderFactory ConsolerReaderFactory
-	stopBlock            uint64 // if set, call shutdownFunc(nil) when we hit this number
-	channelCapacity      int    // transformed blocks are buffered in a channel
+	archiver                 *Archiver // transformed blocks are sent to Archiver
+	consoleReaderFactory     ConsolerReaderFactory
+	stopBlock                uint64 // if set, call shutdownFunc(nil) when we hit this number
+	channelCapacity          int    // transformed blocks are buffered in a channel
+	forceFinalityAfterBlocks *uint64
 
 	lastSeenBlock     bstream.BlockRef
 	lastSeenBlockLock sync.RWMutex
@@ -134,14 +136,15 @@ func NewMindReaderPlugin(
 
 	zlogger.Info("creating new mindreader plugin")
 	return &MindReaderPlugin{
-		Shutter:              shutter.New(),
-		archiver:             archiver,
-		consoleReaderFactory: consoleReaderFactory,
-		stopBlock:            stopBlockNum,
-		channelCapacity:      channelCapacity,
-		headBlockUpdater:     headBlockUpdater,
-		blockStreamServer:    blockStreamServer,
-		zlogger:              zlogger,
+		Shutter:                  shutter.New(),
+		archiver:                 archiver,
+		consoleReaderFactory:     consoleReaderFactory,
+		stopBlock:                stopBlockNum,
+		channelCapacity:          channelCapacity,
+		headBlockUpdater:         headBlockUpdater,
+		blockStreamServer:        blockStreamServer,
+		forceFinalityAfterBlocks: utils.GetEnvForceFinalityAfterBlocks(),
+		zlogger:                  zlogger,
 	}, nil
 }
 
@@ -258,7 +261,7 @@ func (p *MindReaderPlugin) consumeReadFlow(blocks <-chan *pbbstream.Block) {
 
 		err := p.archiver.StoreBlock(ctx, block)
 		if err != nil {
-			p.zlogger.Error("failed storing block in archiver, shutting down and trying to send next blocks individually. You will need to reprocess over this range.", zap.Error(err), zap.Stringer("received_block", block))
+			p.zlogger.Error("failed storing block in archiver, shutting down and trying to send next blocks individually. You will need to reprocess over this range.", zap.Error(err), zap.String("received_block", block.Id), zap.Uint64("received_block_num", block.Number))
 
 			if !p.IsTerminating() {
 				go p.Shutdown(fmt.Errorf("archiver store block failed: %w", err))
@@ -305,6 +308,10 @@ func (p *MindReaderPlugin) readOneMessage(blocks chan<- *pbbstream.Block) error 
 	block, err := p.consoleReader.ReadBlock()
 	if err != nil {
 		return err
+	}
+
+	if p.forceFinalityAfterBlocks != nil {
+		utils.TweakBlockFinality(block, *p.forceFinalityAfterBlocks)
 	}
 
 	if block.Number < bstream.GetProtocolFirstStreamableBlock {
