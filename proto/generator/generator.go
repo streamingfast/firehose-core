@@ -77,7 +77,6 @@ func main() {
 			}
 
 			bytesEncoding := "hex"
-
 			if strings.Contains(name, "solana") {
 				bytesEncoding = "base58"
 			}
