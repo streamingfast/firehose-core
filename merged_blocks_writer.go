@@ -43,7 +43,7 @@ func (w *MergedBlocksWriter) ProcessBlock(blk *pbbstream.Block, obj interface{})
 
 	if blk.Number > w.LowBlockNum+99 {
 		w.Logger.Debug("bundling because we saw block %s from next bundle (%d was not seen, it must not exist on this chain)", zap.Uint64("blk_num", blk.Number), zap.Uint64("last_bundle_block", w.LowBlockNum+99))
-		if err := w.writeBundle(); err != nil {
+		if err := w.WriteBundle(); err != nil {
 			return err
 		}
 	}
@@ -56,7 +56,7 @@ func (w *MergedBlocksWriter) ProcessBlock(blk *pbbstream.Block, obj interface{})
 
 	if blk.Number == w.LowBlockNum+99 {
 		w.Logger.Debug("bundling on last bundle block", zap.Uint64("last_bundle_block", w.LowBlockNum+99))
-		if err := w.writeBundle(); err != nil {
+		if err := w.WriteBundle(); err != nil {
 			return err
 		}
 		return nil
@@ -65,7 +65,7 @@ func (w *MergedBlocksWriter) ProcessBlock(blk *pbbstream.Block, obj interface{})
 	return nil
 }
 
-func (w *MergedBlocksWriter) writeBundle() error {
+func (w *MergedBlocksWriter) WriteBundle() error {
 	file := filename(w.LowBlockNum)
 	w.Logger.Info("writing merged file to store (suffix: .dbin.zst)", zap.String("filename", file), zap.Uint64("lowBlockNum", w.LowBlockNum))
 
