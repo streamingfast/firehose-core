@@ -339,14 +339,14 @@ func (p *BlockPoller) fire(blk *block) (bool, error) {
 
 func nextBlkInSeg(blocks []*forkable.Block) uint64 {
 	if len(blocks) == 0 {
-		panic(fmt.Errorf("the optimisticlyPolledBlocks segments should never be empty"))
+		panic(fmt.Errorf("the blocks segments should never be empty"))
 	}
 	return blocks[len(blocks)-1].BlockNum + 1
 }
 
 func prevBlockInSegment(blocks []*forkable.Block) (uint64, *string) {
 	if len(blocks) == 0 {
-		panic(fmt.Errorf("the optimisticlyPolledBlocks segments should never be empty"))
+		panic(fmt.Errorf("the blocks segments should never be empty"))
 	}
 	blockObject := blocks[0].Object.(*block)
 	return blockObject.ParentNum, &blockObject.ParentId

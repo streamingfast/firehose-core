@@ -121,7 +121,7 @@ func TestForkHandler_run(t *testing.T) {
 			},
 		},
 		{
-			name:       "with skipping optimisticlyPolledBlocks",
+			name:       "with skipping blocks",
 			startBlock: blk("100a", "99a", 100).AsRef(),
 			blocks: []*TestBlock{
 				tb("100a", "99a", 100),

@@ -71,7 +71,7 @@ func (b *TestBlockFetcher) Fetch(_ context.Context, blkNum uint64) (*pbbstream.B
 
 func (b *TestBlockFetcher) check(t *testing.T) {
 	t.Helper()
-	require.Equal(b.t, uint64(len(b.blocks)), b.idx, "we should have fetched all %d optimisticlyPolledBlocks, only fired %d optimisticlyPolledBlocks", len(b.blocks), b.idx)
+	require.Equal(b.t, uint64(len(b.blocks)), b.idx, "we should have fetched all %d blocks, only fired %d blocks", len(b.blocks), b.idx)
 }
 
 var _ BlockHandler = &TestBlockFinalizer{}
@@ -112,7 +112,7 @@ func (t *TestBlockFinalizer) Handle(blk *pbbstream.Block) error {
 
 func (b *TestBlockFinalizer) check(t *testing.T) {
 	t.Helper()
-	require.Equal(b.t, uint64(len(b.fireBlocks)), b.idx, "we should have fired all %d optimisticlyPolledBlocks, only fired %d optimisticlyPolledBlocks", len(b.fireBlocks), b.idx)
+	require.Equal(b.t, uint64(len(b.fireBlocks)), b.idx, "we should have fired all %d blocks, only fired %d blocks", len(b.fireBlocks), b.idx)
 }
 
 var _ BlockHandler = &TestNoopBlockFinalizer{}

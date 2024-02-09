@@ -33,7 +33,7 @@ func TestFireBlockFinalizer_state(t *testing.T) {
 	fk.AddLink(bstream.NewBlockRef("106a", 106), "105a", &block{Block: blk("106a", "105a", 101)})
 	fk.AddLink(bstream.NewBlockRef("105a", 105), "104a", &block{Block: blk("105a", "104a", 101)})
 	expectedBlocks, reachedLib := fk.CompleteSegment(blk("105a", "104a", 101).AsRef())
-	// simulate firing the optimisticlyPolledBlocks
+	// simulate firing the blocks
 	for _, blk := range expectedBlocks {
 		blk.Object.(*block).fired = true
 	}
