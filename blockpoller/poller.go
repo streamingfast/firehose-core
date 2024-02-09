@@ -304,7 +304,7 @@ func (p *BlockPoller) fetchBlockWithHash(blkNum uint64, hash string) (*pbbstream
 	}
 
 	if p.forceFinalityAfterBlocks != nil {
-		utils.TweakBlockFinality(blk, *p.forceFinalityAfterBlocks)
+		utils.TweakBlockFinality(out, *p.forceFinalityAfterBlocks)
 	}
 
 	return out, nil
