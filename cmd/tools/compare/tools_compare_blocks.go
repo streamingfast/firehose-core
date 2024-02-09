@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"reflect"
 	"strconv"
 	"sync"
@@ -377,24 +376,6 @@ func Compare(reference proto.Message, current proto.Message, includeUnknownField
 		c, err := jd.ReadJsonString(currentAsJSON)
 		cli.NoError(err, "read JSON current")
 
-		//Get the r and the c and print them within a file for further analysis
-
-		referenceWriter, err := os.Create("/Users/arnaudberger/t/reference.json")
-		if err != nil {
-			fmt.Println(err)
-		}
-		defer referenceWriter.Close()
-		currentWriter, err := os.Create("/Users/arnaudberger/t/current.json")
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		defer currentWriter.Close()
-
-		referenceWriter.WriteString(referenceAsJSON)
-		currentWriter.WriteString(currentAsJSON)
-
-		//todo: manage better output off differences
 		if diff := r.Diff(c).Render(); diff != "" {
 
 			differences = append(differences, diff)
