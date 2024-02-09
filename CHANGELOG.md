@@ -10,6 +10,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 * update to latest `dgrpc`
+* Add missing metering events for `sf.firehose.v2.Fetch/Block` responses.
 
 ### Substreams
 * Fixed bug in scheduler ramp-up function sometimes waiting before raising the number of workers
