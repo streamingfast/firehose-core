@@ -8,6 +8,18 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## UNRELEASED
+
+* Poller is now fetching blocks in an optimized way, it will fetch several blocks at once and then process them.
+
+* Poller is now handling skipped blocks, it will fetch the next blocks until it find a none skipped block.
+
+* Compare tool is now using dynamic protobuf unmarshaler, it will be able to compare any block type.
+
+* Print tool is now using dynamic protobuf unmarshaler, it will be able to print any block type.
+
+* Print tool is encoding bytes in base64 by default, it can be changed to hex or base58 by using parameter `bytes-encoding`.
+
 ## v1.1.3
 
 * Removed useless chainLatestFinalizeBlock from blockPoller initialization
