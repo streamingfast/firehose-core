@@ -11,6 +11,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ## Unreleased
 
 * add 'x-trace-id' header to auth requests when using --common-auth-plugin=grpc
+* fix Substreams scheduler sometimes taking a long time to spawn more than a single worker.
+* add ACCEPT_SOLANA_LEGACY_BLOCK_FORMAT env var to allow special tweak operations
 
 ## v1.1.3
 
