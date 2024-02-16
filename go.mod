@@ -1,6 +1,6 @@
 module github.com/streamingfast/firehose-core
 
-go 1.21
+go 1.22
 
 require (
 	buf.build/gen/go/bufbuild/reflect/connectrpc/go v1.12.0-20230822193137-310c9c4845dd.1

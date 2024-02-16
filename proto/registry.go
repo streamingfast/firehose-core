@@ -63,6 +63,7 @@ func (r *Registry) RegisterFiles(files []string) error {
 
 	return r.RegisterFileDescriptors(fileDescriptors)
 }
+
 func (r *Registry) RegisterFileDescriptors(fds []protoreflect.FileDescriptor) error {
 	for _, fd := range fds {
 		err := r.RegisterFileDescriptor(fd)
