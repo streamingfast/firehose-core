@@ -51,6 +51,8 @@ func getFirehoseClientFromCmd[B firecore.Block, C any](cmd *cobra.Command, logge
 	requestInfo = &firehoseRequestInfo{}
 
 	jwt := os.Getenv(sflags.MustGetString(cmd, "api-token-env-var"))
+	apiKey := os.Getenv(sflags.MustGetString(cmd, "api-key-env-var"))
+
 	plaintext := sflags.MustGetBool(cmd, "plaintext")
 	insecure := sflags.MustGetBool(cmd, "insecure")
 
@@ -64,7 +66,7 @@ func getFirehoseClientFromCmd[B firecore.Block, C any](cmd *cobra.Command, logge
 
 	var rawClient any
 	if kind == "stream-client" {
-		rawClient, connClose, requestInfo.GRPCCallOpts, err = client.NewFirehoseClient(endpoint, jwt, insecure, plaintext)
+		rawClient, connClose, requestInfo.GRPCCallOpts, err = client.NewFirehoseClient(endpoint, jwt, apiKey, insecure, plaintext)
 	} else if kind == "fetch-client" {
 		rawClient, connClose, err = client.NewFirehoseFetchClient(endpoint, jwt, insecure, plaintext)
 	} else {
@@ -113,7 +115,8 @@ func addFirehoseStreamClientFlagsToSet[B firecore.Block](flags *pflag.FlagSet, c
 }
 
 func addFirehoseFetchClientFlagsToSet[B firecore.Block](flags *pflag.FlagSet, chain *firecore.Chain[B]) {
-	flags.StringP("api-token-env-var", "a", "FIREHOSE_API_TOKEN", "Look for a JWT in this environment variable to authenticate against endpoint")
+	flags.StringP("api-token-env-var", "a", "FIREHOSE_API_TOKEN", "Look for a JWT in this environment variable to authenticate against endpoint (alternative to api-key-env-var)")
+	flags.String("api-key-env-var", "FIREHOSE_API_KEY", "Look for an API key directly in this environment variable to authenticate against endpoint (alternative to api-token-env-var)")
 	flags.String("compression", "none", "The HTTP compression: use either 'none', 'gzip' or 'zstd'")
 	flags.BoolP("plaintext", "p", false, "Use plaintext connection to Firehose")
 	flags.BoolP("insecure", "k", false, "Use SSL connection to Firehose but skip SSL certificate validation")

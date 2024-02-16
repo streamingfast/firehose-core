@@ -8,6 +8,16 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## v1.2.1
+
+### Fixed
+
+* Fixed `tools firehose-client` which was broken because of bad flag handling
+
+### Added
+
+* Added `--api-key-env-var` flag to firehose-clients, which allows you to pass your API Key from an environment variable (HTTP header `x-api-key`) instead of a JWT (`Authorization: bearer`), where supported.
+
 ## v1.2.0
 
 * Poller is now fetching blocks in an optimized way, it will fetch several blocks at once and then process them.

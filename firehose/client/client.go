@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 
@@ -11,13 +12,13 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/credentials/oauth"
+	"google.golang.org/grpc/metadata"
 )
 
 // firehoseClient, closeFunc, grpcCallOpts, err := NewFirehoseClient(endpoint, jwt, insecure, plaintext)
 // defer closeFunc()
 // stream, err := firehoseClient.Blocks(context.Background(), request, grpcCallOpts...)
-func NewFirehoseClient(endpoint, jwt string, useInsecureTSLConnection, usePlainTextConnection bool) (cli pbfirehose.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
-	skipAuth := jwt == "" || usePlainTextConnection
+func NewFirehoseClient(endpoint, jwt, apiKey string, useInsecureTSLConnection, usePlainTextConnection bool) (cli pbfirehose.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
 
 	if useInsecureTSLConnection && usePlainTextConnection {
 		return nil, nil, nil, fmt.Errorf("option --insecure and --plaintext are mutually exclusive, they cannot be both specified at the same time")
@@ -39,12 +40,41 @@ func NewFirehoseClient(endpoint, jwt string, useInsecureTSLConnection, usePlainT
 	closeFunc = conn.Close
 	cli = pbfirehose.NewStreamClient(conn)
 
-	if !skipAuth {
-		credentials := oauth.NewOauthAccess(&oauth2.Token{AccessToken: jwt, TokenType: "Bearer"})
-		callOpts = append(callOpts, grpc.PerRPCCredentials(credentials))
+	if !usePlainTextConnection {
+		if jwt != "" {
+			credentials := oauth.NewOauthAccess(&oauth2.Token{AccessToken: jwt, TokenType: "Bearer"})
+			callOpts = append(callOpts, grpc.PerRPCCredentials(credentials))
+		} else if apiKey != "" {
+			callOpts = append(callOpts, grpc.PerRPCCredentials(&ApiKeyAuth{ApiKey: apiKey}))
+		}
 	}
 
 	return
+}
+
+type ApiKeyAuth struct {
+	ApiKey string
+}
+
+func (a *ApiKeyAuth) GetRequestMetadata(ctx context.Context, uri ...string) (out map[string]string, err error) {
+	md, ok := metadata.FromOutgoingContext(ctx)
+	if !ok {
+		md = metadata.New(nil)
+	}
+	out = make(map[string]string)
+	for k, v := range md {
+		if len(v) != 0 {
+			out[k] = v[0]
+		}
+	}
+	if a.ApiKey != "" {
+		out["x-api-key"] = a.ApiKey
+	}
+	return
+}
+
+func (a *ApiKeyAuth) RequireTransportSecurity() bool {
+	return true
 }
 
 func NewFirehoseFetchClient(endpoint, jwt string, useInsecureTSLConnection, usePlainTextConnection bool) (cli pbfirehose.FetchClient, closeFunc func() error, err error) {
