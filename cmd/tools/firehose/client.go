@@ -27,6 +27,7 @@ func NewToolsFirehoseClientCmd[B firecore.Block](chain *firecore.Chain[B], logge
 	cmd.Flags().StringSlice("proto-paths", []string{""}, "Paths to proto files to use for dynamic decoding of blocks")
 	cmd.Flags().Bool("final-blocks-only", false, "Only ask for final blocks")
 	cmd.Flags().Bool("print-cursor-only", false, "Skip block decoding, only print the step cursor (useful for performance testing)")
+	cmd.Flags().String("bytes-encoding", "hex", "Encoding for bytes fields, either 'hex' or 'base58'")
 
 	return cmd
 }
