@@ -3,6 +3,7 @@ package blockpoller
 import (
 	"context"
 	"fmt"
+	"math"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
@@ -50,7 +51,7 @@ func New(
 		Shutter:                  shutter.New(),
 		blockFetcher:             blockFetcher,
 		blockHandler:             blockHandler,
-		fetchBlockRetryCount:     4,
+		fetchBlockRetryCount:     math.MaxUint64,
 		logger:                   zap.NewNop(),
 		forceFinalityAfterBlocks: utils.GetEnvForceFinalityAfterBlocks(),
 	}
@@ -62,10 +63,11 @@ func New(
 	return b
 }
 
-func (p *BlockPoller) Run(ctx context.Context, startBlockNum uint64, numberOfBlockToFetch int) error {
+func (p *BlockPoller) Run(ctx context.Context, startBlockNum uint64, blockFetchBatchSize int) error {
 	p.startBlockNumGate = startBlockNum
 	p.logger.Info("starting poller",
 		zap.Uint64("start_block_num", startBlockNum),
+		zap.Uint64("block_fetch_batch_size", uint64(blockFetchBatchSize)),
 	)
 	p.blockHandler.Init()
 
@@ -78,7 +80,7 @@ func (p *BlockPoller) Run(ctx context.Context, startBlockNum uint64, numberOfBlo
 			startBlockNum++
 			continue
 		}
-		return p.run(startBlock.AsRef(), numberOfBlockToFetch)
+		return p.run(startBlock.AsRef(), blockFetchBatchSize)
 	}
 }
 

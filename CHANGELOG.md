@@ -14,6 +14,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 * Poller is now handling skipped blocks, it will fetch the next blocks until it find a none skipped block.
 
+* Poller now has default retry value of infinite.
+
 * Compare tool is now using dynamic protobuf unmarshaler, it will be able to compare any block type.
 
 * Print tool is now using dynamic protobuf unmarshaler, it will be able to print any block type.
