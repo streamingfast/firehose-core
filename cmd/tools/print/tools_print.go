@@ -26,8 +26,8 @@ import (
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
-	"github.com/streamingfast/firehose-core/jsonencoder"
-	"github.com/streamingfast/firehose-core/protoregistry"
+	fcjson "github.com/streamingfast/firehose-core/json"
+	"github.com/streamingfast/firehose-core/proto"
 	"github.com/streamingfast/firehose-core/types"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -54,6 +54,7 @@ func NewToolsPrintCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra.Command
 	toolsPrintCmd.AddCommand(toolsPrintMergedBlocksCmd)
 
 	toolsPrintCmd.PersistentFlags().StringP("output", "o", "text", "Output mode for block printing, either 'text', 'json' or 'jsonl'")
+	toolsPrintCmd.PersistentFlags().String("bytes-encoding", "hex", "Encoding for bytes fields, either 'hex' or 'base58'")
 	toolsPrintCmd.PersistentFlags().StringSlice("proto-paths", []string{""}, "Paths to proto files to use for dynamic decoding of blocks")
 	toolsPrintCmd.PersistentFlags().Bool("transactions", false, "When in 'text' output mode, also print transactions summary")
 
@@ -100,7 +101,7 @@ func createToolsPrintMergedBlocksE[B firecore.Block](chain *firecore.Chain[B]) f
 			return err
 		}
 
-		jencoder, err := SetupJsonEncoder(cmd, chain.BlockFactory().ProtoReflect().Descriptor().ParentFile())
+		jencoder, err := SetupJsonMarshaller(cmd, chain.BlockFactory().ProtoReflect().Descriptor().ParentFile())
 		if err != nil {
 			return fmt.Errorf("unable to create json encoder: %w", err)
 		}
@@ -137,7 +138,7 @@ func createToolsPrintOneBlockE[B firecore.Block](chain *firecore.Chain[B]) firec
 
 		printTransactions := sflags.MustGetBool(cmd, "transactions")
 
-		jencoder, err := SetupJsonEncoder(cmd, chain.BlockFactory().ProtoReflect().Descriptor().ParentFile())
+		jencoder, err := SetupJsonMarshaller(cmd, chain.BlockFactory().ProtoReflect().Descriptor().ParentFile())
 		if err != nil {
 			return fmt.Errorf("unable to create json encoder: %w", err)
 		}
@@ -209,7 +210,7 @@ func toolsPrintCmdGetOutputMode(cmd *cobra.Command) (PrintOutputMode, error) {
 	return out, nil
 }
 
-func displayBlock[B firecore.Block](pbBlock *pbbstream.Block, chain *firecore.Chain[B], outputMode PrintOutputMode, printTransactions bool, encoder *jsonencoder.Encoder) error {
+func displayBlock[B firecore.Block](pbBlock *pbbstream.Block, chain *firecore.Chain[B], outputMode PrintOutputMode, printTransactions bool, encoder *fcjson.Marshaller) error {
 	if pbBlock == nil {
 		return fmt.Errorf("block is nil")
 	}
@@ -237,7 +238,12 @@ func displayBlock[B firecore.Block](pbBlock *pbbstream.Block, chain *firecore.Ch
 	}
 
 	// since we are running directly the firecore binary we will *NOT* use the BlockFactory
-	return encoder.Marshal(pbBlock.Payload)
+	err := encoder.Marshal(pbBlock.Payload)
+	if err != nil {
+		return fmt.Errorf("marshalling block to json: %w", err)
+	}
+
+	return nil
 }
 
 func PrintBStreamBlock(b *pbbstream.Block, printTransactions bool, out io.Writer) error {
@@ -263,11 +269,17 @@ func PrintBStreamBlock(b *pbbstream.Block, printTransactions bool, out io.Writer
 	return nil
 }
 
-func SetupJsonEncoder(cmd *cobra.Command, chainFileDescriptor protoreflect.FileDescriptor) (*jsonencoder.Encoder, error) {
-	pbregistry, err := protoregistry.New(chainFileDescriptor, sflags.MustGetStringSlice(cmd, "proto-paths")...)
+func SetupJsonMarshaller(cmd *cobra.Command, chainFileDescriptor protoreflect.FileDescriptor) (*fcjson.Marshaller, error) {
+	registry, err := proto.NewRegistry(chainFileDescriptor, sflags.MustGetStringSlice(cmd, "proto-paths")...)
 	if err != nil {
 		return nil, fmt.Errorf("new registry: %w", err)
 	}
 
-	return jsonencoder.New(pbregistry), nil
+	var options []fcjson.MarshallerOption
+	bytesEncoding := sflags.MustGetString(cmd, "bytes-encoding")
+	if bytesEncoding == "base58" {
+		options = append(options, fcjson.WithBytesEncoderFunc(fcjson.ToBase58))
+	}
+
+	return fcjson.NewMarshaller(registry, options...), nil
 }

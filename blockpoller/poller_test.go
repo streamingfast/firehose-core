@@ -157,7 +157,7 @@ func TestForkHandler_run(t *testing.T) {
 			f := New(blockFetcher, blockFinalizer)
 			f.forkDB = forkable.NewForkDB()
 
-			err := f.run(tt.startBlock)
+			err := f.run(tt.startBlock, 1)
 			if !errors.Is(err, TestErrCompleteDone) {
 				require.NoError(t, err)
 			}

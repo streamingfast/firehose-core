@@ -7,5 +7,6 @@ import (
 )
 
 type BlockFetcher interface {
-	Fetch(ctx context.Context, blkNum uint64) (*pbbstream.Block, error)
+	IsBlockAvailable(requestedSlot uint64) bool
+	Fetch(ctx context.Context, blkNum uint64) (b *pbbstream.Block, skipped bool, err error)
 }

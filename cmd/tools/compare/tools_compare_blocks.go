@@ -15,9 +15,7 @@
 package compare
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"reflect"
@@ -32,12 +30,18 @@ import (
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/cmd/tools/check"
+	"github.com/streamingfast/firehose-core/json"
+	fcproto "github.com/streamingfast/firehose-core/proto"
 	"github.com/streamingfast/firehose-core/types"
 	"go.uber.org/multierr"
-	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/dynamicpb"
 )
+
+type BlockDifferences struct {
+	BlockNumber uint64
+	Differences []string
+}
 
 func NewToolsCompareBlocksCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra.Command {
 	cmd := &cobra.Command{
@@ -69,20 +73,22 @@ func NewToolsCompareBlocksCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra
 
 	flags := cmd.PersistentFlags()
 	flags.Bool("diff", false, "When activated, difference is displayed for each block with a difference")
+	flags.String("bytes-encoding", "hex", "Encoding for bytes fields, either 'hex' or 'base58'")
 	flags.Bool("include-unknown-fields", false, "When activated, the 'unknown fields' in the protobuf message will also be compared. These would not generate any difference when unmarshalled with the current protobuf definition.")
+	flags.StringSlice("proto-paths", []string{""}, "Paths to proto files to use for dynamic decoding of blocks")
 
 	return cmd
 }
 
 func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.CommandExecutor {
-	sanitizer := chain.Tools.GetSanitizeBlockForCompare()
 
 	return func(cmd *cobra.Command, args []string) error {
 		displayDiff := sflags.MustGetBool(cmd, "diff")
-		ignoreUnknown := !sflags.MustGetBool(cmd, "include-unknown-fields")
+		includeUnknownFields := sflags.MustGetBool(cmd, "include-unknown-fields")
+		protoPaths := sflags.MustGetStringSlice(cmd, "proto-paths")
+		bytesEncoding := sflags.MustGetString(cmd, "bytes-encoding")
 		segmentSize := uint64(100000)
 		warnAboutExtraBlocks := sync.Once{}
-
 		ctx := cmd.Context()
 		blockRange, err := types.GetBlockRangeFromArg(args[2])
 		if err != nil {
@@ -113,6 +119,13 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 			segments: segments,
 		}
 
+		registry, err := fcproto.NewRegistry(nil, protoPaths...)
+		if err != nil {
+			return fmt.Errorf("creating registry: %w", err)
+		}
+
+		sanitizer := chain.Tools.GetSanitizeBlockForCompare()
+
 		err = storeReference.Walk(ctx, check.WalkBlockPrefix(blockRange, 100), func(filename string) (err error) {
 			fileStartBlock, err := strconv.Atoi(filename)
 			if err != nil {
@@ -129,21 +142,22 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 				var bundleErrLock sync.Mutex
 				var bundleReadErr error
 				var referenceBlockHashes []string
-				var referenceBlocks map[string]B
-				var currentBlocks map[string]B
+				var referenceBlocks map[string]*dynamicpb.Message
+				var referenceBlocksNum map[string]uint64
+				var currentBlocks map[string]*dynamicpb.Message
 
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					referenceBlockHashes, referenceBlocks, err = readBundle[B](
+					referenceBlockHashes, referenceBlocks, referenceBlocksNum, err = readBundle(
 						ctx,
 						filename,
 						storeReference,
 						uint64(fileStartBlock),
 						stopBlock,
-						sanitizer,
 						&warnAboutExtraBlocks,
-						chain.BlockFactory,
+						sanitizer,
+						registry,
 					)
 					if err != nil {
 						bundleErrLock.Lock()
@@ -155,14 +169,14 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					_, currentBlocks, err = readBundle(ctx,
+					_, currentBlocks, _, err = readBundle(ctx,
 						filename,
 						storeCurrent,
 						uint64(fileStartBlock),
 						stopBlock,
-						sanitizer,
 						&warnAboutExtraBlocks,
-						chain.BlockFactory,
+						sanitizer,
+						registry,
 					)
 					if err != nil {
 						bundleErrLock.Lock()
@@ -175,24 +189,36 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 					return fmt.Errorf("reading bundles: %w", bundleReadErr)
 				}
 
+				outLock := sync.Mutex{}
 				for _, referenceBlockHash := range referenceBlockHashes {
-					referenceBlock := referenceBlocks[referenceBlockHash]
-					currentBlock, existsInCurrent := currentBlocks[referenceBlockHash]
+					wg.Add(1)
+					go func(hash string) {
+						defer wg.Done()
+						referenceBlock := referenceBlocks[hash]
+						currentBlock, existsInCurrent := currentBlocks[hash]
+						referenceBlockNum := referenceBlocksNum[hash]
 
-					var isEqual bool
-					if existsInCurrent {
-						var differences []string
-						isEqual, differences = Compare(referenceBlock, currentBlock, ignoreUnknown)
-						if !isEqual {
-							fmt.Printf("- Block %s is different\n", firehoseBlockToRef(referenceBlock))
-							if displayDiff {
-								for _, diff := range differences {
-									fmt.Println("  · ", diff)
+						var isDifferent bool
+						if existsInCurrent {
+							var differences []string
+							differences = Compare(referenceBlock, currentBlock, includeUnknownFields, registry, bytesEncoding)
+
+							isDifferent = len(differences) > 0
+
+							if isDifferent {
+								outLock.Lock()
+								fmt.Printf("- Block %d is different\n", referenceBlockNum)
+								if displayDiff {
+									for _, diff := range differences {
+										fmt.Println("  · ", diff)
+									}
 								}
+								outLock.Unlock()
 							}
 						}
-					}
-					processState.process(referenceBlock.GetFirehoseBlockNumber(), !isEqual, !existsInCurrent)
+						processState.process(referenceBlockNum, isDifferent, !existsInCurrent)
+					}(referenceBlockHash)
+					wg.Wait()
 				}
 			}
 			return nil
@@ -206,39 +232,37 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 	}
 }
 
-func firehoseBlockToRef[B firecore.Block](b B) bstream.BlockRef {
-	return bstream.NewBlockRef(b.GetFirehoseBlockID(), b.GetFirehoseBlockNumber())
-}
-
-func readBundle[B firecore.Block](
+func readBundle(
 	ctx context.Context,
 	filename string,
 	store dstore.Store,
 	fileStartBlock,
 	stopBlock uint64,
-	sanitizer firecore.SanitizeBlockForCompareFunc[B],
 	warnAboutExtraBlocks *sync.Once,
-	blockFactory func() firecore.Block,
-) ([]string, map[string]B, error) {
+	sanitizer firecore.SanitizeBlockForCompareFunc,
+	registry *fcproto.Registry,
+) ([]string, map[string]*dynamicpb.Message, map[string]uint64, error) {
 	fileReader, err := store.OpenObject(ctx, filename)
+
 	if err != nil {
-		return nil, nil, fmt.Errorf("creating reader: %w", err)
+		return nil, nil, nil, fmt.Errorf("creating reader: %w", err)
 	}
 
 	blockReader, err := bstream.NewDBinBlockReader(fileReader)
 	if err != nil {
-		return nil, nil, fmt.Errorf("creating block reader: %w", err)
+		return nil, nil, nil, fmt.Errorf("creating block reader: %w", err)
 	}
 
 	var blockHashes []string
-	blocksMap := make(map[string]B)
+	blocksMap := make(map[string]*dynamicpb.Message)
+	blockNumMap := make(map[string]uint64)
 	for {
 		curBlock, err := blockReader.Read()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return nil, nil, fmt.Errorf("reading blocks: %w", err)
+			return nil, nil, nil, fmt.Errorf("reading blocks: %w", err)
 		}
 		if curBlock.Number >= stopBlock {
 			break
@@ -250,18 +274,21 @@ func readBundle[B firecore.Block](
 			continue
 		}
 
-		b := blockFactory()
-		if err = curBlock.Payload.UnmarshalTo(b); err != nil {
-			fmt.Println("Error unmarshalling block", curBlock.Number, ":", err)
-			break
+		if sanitizer != nil {
+			curBlock = sanitizer(curBlock)
 		}
 
-		curBlockPB := sanitizer(b.(B))
+		curBlockPB, err := registry.Unmarshal(curBlock.Payload)
+
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("unmarshalling block: %w", err)
+		}
 		blockHashes = append(blockHashes, curBlock.Id)
+		blockNumMap[curBlock.Id] = curBlock.Number
 		blocksMap[curBlock.Id] = curBlockPB
 	}
 
-	return blockHashes, blocksMap, nil
+	return blockHashes, blocksMap, blockNumMap, nil
 }
 
 type state struct {
@@ -317,83 +344,54 @@ func (s *state) print() {
 	fmt.Printf("✖ Segment %d - %s has %d different blocks and %d missing blocks (%d blocks counted)\n", s.segments[s.currentSegmentIdx].Start, endBlock, s.differencesFound, s.missingBlocks, s.totalBlocksCounted)
 }
 
-func Compare(reference, current proto.Message, ignoreUnknown bool) (isEqual bool, differences []string) {
+func Compare(reference proto.Message, current proto.Message, includeUnknownFields bool, registry *fcproto.Registry, bytesEncoding string) (differences []string) {
 	if reference == nil && current == nil {
-		return true, nil
+		return nil
 	}
 	if reflect.TypeOf(reference).Kind() == reflect.Ptr && reference == current {
-		return true, nil
+		return nil
 	}
 
 	referenceMsg := reference.ProtoReflect()
 	currentMsg := current.ProtoReflect()
 	if referenceMsg.IsValid() && !currentMsg.IsValid() {
-		return false, []string{fmt.Sprintf("reference block is valid protobuf message, but current block is invalid")}
+		return []string{fmt.Sprintf("reference block is valid protobuf message, but current block is invalid")}
 	}
 	if !referenceMsg.IsValid() && currentMsg.IsValid() {
-		return false, []string{fmt.Sprintf("reference block is invalid protobuf message, but current block is valid")}
+		return []string{fmt.Sprintf("reference block is invalid protobuf message, but current block is valid")}
 	}
 
-	if ignoreUnknown {
-		referenceMsg.SetUnknown(nil)
-		currentMsg.SetUnknown(nil)
-		reference = referenceMsg.Interface().(proto.Message)
-		current = currentMsg.Interface().(proto.Message)
-	} else {
-		x := referenceMsg.GetUnknown()
-		y := currentMsg.GetUnknown()
-
-		if !bytes.Equal(x, y) {
-			// from https://github.com/protocolbuffers/protobuf-go/tree/v1.28.1/proto
-			mx := make(map[protoreflect.FieldNumber]protoreflect.RawFields)
-			my := make(map[protoreflect.FieldNumber]protoreflect.RawFields)
-			for len(x) > 0 {
-				fnum, _, n := protowire.ConsumeField(x)
-				mx[fnum] = append(mx[fnum], x[:n]...)
-				x = x[n:]
-			}
-			for len(y) > 0 {
-				fnum, _, n := protowire.ConsumeField(y)
-				my[fnum] = append(my[fnum], y[:n]...)
-				y = y[n:]
-			}
-			for k, v := range mx {
-				vv, ok := my[k]
-				if !ok {
-					differences = append(differences, fmt.Sprintf("reference block contains unknown protobuf field number %d (%x), but current block does not", k, v))
-					continue
-				}
-				if !bytes.Equal(v, vv) {
-					differences = append(differences, fmt.Sprintf("unknown protobuf field number %d has different values. Reference: %x, current: %x", k, v, vv))
-				}
-			}
-			for k := range my {
-				v, ok := my[k]
-				if !ok {
-					differences = append(differences, fmt.Sprintf("current block contains unknown protobuf field number %d (%x), but reference block does not", k, v))
-					continue
-				}
-			}
-		}
-	}
-
+	//todo: check if there is a equals that do not compare unknown fields
 	if !proto.Equal(reference, current) {
-		ref, err := json.MarshalIndent(reference, "", " ")
+		var opts []json.MarshallerOption
+		if !includeUnknownFields {
+			opts = append(opts, json.WithoutUnknownFields())
+		}
+
+		if bytesEncoding == "base58" {
+			opts = append(opts, json.WithBytesEncoderFunc(json.ToBase58))
+		}
+
+		encoder := json.NewMarshaller(registry, opts...)
+
+		referenceAsJSON, err := encoder.MarshalToString(reference)
 		cli.NoError(err, "marshal JSON reference")
 
-		cur, err := json.MarshalIndent(current, "", " ")
+		currentAsJSON, err := encoder.MarshalToString(current)
 		cli.NoError(err, "marshal JSON current")
 
-		r, err := jd.ReadJsonString(string(ref))
+		r, err := jd.ReadJsonString(referenceAsJSON)
 		cli.NoError(err, "read JSON reference")
 
-		c, err := jd.ReadJsonString(string(cur))
+		c, err := jd.ReadJsonString(currentAsJSON)
 		cli.NoError(err, "read JSON current")
 
 		if diff := r.Diff(c).Render(); diff != "" {
+
 			differences = append(differences, diff)
 		}
-		return false, differences
+
 	}
-	return true, nil
+
+	return differences
 }
