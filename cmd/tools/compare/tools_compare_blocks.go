@@ -81,6 +81,7 @@ func NewToolsCompareBlocksCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra
 }
 
 func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.CommandExecutor {
+
 	return func(cmd *cobra.Command, args []string) error {
 		displayDiff := sflags.MustGetBool(cmd, "diff")
 		includeUnknownFields := sflags.MustGetBool(cmd, "include-unknown-fields")
@@ -123,6 +124,8 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 			return fmt.Errorf("creating registry: %w", err)
 		}
 
+		sanitizer := chain.Tools.GetSanitizeBlockForCompare()
+
 		err = storeReference.Walk(ctx, check.WalkBlockPrefix(blockRange, 100), func(filename string) (err error) {
 			fileStartBlock, err := strconv.Atoi(filename)
 			if err != nil {
@@ -153,6 +156,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 						uint64(fileStartBlock),
 						stopBlock,
 						&warnAboutExtraBlocks,
+						sanitizer,
 						registry,
 					)
 					if err != nil {
@@ -171,6 +175,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 						uint64(fileStartBlock),
 						stopBlock,
 						&warnAboutExtraBlocks,
+						sanitizer,
 						registry,
 					)
 					if err != nil {
@@ -234,6 +239,7 @@ func readBundle(
 	fileStartBlock,
 	stopBlock uint64,
 	warnAboutExtraBlocks *sync.Once,
+	sanitizer firecore.SanitizeBlockForCompareFunc,
 	registry *fcproto.Registry,
 ) ([]string, map[string]*dynamicpb.Message, map[string]uint64, error) {
 	fileReader, err := store.OpenObject(ctx, filename)
@@ -266,6 +272,10 @@ func readBundle(
 				fmt.Printf("Warn: Bundle file %s contains block %d, preceding its start_block. This 'feature' is not used anymore and extra blocks like this one will be ignored during compare\n", store.ObjectURL(filename), curBlock.Number)
 			})
 			continue
+		}
+
+		if sanitizer != nil {
+			curBlock = sanitizer(curBlock)
 		}
 
 		curBlockPB, err := registry.Unmarshal(curBlock.Payload)
