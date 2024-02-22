@@ -21,7 +21,7 @@ require (
 	github.com/streamingfast/dauth v0.0.0-20240219205130-bfe428489338
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
-	github.com/streamingfast/dgrpc v0.0.0-20240219152146-57bb131c39ca
+	github.com/streamingfast/dgrpc v0.0.0-20240221215336-fd4bfbe03582
 	github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4
 	github.com/streamingfast/dmetering v0.0.0-20240215171500-4f0413a948bb
 	github.com/streamingfast/dmetrics v0.0.0-20230919161904-206fa8ebd545
@@ -46,6 +46,7 @@ require (
 	connectrpc.com/otelconnect v0.7.0 // indirect
 	github.com/bufbuild/protocompile v0.4.0 // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
+	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240102182953-50ed04b92917 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240102182953-50ed04b92917 // indirect
 )
