@@ -42,6 +42,7 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 		RegisterFlags: func(cmd *cobra.Command) error {
 			cmd.Flags().String("substreams-tier2-grpc-listen-addr", firecore.SubstreamsTier2GRPCServingAddr, "Address on which the substreams tier2 will listen. Default is plain-text, appending a '*' to the end to jkkkj")
 			cmd.Flags().String("substreams-tier2-discovery-service-url", "", "URL to advertise presence to the grpc discovery service") //traffic-director://xds?vpc_network=vpc-global&use_xds_reds=true
+			cmd.Flags().Uint64("substreams-tier2-max-concurrent-requests", 0, "Maximum number of concurrent requests allowed on the server. When the tier2 service hits this limit, it will set itself as 'Not Ready' until requests are processed. Default 0 (no limit)")
 
 			// all substreams
 			registerCommonSubstreamsFlags(cmd)
@@ -63,6 +64,8 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 			stateStoreDefaultTag := viper.GetString("substreams-state-store-default-tag")
 
 			stateBundleSize := viper.GetUint64("substreams-state-bundle-size")
+
+			maximumConcurrentRequests := viper.GetUint64("substreams-tier2-max-concurrent-requests")
 
 			tracing := os.Getenv("SUBSTREAMS_TRACING") == "modules_exec"
 
@@ -98,6 +101,8 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 
 					GRPCListenAddr:      grpcListenAddr,
 					ServiceDiscoveryURL: serviceDiscoveryURL,
+
+					MaximumConcurrentRequests: maximumConcurrentRequests,
 				}, &app.Tier2Modules{
 					CheckPendingShutDown: runtime.IsPendingShutdown,
 				}), nil
