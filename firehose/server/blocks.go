@@ -42,6 +42,7 @@ func (s *Server) Block(ctx context.Context, request *pbfirehose.SingleBlockReque
 		blockNum = ref.BlockNumber.Num
 	}
 
+	ctx = dmetering.WithBytesMeter(ctx)
 	blk, err := s.blockGetter.Get(ctx, blockNum, blockHash, s.logger)
 	if err != nil {
 		if _, ok := status.FromError(err); ok {
@@ -53,9 +54,35 @@ func (s *Server) Block(ctx context.Context, request *pbfirehose.SingleBlockReque
 		return nil, status.Errorf(codes.NotFound, "block %s not found", bstream.NewBlockRef(blockHash, blockNum))
 	}
 
-	return &pbfirehose.SingleBlockResponse{
+	resp := &pbfirehose.SingleBlockResponse{
 		Block: blk.Payload,
-	}, nil
+	}
+
+	//////////////////////////////////////////////////////////////////////
+	meter := dmetering.GetBytesMeter(ctx)
+	bytesRead := meter.BytesReadDelta()
+	bytesWritten := meter.BytesWrittenDelta()
+	size := proto.Size(resp)
+
+	auth := dauth.FromContext(ctx)
+	event := dmetering.Event{
+		UserID:    auth.UserID(),
+		ApiKeyID:  auth.APIKeyID(),
+		IpAddress: auth.RealIP(),
+		Meta:      auth.Meta(),
+		Endpoint:  "sf.firehose.v2.Firehose/Block",
+		Metrics: map[string]float64{
+			"egress_bytes":  float64(size),
+			"written_bytes": float64(bytesWritten),
+			"read_bytes":    float64(bytesRead),
+			"block_count":   1,
+		},
+		Timestamp: time.Now(),
+	}
+	dmetering.Emit(ctx, event)
+	//////////////////////////////////////////////////////////////////////
+
+	return resp, nil
 }
 
 func (s *Server) Blocks(request *pbfirehose.Request, streamSrv pbfirehose.Stream_BlocksServer) error {
