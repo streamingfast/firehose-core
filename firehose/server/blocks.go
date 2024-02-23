@@ -42,6 +42,7 @@ func (s *Server) Block(ctx context.Context, request *pbfirehose.SingleBlockReque
 		blockNum = ref.BlockNumber.Num
 	}
 
+	ctx = dmetering.WithBytesMeter(ctx)
 	blk, err := s.blockGetter.Get(ctx, blockNum, blockHash, s.logger)
 	if err != nil {
 		if _, ok := status.FromError(err); ok {
