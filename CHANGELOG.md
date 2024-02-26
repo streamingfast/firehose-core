@@ -10,6 +10,32 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+* The `reader-node-bootstrap-url` gained the ability to be bootstrapped from a `bash` script.
+
+	If the bootstrap URL is of the form `bash:///<path/to/script>?<parameters>`, the bash script at
+	`<path/to/script>` will be executed. The script is going to receive in environment variables the resolved
+	reader node variables in the form of `READER_NODE_<VARIABLE_NAME>`. The fully resolved node arguments
+	(from `reader-node-arguments`) are passed as args to the bash script. The query parameters accepted are:
+
+	- `arg=<value>` | Pass as extra argument to the script, prepended to the list of resolved node arguments
+	- `env=<key>%3d<value>` | Pass as extra environment variable as `<key>=<value>` with key being upper-cased (multiple(s) allowed)
+	- `env_<key>=<value>` | Pass as extra environment variable as `<key>=<value>` with key being upper-cased (multiple(s) allowed)
+	- `cwd=<path>` | Change the working directory to `<path>` before running the script
+	- `interpreter=<path>` | Use `<path>` as the interpreter to run the script
+	- `interpreter_arg=<arg>` | Pass `<interpreter_arg>` as arguments to the interpreter before the script path (multiple(s) allowed)
+
+  > [!NOTE]
+  > The `bash:///` script support is currently experimental and might change in upcoming releases, the behavior changes will be
+    clearly documented here.
+
+* The `reader-node-bootstrap-url` gained the ability to be bootstrapped from a pre-made archive file ending with `tar.zst` or `tar.zstd`.
+
+* The `reader-node-bootstrap-data-url` is now added automatically if `firecore.Chain#ReaderNodeBootstrapperFactory` is `non-nil`.
+
+  If the bootstrap URL ends with `tar.zst` or `tar.zstd`, the archive is read and extracted into the
+	`reader-node-data-dir` location. The archive is expected to contain the full content of the 'reader-node-data-dir'
+	and is expanded as is.
+
 * Added `Beacon` to known list of Block model.
 
 ## v1.2.3

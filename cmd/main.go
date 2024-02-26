@@ -108,11 +108,15 @@ func Main[B firecore.Block](chain *firecore.Chain[B]) {
 		apps.RegisterIndexBuilderApp(chain, rootLog)
 	}
 
+	startFlags := apps.StartCmd.Flags()
+
 	if chain.RegisterExtraStartFlags != nil {
-		chain.RegisterExtraStartFlags(apps.StartCmd.Flags())
+		chain.RegisterExtraStartFlags(startFlags)
 	}
 
-	apps.ConfigureStartCmd(chain, binaryName, rootLog)
+	if chain.ReaderNodeBootstrapperFactory != nil && startFlags.Lookup("reader-node-bootstrap-data-url") == nil {
+		startFlags.String("reader-node-bootstrap-data-url", "", firecore.DefaultReaderNodeBootstrapDataURLFlagDescription())
+	}
 
 	if err := tools.ConfigureToolsCmd(chain, rootLog, rootTracer); err != nil {
 		exitWithError("registering tools command", err)

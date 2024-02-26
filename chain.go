@@ -289,8 +289,11 @@ func (c *Chain[B]) Validate() {
 // **Caveats** Two chain in the same Go binary will not work today as `bstream` uses global
 // variables to store configuration which presents multiple chain to exist in the same process.
 func (c *Chain[B]) Init() {
-
 	c.BlockEncoder = NewBlockEncoder()
+
+	if c.ReaderNodeBootstrapperFactory == nil {
+		c.ReaderNodeBootstrapperFactory = DefaultReaderNodeBootstrapper(noOpReaderNodeBootstrapperFactory)
+	}
 }
 
 // BinaryName represents the binary name for your Firehose on <Chain> is the [ShortName]
