@@ -132,6 +132,20 @@ func (m *Marshaller) dynamicpbMessage(encoder *jsontext.Encoder, msg *dynamicpb.
 	}
 
 	msg.Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
+		if fd.IsMap() {
+			out := map[string]interface{}{}
+			v.Map().Range(func(k protoreflect.MapKey, v2 protoreflect.Value) bool {
+				key := k.String()
+				out[key] = v2.Interface()
+				return true
+			})
+			kvl = append(kvl, &kv{
+				key:   string(fd.Name()),
+				value: out,
+			})
+			return true
+		}
+
 		if fd.IsList() {
 			out := make([]any, v.List().Len())
 			for i := 0; i < v.List().Len(); i++ {
