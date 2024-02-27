@@ -23,14 +23,14 @@ require (
 	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
 	github.com/streamingfast/dgrpc v0.0.0-20240222213940-b9f324ff4d5c
 	github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4
-	github.com/streamingfast/dmetering v0.0.0-20240226195549-85c4cb6f8a46
+	github.com/streamingfast/dmetering v0.0.0-20240227170539-29b479694f8f
 	github.com/streamingfast/dmetrics v0.0.0-20230919161904-206fa8ebd545
 	github.com/streamingfast/dstore v0.1.1-0.20240215171730-493ad5a0f537
 	github.com/streamingfast/jsonpb v0.0.0-20210811021341-3670f0aa02d0
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	github.com/streamingfast/pbgo v0.0.6-0.20240131193313-6b88bc7139db
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.3.6-0.20240227164652-86f63e438424
+	github.com/streamingfast/substreams v1.3.6-0.20240227170610-c02ee052ddf8
 	github.com/stretchr/testify v1.8.4
 	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.10.0
