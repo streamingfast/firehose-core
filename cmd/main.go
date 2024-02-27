@@ -118,6 +118,8 @@ func Main[B firecore.Block](chain *firecore.Chain[B]) {
 		startFlags.String("reader-node-bootstrap-data-url", "", firecore.DefaultReaderNodeBootstrapDataURLFlagDescription())
 	}
 
+	apps.ConfigureStartCmd(chain, binaryName, rootLog)
+
 	if err := tools.ConfigureToolsCmd(chain, rootLog, rootTracer); err != nil {
 		exitWithError("registering tools command", err)
 	}
