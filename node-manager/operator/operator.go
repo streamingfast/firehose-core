@@ -48,6 +48,10 @@ type Operator struct {
 	zlogger     *zap.Logger
 }
 
+type Bootstrapper interface {
+	Bootstrap() error
+}
+
 type Options struct {
 	Bootstrapper Bootstrapper
 
