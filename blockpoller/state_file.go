@@ -79,7 +79,7 @@ func (p *BlockPoller) saveState(blocks []*forkable.Block) error {
 	}
 	fpath := filepath.Join(p.stateStorePath, "cursor.json")
 
-	if err := os.WriteFile(fpath, cnt, os.ModePerm); err != nil {
+	if err := os.WriteFile(fpath, cnt, 0666); err != nil {
 		return fmt.Errorf("unable to open cursor file %s: %w", fpath, err)
 	}
 
