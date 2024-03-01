@@ -8,10 +8,16 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.2.3
 
-* Substreams Performance: prevent reprocessing jobs when there is only a mapper in production mode and everything is already cached
-* Substreams Performance: prevent "UpdateStats" from running too often and affecting performance
+### Substreams improvements
+
+* Performance: prevent reprocessing jobs when there is only a mapper in production mode and everything is already cached
+* Performance: prevent "UpdateStats" from running too often and stalling other operations when running with a high parallel jobs count
+* Performance: fixed bug in scheduler ramp-up function sometimes waiting before raising the number of workers
+* Added the output module's hash to the "incoming request" log
+
+### Reader node and Beacon blocks
 * The `reader-node-bootstrap-url` gained the ability to be bootstrapped from a `bash` script.
 
 	If the bootstrap URL is of the form `bash:///<path/to/script>?<parameters>`, the bash script at
