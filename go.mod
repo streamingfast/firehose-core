@@ -45,8 +45,10 @@ require (
 	connectrpc.com/grpcreflect v1.2.0 // indirect
 	connectrpc.com/otelconnect v0.7.0 // indirect
 	github.com/bufbuild/protocompile v0.4.0 // indirect
+	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.47.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240205150955-31a09d347014 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240125205218-1f4bbc51befe // indirect
 )
