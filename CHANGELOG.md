@@ -49,6 +49,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 	and is expanded as is.
 
 * Added `Beacon` to known list of Block model.
+* Added api key authentication to `NewFirehoseFetchClient`
 
 ## v1.2.3
 

@@ -68,7 +68,7 @@ func getFirehoseClientFromCmd[B firecore.Block, C any](cmd *cobra.Command, logge
 	if kind == "stream-client" {
 		rawClient, connClose, requestInfo.GRPCCallOpts, err = client.NewFirehoseClient(endpoint, jwt, apiKey, insecure, plaintext)
 	} else if kind == "fetch-client" {
-		rawClient, connClose, err = client.NewFirehoseFetchClient(endpoint, jwt, insecure, plaintext)
+		rawClient, connClose, requestInfo.GRPCCallOpts, err = client.NewFirehoseFetchClient(endpoint, jwt, apiKey, insecure, plaintext)
 	} else {
 		panic(fmt.Errorf("unsupported Firehose client kind: %s", kind))
 	}
