@@ -69,7 +69,8 @@ func NewCheckCommand[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Lo
 		"./sf-data/storage/merged-blocks"
 		"gs://<project>/<bucket>/<path>" -s
 		"s3://<project>/<bucket>/<path>" -f
-		"az://<project>/<bucket>/<path>" -r "10 000 - 1 000 000"
+		"az://<project>/<bucket>/<path>" -r ":1_000_000"
+		"az://<project>/<bucket>/<path>" -r "100_000:1_000_000"
 	`)
 
 	toolsCheckForksCmd.RunE = toolsCheckForksE

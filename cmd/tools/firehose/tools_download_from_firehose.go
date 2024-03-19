@@ -27,7 +27,7 @@ func NewToolsDownloadFromFirehoseCmd[B firecore.Block](chain *firecore.Chain[B],
 		RunE:  createToolsDownloadFromFirehoseE(chain, zlog),
 		Example: firecore.ExamplePrefixed(chain, "tools download-from-firehose", `
 			# Adjust <url> based on your actual network
-			mainnet.eth.streamingfast.io:443 1000 2000 ./output_dir
+			mainnet.eth.streamingfast.io:443 1000:2000 ./output_dir
 		`),
 	}
 

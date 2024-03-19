@@ -10,7 +10,11 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
-* Added `--substreams-tier2-max-concurrent-requests` to limit the number of concurrent requests to the tier2 substreams service.
+* Added API Key authentication to `NewFirehoseFetchClient`.
+
+* Fixed `tools check merged-blocks` examples using block range (range should be specified as `[<start>]?:[<end>]`).
+
+* Added `--substreams-tier2-max-concurrent-requests` to limit the number of concurrent requests to the tier2 Substreams service.
 
 ## v1.2.4
 
@@ -49,7 +53,6 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 	and is expanded as is.
 
 * Added `Beacon` to known list of Block model.
-* Added api key authentication to `NewFirehoseFetchClient`
 
 ## v1.2.3
 
