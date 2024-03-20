@@ -40,7 +40,7 @@ func (b *TarballNodeBootstrapper) Bootstrap() error {
 		return nil
 	}
 
-	b.logger.Info("bootstrapping geth chain data from pre-built data", zap.String("bootstrap_data_url", b.url))
+	b.logger.Info("bootstrapping native node chain data from pre-built archive", zap.String("bootstrap_data_url", b.url))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
