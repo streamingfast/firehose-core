@@ -10,7 +10,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
-* Added API Key authentication to `NewFirehoseFetchClient`.
+* Added API Key authentication to `client.NewFirehoseFetchClient` and `client.NewFirehoseClient`.
+
+  > [!NOTE]
+  > If you were using `github.com/streamingfast/firehose-core/firehose/client.NewFirehoseFetchClient` or `github.com/streamingfast/firehose-core/firehose/client.NewFirehoseStreamClient`, this will be a minor breaking change, refer to [upgrade notes](./UPDATE.md#v125) for details if it affects you.
 
 * Fixed `tools check merged-blocks` examples using block range (range should be specified as `[<start>]?:[<end>]`).
 

@@ -1,5 +1,13 @@
 # Update
 
+## v1.2.5
+
+If you were using `github.com/streamingfast/firehose-core/firehose/client.NewFirehoseFetchClient` or `github.com/streamingfast/firehose-core/firehose/client.NewFirehoseClient`, this will be a minor breaking change, the constructor now returns `callOpts` which should be passed to all request you make, see usage in [resp, err := firehoseClient.Block(ctx, req, requestInfo.GRPCCallOpts...)](https://github.com/streamingfast/firehose-core/blob/6c20f33f74be1abe58fbded1c178223702dcd6dd/cmd/tools/firehose/single_block_client.go#L74-L75) and populating `requestInfo.GRPCCallOpts` from `NewFirehoseFetchClient` function returns can be seen [here](https://github.com/streamingfast/firehose-core/blob/develop/cmd/tools/firehose/firehose.go#L71).
+
+## v1.0.0
+
+No changes was required.
+
 ## v0.2.0
 
 This includes changes that are needed to upgrade to version v0.2.0.
