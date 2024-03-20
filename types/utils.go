@@ -26,8 +26,29 @@ func PrettyBlockNum(b uint64) string {
 	return "#" + strings.ReplaceAll(humanize.Comma(int64(b)), ",", " ")
 }
 
+// Deprecated: use ParseBlockRangeDefault instead and provide the default range when the input is
+// empty.
 func ParseBlockRange(input string, firstStreamableBlock uint64) (out BlockRange, err error) {
-	if input == "" || input == "-1" {
+	return ParseBlockRangeDefault(input, firstStreamableBlock, NewOpenRange(-1))
+}
+
+// ParseBlockRangeDefault parses a block range from a string, using the default block range
+// `defaultRange` if the input is empty. The input "-1" is interpreted as an open range from [HEAD, +∞].
+//
+// The accepted inputs are:
+// - ":" (an open range from 0 to +∞)
+// - "-1" (an open range from HEAD to +∞, equivalent to "-1:")
+// - "123" (a single block leading to a closed range from 123 to 123)
+// - "123:456" (a range of blocks)
+// - "123:" (a range of blocks from 123 to +∞)
+// - ":456" (a range of blocks from <firstStreamableBlock> to 456)
+// - "-1:456" (a range of blocks from HEAD to +∞ (assuming HEAD is before 456))
+func ParseBlockRangeDefault(input string, firstStreamableBlock uint64, defaultRange BlockRange) (out BlockRange, err error) {
+	if input == "" {
+		return defaultRange, nil
+	}
+
+	if input == "-1" {
 		return NewOpenRange(-1), nil
 	}
 

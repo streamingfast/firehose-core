@@ -41,14 +41,6 @@ func CheckMergedBlocks[B firecore.Block](ctx context.Context, chain *firecore.Ch
 	var highestBlockSeen uint64
 	lowestBlockSeen := firecore.MaxUint64
 
-	if !blockRange.IsResolved() {
-		return fmt.Errorf("check merged blocks can only work with fully resolved range, got %s", blockRange)
-	}
-
-	// if blockRange.Start < bstream.GetProtocolFirstStreamableBlock {
-	// 	blockRange.Start = bstream.GetProtocolFirstStreamableBlock
-	// }
-
 	holeFound := false
 	expected = types.RoundToBundleStartBlock(uint64(blockRange.Start), fileBlockSize)
 	currentStartBlk := uint64(blockRange.Start)

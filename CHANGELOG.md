@@ -10,6 +10,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+* Fixed `tools check merged-blocks` default range when `-r <range>` is not provided to now be `[0, +∞]` (was previously `[HEAD, +∞]`).
+
+* Fixed `tools check merged-blocks` to be able to run without a block range provided.
+
 * Added API Key authentication to `client.NewFirehoseFetchClient` and `client.NewFirehoseClient`.
 
   > [!NOTE]

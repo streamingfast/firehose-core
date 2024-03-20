@@ -83,7 +83,7 @@ func createToolsCheckMergedBlocksE[B firecore.Block](chain *firecore.Chain[B], r
 		storeURL := args[0]
 		fileBlockSize := uint64(100)
 
-		blockRange, err := types.GetBlockRangeFromFlag(cmd, "range")
+		blockRange, err := types.GetBlockRangeFromFlagDefault(cmd, "range", types.NewOpenRange(0))
 		if err != nil {
 			return err
 		}
