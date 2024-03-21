@@ -23,7 +23,6 @@ import (
 
 var ErrHoleFound = errors.New("hole found in merged files")
 var DefaultFilesDeleteBatchSize = 10000
-var DefaultFilesDeleteThreads = 8
 
 type IOInterface interface {
 
@@ -82,10 +81,11 @@ func NewDStoreIO(
 	retryAttempts int,
 	retryCooldown time.Duration,
 	bundleSize uint64,
+	numDeleteThreads int,
 ) IOInterface {
 
 	od := &oneBlockFilesDeleter{store: oneBlocksStore, logger: logger}
-	od.Start(DefaultFilesDeleteThreads, DefaultFilesDeleteBatchSize*2)
+	od.Start(numDeleteThreads, DefaultFilesDeleteBatchSize*2)
 	dstoreIO := &DStoreIO{
 		oneBlocksStore:    oneBlocksStore,
 		mergedBlocksStore: mergedBlocksStore,
@@ -103,7 +103,7 @@ func NewDStoreIO(
 	}
 
 	forkOd := &oneBlockFilesDeleter{store: forkedBlocksStore, logger: logger}
-	forkOd.Start(DefaultFilesDeleteThreads, DefaultFilesDeleteBatchSize*2)
+	forkOd.Start(numDeleteThreads, DefaultFilesDeleteBatchSize*2)
 
 	return &ForkAwareDStoreIO{
 		DStoreIO:          dstoreIO,

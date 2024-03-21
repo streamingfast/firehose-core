@@ -23,6 +23,7 @@ func RegisterMergerApp(rootLog *zap.Logger) {
 			cmd.Flags().Uint64("merger-stop-block", 0, "If non-zero, merger will trigger shutdown when blocks have been merged up to this block")
 			cmd.Flags().Duration("merger-time-between-store-lookups", 1*time.Second, "Delay between source store polling (should be higher for remote storage)")
 			cmd.Flags().Duration("merger-time-between-store-pruning", time.Minute, "Delay between source store pruning loops")
+			cmd.Flags().Int("merger-delete-threads", 8, "Number of threads for deleting files in parallel.")
 			return nil
 		},
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
@@ -40,6 +41,7 @@ func RegisterMergerApp(rootLog *zap.Logger) {
 				StopBlock:                    viper.GetUint64("merger-stop-block"),
 				TimeBetweenPruning:           viper.GetDuration("merger-time-between-store-pruning"),
 				TimeBetweenPolling:           viper.GetDuration("merger-time-between-store-lookups"),
+				FilesDeleteThreads:           viper.GetInt("merger-delete-threads"),
 			}), nil
 		},
 	})
