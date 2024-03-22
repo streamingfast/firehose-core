@@ -35,6 +35,8 @@ type Config struct {
 	StorageMergedBlocksFilesPath string
 	StorageForkedBlocksFilesPath string
 
+	FilesDeleteThreads int
+
 	GRPCListenAddr string
 
 	PruneForkedBlocksAfter uint64
@@ -91,7 +93,8 @@ func (a *App) Run() error {
 		forkedBlocksStore,
 		5,
 		500*time.Millisecond,
-		bundleSize)
+		bundleSize,
+		a.config.FilesDeleteThreads)
 
 	m := merger.NewMerger(
 		zlog,
