@@ -47,7 +47,7 @@ type Config struct {
 	GRPCListenAddr          string        // gRPC address where this app will listen to
 	GRPCShutdownGracePeriod time.Duration // The duration we allow for gRPC connections to terminate gracefully prior forcing shutdown
 	ServiceDiscoveryURL     *url.URL
-	ServerOptions           []server.Option
+	ServerOptions           []server.Option `json:"-"`
 }
 
 type RegisterServiceExtensionFunc func(server dgrpcserver.Server,
