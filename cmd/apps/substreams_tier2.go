@@ -69,12 +69,18 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 				}
 			}
 
+			wasmExtensions, err := chain.RegisterSubstreamsExtensions()
+			if err != nil {
+				return nil, fmt.Errorf("substreams extensions: %w", err)
+			}
+
 			return app.NewTier2(appLogger,
 				&app.Tier2Config{
 					Tracing: tracing,
 
 					GRPCListenAddr:      grpcListenAddr,
 					ServiceDiscoveryURL: serviceDiscoveryURL,
+					WASMExtensions:      wasmExtensions,
 
 					MaximumConcurrentRequests: maximumConcurrentRequests,
 				}, &app.Tier2Modules{

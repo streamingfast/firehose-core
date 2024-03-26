@@ -2,8 +2,6 @@ module github.com/streamingfast/firehose-core
 
 go 1.22
 
-replace github.com/streamingfast/substreams => github.com/streamingfast/substreams v1.4.1-0.20240326144332-9f8e91e85d39
-
 require (
 	buf.build/gen/go/bufbuild/reflect/connectrpc/go v1.12.0-20230822193137-310c9c4845dd.1
 	buf.build/gen/go/bufbuild/reflect/protocolbuffers/go v1.31.0-20230822193137-310c9c4845dd.2
@@ -32,7 +30,7 @@ require (
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	github.com/streamingfast/pbgo v0.0.6-0.20240131193313-6b88bc7139db
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.4.1-0.20240326143310-a4878081f44c
+	github.com/streamingfast/substreams v1.4.1-0.20240326155609-e3ba0b840b6b
 	github.com/stretchr/testify v1.8.4
 	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.10.0
