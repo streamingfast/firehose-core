@@ -12,7 +12,7 @@ RUN go build -v -ldflags "-X main.version=${VERSION}" ./cmd/firecore
 
 ####
 
-FROM alpine:edge
+FROM alpine:3
 
 
 RUN apk --no-cache add \
