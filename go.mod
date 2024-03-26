@@ -2,6 +2,8 @@ module github.com/streamingfast/firehose-core
 
 go 1.22
 
+replace github.com/streamingfast/substreams => github.com/streamingfast/substreams v1.4.1-0.20240326144332-9f8e91e85d39
+
 require (
 	buf.build/gen/go/bufbuild/reflect/connectrpc/go v1.12.0-20230822193137-310c9c4845dd.1
 	buf.build/gen/go/bufbuild/reflect/protocolbuffers/go v1.31.0-20230822193137-310c9c4845dd.2

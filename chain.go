@@ -6,12 +6,13 @@ import (
 	"runtime/debug"
 	"strings"
 
+	"github.com/streamingfast/substreams/wasm"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/firehose-core/node-manager/mindreader"
 	"github.com/streamingfast/firehose-core/node-manager/operator"
-	"github.com/streamingfast/firehose-core/substreams"
 	"github.com/streamingfast/logging"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
@@ -150,7 +151,7 @@ type Chain[B Block] struct {
 	//
 	BlockEncoder BlockEncoder
 
-	RegisterSubstreamsExtensions func(chain *Chain[B]) ([]substreams.Extension, error)
+	RegisterSubstreamsExtensions func() (wasm.WASMExtensioner, error)
 }
 
 type ToolsConfig[B Block] struct {

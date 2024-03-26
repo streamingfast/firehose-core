@@ -97,7 +97,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				}
 			}
 
-			wasmExtensions, pipelineOptioner, err := getSubstreamsExtensions(chain)
+			wasmExtensions, err := chain.RegisterSubstreamsExtensions()
 			if err != nil {
 				return nil, fmt.Errorf("substreams extensions: %w", err)
 			}
@@ -117,8 +117,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 					SubrequestsInsecure:  subrequestsInsecure,
 					SubrequestsPlaintext: subrequestsPlaintext,
 
-					WASMExtensions:  wasmExtensions,
-					PipelineOptions: pipelineOptioner,
+					WASMExtensions: wasmExtensions,
 
 					Tracing: tracing,
 
