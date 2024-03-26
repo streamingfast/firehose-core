@@ -42,6 +42,7 @@ func TestNewDstore(t *testing.T) {
 		1,
 		0,
 		100,
+		0,
 	)
 
 	_, ok := store.(ForkAwareIOInterface)
@@ -57,6 +58,7 @@ func TestNewDstore(t *testing.T) {
 		1,
 		0,
 		100,
+		0,
 	)
 
 	_, ok = store.(ForkAwareIOInterface)
@@ -67,7 +69,7 @@ func newTestDStoreIO(
 	oneBlocksStore dstore.Store,
 	mergedBlocksStore dstore.Store,
 ) IOInterface {
-	return NewDStoreIO(testLogger, testTracer, oneBlocksStore, mergedBlocksStore, nil, 0, 0, 100)
+	return NewDStoreIO(testLogger, testTracer, oneBlocksStore, mergedBlocksStore, nil, 0, 0, 100, 0)
 }
 
 func TestMergerIO_MergeUploadPerfect(t *testing.T) {
