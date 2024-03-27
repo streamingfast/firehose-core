@@ -28,6 +28,7 @@ import (
 	"github.com/streamingfast/firehose-core/launcher"
 	"github.com/streamingfast/logging"
 	app "github.com/streamingfast/substreams/app"
+	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/zap"
 )
 
@@ -97,9 +98,13 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				}
 			}
 
-			wasmExtensions, err := chain.RegisterSubstreamsExtensions()
-			if err != nil {
-				return nil, fmt.Errorf("substreams extensions: %w", err)
+			var wasmExtensions wasm.WASMExtensioner
+			if chain.RegisterSubstreamsExtensions != nil {
+				exts, err := chain.RegisterSubstreamsExtensions()
+				if err != nil {
+					return nil, fmt.Errorf("substreams extensions: %w", err)
+				}
+				wasmExtensions = exts
 			}
 
 			meteringConfig := viper.GetString("common-metering-plugin")
