@@ -49,7 +49,6 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().Bool("substreams-tier1-subrequests-insecure", false, "Connect to tier2 without checking certificate validity")
 			cmd.Flags().Bool("substreams-tier1-subrequests-plaintext", true, "Connect to tier2 without client in plaintext mode")
 			cmd.Flags().Int("substreams-tier1-max-subrequests", 4, "number of parallel subrequests that the tier1 can make to the tier2 per request")
-			cmd.Flags().String("substreams-tier1-network-name", "undefined", "Network name to use for the substreams tier1 server. Used for metrics and logging. Default is 'undefined'")
 
 			// all substreams
 			registerCommonSubstreamsFlags(cmd)
@@ -103,11 +102,11 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				return nil, fmt.Errorf("substreams extensions: %w", err)
 			}
 
-			networkName := viper.GetString("substreams-tier1-network-name")
+			meteringConfig := viper.GetString("common-metering-plugin")
 
 			return app.NewTier1(appLogger,
 				&app.Tier1Config{
-					NetworkName: networkName,
+					MeteringConfig: meteringConfig,
 
 					MergedBlocksStoreURL: mergedBlocksStoreURL,
 					OneBlocksStoreURL:    oneBlocksStoreURL,
