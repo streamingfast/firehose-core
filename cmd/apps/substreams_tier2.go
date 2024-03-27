@@ -59,14 +59,16 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 
 			var serviceDiscoveryURL *url.URL
 			if rawServiceDiscoveryURL != "" {
-				serviceDiscoveryURL, err := url.Parse(rawServiceDiscoveryURL)
+				var err error
+				svcURL, err := url.Parse(rawServiceDiscoveryURL)
 				if err != nil {
 					return nil, fmt.Errorf("unable to parse discovery service url: %w", err)
 				}
-				err = discoveryservice.Bootstrap(serviceDiscoveryURL)
+				err = discoveryservice.Bootstrap(svcURL)
 				if err != nil {
 					return nil, fmt.Errorf("unable to bootstrap discovery service: %w", err)
 				}
+				serviceDiscoveryURL = svcURL
 			}
 
 			wasmExtensions, err := chain.RegisterSubstreamsExtensions()
