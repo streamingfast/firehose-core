@@ -26,6 +26,7 @@ import (
 	"github.com/streamingfast/firehose-core/launcher"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/app"
+	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/zap"
 )
 
@@ -71,9 +72,13 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 				serviceDiscoveryURL = svcURL
 			}
 
-			wasmExtensions, err := chain.RegisterSubstreamsExtensions()
-			if err != nil {
-				return nil, fmt.Errorf("substreams extensions: %w", err)
+			var wasmExtensions wasm.WASMExtensioner
+			if chain.RegisterSubstreamsExtensions != nil {
+				exts, err := chain.RegisterSubstreamsExtensions()
+				if err != nil {
+					return nil, fmt.Errorf("substreams extensions: %w", err)
+				}
+				wasmExtensions = exts
 			}
 
 			return app.NewTier2(appLogger,
