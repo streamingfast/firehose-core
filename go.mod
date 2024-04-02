@@ -23,14 +23,14 @@ require (
 	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
 	github.com/streamingfast/dgrpc v0.0.0-20240222213940-b9f324ff4d5c
 	github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4
-	github.com/streamingfast/dmetering v0.0.0-20240319201447-018aabe46634
+	github.com/streamingfast/dmetering v0.0.0-20240327163525-9249aa9bcceb
 	github.com/streamingfast/dmetrics v0.0.0-20230919161904-206fa8ebd545
-	github.com/streamingfast/dstore v0.1.1-0.20240320135256-1aeefdeeecd5
+	github.com/streamingfast/dstore v0.1.1-0.20240325191553-bcce8892a9bb
 	github.com/streamingfast/jsonpb v0.0.0-20210811021341-3670f0aa02d0
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	github.com/streamingfast/pbgo v0.0.6-0.20240131193313-6b88bc7139db
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.4.1-0.20240328190938-81c82176fffe
+	github.com/streamingfast/substreams v1.4.1-0.20240402141712-b2a8afdd34cc
 	github.com/stretchr/testify v1.8.4
 	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.10.0
@@ -72,13 +72,13 @@ require (
 	github.com/KimMachineGun/automemlimit v0.2.4
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
-	github.com/RoaringBitmap/roaring v0.9.4 // indirect
+	github.com/RoaringBitmap/roaring v1.9.1 // indirect
 	github.com/ShinyTrinkets/meta-logger v0.2.0 // indirect
 	github.com/abourget/llerrgroup v0.2.0
 	github.com/aws/aws-sdk-go v1.44.325 // indirect
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/bits-and-blooms/bitset v1.3.1 // indirect
+	github.com/bits-and-blooms/bitset v1.12.0 // indirect
 	github.com/blendle/zapdriver v1.3.2-0.20200203083823-9200777f8a3d // indirect
 	github.com/bobg/go-generics/v2 v2.1.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect

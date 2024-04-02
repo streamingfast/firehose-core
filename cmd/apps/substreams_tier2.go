@@ -50,20 +50,8 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 		},
 
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
-			mergedBlocksStoreURL, _, _, err := firecore.GetCommonStoresURLs(runtime.AbsDataDir)
-			if err != nil {
-				return nil, err
-			}
-
-			sfDataDir := runtime.AbsDataDir
-
 			rawServiceDiscoveryURL := viper.GetString("substreams-tier2-discovery-service-url")
 			grpcListenAddr := viper.GetString("substreams-tier2-grpc-listen-addr")
-
-			stateStoreURL := firecore.MustReplaceDataDir(sfDataDir, viper.GetString("substreams-state-store-url"))
-			stateStoreDefaultTag := viper.GetString("substreams-state-store-default-tag")
-
-			stateBundleSize := viper.GetUint64("substreams-state-bundle-size")
 
 			maximumConcurrentRequests := viper.GetUint64("substreams-tier2-max-concurrent-requests")
 
@@ -71,36 +59,30 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 
 			var serviceDiscoveryURL *url.URL
 			if rawServiceDiscoveryURL != "" {
-				serviceDiscoveryURL, err = url.Parse(rawServiceDiscoveryURL)
+				var err error
+				svcURL, err := url.Parse(rawServiceDiscoveryURL)
 				if err != nil {
 					return nil, fmt.Errorf("unable to parse discovery service url: %w", err)
 				}
-				err = discoveryservice.Bootstrap(serviceDiscoveryURL)
+				err = discoveryservice.Bootstrap(svcURL)
 				if err != nil {
 					return nil, fmt.Errorf("unable to bootstrap discovery service: %w", err)
 				}
+				serviceDiscoveryURL = svcURL
 			}
 
-			wasmExtensions, pipelineOptioner, err := getSubstreamsExtensions(chain)
+			wasmExtensions, err := chain.RegisterSubstreamsExtensions()
 			if err != nil {
 				return nil, fmt.Errorf("substreams extensions: %w", err)
 			}
 
 			return app.NewTier2(appLogger,
 				&app.Tier2Config{
-					MergedBlocksStoreURL: mergedBlocksStoreURL,
-
-					StateStoreURL:        stateStoreURL,
-					StateStoreDefaultTag: stateStoreDefaultTag,
-					StateBundleSize:      stateBundleSize,
-
-					WASMExtensions:  wasmExtensions,
-					PipelineOptions: pipelineOptioner,
-
 					Tracing: tracing,
 
 					GRPCListenAddr:      grpcListenAddr,
 					ServiceDiscoveryURL: serviceDiscoveryURL,
+					WASMExtensions:      wasmExtensions,
 
 					MaximumConcurrentRequests: maximumConcurrentRequests,
 				}, &app.Tier2Modules{

@@ -10,6 +10,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+* Chain interface method RegisterSubstreamsExtensions is changed to be chain agnostic and returns a simplified wasm.WASMExtensioner interface.
+
+* Update Substreams tier-2 factory function with new, chain-agnostic parameters.
+
 * Substreams server @v1.4.0: performance improvements: less redundant module execution (at the cost of more cache storage). See https://github.com/streamingfast/substreams/releases/tag/v1.4.0.
 
 * Added `--substreams-tier2-max-concurrent-requests` to limit the number of concurrent requests to the tier2 substreams service.
