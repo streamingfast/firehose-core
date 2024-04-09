@@ -8,6 +8,14 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## v1.3.4 (unreleased)
+
+### substreams
+
+* fix missing error handling when writing output data to files. This could result in tier1 request just "hanging" waiting for the file never produced by tier2.
+* fix handling of dstore error in tier1 'execout walker' causing stalling issues on S3 or on unexpected storage errors
+* increase number of retries on storage when writing states or execouts (5 -> 10)
+
 ## v1.3.3
 
 ### substreams
