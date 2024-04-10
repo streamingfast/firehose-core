@@ -10,6 +10,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## v1.3.4 (unreleased)
 
+* add `DefaultBlockType` into `firehose.Chain` struct, enabling default block type setting for known chain
+
 ### substreams
 * add `--block-type` flag that can be specified when creating substreams tier1. If not specified, tier1 will auto-detect block type from source.
 * fix missing error handling when writing output data to files. This could result in tier1 request just "hanging" waiting for the file never produced by tier2.

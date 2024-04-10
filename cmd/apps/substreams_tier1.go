@@ -81,10 +81,20 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			stateBundleSize := viper.GetUint64("substreams-state-bundle-size")
 
 			subrequestsEndpoint := viper.GetString("substreams-tier1-subrequests-endpoint")
-			blockType := viper.GetString("block-type")
 			subrequestsInsecure := viper.GetBool("substreams-tier1-subrequests-insecure")
 			subrequestsPlaintext := viper.GetBool("substreams-tier1-subrequests-plaintext")
 			maxSubrequests := viper.GetUint64("substreams-tier1-max-subrequests")
+
+			var blockType string
+			if chain.DefaultBlockType != "" {
+				blockType = chain.DefaultBlockType
+			}
+
+			blockTypeFromFlag := viper.GetString("block-type")
+
+			if blockTypeFromFlag != "" {
+				blockType = blockTypeFromFlag
+			}
 
 			tracing := os.Getenv("SUBSTREAMS_TRACING") == "modules_exec"
 
