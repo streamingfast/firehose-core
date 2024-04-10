@@ -50,6 +50,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().Bool("substreams-tier1-subrequests-insecure", false, "Connect to tier2 without checking certificate validity")
 			cmd.Flags().Bool("substreams-tier1-subrequests-plaintext", true, "Connect to tier2 without client in plaintext mode")
 			cmd.Flags().Int("substreams-tier1-max-subrequests", 4, "number of parallel subrequests that the tier1 can make to the tier2 per request")
+			cmd.Flags().String("block-type", "", "Block type to use for the substreams tier1 (Ex: sf.ethereum.type.v2.Block)")
 
 			// all substreams
 			registerCommonSubstreamsFlags(cmd)
@@ -80,6 +81,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			stateBundleSize := viper.GetUint64("substreams-state-bundle-size")
 
 			subrequestsEndpoint := viper.GetString("substreams-tier1-subrequests-endpoint")
+			blockType := viper.GetString("block-type")
 			subrequestsInsecure := viper.GetBool("substreams-tier1-subrequests-insecure")
 			subrequestsPlaintext := viper.GetBool("substreams-tier1-subrequests-plaintext")
 			maxSubrequests := viper.GetUint64("substreams-tier1-max-subrequests")
@@ -125,8 +127,8 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 					SubrequestsEndpoint:  subrequestsEndpoint,
 					SubrequestsInsecure:  subrequestsInsecure,
 					SubrequestsPlaintext: subrequestsPlaintext,
-
-					WASMExtensions: wasmExtensions,
+					BlockType:            blockType,
+					WASMExtensions:       wasmExtensions,
 
 					Tracing: tracing,
 
