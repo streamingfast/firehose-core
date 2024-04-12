@@ -8,6 +8,14 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## v1.3.5
+
+### Substreams fixes
+
+* fix a possible panic() when an request is interrupted during the file loading phase of a squashing operation.
+* fix a rare possibility of stalling if only some fullkv stores caches were deleted, but further segments were still present.
+* fix stats counters for store operations time
+
 ## v1.3.4
 
 * add `DefaultBlockType` into `firehose.Chain` struct, enabling default block type setting for known chain
