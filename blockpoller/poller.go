@@ -112,7 +112,8 @@ func (p *BlockPoller) run(resolvedStartBlock bstream.BlockRef, numberOfBlockToFe
 				fetchedBlockItem := <-requestedBlockItem
 
 				if fetchedBlockItem.skipped {
-					numberOfBlockToFetch++
+					p.logger.Info("block was skipped", zap.Uint64("block_num", fetchedBlockItem.blockNumber))
+					blockToFetch++
 					continue
 				}
 
@@ -275,6 +276,7 @@ func (p *BlockPoller) loadNextBlocks(requestedBlock uint64, numberOfBlockToFetch
 }
 
 func (p *BlockPoller) requestBlock(blockNumber uint64, numberOfBlockToFetch int) chan *BlockItem {
+	p.logger.Info("requesting block", zap.Uint64("block_num", blockNumber))
 	requestedBlock := make(chan *BlockItem)
 
 	go func(requestedBlock chan *BlockItem) {
@@ -297,6 +299,7 @@ func (p *BlockPoller) requestBlock(blockNumber uint64, numberOfBlockToFetch int)
 
 			p.logger.Info("block was optimistically polled", zap.Uint64("block_num", blockNumber))
 			requestedBlock <- blockItem
+			close(requestedBlock)
 			break
 		}
 
