@@ -154,10 +154,11 @@ func TestForkHandler_run(t *testing.T) {
 			blockFetcher := newTestBlockFetcher(t, tt.blocks)
 			blockFinalizer := newTestBlockFinalizer(t, tt.expectFireBlock)
 
-			f := New(blockFetcher, blockFinalizer)
-			f.forkDB = forkable.NewForkDB()
+			poller := New(blockFetcher, blockFinalizer)
+			poller.fetchBlockRetryCount = 0
+			poller.forkDB = forkable.NewForkDB()
 
-			err := f.run(tt.startBlock, 1)
+			err := poller.run(tt.startBlock, 1)
 			if !errors.Is(err, TestErrCompleteDone) {
 				require.NoError(t, err)
 			}

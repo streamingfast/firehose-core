@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -41,7 +42,8 @@ type BlockPoller struct {
 
 	optimisticallyPolledBlocks map[uint64]*BlockItem
 
-	fetching bool
+	fetching                       bool
+	optimisticallyPolledBlocksLock sync.Mutex
 }
 
 func New(
@@ -109,18 +111,20 @@ func (p *BlockPoller) run(resolvedStartBlock bstream.BlockRef, numberOfBlockToFe
 
 			for {
 				requestedBlockItem := p.requestBlock(blockToFetch, numberOfBlockToFetch)
-				fetchedBlockItem := <-requestedBlockItem
-
-				if fetchedBlockItem.skipped {
-					p.logger.Info("block was skipped", zap.Uint64("block_num", fetchedBlockItem.blockNumber))
-					blockToFetch++
-					continue
+				fetchedBlockItem, ok := <-requestedBlockItem
+				if !ok {
+					p.logger.Info("requested block channel was closed, quitting")
+					return nil
+				}
+				if !fetchedBlockItem.skipped {
+					fetchedBlock = fetchedBlockItem.block
+					break
 				}
 
-				fetchedBlock = fetchedBlockItem.block
-				break
-			}
+				p.logger.Info("block was skipped", zap.Uint64("block_num", fetchedBlockItem.blockNumber))
+				blockToFetch++
 
+			}
 		}
 
 		if err != nil {
@@ -236,7 +240,9 @@ func (p *BlockPoller) loadNextBlocks(requestedBlock uint64, numberOfBlockToFetch
 	done := make(chan interface{}, 1)
 	go func() {
 		for blockItem := range nailer.Out {
+			p.optimisticallyPolledBlocksLock.Lock()
 			p.optimisticallyPolledBlocks[blockItem.blockNumber] = blockItem
+			p.optimisticallyPolledBlocksLock.Unlock()
 		}
 		close(done)
 	}()
@@ -281,7 +287,16 @@ func (p *BlockPoller) requestBlock(blockNumber uint64, numberOfBlockToFetch int)
 
 	go func(requestedBlock chan *BlockItem) {
 		for {
+
+			if p.IsTerminating() {
+				close(requestedBlock)
+				p.logger.Info("block poller is terminating")
+				return
+			}
+
+			p.optimisticallyPolledBlocksLock.Lock()
 			blockItem, found := p.optimisticallyPolledBlocks[blockNumber]
+			p.optimisticallyPolledBlocksLock.Unlock()
 			if !found {
 				if !p.fetching {
 					go func() {
