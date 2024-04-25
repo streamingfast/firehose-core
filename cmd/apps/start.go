@@ -73,7 +73,7 @@ func start(cmd *cobra.Command, dataDir string, args []string, rootLog *zap.Logge
 		return fmt.Errorf("protocol specific hooks not configured correctly: %w", err)
 	}
 
-	eventEmitter, err := dmetering.New(sflags.MustGetString(cmd, "common-metering-plugin"), rootLog)
+	eventEmitter, err := GetCommonMeteringPlugin(cmd, rootLog)
 	if err != nil {
 		return fmt.Errorf("unable to initialize dmetering: %w", err)
 	}

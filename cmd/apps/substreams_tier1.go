@@ -119,11 +119,9 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				wasmExtensions = exts
 			}
 
-			meteringConfig := viper.GetString("common-metering-plugin")
-
 			return app.NewTier1(appLogger,
 				&app.Tier1Config{
-					MeteringConfig: meteringConfig,
+					MeteringConfig: GetCommonMeteringPluginValue(),
 
 					MergedBlocksStoreURL: mergedBlocksStoreURL,
 					OneBlocksStoreURL:    oneBlocksStoreURL,
