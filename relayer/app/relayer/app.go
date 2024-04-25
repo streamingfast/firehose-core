@@ -37,6 +37,7 @@ type Config struct {
 	SourceRequestBurst int
 	MaxSourceLatency   time.Duration
 	OneBlocksURL       string
+	SingleReaderMode   bool
 }
 
 func (c *Config) ZapFields() []zap.Field {
@@ -92,6 +93,7 @@ func (a *App) Run() error {
 		liveSourceFactory,
 		oneBlocksSourceFactory,
 		a.config.GRPCListenAddr,
+		a.config.SingleReaderMode,
 	)
 
 	a.OnTerminating(a.relayer.Shutdown)

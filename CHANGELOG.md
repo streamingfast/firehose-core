@@ -105,6 +105,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 * Added `--merger-delete-threads` to customize the number of threads the merger will use to delete files. It's recommended to increase this when using Ceph as S3 storage provider to 25 or higher (due to performance issues with deletes the merger might otherwise not be able to delete one-block files fast enough).
 * Added `--substreams-tier2-max-concurrent-requests` to limit the number of concurrent requests to the tier2 substreams service.
 
+* If relayer is started with a single source, it will have reduced tolerance for missing blocks. This is to prevent the relayer from falling behind when the source is not producing blocks.
+
 ## v1.2.5
 
 * Fixed `tools check merged-blocks` default range when `-r <range>` is not provided to now be `[0, +∞]` (was previously `[HEAD, +∞]`).

@@ -53,6 +53,7 @@ func NewRelayer(
 	liveSourceFactory bstream.SourceFactory,
 	oneBlocksSourceFactory bstream.SourceFromNumFactoryWithSkipFunc,
 	grpcListenAddr string,
+	singleReaderMode bool,
 ) *Relayer {
 	r := &Relayer{
 		Shutter:                shutter.New(),
@@ -64,14 +65,24 @@ func NewRelayer(
 	gs := dgrpcfactory.ServerFromOptions()
 	pbhealth.RegisterHealthServer(gs.ServiceRegistrar(), r)
 
+	options := []forkable.Option{
+		forkable.EnsureAllBlocksTriggerLongestChain(), // send every forked block too
+		forkable.WithFilters(bstream.StepNew),
+	}
+
+	if singleReaderMode {
+		options = append(options, forkable.WithFailOnUnlinkableBlocks(1, 10*time.Second))
+	} else {
+		options = append(options, forkable.WithFailOnUnlinkableBlocks(20, time.Minute))
+	}
+
 	forkableHub := hub.NewForkableHub(
 		r.liveSourceFactory,
 		r.oneBlocksSourceFactory,
 		10,
-		forkable.EnsureAllBlocksTriggerLongestChain(), // send every forked block too
-		forkable.WithFilters(bstream.StepNew),
-		forkable.WithFailOnUnlinkableBlocks(20, time.Minute),
+		options...,
 	)
+
 	r.hub = forkableHub
 	gs.OnTerminated(r.Shutdown)
 	r.blockStreamServer = r.hub.NewBlockstreamServer(gs)
