@@ -8,6 +8,22 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## v1.3.7
+
+### Fixed
+
+* Fixed possible race condition in the blockPoller
+* Fix relayer waiting too long to fail when reconnecting to a single source (especially on slow chains). It will now fail right away if it receives an unlinkable block and has a single source configured.
+* Fixed skipped block handling and performance issues on blockPoller
+
+### Changed
+
+* The `--block-type` flag got renamed to `--substreams-tier1-block-type`. Specifying it will make substreams-tier1 skip the block type discovery (from files or live stream) on startup, getting ready faster.
+
+### Added
+
+* Logs now print the "x-deployment-id" header on firehose connections (used to propagate subgraph deployment ids from graph-node and help debugging)
+
 ## v1.3.6
 
 * bump substreams to v1.5.5 with fix in wazero to prevent process freezing on certain substreams

@@ -1,8 +1,46 @@
-## Firehose Integrators Tool Kit
+## Firehose multi-chain executor
 
-This repository contains all the code that is required to maintain the Golang part of the Firehose stack for chain integrators. This repository can be seen as an Integrator Tool Kit for developers maintaining Firehose for a specific chain. It's essentially a chain-agnostic shared library that is used to avoid duplication across all projects and ease maintenance work for the teams. It contains **no** chain-specific code and everything that is chain-specific must be provided.
+This repository contains all the base components of [Firehose](https://firehose.streamingfast.io/) and run the software for multiple block chains (Bitcoin, Solana, ...) or be used as a library (firehose-ethereum, firehose-antelope)
 
-> **Note** This repository is **only** useful for maintainers of `firehose-<chain>` repositories and new integrators looking to integrate Firehose into a new chain. If you are a developer using Firehose or Substreams technology, this repository is not for you.
+## Compiling
+
+* `go install -v ./cmd/firecore`
+
+Or download the latest Release from https://github.com/streamingfast/firehose-core/releases/
+
+## Running directly
+
+* firehose-core can run one or many of the following components:
+  - reader-node
+  - merger
+  - relayer
+  - firehose
+  - substreams-tier1
+  - substreams-tier2
+  - (reader-node-stdin -- not run by default)
+
+* You can use a config file like this (default: `firehose.yaml`)
+
+```
+start:
+  args:
+  - reader-node
+  - merger
+  flags:
+    reader-node-path: "/usr/local/bin/firesol"
+    reader-node-args: ["fetch", "rpc", "http://localhost:8545", "0"]
+```
+
+* Run it with `firecore start --config-file=./firehose.yaml` or set an empty value for config-file (`--config-file=`) to use the default values.
+
+
+## Using as a library
+
+For chains that implement "firehose block filters" and extensions like "eth_call", this repository can be used as a library for those implementations, like these:
+
+* [firehose-ethereum](https://github.com/streamingfast/firehose-ethereum)
+* [firehose-antelope](https://github.com/pinax-network/firehose-antelope)
+
 
 ### Philosophy
 
@@ -24,13 +62,6 @@ Maintainers, you should copy/paste content of this content straight to your proj
 
 The bash command `awk '/## v0.1.11/,/## v0.1.8/' CHANGELOG.md | grep -v '## v0.1.8'` to obtain the content between 2 versions. You can then merged the different `Added`, `Changed`, `Removed` and others into single merged section.
 
-> [!NOTE]
-> At some point will provide a tool to easily generate the change for you so you can simply copy it over.
-
 ### Update
 
 When bumping `firehose-core` to a breaking version, details of such upgrade will be described in [UPDATE.md](./UPDATE.md). Breaking version can be be noticed currently if the minor version is bumped up, for example going from v0.1.11 to v0.2.0 introduces some breaking changes. Once we will release the very first major version 1, breaking changes will be when going from v0.y.z to v1.0.0.
-
-### Build & CI
-
-The build and CI files are maintained for now in https://github.com/streamingfast/firehose-acme directly and should be updated manually from time to time from there.
