@@ -15,13 +15,13 @@ import (
 	dauthnull "github.com/streamingfast/dauth/null"
 	dauthsecret "github.com/streamingfast/dauth/secret"
 	dauthtrust "github.com/streamingfast/dauth/trust"
-	"github.com/streamingfast/dmetering"
 	dmeteringgrpc "github.com/streamingfast/dmetering/grpc"
 	dmeteringlogger "github.com/streamingfast/dmetering/logger"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/cmd/apps"
 	"github.com/streamingfast/firehose-core/cmd/tools"
 	"github.com/streamingfast/firehose-core/launcher"
+	paymentGatewayMetering "github.com/streamingfast/payment-gateway/metering"
 
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
@@ -40,7 +40,7 @@ func Main[B firecore.Block](chain *firecore.Chain[B]) {
 	dauthtrust.Register()
 	dmeteringgrpc.Register()
 	dmeteringlogger.Register()
-	dmetering.RegisterNull()
+	paymentGatewayMetering.Register()
 
 	chain.Validate()
 	chain.Init()

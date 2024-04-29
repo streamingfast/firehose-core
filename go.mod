@@ -1,11 +1,11 @@
 module github.com/streamingfast/firehose-core
 
-go 1.22
+go 1.22.0
 
 require (
 	buf.build/gen/go/bufbuild/reflect/connectrpc/go v1.12.0-20230822193137-310c9c4845dd.1
 	buf.build/gen/go/bufbuild/reflect/protocolbuffers/go v1.31.0-20230822193137-310c9c4845dd.2
-	connectrpc.com/connect v1.15.0
+	connectrpc.com/connect v1.16.1
 	github.com/ShinyTrinkets/overseer v0.3.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/go-json-experiment/json v0.0.0-20231013223334-54c864be5b8d
@@ -21,9 +21,9 @@ require (
 	github.com/streamingfast/dauth v0.0.0-20240222213226-519afc16cf84
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
-	github.com/streamingfast/dgrpc v0.0.0-20240222213940-b9f324ff4d5c
+	github.com/streamingfast/dgrpc v0.0.0-20240423143010-f36784700c9a
 	github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4
-	github.com/streamingfast/dmetering v0.0.0-20240409120340-b517f0225538
+	github.com/streamingfast/dmetering v0.0.0-20240422183130-658027cbb7a1
 	github.com/streamingfast/dmetrics v0.0.0-20230919161904-206fa8ebd545
 	github.com/streamingfast/dstore v0.1.1-0.20240325191553-bcce8892a9bb
 	github.com/streamingfast/jsonpb v0.0.0-20210811021341-3670f0aa02d0
@@ -51,6 +51,7 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
+	github.com/streamingfast/payment-gateway v0.0.0-20240426151444-581e930c76e2 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240311132316-a219d84964c2 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240318140521-94a12d6c2237 // indirect
