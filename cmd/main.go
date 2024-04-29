@@ -15,6 +15,7 @@ import (
 	dauthnull "github.com/streamingfast/dauth/null"
 	dauthsecret "github.com/streamingfast/dauth/secret"
 	dauthtrust "github.com/streamingfast/dauth/trust"
+	"github.com/streamingfast/dmetering"
 	dmeteringgrpc "github.com/streamingfast/dmetering/grpc"
 	dmeteringlogger "github.com/streamingfast/dmetering/logger"
 	firecore "github.com/streamingfast/firehose-core"
@@ -38,6 +39,7 @@ func Main[B firecore.Block](chain *firecore.Chain[B]) {
 	dauthnull.Register()
 	dauthsecret.Register()
 	dauthtrust.Register()
+	dmetering.RegisterNull()
 	dmeteringgrpc.Register()
 	dmeteringlogger.Register()
 	paymentGatewayMetering.Register()

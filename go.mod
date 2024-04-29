@@ -28,6 +28,7 @@ require (
 	github.com/streamingfast/dstore v0.1.1-0.20240325191553-bcce8892a9bb
 	github.com/streamingfast/jsonpb v0.0.0-20210811021341-3670f0aa02d0
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
+	github.com/streamingfast/payment-gateway v0.0.0-20240426151444-581e930c76e2
 	github.com/streamingfast/pbgo v0.0.6-0.20240131193313-6b88bc7139db
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
 	github.com/streamingfast/substreams v1.5.5
@@ -51,7 +52,6 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
-	github.com/streamingfast/payment-gateway v0.0.0-20240426151444-581e930c76e2 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240311132316-a219d84964c2 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240318140521-94a12d6c2237 // indirect
