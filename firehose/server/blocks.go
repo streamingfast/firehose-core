@@ -56,6 +56,14 @@ func (s *Server) Block(ctx context.Context, request *pbfirehose.SingleBlockReque
 
 	resp := &pbfirehose.SingleBlockResponse{
 		Block: blk.Payload,
+		Metadata: &pbfirehose.BlockMetadata{
+			Id:        blk.Id,
+			Num:       blk.Number,
+			ParentId:  blk.ParentId,
+			ParentNum: blk.ParentNum,
+			LibNum:    blk.LibNum,
+			Time:      blk.Timestamp,
+		},
 	}
 
 	//////////////////////////////////////////////////////////////////////
@@ -120,11 +128,7 @@ func (s *Server) Blocks(request *pbfirehose.Request, streamSrv pbfirehose.Stream
 	}
 
 	isLiveBlock := func(step pbfirehose.ForkStep) bool {
-		if step == pbfirehose.ForkStep_STEP_NEW {
-			return true
-		}
-
-		return false
+		return step == pbfirehose.ForkStep_STEP_NEW
 	}
 
 	var blockCount uint64
@@ -150,12 +154,19 @@ func (s *Server) Blocks(request *pbfirehose.Request, streamSrv pbfirehose.Stream
 		resp := &pbfirehose.Response{
 			Step:   protoStep,
 			Cursor: cursor.ToOpaque(),
+			Metadata: &pbfirehose.BlockMetadata{
+				Id:        block.Id,
+				Num:       block.Number,
+				ParentId:  block.ParentId,
+				ParentNum: block.ParentNum,
+				LibNum:    block.LibNum,
+				Time:      block.Timestamp,
+			},
 		}
 
 		switch v := obj.(type) {
 		case *anypb.Any:
 			resp.Block = v
-			break
 		case proto.Message:
 			cnt, err := anypb.New(v)
 			if err != nil {
@@ -191,60 +202,7 @@ func (s *Server) Blocks(request *pbfirehose.Request, streamSrv pbfirehose.Stream
 		return nil
 	})
 
-	if s.transformRegistry != nil {
-		passthroughTr, err := s.transformRegistry.PassthroughFromTransforms(request.Transforms)
-		if err != nil {
-			return status.Errorf(codes.Internal, "unable to create pre-proc function: %s", err)
-		}
-
-		if passthroughTr != nil {
-			metrics.ActiveSubstreams.Inc()
-			defer metrics.ActiveSubstreams.Dec()
-			metrics.SubstreamsCounter.Inc()
-			outputFunc := func(cursor *bstream.Cursor, message *anypb.Any) error {
-				var blocknum uint64
-				var opaqueCursor string
-				var outStep pbfirehose.ForkStep
-				if cursor != nil {
-					blocknum = cursor.Block.Num()
-					opaqueCursor = cursor.ToOpaque()
-
-					protoStep, skip := stepToProto(cursor.Step, request.FinalBlocksOnly)
-					if skip {
-						return nil
-					}
-					outStep = protoStep
-				}
-				resp := &pbfirehose.Response{
-					Step:   outStep,
-					Cursor: opaqueCursor,
-					Block:  message,
-				}
-				if s.postHookFunc != nil {
-					s.postHookFunc(ctx, resp)
-				}
-				start := time.Now()
-				err := streamSrv.Send(resp)
-				if err != nil {
-					logger.Info("stream send error from transform", zap.Uint64("blocknum", blocknum), zap.Error(err))
-					return NewErrSendBlock(err)
-				}
-
-				level := zap.DebugLevel
-				if blocknum%200 == 0 {
-					level = zap.InfoLevel
-				}
-				logger.Check(level, "stream sent message from transform").Write(zap.Uint64("blocknum", blocknum), zap.Duration("duration", time.Since(start)))
-				return nil
-			}
-			request.Transforms = nil
-
-			return passthroughTr.Run(ctx, request, s.streamFactory.New, outputFunc)
-			//  --> will want to start a few firehose instances,sources, manage them, process them...
-			//  --> I give them an output func to print back to the user with the request
-			//   --> I could HERE give him the
-		}
-	} else if len(request.Transforms) > 0 {
+	if len(request.Transforms) > 0 && s.transformRegistry == nil {
 		return status.Errorf(codes.Unimplemented, "no transforms registry configured within this instance")
 	}
 

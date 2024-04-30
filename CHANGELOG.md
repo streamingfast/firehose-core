@@ -8,6 +8,12 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+* The `tools download-from-firehose` has been improved to work with new Firehose `sf.firehose.v2.BlockMetadata` field, if the server sends this new field, the tool is going to work on any chain. If the server's you are reaching is not recent enough, the tool fallbacks to the previous logic.
+
+* Firehose response (both single block and stream) now include the `sf.firehose.v2.BlockMetadata` field. This new field contains the chain agnostic fields we hold about any block of any chain.
+
 ## v1.3.7
 
 ### Fixed
@@ -92,7 +98,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 #### Performance improvements
 
-* All module outputs are now cached. (previously, only the last module was cached, along with the "store snapshots", to allow parallel processing). 
+* All module outputs are now cached. (previously, only the last module was cached, along with the "store snapshots", to allow parallel processing).
 * Tier2 will now read back mapper outputs (if they exist) to prevent running them again. Additionally, it will not read back the full blocks if its inputs can be satisfied from existing cached mapper outputs.
 * Tier2 will skip processing completely if it's processing the last stage and the `output_module` is a mapper that has already been processed (ex: when multiple requests are indexing the same data at the same time)
 * Tier2 will skip processing completely if it's processing a stage where all the stores and outputs have been processed and cached.
