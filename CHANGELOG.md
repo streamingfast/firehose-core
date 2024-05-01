@@ -8,6 +8,13 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## v1.3.9 (unreleased)
+
+### Substreams
+
+* Allow stores to write to stores with out-of-order ordinals (they will be reordered at the end of the module execution for each block)
+* Fix issue in substreams-tier2 causing some files to be written to the wrong place sometimes under load, resulting in some hanging requests
+
 ## v1.3.8
 
 * The `tools download-from-firehose` now respects it's documentation when doing `--help`, correct invocation now is `firecore tools download-from-firehose <endpoint> <start>:<end> <output_folder>`.

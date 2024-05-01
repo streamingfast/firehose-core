@@ -3,8 +3,8 @@ module github.com/streamingfast/firehose-core
 go 1.22.0
 
 require (
-	buf.build/gen/go/bufbuild/reflect/connectrpc/go v1.12.0-20230822193137-310c9c4845dd.1
-	buf.build/gen/go/bufbuild/reflect/protocolbuffers/go v1.31.0-20230822193137-310c9c4845dd.2
+	buf.build/gen/go/bufbuild/reflect/connectrpc/go v1.16.1-20240117202343-bf8f65e8876c.1
+	buf.build/gen/go/bufbuild/reflect/protocolbuffers/go v1.33.0-20240117202343-bf8f65e8876c.1
 	connectrpc.com/connect v1.16.1
 	github.com/ShinyTrinkets/overseer v0.3.0
 	github.com/dustin/go-humanize v1.0.1
@@ -31,7 +31,7 @@ require (
 	github.com/streamingfast/payment-gateway v0.0.0-20240426151444-581e930c76e2
 	github.com/streamingfast/pbgo v0.0.6-0.20240430190514-722fe9d82e5d
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.5.5
+	github.com/streamingfast/substreams v1.5.6-0.20240501182049-2e5674e5778e
 	github.com/stretchr/testify v1.8.4
 	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.10.0
