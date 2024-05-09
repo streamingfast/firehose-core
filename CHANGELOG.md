@@ -8,6 +8,17 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## v1.4.0
+
+### Substreams bumped to v1.6.0
+
+> **Note** Upgrading will require changing the tier1 and tier2 versions concurrently, as the internal protocol has changed.
+
+* *Index Modules* and *Block Filter* now supported. See https://github.com/streamingfast/substreams-foundational-modules for an example implementation
+* Various scheduling and performance improvements
+* env variable `SUBSTREAMS_WORKERS_RAMPUP_TIME` changed from `4s` to `0`. Set it to `4s` to keep previous behavior
+* `otelcol://` tracing protocol no longer supported
+
 ## v1.3.9
 
 ### Substreams
