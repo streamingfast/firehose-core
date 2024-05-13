@@ -8,6 +8,13 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## v1.4.1
+
+### Substreams bumped to v1.6.1
+
+* Revert sanity check to support the special case of a substreams with only 'params' as input. This allows a chain-agnostic event to be sent, along with the clock.
+* Fix error handling when resolved start-block == stop-block and stop-block is defined as non-zero
+
 ## v1.4.0
 
 ### Substreams bumped to v1.6.0
