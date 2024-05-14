@@ -3,6 +3,8 @@ package firecore
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/spf13/viper"
 	"github.com/streamingfast/dstore"
@@ -54,7 +56,17 @@ func GetIndexStore(dataDir string) (indexStore dstore.Store, possibleIndexSizes 
 		indexStore = s
 	}
 
-	for _, size := range viper.GetIntSlice("common-index-block-sizes") {
+	sizes := viper.GetIntSlice("common-index-block-sizes")
+	if len(sizes) == 0 {
+		// viper doesn't parse ints from yaml file correctly
+		for _, k := range strings.Split(viper.GetString("common-index-block-sizes"), ",") {
+			if asInt, _err := strconv.ParseInt(k, 10, 64); _err == nil {
+				sizes = append(sizes, int(asInt))
+			}
+		}
+
+	}
+	for _, size := range sizes {
 		if size < 0 {
 			return nil, nil, fmt.Errorf("invalid negative size for common-index-block-sizes: %d", size)
 		}
