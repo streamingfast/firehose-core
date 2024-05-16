@@ -8,9 +8,14 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## v1.4.2 (Unreleased)
+## v1.4.2
 
 * Fix parsing of flag 'common-index-block-sizes' from yaml config file
+
+### Substreams bumped to v1.6.2
+
+* execout: preload only one file instead of two, log if undeleted caches found
+* execout: add environment variable SUBSTREAMS_DISABLE_PRELOAD_EXEC_FILES to disable file preloading
 
 ## v1.4.1
 
