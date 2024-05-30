@@ -3,6 +3,7 @@ package firecore
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -15,9 +16,9 @@ var commonStoresCreated bool
 var indexStoreCreated bool
 
 func GetCommonStoresURLs(dataDir string) (mergedBlocksStoreURL, oneBlocksStoreURL, forkedBlocksStoreURL string, err error) {
-	mergedBlocksStoreURL = MustReplaceDataDir(dataDir, viper.GetString("common-merged-blocks-store-url"))
-	oneBlocksStoreURL = MustReplaceDataDir(dataDir, viper.GetString("common-one-block-store-url"))
-	forkedBlocksStoreURL = MustReplaceDataDir(dataDir, viper.GetString("common-forked-blocks-store-url"))
+	mergedBlocksStoreURL = MustReplaceDataDir(dataDir, viperExpandedEnvGetString("common-merged-blocks-store-url"))
+	oneBlocksStoreURL = MustReplaceDataDir(dataDir, viperExpandedEnvGetString("common-one-block-store-url"))
+	forkedBlocksStoreURL = MustReplaceDataDir(dataDir, viperExpandedEnvGetString("common-forked-blocks-store-url"))
 
 	if commonStoresCreated {
 		return
@@ -40,7 +41,7 @@ func GetCommonStoresURLs(dataDir string) (mergedBlocksStoreURL, oneBlocksStoreUR
 }
 
 func GetIndexStore(dataDir string) (indexStore dstore.Store, possibleIndexSizes []uint64, err error) {
-	indexStoreURL := MustReplaceDataDir(dataDir, viper.GetString("common-index-store-url"))
+	indexStoreURL := MustReplaceDataDir(dataDir, viperExpandedEnvGetString("common-index-store-url"))
 
 	if indexStoreURL != "" {
 		s, err := dstore.NewStore(indexStoreURL, "", "", false)
@@ -120,4 +121,8 @@ func blockNumIter(startBlockNum, exclusiveEndBlockNum, interval uint64, f func(u
 		}
 	}
 	return startBlockNum, nil
+}
+
+func viperExpandedEnvGetString(key string) string {
+	return os.ExpandEnv(viper.GetString(key))
 }
