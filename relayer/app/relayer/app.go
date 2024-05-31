@@ -37,7 +37,6 @@ type Config struct {
 	SourceRequestBurst int
 	MaxSourceLatency   time.Duration
 	OneBlocksURL       string
-	SingleReaderMode   bool
 }
 
 func (c *Config) ZapFields() []zap.Field {
@@ -80,20 +79,12 @@ func (a *App) Run() error {
 			a.config.SourceRequestBurst,
 		)
 	})
-	oneBlocksSourceFactory := bstream.SourceFromNumFactoryWithSkipFunc(func(num uint64, h bstream.Handler, skipFunc func(idSuffix string) bool) bstream.Source {
-		src, err := bstream.NewOneBlocksSource(num, oneBlocksStore, h, bstream.OneBlocksSourceWithSkipperFunc(skipFunc))
-		if err != nil {
-			return nil
-		}
-		return src
-	})
 
 	zlog.Info("starting relayer", a.config.ZapFields()...)
 	a.relayer = relayer.NewRelayer(
 		liveSourceFactory,
-		oneBlocksSourceFactory,
 		a.config.GRPCListenAddr,
-		a.config.SingleReaderMode,
+		oneBlocksStore,
 	)
 
 	a.OnTerminating(a.relayer.Shutdown)

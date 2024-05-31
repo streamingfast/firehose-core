@@ -134,15 +134,7 @@ func (a *App) Run() error {
 			)
 		})
 
-		oneBlocksSourceFactory := bstream.SourceFromNumFactoryWithSkipFunc(func(num uint64, h bstream.Handler, skipFunc func(string) bool) bstream.Source {
-			src, err := bstream.NewOneBlocksSource(num, oneBlocksStore, h, bstream.OneBlocksSourceWithSkipperFunc(skipFunc))
-			if err != nil {
-				return nil
-			}
-			return src
-		})
-
-		forkableHub = hub.NewForkableHub(liveSourceFactory, oneBlocksSourceFactory, 500)
+		forkableHub = hub.NewForkableHub(liveSourceFactory, 500, oneBlocksStore)
 		forkableHub.OnTerminated(a.Shutdown)
 
 		go forkableHub.Run()

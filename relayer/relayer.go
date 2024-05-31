@@ -19,6 +19,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/streamingfast/dstore"
+
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 
 	"github.com/streamingfast/bstream"
@@ -51,15 +53,13 @@ type Relayer struct {
 
 func NewRelayer(
 	liveSourceFactory bstream.SourceFactory,
-	oneBlocksSourceFactory bstream.SourceFromNumFactoryWithSkipFunc,
 	grpcListenAddr string,
-	singleReaderMode bool,
+	oneBlocksStore dstore.Store,
 ) *Relayer {
 	r := &Relayer{
-		Shutter:                shutter.New(),
-		grpcListenAddr:         grpcListenAddr,
-		liveSourceFactory:      liveSourceFactory,
-		oneBlocksSourceFactory: oneBlocksSourceFactory,
+		Shutter:           shutter.New(),
+		grpcListenAddr:    grpcListenAddr,
+		liveSourceFactory: liveSourceFactory,
 	}
 
 	gs := dgrpcfactory.ServerFromOptions()
@@ -70,16 +70,10 @@ func NewRelayer(
 		forkable.WithFilters(bstream.StepNew),
 	}
 
-	if singleReaderMode {
-		options = append(options, forkable.WithFailOnUnlinkableBlocks(1, 10*time.Second))
-	} else {
-		options = append(options, forkable.WithFailOnUnlinkableBlocks(20, time.Minute))
-	}
-
 	forkableHub := hub.NewForkableHub(
 		r.liveSourceFactory,
-		r.oneBlocksSourceFactory,
 		10,
+		oneBlocksStore,
 		options...,
 	)
 

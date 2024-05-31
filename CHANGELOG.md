@@ -8,6 +8,11 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## v1.5.1
+
+* Bootstrapping from live blocks improved for chains with very slow blocks or with very fast blocks (affects relayer, firehose and substreams tier1)
+* Substreams fixed slow response close to HEAD in production-mode
+
 ## v1.5.0
 
 ### Highlights
