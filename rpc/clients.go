@@ -20,6 +20,10 @@ func NewClients[C any](clients []C) *Clients[C] {
 	}
 }
 
+func (c *Clients[C]) Add(client C) {
+	c.clients = append(c.clients, client)
+}
+
 func (c *Clients[C]) Next() (client C, err error) {
 	if len(c.clients) <= c.next {
 		return client, ErrorNoMoreClient
