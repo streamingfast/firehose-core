@@ -38,7 +38,8 @@ func WithClients[C any, V any](clients *Clients[C], f func(C) (v V, err error)) 
 	for {
 		client, err := clients.Next()
 		if err != nil {
-			return v, err
+			errs = multierror.Append(errs, err)
+			return v, errs
 		}
 		v, err := f(client)
 		if err != nil {
