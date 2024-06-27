@@ -13,6 +13,13 @@ type Clients[C any] struct {
 	next    int
 }
 
+func NewClients[C any](clients []C) *Clients[C] {
+	return &Clients[C]{
+		clients: clients,
+		next:    0,
+	}
+}
+
 func (c *Clients[C]) Next() (client C, err error) {
 	if len(c.clients) <= c.next {
 		return client, ErrorNoMoreClient
@@ -23,6 +30,7 @@ func (c *Clients[C]) Next() (client C, err error) {
 }
 
 func WithClients[C any, V any](clients *Clients[C], f func(C) (v V, err error)) (v V, err error) {
+	clients.next = 0
 	var errs error
 	for {
 		client, err := clients.Next()
