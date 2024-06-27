@@ -13,10 +13,9 @@ type Clients[C any] struct {
 	next    int
 }
 
-func NewClients[C any](clients []C) *Clients[C] {
+func NewClients[C any]() *Clients[C] {
 	return &Clients[C]{
-		clients: clients,
-		next:    0,
+		next: 0,
 	}
 }
 
