@@ -307,7 +307,7 @@ func (p *BlockPoller) requestBlock(blockNumber uint64, numberOfBlockToFetch int)
 						}
 					}()
 				}
-				p.logger.Info("waiting for block to be fetched", zap.Uint64("block_num", blockNumber))
+				p.logger.Debug("waiting for block to be fetched", zap.Uint64("block_num", blockNumber))
 				time.Sleep(100 * time.Millisecond)
 				continue
 			}
