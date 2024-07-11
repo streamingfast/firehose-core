@@ -8,6 +8,21 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## v1.5.4
+
+### Substreams bumped to v1.9.0
+
+#### Important Substreams BUG FIX
+
+* Fix a bug introduced in v1.6.0 that could result in corrupted store "state" file if all 
+  the "outputs" were already cached for a module in a given segment (rare occurence)
+* We recommend clearing your substreams cache after this upgrade and re-processing or 
+  validating your data if you use stores.
+
+#### Added
+
+* Expose a new intrinsic to modules: `skip_empty_output`, which causes the module output to be skipped if it has zero bytes. (Watch out, a protobuf object with all its default values will have zero bytes)
+* Improve schedule order (faster time to first block) for substreams with multiple stages when starting mid-chain 
 
 ## v1.5.3
 
