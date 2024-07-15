@@ -34,6 +34,8 @@ var wellKnownProtoRepos = []string{
 	"buf.build/pinax/firehose-antelope",
 	"buf.build/pinax/firehose-arweave",
 	"buf.build/pinax/firehose-beacon",
+	"buf.build/streamingfast/firehose-starknet",
+	"buf.build/streamingfast/firehose-cosmos",
 }
 
 func main() {
