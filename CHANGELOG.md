@@ -8,8 +8,10 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.5.5
+
 * added well known type for starknet and cosmos
+* Fixed a bug in substreams where chains with non-zero first-streamable-block would cause some substreams to hang. Solution changes the 'cached' hashes for those substreams.
 
 ## v1.5.4
 
