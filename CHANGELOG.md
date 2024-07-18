@@ -8,12 +8,9 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## v1.5.7
-
-* Bump substreams to v1.9.2: Prevent Noop handler from sending outputs with 'Stalled' step in cursor (which breaks substreams-sink-kv)
-
 ## v1.5.6
 
+* Bump substreams to v1.9.2: Prevent Noop handler from sending outputs with 'Stalled' step in cursor (which breaks substreams-sink-kv)
 * add `--reader-node-line-buffer-size` flag and bump default value from 100M to 200M to go over crazy block 278208000 on Solana
 
 ## v1.5.5
