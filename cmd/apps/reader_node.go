@@ -62,6 +62,7 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 			cmd.Flags().Uint("reader-node-start-block-num", 0, "Blocks that were produced with smaller block number then the given block num are skipped")
 			cmd.Flags().Uint("reader-node-stop-block-num", 0, "Shutdown reader when we the following 'stop-block-num' has been reached, inclusively.")
 			cmd.Flags().Int("reader-node-blocks-chan-capacity", 100, "Capacity of the channel holding blocks read by the reader. Process will shutdown reader-node if the channel gets over 90% of that capacity to prevent horrible consequences. Raise this number when processing tiny blocks very quickly")
+			cmd.Flags().Uint64("reader-node-line-buffer-size", 209715200, "Capacity of the buffer for reading a single line out of the node, in bytes (This is a hard limit. Some future enormouse blocks may require raising this to process them).")
 			cmd.Flags().String("reader-node-one-block-suffix", "default", cli.FlagDescription(`
 				Unique identifier for reader, so that it can produce 'oneblock files' in the same store as another instance without competing
 				for writes. You should set this flag if you have multiple reader running, each one should get a unique identifier, the
@@ -132,7 +133,9 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 				readinessMaxLatency,
 			)
 
-			superviser := sv.SupervisorFactory(chain.ExecutableName, nodePath, nodeArguments, appLogger)
+			lineBufferSize := viper.GetUint64("reader-node-line-buffer-size")
+
+			superviser := sv.SupervisorFactory(chain.ExecutableName, nodePath, nodeArguments, lineBufferSize, appLogger)
 			superviser.RegisterLogPlugin(sv.NewNodeLogPlugin(debugFirehose))
 
 			var bootstrapper operator.Bootstrapper
