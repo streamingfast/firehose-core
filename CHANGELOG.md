@@ -8,6 +8,10 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## v1.5.7
+
+* Bump substreams to v1.9.3: fix high CPU usage on tier1 caused by a bad error handling
+
 ## v1.5.6
 
 * Bump substreams to v1.9.2: Prevent Noop handler from sending outputs with 'Stalled' step in cursor (which breaks substreams-sink-kv)
