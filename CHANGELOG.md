@@ -8,6 +8,10 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+* Add `reader-node-firehose` which creates one-blocks by consuming blocks from an already existing Firehose endpoint. This can be used to set up an indexer stack without having to run an instrumented blockchain node.
+
 ## v1.9.8
 
 * Flag `--reader-node-arguments` now accepts to expand `{first-streamable-block}` with the value defined by config flag `--common-first-streamable-block`.
