@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/encoding/gzip"
 	"os"
+	"time"
 )
 
 type FirehoseReader struct {
@@ -22,6 +23,7 @@ type FirehoseReader struct {
 	callOpts        []grpc.CallOption
 	zlogger         *zap.Logger
 	cursorStateFile string
+	stats           *firehoseReaderStats
 }
 
 func NewFirehoseReader(endpoint, compression string, insecure, plaintext bool, zlogger *zap.Logger) (*FirehoseReader, error) {
@@ -45,6 +47,7 @@ func NewFirehoseReader(endpoint, compression string, insecure, plaintext bool, z
 		closeFunc:      closeFunc,
 		callOpts:       callOpts,
 		zlogger:        zlogger,
+		stats:          newFirehoseReaderStats(),
 	}
 
 	return res, nil
@@ -73,6 +76,7 @@ func (f *FirehoseReader) Launch(startBlock, stopBlock uint64, cursorFile string)
 
 	f.firehoseStream = stream
 	f.cursorStateFile = cursorFile
+	f.stats.StartPeriodicLogToZap(context.Background(), f.zlogger, 10*time.Second)
 
 	return nil
 }
@@ -93,6 +97,12 @@ func (f *FirehoseReader) ReadBlock() (obj *pbbstream.Block, err error) {
 		return nil, fmt.Errorf("failed to write cursor to state file: %w", err)
 	}
 
+	BlockReadCount.Inc()
+	f.stats.lastBlock = pbbstream.BlockRef{
+		Num: res.Metadata.Num,
+		Id:  res.Metadata.Id,
+	}
+
 	return &pbbstream.Block{
 		Number:    res.Metadata.Num,
 		Id:        res.Metadata.Id,
@@ -110,5 +120,6 @@ func (f *FirehoseReader) Done() <-chan interface{} {
 }
 
 func (f *FirehoseReader) Close() error {
+	f.stats.StopPeriodicLogToZap()
 	return f.closeFunc()
 }
