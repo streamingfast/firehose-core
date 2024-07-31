@@ -8,6 +8,11 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+* Substreams: revert module hash calculation from `v1.5.5`, when using a non-zero firstStreamableBlock. Hashes will now be the same even if the chain's first streamable block affects the initialBlock of a module.
+* Substreams: add `--substreams-block-execution-timeout` flag (default 3 minutes) to prevent requests stalling
+
 ## v1.5.7
 
 * Bump substreams to v1.9.3: fix high CPU usage on tier1 caused by a bad error handling

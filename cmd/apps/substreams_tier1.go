@@ -77,6 +77,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 
 			stateStoreURL := firecore.MustReplaceDataDir(sfDataDir, viper.GetString("substreams-state-store-url"))
 			stateStoreDefaultTag := viper.GetString("substreams-state-store-default-tag")
+			executionTimeout := viper.GetDuration("substreams-block-execution-timeout")
 
 			stateBundleSize := viper.GetUint64("substreams-state-bundle-size")
 
@@ -128,15 +129,16 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 					ForkedBlocksStoreURL: forkedBlocksStoreURL,
 					BlockStreamAddr:      blockstreamAddr,
 
-					StateStoreURL:        stateStoreURL,
-					StateStoreDefaultTag: stateStoreDefaultTag,
-					StateBundleSize:      stateBundleSize,
-					MaxSubrequests:       maxSubrequests,
-					SubrequestsEndpoint:  subrequestsEndpoint,
-					SubrequestsInsecure:  subrequestsInsecure,
-					SubrequestsPlaintext: subrequestsPlaintext,
-					BlockType:            blockType,
-					WASMExtensions:       wasmExtensions,
+					StateStoreURL:         stateStoreURL,
+					StateStoreDefaultTag:  stateStoreDefaultTag,
+					StateBundleSize:       stateBundleSize,
+					MaxSubrequests:        maxSubrequests,
+					SubrequestsEndpoint:   subrequestsEndpoint,
+					SubrequestsInsecure:   subrequestsInsecure,
+					SubrequestsPlaintext:  subrequestsPlaintext,
+					BlockType:             blockType,
+					WASMExtensions:        wasmExtensions,
+					BlockExecutionTimeout: executionTimeout,
 
 					Tracing: tracing,
 

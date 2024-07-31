@@ -55,6 +55,7 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 			grpcListenAddr := viper.GetString("substreams-tier2-grpc-listen-addr")
 
 			maximumConcurrentRequests := viper.GetUint64("substreams-tier2-max-concurrent-requests")
+			executionTimeout := viper.GetDuration("substreams-block-execution-timeout")
 
 			tracing := os.Getenv("SUBSTREAMS_TRACING") == "modules_exec"
 
@@ -85,9 +86,10 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 				&app.Tier2Config{
 					Tracing: tracing,
 
-					GRPCListenAddr:      grpcListenAddr,
-					ServiceDiscoveryURL: serviceDiscoveryURL,
-					WASMExtensions:      wasmExtensions,
+					GRPCListenAddr:        grpcListenAddr,
+					ServiceDiscoveryURL:   serviceDiscoveryURL,
+					WASMExtensions:        wasmExtensions,
+					BlockExecutionTimeout: executionTimeout,
 
 					MaximumConcurrentRequests: maximumConcurrentRequests,
 				}, &app.Tier2Modules{
