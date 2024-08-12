@@ -32,12 +32,12 @@ require (
 	github.com/streamingfast/payment-gateway v0.0.0-20240426151444-581e930c76e2
 	github.com/streamingfast/pbgo v0.0.6-0.20240430190514-722fe9d82e5d
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.9.4-0.20240801142150-9da72c6fa000
+	github.com/streamingfast/substreams v1.9.4-0.20240812201411-47dcc4536b7b
 	github.com/stretchr/testify v1.8.4
 	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.10.0
 	go.uber.org/zap v1.26.0
-	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
+	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	google.golang.org/grpc v1.64.0
 	google.golang.org/protobuf v1.33.0
 )
@@ -174,13 +174,13 @@ require (
 	go.uber.org/atomic v1.10.0
 	go.uber.org/automaxprocs v1.5.1
 	golang.org/x/crypto v0.23.0 // indirect
-	golang.org/x/mod v0.12.0 // indirect
-	golang.org/x/net v0.22.0 // indirect
+	golang.org/x/mod v0.17.0 // indirect
+	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/oauth2 v0.18.0
 	golang.org/x/sync v0.7.0 // indirect
-	golang.org/x/sys v0.20.0 // indirect
+	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/term v0.20.0 // indirect
-	golang.org/x/text v0.15.0 // indirect
+	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/api v0.172.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
