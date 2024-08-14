@@ -18,6 +18,8 @@ const (
 	RangeBoundaryExclusive
 )
 
+var ErrInvalidRangeBoundary = fmt.Errorf("not a valid RangeBoundary, try [%s]", strings.Join(_RangeBoundaryNames, ", "))
+
 const _RangeBoundaryName = "InclusiveExclusive"
 
 var _RangeBoundaryNames = []string{
@@ -45,6 +47,13 @@ func (x RangeBoundary) String() string {
 	return fmt.Sprintf("RangeBoundary(%d)", x)
 }
 
+// IsValid provides a quick way to determine if the typed value is
+// part of the allowed enumerated values
+func (x RangeBoundary) IsValid() bool {
+	_, ok := _RangeBoundaryMap[x]
+	return ok
+}
+
 var _RangeBoundaryValue = map[string]RangeBoundary{
 	_RangeBoundaryName[0:9]:                   RangeBoundaryInclusive,
 	strings.ToLower(_RangeBoundaryName[0:9]):  RangeBoundaryInclusive,
@@ -52,7 +61,7 @@ var _RangeBoundaryValue = map[string]RangeBoundary{
 	strings.ToLower(_RangeBoundaryName[9:18]): RangeBoundaryExclusive,
 }
 
-// ParseRangeBoundary attempts to convert a string to a RangeBoundary
+// ParseRangeBoundary attempts to convert a string to a RangeBoundary.
 func ParseRangeBoundary(name string) (RangeBoundary, error) {
 	if x, ok := _RangeBoundaryValue[name]; ok {
 		return x, nil
@@ -61,15 +70,15 @@ func ParseRangeBoundary(name string) (RangeBoundary, error) {
 	if x, ok := _RangeBoundaryValue[strings.ToLower(name)]; ok {
 		return x, nil
 	}
-	return RangeBoundary(0), fmt.Errorf("%s is not a valid RangeBoundary, try [%s]", name, strings.Join(_RangeBoundaryNames, ", "))
+	return RangeBoundary(0), fmt.Errorf("%s is %w", name, ErrInvalidRangeBoundary)
 }
 
-// MarshalText implements the text marshaller method
+// MarshalText implements the text marshaller method.
 func (x RangeBoundary) MarshalText() ([]byte, error) {
 	return []byte(x.String()), nil
 }
 
-// UnmarshalText implements the text unmarshaller method
+// UnmarshalText implements the text unmarshaller method.
 func (x *RangeBoundary) UnmarshalText(text []byte) error {
 	name := string(text)
 	tmp, err := ParseRangeBoundary(name)
