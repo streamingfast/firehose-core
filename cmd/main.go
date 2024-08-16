@@ -72,7 +72,7 @@ func Main[B firecore.Block](chain *firecore.Chain[B]) {
 		flags.StringP("config-file", "c", "./firehose.yaml", "Configuration file to use. No config file loaded if set to an empty string.")
 
 		flags.String("log-format", "text", "Format for logging to stdout. Either 'text' or 'stackdriver'")
-		flags.Bool("log-to-file", true, "Also write logs to {data-dir}/firehose.log.json ")
+		flags.Bool("log-to-file", true, fmt.Sprintf("Also write logs to {data-dir}/%s ", launcher.DefaultLogFile))
 		flags.String("log-level-switcher-listen-addr", "localhost:1065", cli.FlagDescription(`
 			If non-empty, a JSON based HTTP server will listen on this address to let you switch the default logging level
 			of all registered loggers to a different one on the fly. This enables switching to debug level on

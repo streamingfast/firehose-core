@@ -21,6 +21,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const DefaultLogFile = "app.log.json"
+
 type LoggingOptions struct {
 	WorkingDir    string // the folder where the data will be stored, in our case will be used to store the logger
 	Verbosity     int    // verbosity level
@@ -50,7 +52,7 @@ func SetupLogger(rootLogger *zap.Logger, opts *LoggingOptions) {
 	}
 
 	if opts.LogToFile {
-		options = append(options, logging.WithOutputToFile(filepath.Join(opts.WorkingDir, "app.log.json")))
+		options = append(options, logging.WithOutputToFile(filepath.Join(opts.WorkingDir, DefaultLogFile)))
 	}
 
 	logging.InstantiateLoggers(options...)
