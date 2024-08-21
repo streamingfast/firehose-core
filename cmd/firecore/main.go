@@ -4,6 +4,7 @@ import (
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	firecore "github.com/streamingfast/firehose-core"
 	fhCMD "github.com/streamingfast/firehose-core/cmd"
+	info "github.com/streamingfast/firehose-core/firehose/info"
 )
 
 func main() {
@@ -17,6 +18,7 @@ func main() {
 		Version:              version,
 		BlockFactory:         func() firecore.Block { return new(pbbstream.Block) },
 		ConsoleReaderFactory: firecore.NewConsoleReader,
+		InfoResponseFiller:   info.DefaultInfoResponseFiller,
 		Tools:                &firecore.ToolsConfig[*pbbstream.Block]{},
 	})
 }

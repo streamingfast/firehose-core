@@ -16,6 +16,7 @@ import (
 	"github.com/streamingfast/dmetrics"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/firehose"
+	"github.com/streamingfast/firehose-core/firehose/info"
 	"github.com/streamingfast/firehose-core/firehose/rate"
 	pbfirehoseV1 "github.com/streamingfast/pbgo/sf/firehose/v1"
 	pbfirehoseV2 "github.com/streamingfast/pbgo/sf/firehose/v2"
@@ -61,6 +62,7 @@ func New(
 	isReady func(context.Context) bool,
 	listenAddr string,
 	serviceDiscoveryURL *url.URL,
+	infoServer *info.InfoServer,
 	opts ...Option,
 ) *Server {
 	initFunc := func(ctx context.Context, _ *pbfirehoseV2.Request) context.Context {
@@ -140,6 +142,7 @@ func New(
 		if blockGetter != nil {
 			pbfirehoseV2.RegisterFetchServer(gs, s)
 		}
+		pbfirehoseV2.RegisterEndpointInfoServer(gs, infoServer)
 		pbfirehoseV2.RegisterStreamServer(gs, s)
 		pbfirehoseV1.RegisterStreamServer(gs, NewFirehoseProxyV1ToV2(s)) // compatibility with firehose
 	})

@@ -31,6 +31,7 @@ import (
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/firehose"
+	"github.com/streamingfast/firehose-core/firehose/info"
 	"github.com/streamingfast/firehose-core/firehose/metrics"
 	"github.com/streamingfast/firehose-core/firehose/server"
 	"github.com/streamingfast/logging"
@@ -64,6 +65,7 @@ type Modules struct {
 	TransformRegistry        *transform.Registry
 	RegisterServiceExtension RegisterServiceExtensionFunc
 	CheckPendingShutdown     func() bool
+	InfoServer               *info.InfoServer
 }
 
 type App struct {
@@ -158,6 +160,7 @@ func (a *App) Run() error {
 		a.IsReady,
 		a.config.GRPCListenAddr,
 		a.config.ServiceDiscoveryURL,
+		a.modules.InfoServer,
 		a.config.ServerOptions...,
 	)
 
@@ -185,6 +188,14 @@ func (a *App) Run() error {
 				return
 			}
 		}
+
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+			defer cancel()
+			if err := a.modules.InfoServer.Init(ctx, forkableHub, mergedBlocksStore, oneBlocksStore, a.logger); err != nil {
+				a.Shutdown(fmt.Errorf("cannot initialize info server: %w", err))
+			}
+		}()
 
 		a.logger.Info("launching gRPC firehoseServer", zap.Bool("live_support", withLive))
 		a.isReady.CAS(false, true)

@@ -101,6 +101,7 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 				HeadBlockNumberMetric: headBlockNumMetric,
 				TransformRegistry:     registry,
 				CheckPendingShutdown:  runtime.IsPendingShutdown,
+				InfoServer:            runtime.InfoServer,
 			}), nil
 		},
 	})

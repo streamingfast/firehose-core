@@ -23,6 +23,7 @@ import (
 	"github.com/streamingfast/firehose-core/cmd/tools"
 	"github.com/streamingfast/firehose-core/launcher"
 	paymentGatewayMetering "github.com/streamingfast/payment-gateway/metering"
+	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
@@ -170,6 +171,20 @@ func registerCommonFlags[B firecore.Block](chain *firecore.Chain[B]) {
 		cmd.Flags().String("common-merged-blocks-store-url", firecore.MergedBlocksStoreURL, "[COMMON] Store URL where to read/write merged blocks.")
 		cmd.Flags().String("common-forked-blocks-store-url", firecore.ForkedBlocksStoreURL, "[COMMON] Store URL where to read/write forked block files that we want to keep.")
 		cmd.Flags().String("common-live-blocks-addr", firecore.RelayerServingAddr, "[COMMON] gRPC endpoint to get real-time blocks.")
+
+		cmd.Flags().String("advertise-chain-name", "", "[firehose,substreams-tier1] Chain name to advertise in the Info Endpoint. Required but it may be inferred from the genesis blocks.")
+		cmd.Flags().StringSlice("advertise-chain-aliases", nil, "[firehose,substreams-tier1] List of chain name aliases to advertise in the Info Endpoint. If unset, it may be inferred from the genesis blocks.")
+		cmd.Flags().StringSlice("advertise-block-features", nil, "[firehose,substreams-tier1] List of block features to advertise in the Info Endpoint. If unset, it may be inferred from the genesis block.")
+
+		acceptedEncodings := make([]string, len(pbfirehose.InfoResponse_BlockIdEncoding_value)-1)
+		i := 0
+		for encoding := range pbfirehose.InfoResponse_BlockIdEncoding_value {
+			if encoding != "BLOCK_ID_ENCODING_UNSET" {
+				acceptedEncodings[i] = encoding
+				i++
+			}
+		}
+		cmd.Flags().String("advertise-block-id-encoding", "", fmt.Sprintf("[firehose,substreams-tier1] Block ID encoding type to advertise in the Info Endpoint (%s). If unset, it may be inferred from the genesis block.", strings.Join(acceptedEncodings, ", ")))
 
 		cmd.Flags().String("common-index-store-url", firecore.IndexStoreURL, "[COMMON] Store URL where to read/write index files (if used on the chain).")
 		cmd.Flags().IntSlice("common-index-block-sizes", []int{100000, 10000, 1000, 100}, "Index bundle sizes that that are considered valid when looking for block indexes")
