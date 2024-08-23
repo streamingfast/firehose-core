@@ -10,7 +10,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
-* Add `sf.firehose.v2.EndpointInfo/Info` service on Firehose and Substreams endpoints. This involves the following new flags:
+* Add `sf.firehose.v2.EndpointInfo/Info` service on Firehose and `sf.substreams.rpc.v2.EndpointInfo/Info` to Substreams endpoints. This involves the following new flags:
   - `advertise-chain-name` Canonical name of the chain according to https://thegraph.com/docs/en/developing/supported-networks/ (required, unless it is in the "well-known" list)
   - `advertise-chain-aliases` Alternate names for that chain (optional)
   - `advertise-block-features` List of features describing the blocks (optional)

@@ -150,6 +150,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 					HeadTimeDriftMetric:   ss1HeadTimeDriftmetric,
 					HeadBlockNumberMetric: ss1HeadBlockNumMetric,
 					CheckPendingShutDown:  runtime.IsPendingShutdown,
+					InfoServer:            runtime.InfoServer,
 				}), nil
 		},
 	})

@@ -15,10 +15,13 @@ import (
 )
 
 type InfoServer struct {
+	sync.Mutex
+
 	responseFiller func(block *pbbstream.Block, resp *pbfirehose.InfoResponse) error
 	response       *pbfirehose.InfoResponse
 	ready          chan struct{}
-	once           sync.Once
+	initDone       bool
+	initError      error
 	logger         *zap.Logger
 }
 
@@ -71,9 +74,24 @@ func validateInfoResponse(resp *pbfirehose.InfoResponse) error {
 }
 
 // multiple apps (firehose, substreams...) can initialize the same server, we only need one
-func (s *InfoServer) Init(ctx context.Context, fhub *hub.ForkableHub, mergedBlocksStore dstore.Store, oneBlockStore dstore.Store, logger *zap.Logger) (err error) {
-	s.once.Do(func() { err = s.init(ctx, fhub, mergedBlocksStore, oneBlockStore, logger) })
-	return
+func (s *InfoServer) Init(ctx context.Context, fhub *hub.ForkableHub, mergedBlocksStore dstore.Store, oneBlockStore dstore.Store, logger *zap.Logger) error {
+	s.Lock()
+	defer func() {
+		s.initDone = true
+		s.Unlock()
+	}()
+
+	if s.initDone {
+		return s.initError
+	}
+
+	if err := s.init(ctx, fhub, mergedBlocksStore, oneBlockStore, logger); err != nil {
+		s.initError = err
+		return err
+	}
+
+	close(s.ready)
+	return nil
 }
 
 func (s *InfoServer) getBlockFromMergedBlocksStore(ctx context.Context, blockNum uint64, mergedBlocksStore dstore.Store) *pbbstream.Block {
@@ -178,6 +196,5 @@ func (s *InfoServer) init(ctx context.Context, fhub *hub.ForkableHub, mergedBloc
 		return err
 	}
 
-	close(s.ready)
 	return nil
 }
