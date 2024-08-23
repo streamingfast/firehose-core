@@ -34,6 +34,21 @@ var DefaultInfoResponseFiller = func(firstStreamableBlock *pbbstream.Block, resp
 			break
 		}
 	}
+
+	// Extra validation for ethereum blocks
+	if firstStreamableBlock.Payload.TypeUrl == "type.googleapis.com/sf.ethereum.type.v2.Block" {
+		var seenDetailLevel bool
+		for _, feature := range resp.BlockFeatures {
+			if feature == "base" || feature == "extended" || feature == "hybrid" {
+				seenDetailLevel = true
+				break
+			}
+		}
+		if !seenDetailLevel {
+			return fmt.Errorf("ethereum blocks are used without setting detail level in 'advertise-block-features': expected one of 'base', 'extended' or 'hybrid' (or use 'firehose-ethereum' binary instead to serve this chain and get automatic detection/validation)")
+		}
+	}
+
 	return nil
 }
 
