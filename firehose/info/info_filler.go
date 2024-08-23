@@ -4,57 +4,39 @@ import (
 	"fmt"
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	wellknown "github.com/streamingfast/firehose-core/well-known"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 )
 
-var DefaultInfoResponseFiller = func(block *pbbstream.Block, resp *pbfirehose.InfoResponse) error {
-	resp.FirstStreamableBlockId = block.Id
+var DefaultInfoResponseFiller = func(firstStreamableBlock *pbbstream.Block, resp *pbfirehose.InfoResponse) error {
+	resp.FirstStreamableBlockId = firstStreamableBlock.Id
 
-	switch block.Payload.TypeUrl {
-	case "type.googleapis.com/sf.antelope.type.v1.Block":
-		return fillInfoResponseForAntelope(block, resp)
-
-	case "type.googleapis.com/sf.ethereum.type.v2.Block":
-		return fillInfoResponseForEthereum(block, resp)
-
-	case "type.googleapis.com/sf.cosmos.type.v1.Block":
-		return fillInfoResponseForCosmos(block, resp)
-
-	case "type.googleapis.com/sf.solana.type.v1.Block":
-		return fillInfoResponseForSolana(block, resp)
+	if resp.ChainName != "" {
+		if chain := wellknown.WellKnownProtocols.ChainByName(resp.ChainName); chain != nil {
+			if firstStreamableBlock.Number == chain.GenesisBlockNumber && chain.GenesisBlockID != firstStreamableBlock.Id { // we don't check if the firstStreamableBlock is something other than our well-known genesis block
+				return fmt.Errorf("chain name defined in flag: %q inconsistent with the genesis block ID %q (expected: %q)", resp.ChainName, ox(firstStreamableBlock.Id), ox(chain.GenesisBlockID))
+			}
+			resp.ChainName = chain.Name
+			resp.ChainNameAliases = chain.Aliases
+		} else if chain := wellknown.WellKnownProtocols.ChainByGenesisBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
+			return fmt.Errorf("chain name defined in flag: %q inconsistent with the one discovered from genesis block %q", resp.ChainName, chain.Name)
+		}
+	} else {
+		if chain := wellknown.WellKnownProtocols.ChainByGenesisBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
+			resp.ChainName = chain.Name
+			resp.ChainNameAliases = chain.Aliases
+		}
 	}
 
-	return nil
-}
-
-// this is a simple helper, a full implementation would live in github.com/streamingfast/firehose-ethereum
-func fillInfoResponseForEthereum(block *pbbstream.Block, resp *pbfirehose.InfoResponse) error {
-	resp.BlockIdEncoding = pbfirehose.InfoResponse_BLOCK_ID_ENCODING_HEX
-	var seenBlockType bool
-	for _, feature := range resp.BlockFeatures {
-		if feature == "extended" || feature == "base" || feature == "hybrid" {
-			seenBlockType = true
+	for _, protocol := range wellknown.WellKnownProtocols {
+		if protocol.BlockType == firstStreamableBlock.Payload.TypeUrl {
+			resp.BlockIdEncoding = protocol.BytesEncoding
 			break
 		}
 	}
-	if !seenBlockType {
-		return fmt.Errorf("invalid block features, missing 'base', 'extended' or 'hybrid'")
-	}
 	return nil
 }
 
-// this is a simple helper, a full implementation would live in github.com/pinax-network/firehose-antelope
-func fillInfoResponseForAntelope(block *pbbstream.Block, resp *pbfirehose.InfoResponse) error {
-	resp.BlockIdEncoding = pbfirehose.InfoResponse_BLOCK_ID_ENCODING_HEX
-	return nil
-}
-
-func fillInfoResponseForCosmos(block *pbbstream.Block, resp *pbfirehose.InfoResponse) error {
-	resp.BlockIdEncoding = pbfirehose.InfoResponse_BLOCK_ID_ENCODING_HEX
-	return nil
-}
-
-func fillInfoResponseForSolana(block *pbbstream.Block, resp *pbfirehose.InfoResponse) error {
-	resp.BlockIdEncoding = pbfirehose.InfoResponse_BLOCK_ID_ENCODING_BASE58
-	return nil
+func ox(s string) string {
+	return "0x" + s
 }

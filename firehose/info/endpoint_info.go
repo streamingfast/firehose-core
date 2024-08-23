@@ -19,6 +19,7 @@ type InfoServer struct {
 	response       *pbfirehose.InfoResponse
 	ready          chan struct{}
 	once           sync.Once
+	logger         *zap.Logger
 }
 
 func (s *InfoServer) Info(ctx context.Context, request *pbfirehose.InfoRequest) (*pbfirehose.InfoResponse, error) {
@@ -37,6 +38,7 @@ func NewInfoServer(
 	blockFeatures []string,
 	firstStreamableBlock uint64,
 	responseFiller func(block *pbbstream.Block, resp *pbfirehose.InfoResponse) error,
+	logger *zap.Logger,
 ) *InfoServer {
 
 	resp := &pbfirehose.InfoResponse{
@@ -51,6 +53,7 @@ func NewInfoServer(
 		responseFiller: responseFiller,
 		response:       resp,
 		ready:          make(chan struct{}),
+		logger:         logger,
 	}
 }
 
@@ -145,6 +148,21 @@ func (s *InfoServer) init(ctx context.Context, fhub *hub.ForkableHub, mergedBloc
 		select {
 		case ch <- s.getBlockFromOneBlockStore(ctx, s.response.FirstStreamableBlockNum, oneBlockStore):
 		case <-ctx.Done():
+		}
+	}()
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Second):
+				logger.Warn("waiting to read the first_streamable_block before starting firehose/substreams endpoints",
+					zap.Uint64("first_streamable_block", s.response.FirstStreamableBlockNum),
+					zap.Stringer("merged_blocks_store", mergedBlocksStore.BaseURL()), // , zap.String("one_block_store", oneBlockStore.String())
+					zap.Stringer("one_block_store", oneBlockStore.BaseURL()),         // , zap.String("one_block_store", oneBlockStore.String())
+				)
+			}
 		}
 	}()
 

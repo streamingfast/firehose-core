@@ -30,7 +30,7 @@ require (
 	github.com/streamingfast/jsonpb v0.0.0-20210811021341-3670f0aa02d0
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	github.com/streamingfast/payment-gateway v0.0.0-20240426151444-581e930c76e2
-	github.com/streamingfast/pbgo v0.0.6-0.20240821201153-468db4096ff0
+	github.com/streamingfast/pbgo v0.0.6-0.20240823134334-812f6a16c5cb
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
 	github.com/streamingfast/substreams v1.9.4-0.20240812210000-635f7bcba6cf
 	github.com/stretchr/testify v1.8.4

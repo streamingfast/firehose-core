@@ -96,6 +96,7 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 		sflags.MustGetStringSlice(cmd, "advertise-block-features"),
 		bstream.GetProtocolFirstStreamableBlock,
 		chain.InfoResponseFiller,
+		rootLog,
 	)
 
 	launch := launcher.NewLauncher(rootLog, dataDirAbs, infoServer)
