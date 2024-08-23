@@ -102,6 +102,7 @@ func (s *InfoServer) getBlockFromMergedBlocksStore(ctx context.Context, blockNum
 
 		block, err := bstream.FetchBlockFromMergedBlocksStore(ctx, blockNum, mergedBlocksStore)
 		if err != nil {
+			time.Sleep(time.Millisecond * 500)
 			continue
 		}
 		return block
@@ -132,6 +133,7 @@ func (s *InfoServer) getBlockFromOneBlockStore(ctx context.Context, blockNum uin
 
 		block, err := bstream.FetchBlockFromOneBlockStore(ctx, blockNum, "", oneBlockStore)
 		if err != nil {
+			time.Sleep(time.Millisecond * 500)
 			continue
 		}
 		return block

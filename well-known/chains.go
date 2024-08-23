@@ -13,10 +13,15 @@ type WellKnownProtocol struct {
 }
 
 type Chain struct {
-	Name    string
+	// Canonical name, from https://thegraph.com/docs/en/developing/supported-networks/
+	Name string
+	// Aliases are other names that can be used to refer to the chain, for example 'polygon' is a popular name for the chain 'matic'
 	Aliases []string
 	// Genesis block here is actually the "lowest possible" first streamable block through firehose blocks.
 	// In most cases, it matches the "genesis block" of the chain.
+	// It must match the value of the `sf.bstream.v1.Block.id` field (https://github.com/streamingfast/bstream/blob/develop/proto/sf/bstream/v1/bstream.proto#L71)
+	// and it follows the encoding specified in the `BytesEncoding` field of the WellKnownProtocol
+	// You can generally get the genesis block ID by running `firecore tools print merged-blocks <path/to/merged-blocks> <first-streamable-block-number>` on the merged-blocks
 	GenesisBlockID     string
 	GenesisBlockNumber uint64
 }
