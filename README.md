@@ -1,6 +1,6 @@
 ## Firehose multi-chain executor
 
-This repository contains all the base components of [Firehose](https://firehose.streamingfast.io/) and run the software for multiple block chains (Bitcoin, Solana, ...) or be used as a library (firehose-ethereum, firehose-antelope)
+This repository contains all the base components of [Firehose Core](https://firehose.streamingfast.io/) and run the software for multiple block chains (Bitcoin, Solana, ...) or be used as a library (firehose-ethereum, firehose-antelope)
 
 ## Compiling
 
