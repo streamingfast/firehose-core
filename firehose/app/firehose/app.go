@@ -189,13 +189,11 @@ func (a *App) Run() error {
 			}
 		}
 
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-			defer cancel()
-			if err := a.modules.InfoServer.Init(ctx, forkableHub, mergedBlocksStore, oneBlocksStore, a.logger); err != nil {
-				a.Shutdown(fmt.Errorf("cannot initialize info server: %w", err))
-			}
-		}()
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+		defer cancel()
+		if err := a.modules.InfoServer.Init(ctx, forkableHub, mergedBlocksStore, oneBlocksStore, a.logger); err != nil {
+			a.Shutdown(fmt.Errorf("cannot initialize info server: %w", err))
+		}
 
 		a.logger.Info("launching gRPC firehoseServer", zap.Bool("live_support", withLive))
 		a.isReady.CAS(false, true)

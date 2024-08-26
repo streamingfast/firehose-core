@@ -148,9 +148,7 @@ func (s *InfoServer) getBlockFromOneBlockStore(ctx context.Context, blockNum uin
 // it can be called only once
 func (s *InfoServer) init(ctx context.Context, fhub *hub.ForkableHub, mergedBlocksStore dstore.Store, oneBlockStore dstore.Store, logger *zap.Logger) error {
 	ctx, cancel := context.WithCancel(ctx)
-	if s.validate {
-		defer cancel()
-	}
+	// cancel is later and depends on s.validate
 
 	ch := make(chan *pbbstream.Block)
 
@@ -199,6 +197,7 @@ func (s *InfoServer) init(ctx context.Context, fhub *hub.ForkableHub, mergedBloc
 	if !s.validate {
 		// in this case we don't wait for an answer, but we still try to fill the response
 		go func() {
+			defer cancel()
 			select {
 			case blk := <-ch:
 				if err := s.responseFiller(blk, s.response, s.validate); err != nil {
@@ -210,11 +209,12 @@ func (s *InfoServer) init(ctx context.Context, fhub *hub.ForkableHub, mergedBloc
 				logger.Warn("info response", zap.Error(err))
 			}
 			close(s.ready)
+			cancel()
 		}()
 
-		cancel()
 		return nil
 	}
+	defer cancel()
 
 	select {
 	case blk := <-ch:
