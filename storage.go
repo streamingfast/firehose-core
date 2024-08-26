@@ -14,6 +14,17 @@ import (
 
 var commonStoresCreated bool
 var indexStoreCreated bool
+var tmpDirCreated bool
+
+func GetTmpDir(dataDir string) (tmpDir string, err error) {
+	if tmpDirCreated {
+		return
+	}
+
+	tmpDir = MustReplaceDataDir(dataDir, viperExpandedEnvGetString("common-tmp-dir"))
+	err = os.MkdirAll(tmpDir, 0755)
+	return
+}
 
 func GetCommonStoresURLs(dataDir string) (mergedBlocksStoreURL, oneBlocksStoreURL, forkedBlocksStoreURL string, err error) {
 	mergedBlocksStoreURL = MustReplaceDataDir(dataDir, viperExpandedEnvGetString("common-merged-blocks-store-url"))

@@ -120,6 +120,11 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				wasmExtensions = exts
 			}
 
+			tmpDir, err := firecore.GetTmpDir(sfDataDir)
+			if err != nil {
+				return nil, fmt.Errorf("getting temporary directory: %w", err)
+			}
+
 			return app.NewTier1(appLogger,
 				&app.Tier1Config{
 					MeteringConfig: GetCommonMeteringPluginValue(),
@@ -128,6 +133,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 					OneBlocksStoreURL:    oneBlocksStoreURL,
 					ForkedBlocksStoreURL: forkedBlocksStoreURL,
 					BlockStreamAddr:      blockstreamAddr,
+					TmpDir:               tmpDir,
 
 					StateStoreURL:         stateStoreURL,
 					StateStoreDefaultTag:  stateStoreDefaultTag,

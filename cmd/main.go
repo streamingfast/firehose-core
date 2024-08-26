@@ -171,6 +171,7 @@ func registerCommonFlags[B firecore.Block](chain *firecore.Chain[B]) {
 		cmd.Flags().String("common-merged-blocks-store-url", firecore.MergedBlocksStoreURL, "[COMMON] Store URL where to read/write merged blocks.")
 		cmd.Flags().String("common-forked-blocks-store-url", firecore.ForkedBlocksStoreURL, "[COMMON] Store URL where to read/write forked block files that we want to keep.")
 		cmd.Flags().String("common-live-blocks-addr", firecore.RelayerServingAddr, "[COMMON] gRPC endpoint to get real-time blocks.")
+		cmd.Flags().String("common-tmp-dir", firecore.TmpDir, "[COMMON] Local directory to store temporary files")
 
 		cmd.Flags().String("advertise-chain-name", "", "[firehose,substreams-tier1] Chain name to advertise in the Info Endpoint. Required but it may be inferred from the genesis blocks.")
 		cmd.Flags().StringSlice("advertise-chain-aliases", nil, "[firehose,substreams-tier1] List of chain name aliases to advertise in the Info Endpoint. If unset, it may be inferred from the genesis blocks.")

@@ -23,4 +23,5 @@ var (
 	OneBlockStoreURL     string = "file://{data-dir}/storage/one-blocks"
 	ForkedBlocksStoreURL string = "file://{data-dir}/storage/forked-blocks"
 	IndexStoreURL        string = "file://{data-dir}/storage/index"
+	TmpDir               string = "file://{data-dir}/tmp"
 )

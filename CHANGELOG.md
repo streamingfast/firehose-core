@@ -24,6 +24,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
     - If the first-streamable-block does not match any known chain, it will require the `advertise-chain-name` to be non-empty
     - If the first-streamable-block type is unknown (i.e. not ethereum, solana, near, cosmos, bitcoin...), it will require the user to provide `advertise-chain-name` as well as `advertise-block-id-encoding`
 
+* Substreams: add `--common-tmp-dir` flag and activate local caching of pre-compiled WASM modules through wazero feature
 * Substreams: revert module hash calculation from `v1.5.5`, when using a non-zero firstStreamableBlock. Hashes will now be the same even if the chain's first streamable block affects the initialBlock of a module.
 * Substreams: add `--substreams-block-execution-timeout` flag (default 3 minutes) to prevent requests stalling
 

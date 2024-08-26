@@ -32,7 +32,7 @@ require (
 	github.com/streamingfast/payment-gateway v0.0.0-20240426151444-581e930c76e2
 	github.com/streamingfast/pbgo v0.0.6-0.20240823134334-812f6a16c5cb
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.9.4-0.20240823175139-fee92bc72fad
+	github.com/streamingfast/substreams v1.9.4-0.20240826160128-7d7c7b132e06
 	github.com/stretchr/testify v1.8.4
 	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.10.0
@@ -160,7 +160,7 @@ require (
 	github.com/streamingfast/shutter v1.5.0
 	github.com/subosito/gotenv v1.4.2 // indirect
 	github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf // indirect
-	github.com/tetratelabs/wazero v1.7.1 // indirect
+	github.com/tetratelabs/wazero v1.8.0 // indirect
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869 // indirect
 	go.opencensus.io v0.24.0
 	go.opentelemetry.io/contrib/detectors/gcp v1.9.0 // indirect
