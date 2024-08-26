@@ -51,6 +51,10 @@ func setupCmd(cmd *cobra.Command, binaryName string) error {
 				return fmt.Errorf("invalid flag %s in config file under command %s", k, subCommand)
 			}
 
+			// Keep compatibility with config files, allow empty value to unset the flag
+			if v == nil {
+				v = ""
+			}
 			viper.SetDefault(flag.viperKey, v)
 
 			// For root command, we want to keep compatibility for `viper.GetXXX("global-<flag>")` to work with config loaded value

@@ -30,9 +30,9 @@ require (
 	github.com/streamingfast/jsonpb v0.0.0-20210811021341-3670f0aa02d0
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	github.com/streamingfast/payment-gateway v0.0.0-20240426151444-581e930c76e2
-	github.com/streamingfast/pbgo v0.0.6-0.20240430190514-722fe9d82e5d
+	github.com/streamingfast/pbgo v0.0.6-0.20240823134334-812f6a16c5cb
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.9.4-0.20240812210000-635f7bcba6cf
+	github.com/streamingfast/substreams v1.9.4-0.20240823175139-fee92bc72fad
 	github.com/stretchr/testify v1.8.4
 	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.10.0

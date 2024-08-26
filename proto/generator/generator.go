@@ -20,24 +20,12 @@ import (
 	connect "connectrpc.com/connect"
 	"github.com/iancoleman/strcase"
 	"github.com/streamingfast/cli"
+	wellknown "github.com/streamingfast/firehose-core/well-known"
 	"google.golang.org/protobuf/proto"
 )
 
 //go:embed *.gotmpl
 var templates embed.FS
-
-var wellKnownProtoRepos = []string{
-	"buf.build/streamingfast/firehose-ethereum",
-	"buf.build/streamingfast/firehose-near",
-	"buf.build/streamingfast/firehose-solana",
-	"buf.build/streamingfast/firehose-bitcoin",
-	"buf.build/pinax/firehose-antelope",
-	"buf.build/pinax/firehose-arweave",
-	"buf.build/pinax/firehose-beacon",
-	"buf.build/streamingfast/firehose-starknet",
-	"buf.build/streamingfast/firehose-cosmos",
-	"buf.build/streamingfast/firehose-gear",
-}
 
 func main() {
 	cli.Ensure(len(os.Args) == 3, "go run ./generator <output_file> <package_name>")
@@ -58,7 +46,8 @@ func main() {
 
 	var protofiles []ProtoFile
 
-	for _, wellKnownProtoRepo := range wellKnownProtoRepos {
+	for _, protocol := range wellknown.WellKnownProtocols {
+		wellKnownProtoRepo := protocol.BufBuildURL
 		request := connect.NewRequest(&reflectv1beta1.GetFileDescriptorSetRequest{
 			Module: wellKnownProtoRepo,
 		})
