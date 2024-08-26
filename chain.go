@@ -158,7 +158,7 @@ type Chain[B Block] struct {
 
 	// InfoResponseFiller is a function that fills the `pbfirehose.InfoResponse` from the first streamable block of the chain.
 	// It can validate that we are on the right chain by checking against a known hash, or populate missing fields.
-	InfoResponseFiller func(firstStreamableBlock *pbbstream.Block, resp *pbfirehose.InfoResponse) error
+	InfoResponseFiller func(firstStreamableBlock *pbbstream.Block, resp *pbfirehose.InfoResponse, validate bool) error
 }
 
 type ToolsConfig[B Block] struct {

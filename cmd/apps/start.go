@@ -95,6 +95,7 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 		blockIDEncoding,
 		sflags.MustGetStringSlice(cmd, "advertise-block-features"),
 		bstream.GetProtocolFirstStreamableBlock,
+		!sflags.MustGetBool(cmd, "ignore-advertise-validation"),
 		chain.InfoResponseFiller,
 		rootLog,
 	)

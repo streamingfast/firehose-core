@@ -12,12 +12,14 @@ import (
 	"github.com/streamingfast/dstore"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type InfoServer struct {
 	sync.Mutex
 
-	responseFiller func(block *pbbstream.Block, resp *pbfirehose.InfoResponse) error
+	validate       bool
+	responseFiller func(block *pbbstream.Block, resp *pbfirehose.InfoResponse, validate bool) error
 	response       *pbfirehose.InfoResponse
 	ready          chan struct{}
 	initDone       bool
@@ -40,7 +42,8 @@ func NewInfoServer(
 	blockIDEncoding pbfirehose.InfoResponse_BlockIdEncoding,
 	blockFeatures []string,
 	firstStreamableBlock uint64,
-	responseFiller func(block *pbbstream.Block, resp *pbfirehose.InfoResponse) error,
+	validate bool,
+	responseFiller func(block *pbbstream.Block, resp *pbfirehose.InfoResponse, validate bool) error,
 	logger *zap.Logger,
 ) *InfoServer {
 
@@ -55,6 +58,7 @@ func NewInfoServer(
 	return &InfoServer{
 		responseFiller: responseFiller,
 		response:       resp,
+		validate:       validate,
 		ready:          make(chan struct{}),
 		logger:         logger,
 	}
@@ -90,7 +94,6 @@ func (s *InfoServer) Init(ctx context.Context, fhub *hub.ForkableHub, mergedBloc
 		return err
 	}
 
-	close(s.ready)
 	return nil
 }
 
@@ -142,9 +145,12 @@ func (s *InfoServer) getBlockFromOneBlockStore(ctx context.Context, blockNum uin
 
 // init tries to fetch the first streamable block from the different sources and fills the response with it
 // returns an error if it is incomplete
+// it can be called only once
 func (s *InfoServer) init(ctx context.Context, fhub *hub.ForkableHub, mergedBlocksStore dstore.Store, oneBlockStore dstore.Store, logger *zap.Logger) error {
 	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	if s.validate {
+		defer cancel()
+	}
 
 	ch := make(chan *pbbstream.Block)
 
@@ -177,19 +183,43 @@ func (s *InfoServer) init(ctx context.Context, fhub *hub.ForkableHub, mergedBloc
 			case <-ctx.Done():
 				return
 			case <-time.After(5 * time.Second):
-				logger.Warn("waiting to read the first_streamable_block before starting firehose/substreams endpoints",
+				loglevel := zapcore.WarnLevel
+				if !s.validate {
+					loglevel = zapcore.DebugLevel
+				}
+				logger.Log(loglevel, "waiting to read the first_streamable_block before starting firehose/substreams endpoints",
 					zap.Uint64("first_streamable_block", s.response.FirstStreamableBlockNum),
-					zap.Stringer("merged_blocks_store", mergedBlocksStore.BaseURL()), // , zap.String("one_block_store", oneBlockStore.String())
-					zap.Stringer("one_block_store", oneBlockStore.BaseURL()),         // , zap.String("one_block_store", oneBlockStore.String())
+					zap.Stringer("merged_blocks_store", mergedBlocksStore.BaseURL()),
+					zap.Stringer("one_block_store", oneBlockStore.BaseURL()),
 				)
 			}
 		}
 	}()
 
+	if !s.validate {
+		// in this case we don't wait for an answer, but we still try to fill the response
+		go func() {
+			select {
+			case blk := <-ch:
+				if err := s.responseFiller(blk, s.response, s.validate); err != nil {
+					logger.Warn("unable to fill and validate info response", zap.Error(err))
+				}
+			case <-ctx.Done():
+			}
+			if err := validateInfoResponse(s.response); err != nil {
+				logger.Warn("info response", zap.Error(err))
+			}
+			close(s.ready)
+		}()
+
+		cancel()
+		return nil
+	}
+
 	select {
 	case blk := <-ch:
-		if err := s.responseFiller(blk, s.response); err != nil {
-			return err
+		if err := s.responseFiller(blk, s.response, s.validate); err != nil {
+			return fmt.Errorf("%w -- use --ignore-advertise-validation to skip these checks", err)
 		}
 	case <-ctx.Done():
 	}
@@ -198,5 +228,6 @@ func (s *InfoServer) init(ctx context.Context, fhub *hub.ForkableHub, mergedBloc
 		return err
 	}
 
+	close(s.ready)
 	return nil
 }
