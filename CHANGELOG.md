@@ -27,6 +27,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 * Substreams: add `--common-tmp-dir` flag and activate local caching of pre-compiled WASM modules through wazero feature
 * Substreams: revert module hash calculation from `v1.5.5`, when using a non-zero firstStreamableBlock. Hashes will now be the same even if the chain's first streamable block affects the initialBlock of a module.
 * Substreams: add `--substreams-block-execution-timeout` flag (default 3 minutes) to prevent requests stalling
+* * Metering update: more detailed metering with addition of new metrics (`live_uncompressed_read_bytes`, `live_uncompressed_read_forked_bytes`, `file_uncompressed_read_bytes`, `file_uncompressed_read_forked_bytes`, `file_compressed_read_forked_bytes`, `file_compressed_read_bytes`).  *DEPRECATION WARNING*: `bytes_read` and `bytes_written` metrics will be removed in the future, please use the new metrics for metering instead.
 
 ## v1.5.7
 

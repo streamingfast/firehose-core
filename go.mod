@@ -17,22 +17,22 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
-	github.com/streamingfast/bstream v0.0.2-0.20240619142813-9d23840859bf
+	github.com/streamingfast/bstream v0.0.2-0.20240819202225-ca1b790abf0b
 	github.com/streamingfast/cli v0.0.4-0.20240412191021-5f81842cb71d
 	github.com/streamingfast/dauth v0.0.0-20240222213226-519afc16cf84
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
 	github.com/streamingfast/dgrpc v0.0.0-20240423143010-f36784700c9a
 	github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4
-	github.com/streamingfast/dmetering v0.0.0-20240422183130-658027cbb7a1
+	github.com/streamingfast/dmetering v0.0.0-20240816165719-51768d3da951
 	github.com/streamingfast/dmetrics v0.0.0-20230919161904-206fa8ebd545
-	github.com/streamingfast/dstore v0.1.1-0.20240325191553-bcce8892a9bb
+	github.com/streamingfast/dstore v0.1.1-0.20240826190906-91345d4a31f2
 	github.com/streamingfast/jsonpb v0.0.0-20210811021341-3670f0aa02d0
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	github.com/streamingfast/payment-gateway v0.0.0-20240426151444-581e930c76e2
 	github.com/streamingfast/pbgo v0.0.6-0.20240823134334-812f6a16c5cb
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.9.4-0.20240826160128-7d7c7b132e06
+	github.com/streamingfast/substreams v1.9.4-0.20240827160230-05a454855aaf
 	github.com/stretchr/testify v1.8.4
 	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.10.0

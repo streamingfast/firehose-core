@@ -18,6 +18,7 @@ import (
 	"github.com/streamingfast/firehose-core/firehose"
 	"github.com/streamingfast/firehose-core/firehose/info"
 	"github.com/streamingfast/firehose-core/firehose/rate"
+	"github.com/streamingfast/firehose-core/metering"
 	pbfirehoseV1 "github.com/streamingfast/pbgo/sf/firehose/v1"
 	pbfirehoseV2 "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -66,41 +67,19 @@ func New(
 	opts ...Option,
 ) *Server {
 	initFunc := func(ctx context.Context, _ *pbfirehoseV2.Request) context.Context {
-		//////////////////////////////////////////////////////////////////////
 		ctx = dmetering.WithBytesMeter(ctx)
 		ctx = withRequestMeter(ctx)
 		return ctx
-		//////////////////////////////////////////////////////////////////////
 	}
 
 	postHookFunc := func(ctx context.Context, response *pbfirehoseV2.Response) {
-		//////////////////////////////////////////////////////////////////////
-		meter := dmetering.GetBytesMeter(ctx)
-		bytesRead := meter.BytesReadDelta()
-		bytesWritten := meter.BytesWrittenDelta()
-		size := proto.Size(response)
-
-		auth := dauth.FromContext(ctx)
-		event := dmetering.Event{
-			UserID:    auth.UserID(),
-			ApiKeyID:  auth.APIKeyID(),
-			IpAddress: auth.RealIP(),
-			Meta:      auth.Meta(),
-			Endpoint:  "sf.firehose.v2.Firehose/Blocks",
-			Metrics: map[string]float64{
-				"egress_bytes":  float64(size),
-				"written_bytes": float64(bytesWritten),
-				"read_bytes":    float64(bytesRead),
-				"block_count":   1,
-			},
-			Timestamp: time.Now(),
-		}
-
 		requestMeter := getRequestMeter(ctx)
 		requestMeter.blocks++
-		requestMeter.egressBytes += size
-		dmetering.Emit(ctx, event)
-		//////////////////////////////////////////////////////////////////////
+		requestMeter.egressBytes += proto.Size(response)
+
+		meter := dmetering.GetBytesMeter(ctx)
+		auth := dauth.FromContext(ctx)
+		metering.Send(ctx, meter, auth.UserID(), auth.APIKeyID(), auth.RealIP(), auth.Meta(), "sf.firehose.v2.Firehose/Block", response)
 	}
 
 	tracerProvider := otel.GetTracerProvider()

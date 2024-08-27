@@ -14,6 +14,7 @@ import (
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/firehose-core/firehose/metrics"
+	"github.com/streamingfast/firehose-core/metering"
 	"github.com/streamingfast/logging"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
@@ -66,29 +67,9 @@ func (s *Server) Block(ctx context.Context, request *pbfirehose.SingleBlockReque
 		},
 	}
 
-	//////////////////////////////////////////////////////////////////////
 	meter := dmetering.GetBytesMeter(ctx)
-	bytesRead := meter.BytesReadDelta()
-	bytesWritten := meter.BytesWrittenDelta()
-	size := proto.Size(resp)
-
 	auth := dauth.FromContext(ctx)
-	event := dmetering.Event{
-		UserID:    auth.UserID(),
-		ApiKeyID:  auth.APIKeyID(),
-		IpAddress: auth.RealIP(),
-		Meta:      auth.Meta(),
-		Endpoint:  "sf.firehose.v2.Firehose/Block",
-		Metrics: map[string]float64{
-			"egress_bytes":  float64(size),
-			"written_bytes": float64(bytesWritten),
-			"read_bytes":    float64(bytesRead),
-			"block_count":   1,
-		},
-		Timestamp: time.Now(),
-	}
-	dmetering.Emit(ctx, event)
-	//////////////////////////////////////////////////////////////////////
+	metering.Send(ctx, meter, auth.UserID(), auth.APIKeyID(), auth.RealIP(), auth.Meta(), "sf.firehose.v2.Firehose/Block", resp)
 
 	return resp, nil
 }
@@ -125,10 +106,6 @@ func (s *Server) Blocks(request *pbfirehose.Request, streamSrv pbfirehose.Stream
 		if err := streamSrv.SendHeader(md); err != nil {
 			logger.Warn("cannot send metadata header", zap.Error(err))
 		}
-	}
-
-	isLiveBlock := func(step pbfirehose.ForkStep) bool {
-		return step == pbfirehose.ForkStep_STEP_NEW
 	}
 
 	var blockCount uint64
@@ -188,10 +165,6 @@ func (s *Server) Blocks(request *pbfirehose.Request, streamSrv pbfirehose.Stream
 			return NewErrSendBlock(err)
 		}
 
-		if isLiveBlock(protoStep) {
-			dmetering.GetBytesMeter(ctx).AddBytesRead(len(block.Payload.Value))
-		}
-
 		level := zap.DebugLevel
 		if block.Number%200 == 0 {
 			level = zap.InfoLevel
@@ -206,8 +179,45 @@ func (s *Server) Blocks(request *pbfirehose.Request, streamSrv pbfirehose.Stream
 		return status.Errorf(codes.Unimplemented, "no transforms registry configured within this instance")
 	}
 
+	liveSourceMiddlewareHandler := func(next bstream.Handler) bstream.Handler {
+		return bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+			if stepable, ok := obj.(bstream.Stepable); ok {
+				if stepable.Step().Matches(bstream.StepNew) {
+					dmetering.GetBytesMeter(ctx).CountInc(metering.MeterLiveUncompressedReadBytes, len(blk.GetPayload().GetValue()))
+
+					// legacy metering
+					// todo(colin): remove this once we are sure the new metering is working
+					dmetering.GetBytesMeter(ctx).AddBytesRead(len(blk.GetPayload().GetValue()))
+				} else {
+					dmetering.GetBytesMeter(ctx).CountInc(metering.MeterLiveUncompressedReadForkedBytes, len(blk.GetPayload().GetValue()))
+				}
+			}
+			return next.ProcessBlock(blk, obj)
+		})
+	}
+
+	fileSourceMiddlewareHandler := func(next bstream.Handler) bstream.Handler {
+		return bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+			if stepable, ok := obj.(bstream.Stepable); ok {
+				if stepable.Step().Matches(bstream.StepNew) {
+					dmetering.GetBytesMeter(ctx).CountInc(metering.MeterFileUncompressedReadBytes, len(blk.GetPayload().GetValue()))
+				} else {
+					dmetering.GetBytesMeter(ctx).CountInc(metering.MeterFileUncompressedReadForkedBytes, len(blk.GetPayload().GetValue()))
+				}
+			}
+			return next.ProcessBlock(blk, obj)
+		})
+	}
+
 	ctx = s.initFunc(ctx, request)
-	str, err := s.streamFactory.New(ctx, handlerFunc, request, logger)
+	str, err := s.streamFactory.New(
+		ctx,
+		handlerFunc,
+		request,
+		logger,
+		stream.WithLiveSourceHandlerMiddleware(liveSourceMiddlewareHandler),
+		stream.WithFileSourceHandlerMiddleware(fileSourceMiddlewareHandler),
+	)
 	if err != nil {
 		return err
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/firehose-core/metering"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -59,10 +60,12 @@ func (g *BlockGetter) Get(
 	mergedBlocksStore := g.mergedBlocksStore
 	if clonable, ok := mergedBlocksStore.(dstore.Clonable); ok {
 		var err error
-		mergedBlocksStore, err = clonable.Clone(ctx)
+		mergedBlocksStore, err = clonable.Clone(ctx, metering.WithBlockBytesReadMeteringOptions(dmetering.GetBytesMeter(ctx), logger)...)
 		if err != nil {
 			return nil, err
 		}
+
+		//todo: (deprecated) remove this
 		mergedBlocksStore.SetMeter(dmetering.GetBytesMeter(ctx))
 	}
 
@@ -91,10 +94,12 @@ func (g *BlockGetter) Get(
 		forkedBlocksStore := g.forkedBlocksStore
 		if clonable, ok := forkedBlocksStore.(dstore.Clonable); ok {
 			var err error
-			forkedBlocksStore, err = clonable.Clone(ctx)
+			forkedBlocksStore, err = clonable.Clone(ctx, metering.WithForkedBlockBytesReadMeteringOptions(dmetering.GetBytesMeter(ctx), logger)...)
 			if err != nil {
 				return nil, err
 			}
+
+			//todo: (deprecated) remove this
 			forkedBlocksStore.SetMeter(dmetering.GetBytesMeter(ctx))
 		}
 
