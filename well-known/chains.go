@@ -72,6 +72,12 @@ var WellKnownProtocols = WellKnownProtocolList([]WellKnownProtocol{
 				GenesisBlockNumber: 0,
 			},
 			{
+				Name:               "base",
+				Aliases:            []string{},
+				GenesisBlockID:     "f712aa9241cc24369b143cf6dce85f0902a9731e70d66818a3a5845b296c73dd",
+				GenesisBlockNumber: 0,
+			},
+			{
 				Name:               "optimism-sepolia",
 				Aliases:            []string{},
 				GenesisBlockID:     "102de6ffb001480cc9b8b548fd05c34cd4f46ae4aa91759393db90ea0409887d",
@@ -88,6 +94,12 @@ var WellKnownProtocols = WellKnownProtocolList([]WellKnownProtocol{
 				Aliases:            []string{"arb-one", "arbitrum"},
 				GenesisBlockID:     "7ee576b35482195fc49205cec9af72ce14f003b9ae69f6ba0faef4514be8b442",
 				GenesisBlockNumber: 0,
+			},
+			{
+				Name:               "sei-mainnet", // EVM blocks on SEI start at 79123881
+				Aliases:            []string{"sei-evm-mainnet"},
+				GenesisBlockID:     "e43c3e52a4f74dc7bb35f55cc813ed2ce97e46aafb3fcf8884056b0a757f5b75",
+				GenesisBlockNumber: 79123881,
 			},
 			// We do not auto-discover avalanche because the genesis block ID is the same as their testnet fuji and we can't differentiate them
 			//{
