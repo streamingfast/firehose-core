@@ -6,7 +6,7 @@ import (
 
 type WellKnownProtocol struct {
 	Name          string
-	BlockType     string
+	BlockType     string // we always trim `type.googleapis.com/`
 	BufBuildURL   string
 	BytesEncoding pbfirehose.InfoResponse_BlockIdEncoding
 	KnownChains   []*Chain
@@ -31,7 +31,7 @@ type WellKnownProtocolList []WellKnownProtocol
 var WellKnownProtocols = WellKnownProtocolList([]WellKnownProtocol{
 	{
 		Name:          "ethereum",
-		BlockType:     "type.googleapis.com/sf.ethereum.type.v2.Block",
+		BlockType:     "sf.ethereum.type.v2.Block",
 		BufBuildURL:   "buf.build/streamingfast/firehose-ethereum",
 		BytesEncoding: pbfirehose.InfoResponse_BLOCK_ID_ENCODING_HEX,
 		KnownChains: []*Chain{
@@ -112,7 +112,7 @@ var WellKnownProtocols = WellKnownProtocolList([]WellKnownProtocol{
 	},
 	{
 		Name:          "near",
-		BlockType:     "type.googleapis.com/sf.near.type.v1.Block",
+		BlockType:     "sf.near.type.v1.Block",
 		BufBuildURL:   "buf.build/streamingfast/firehose-near",
 		BytesEncoding: pbfirehose.InfoResponse_BLOCK_ID_ENCODING_BASE58,
 		KnownChains: []*Chain{
@@ -132,7 +132,7 @@ var WellKnownProtocols = WellKnownProtocolList([]WellKnownProtocol{
 	},
 	{
 		Name:          "solana",
-		BlockType:     "type.googleapis.com/sf.solana.type.v1.Block",
+		BlockType:     "sf.solana.type.v1.Block",
 		BufBuildURL:   "buf.build/streamingfast/firehose-solana",
 		BytesEncoding: pbfirehose.InfoResponse_BLOCK_ID_ENCODING_BASE58,
 		KnownChains: []*Chain{
@@ -146,7 +146,7 @@ var WellKnownProtocols = WellKnownProtocolList([]WellKnownProtocol{
 	},
 	{
 		Name:          "bitcoin",
-		BlockType:     "type.googleapis.com/sf.bitcoin.type.v1.Block",
+		BlockType:     "sf.bitcoin.type.v1.Block",
 		BufBuildURL:   "buf.build/streamingfast/firehose-bitcoin",
 		BytesEncoding: pbfirehose.InfoResponse_BLOCK_ID_ENCODING_HEX,
 		KnownChains: []*Chain{
@@ -160,7 +160,7 @@ var WellKnownProtocols = WellKnownProtocolList([]WellKnownProtocol{
 	},
 	{
 		Name:          "antelope",
-		BlockType:     "type.googleapis.com/sf.antelope.type.v1.Block",
+		BlockType:     "sf.antelope.type.v1.Block",
 		BufBuildURL:   "buf.build/pinax/firehose-antelope",
 		BytesEncoding: pbfirehose.InfoResponse_BLOCK_ID_ENCODING_HEX,
 		KnownChains: []*Chain{
@@ -186,7 +186,7 @@ var WellKnownProtocols = WellKnownProtocolList([]WellKnownProtocol{
 	},
 	{
 		Name:          "arweave",
-		BlockType:     "type.googleapis.com/sf.arweave.type.v1.Block",
+		BlockType:     "sf.arweave.type.v1.Block",
 		BufBuildURL:   "buf.build/pinax/firehose-arweave",
 		BytesEncoding: pbfirehose.InfoResponse_BLOCK_ID_ENCODING_HEX, // even though the usual encoding is base64url, firehose blocks are written with the hex-encoded version
 		KnownChains: []*Chain{
@@ -200,7 +200,7 @@ var WellKnownProtocols = WellKnownProtocolList([]WellKnownProtocol{
 	},
 	{
 		Name:          "beacon",
-		BlockType:     "type.googleapis.com/sf.beacon.type.v1.Block",
+		BlockType:     "sf.beacon.type.v1.Block",
 		BufBuildURL:   "buf.build/pinax/firehose-beacon",
 		BytesEncoding: pbfirehose.InfoResponse_BLOCK_ID_ENCODING_0X_HEX,
 		KnownChains: []*Chain{
@@ -226,7 +226,7 @@ var WellKnownProtocols = WellKnownProtocolList([]WellKnownProtocol{
 	},
 	{
 		Name:          "starknet",
-		BlockType:     "type.googleapis.com/sf.starknet.type.v1.Block",
+		BlockType:     "sf.starknet.type.v1.Block",
 		BufBuildURL:   "buf.build/streamingfast/firehose-starknet",
 		BytesEncoding: pbfirehose.InfoResponse_BLOCK_ID_ENCODING_0X_HEX,
 		KnownChains: []*Chain{
@@ -246,7 +246,7 @@ var WellKnownProtocols = WellKnownProtocolList([]WellKnownProtocol{
 	},
 	{
 		Name:          "cosmos",
-		BlockType:     "type.googleapis.com/sf.cosmos.type.v2.Block",
+		BlockType:     "sf.cosmos.type.v2.Block",
 		BufBuildURL:   "buf.build/streamingfast/firehose-cosmos",
 		BytesEncoding: pbfirehose.InfoResponse_BLOCK_ID_ENCODING_HEX,
 		KnownChains: []*Chain{
@@ -266,7 +266,7 @@ var WellKnownProtocols = WellKnownProtocolList([]WellKnownProtocol{
 	},
 	{
 		Name:          "gear",
-		BlockType:     "type.googleapis.com/sf.gear.type.v1.Block",
+		BlockType:     "sf.gear.type.v1.Block",
 		BufBuildURL:   "buf.build/streamingfast/firehose-gear",
 		BytesEncoding: pbfirehose.InfoResponse_BLOCK_ID_ENCODING_HEX,
 		KnownChains: []*Chain{

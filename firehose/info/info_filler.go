@@ -2,6 +2,7 @@ package info
 
 import (
 	"fmt"
+	"strings"
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	wellknown "github.com/streamingfast/firehose-core/well-known"
@@ -11,8 +12,9 @@ import (
 var DefaultInfoResponseFiller = func(firstStreamableBlock *pbbstream.Block, resp *pbfirehose.InfoResponse, validate bool) error {
 	resp.FirstStreamableBlockId = firstStreamableBlock.Id
 
+	shortTypeURL := strings.TrimPrefix(firstStreamableBlock.Payload.TypeUrl, "type.googleapis.com/")
 	for _, protocol := range wellknown.WellKnownProtocols {
-		if protocol.BlockType == firstStreamableBlock.Payload.TypeUrl {
+		if protocol.BlockType == shortTypeURL {
 			resp.BlockIdEncoding = protocol.BytesEncoding
 			break
 		}
