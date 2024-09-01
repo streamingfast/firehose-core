@@ -222,6 +222,7 @@ func (s *InfoServer) init(ctx context.Context, fhub *hub.ForkableHub, mergedBloc
 			return fmt.Errorf("%w -- use --ignore-advertise-validation to skip these checks", err)
 		}
 	case <-ctx.Done():
+		return fmt.Errorf("%w: no block found for first streamable block %d in the stores or on live source -- use --ignore-advertise-validation to skip these checks", ctx.Err(), s.response.FirstStreamableBlockNum)
 	}
 
 	if err := validateInfoResponse(s.response); err != nil {
