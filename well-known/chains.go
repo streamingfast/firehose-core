@@ -114,7 +114,7 @@ var WellKnownProtocols = WellKnownProtocolList([]WellKnownProtocol{
 		Name:          "near",
 		BlockType:     "sf.near.type.v1.Block",
 		BufBuildURL:   "buf.build/streamingfast/firehose-near",
-		BytesEncoding: pbfirehose.InfoResponse_BLOCK_ID_ENCODING_BASE58,
+		BytesEncoding: pbfirehose.InfoResponse_BLOCK_ID_ENCODING_HEX, // even though the usual encoding is base58, firehose blocks are written with the hex-encoded version
 		KnownChains: []*Chain{
 			{
 				Name:               "near-mainnet",
