@@ -119,13 +119,13 @@ var WellKnownProtocols = WellKnownProtocolList([]WellKnownProtocol{
 			{
 				Name:               "near-mainnet",
 				Aliases:            []string{"near"},
-				GenesisBlockID:     "CFAAJTVsw5y4GmMKNmuTNybxFJtapKcrarsTh5TPUyQf",
+				GenesisBlockID:     "a7110b9052e1be68f7fa8bb4065bf54e731205801878e708db7464ec4b9b8014",
 				GenesisBlockNumber: 9820214,
 			},
 			{
 				Name:               "near-testnet",
 				Aliases:            []string{},
-				GenesisBlockID:     "fQURSjwQKZn8F98ayQjpndh85msJBu12FBkUY1gc5WA",
+				GenesisBlockID:     "09d69c8ba4f319f8e78d0b701f0c1f763cc0d920551bfbd00072d5f56016d853",
 				GenesisBlockNumber: 42376923,
 			},
 		},
