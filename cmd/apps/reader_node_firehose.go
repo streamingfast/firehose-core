@@ -24,6 +24,7 @@ import (
 	"github.com/streamingfast/firehose-core/node-manager/metrics"
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
+	"os"
 )
 
 func RegisterReaderNodeFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) {
@@ -39,6 +40,8 @@ func RegisterReaderNodeFirehoseApp[B firecore.Block](chain *firecore.Chain[B], r
 			cmd.Flags().String("reader-node-firehose-compression", "zstd", "Firehose compression, one of 'gzip', 'zstd' or 'none'.")
 			cmd.Flags().Bool("reader-node-firehose-insecure", false, "Skip TLS validation when connecting to a Firehose endpoint.")
 			cmd.Flags().Bool("reader-node-firehose-plaintext", false, "Connect to a Firehose endpoint using a non-encrypted, plaintext connection.")
+			cmd.Flags().String("reader-node-firehose-api-key-env-var", "FIREHOSE_API_KEY", "Look for an API key directly in this environment variable to authenticate against endpoint (alternative to api-token-env-var)")
+			cmd.Flags().String("reader-node-firehose-api-token-env-var", "FIREHOSE_API_TOKEN", "Look for a JWT in this environment variable to authenticate against endpoint (alternative to api-key-env-var)")
 
 			return nil
 		},
@@ -51,7 +54,6 @@ func RegisterReaderNodeFirehoseApp[B firecore.Block](chain *firecore.Chain[B], r
 			headBlockNumber := metrics.NewHeadBlockNumber(metricID)
 			appReadiness := metrics.NewAppReadiness(metricID)
 			metricsAndReadinessManager := nodeManager.NewMetricsAndReadinessManager(headBlockTimeDrift, headBlockNumber, appReadiness, viper.GetDuration("reader-node-readiness-max-latency"))
-
 			return firehose_reader.New(&firehose_reader.Config{
 				GRPCAddr:                   viper.GetString("reader-node-grpc-listen-addr"),
 				OneBlocksStoreURL:          archiveStoreURL,
@@ -61,11 +63,15 @@ func RegisterReaderNodeFirehoseApp[B firecore.Block](chain *firecore.Chain[B], r
 				WorkingDir:                 firecore.MustReplaceDataDir(sfDataDir, viper.GetString("reader-node-working-dir")),
 				OneBlockSuffix:             viper.GetString("reader-node-one-block-suffix"),
 
-				FirehoseEndpoint:      viper.GetString("reader-node-firehose-endpoint"),
-				FirehoseStateFile:     firecore.MustReplaceDataDir(sfDataDir, viper.GetString("reader-node-firehose-state")),
-				FirehoseInsecureConn:  viper.GetBool("reader-node-firehose-insecure"),
-				FirehosePlaintextConn: viper.GetBool("reader-node-firehose-plaintext"),
-				FirehoseCompression:   viper.GetString("reader-node-firehose-compression"),
+				FirehoseConfig: firehose_reader.FirehoseConfig{
+					Endpoint:      viper.GetString("reader-node-firehose-endpoint"),
+					StateFile:     firecore.MustReplaceDataDir(sfDataDir, viper.GetString("reader-node-firehose-state")),
+					InsecureConn:  viper.GetBool("reader-node-firehose-insecure"),
+					PlaintextConn: viper.GetBool("reader-node-firehose-plaintext"),
+					Compression:   viper.GetString("reader-node-firehose-compression"),
+					ApiKey:        os.Getenv(viper.GetString("reader-node-firehose-api-token-env-var")),
+					Jwt:           os.Getenv(viper.GetString("reader-node-firehose-api-key-env-var")),
+				},
 			}, &firehose_reader.Modules{
 				MetricsAndReadinessManager: metricsAndReadinessManager,
 			}, appLogger, appTracer), nil

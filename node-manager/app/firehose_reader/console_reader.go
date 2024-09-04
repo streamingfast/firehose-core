@@ -23,23 +23,25 @@ type FirehoseReader struct {
 	callOpts        []grpc.CallOption
 	zlogger         *zap.Logger
 	cursorStateFile string
+	cursor          string
 	stats           *firehoseReaderStats
 }
 
-func NewFirehoseReader(endpoint, compression string, insecure, plaintext bool, zlogger *zap.Logger) (*FirehoseReader, error) {
-	firehoseClient, closeFunc, callOpts, err := client.NewFirehoseClient(endpoint, "", "", insecure, plaintext)
+func NewFirehoseReader(config FirehoseConfig, zlogger *zap.Logger) (*FirehoseReader, error) {
+
+	firehoseClient, closeFunc, callOpts, err := client.NewFirehoseClient(config.Endpoint, config.Jwt, config.ApiKey, config.InsecureConn, config.PlaintextConn)
 	if err != nil {
 		return nil, err
 	}
 
-	switch compression {
+	switch config.Compression {
 	case "gzip":
 		callOpts = append(callOpts, grpc.UseCompressor(gzip.Name))
 	case "zstd":
 		callOpts = append(callOpts, grpc.UseCompressor(zstd.Name))
 	case "none":
 	default:
-		return nil, fmt.Errorf("invalid compression: %q, must be one of 'gzip', 'zstd' or 'none'", compression)
+		return nil, fmt.Errorf("invalid compression: %q, must be one of 'gzip', 'zstd' or 'none'", config.Compression)
 	}
 
 	res := &FirehoseReader{
@@ -61,7 +63,7 @@ func (f *FirehoseReader) Launch(startBlock, stopBlock uint64, cursorFile string)
 	}
 
 	if len(cursor) > 0 {
-		f.zlogger.Info("found cursor file, ignoring start block number", zap.String("cursor", string(cursor)), zap.String("state_file", cursorFile))
+		f.zlogger.Info("found state file, continuing previous run", zap.String("cursor", string(cursor)), zap.String("state_file", cursorFile))
 	}
 
 	stream, err := f.firehoseClient.Blocks(context.Background(), &pbfirehose.Request{
@@ -92,10 +94,13 @@ func (f *FirehoseReader) ReadBlock() (obj *pbbstream.Block, err error) {
 		return nil, err
 	}
 
-	err = os.WriteFile(f.cursorStateFile, []byte(res.Cursor), 0644)
+	// We don't write the current cursor here, but the one from the previous block. In case an error happens downstream,
+	// we need to ensure that the current block is included after a restart.
+	err = f.writeCursor()
 	if err != nil {
-		return nil, fmt.Errorf("failed to write cursor to state file: %w", err)
+		return nil, err
 	}
+	f.cursor = res.Cursor
 
 	BlockReadCount.Inc()
 	f.stats.lastBlock = pbbstream.BlockRef{
@@ -120,6 +125,20 @@ func (f *FirehoseReader) Done() <-chan interface{} {
 }
 
 func (f *FirehoseReader) Close() error {
+	_ = f.writeCursor()
 	f.stats.StopPeriodicLogToZap()
 	return f.closeFunc()
+}
+
+func (f *FirehoseReader) writeCursor() error {
+	if f.cursor == "" {
+		return nil
+	}
+
+	err := os.WriteFile(f.cursorStateFile, []byte(f.cursor), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write cursor to state file: %w", err)
+	}
+
+	return nil
 }

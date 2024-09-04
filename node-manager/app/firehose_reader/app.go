@@ -39,12 +39,17 @@ type Config struct {
 	WorkingDir                 string
 	LogToZap                   bool
 	DebugDeepMind              bool
+	FirehoseConfig             FirehoseConfig
+}
 
-	FirehoseEndpoint      string
-	FirehoseStateFile     string
-	FirehosePlaintextConn bool
-	FirehoseInsecureConn  bool
-	FirehoseCompression   string
+type FirehoseConfig struct {
+	Endpoint      string
+	StateFile     string
+	PlaintextConn bool
+	InsecureConn  bool
+	ApiKey        string
+	Jwt           string
+	Compression   string
 }
 
 type Modules struct {
@@ -83,7 +88,7 @@ func (a *App) Run() error {
 		blockstream.ServerOptionWithBuffer(1),
 	)
 
-	firehoseReader, err := NewFirehoseReader(a.Config.FirehoseEndpoint, a.Config.FirehoseCompression, a.Config.FirehoseInsecureConn, a.Config.FirehosePlaintextConn, a.zlogger)
+	firehoseReader, err := NewFirehoseReader(a.Config.FirehoseConfig, a.zlogger)
 	if err != nil {
 		return err
 	}
@@ -125,7 +130,7 @@ func (a *App) Run() error {
 	go gs.Launch(a.Config.GRPCAddr)
 
 	a.zlogger.Debug("launching firehose reader")
-	err = firehoseReader.Launch(a.Config.StartBlockNum, a.Config.StopBlockNum, a.Config.FirehoseStateFile)
+	err = firehoseReader.Launch(a.Config.StartBlockNum, a.Config.StopBlockNum, a.Config.FirehoseConfig.StateFile)
 	if err != nil {
 		return err
 	}
