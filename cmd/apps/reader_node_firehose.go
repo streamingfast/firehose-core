@@ -33,7 +33,7 @@ func RegisterReaderNodeFirehoseApp[B firecore.Block](chain *firecore.Chain[B], r
 	launcher.RegisterApp(rootLog, &launcher.AppDef{
 		ID:          "reader-node-firehose",
 		Title:       "Reader Node (Firehose)",
-		Description: "Blocks reading node, unmanaged, reads Firehose logs from standard input and transform them into Firehose chain specific blocks",
+		Description: "Blocks reading node, consumes blocks from an already existing Firehose endpoint. This can be used to set up an indexer stack without having to run an instrumented blockchain node.",
 		RegisterFlags: func(cmd *cobra.Command) error {
 			cmd.Flags().String("reader-node-firehose-endpoint", "", "Firehose endpoint to connect to.")
 			cmd.Flags().String("reader-node-firehose-state", "{data-dir}/reader/state", "State file to store the cursor from the Firehose connection in.")
@@ -69,8 +69,8 @@ func RegisterReaderNodeFirehoseApp[B firecore.Block](chain *firecore.Chain[B], r
 					InsecureConn:  viper.GetBool("reader-node-firehose-insecure"),
 					PlaintextConn: viper.GetBool("reader-node-firehose-plaintext"),
 					Compression:   viper.GetString("reader-node-firehose-compression"),
-					ApiKey:        os.Getenv(viper.GetString("reader-node-firehose-api-token-env-var")),
-					Jwt:           os.Getenv(viper.GetString("reader-node-firehose-api-key-env-var")),
+					ApiKey:        os.Getenv(viper.GetString("reader-node-firehose-api-key-env-var")),
+					Jwt:           os.Getenv(viper.GetString("reader-node-firehose-api-token-env-var")),
 				},
 			}, &firehose_reader.Modules{
 				MetricsAndReadinessManager: metricsAndReadinessManager,
