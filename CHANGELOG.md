@@ -10,7 +10,11 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
-* Substreams: revert module hash calculation from `v1.5.5`, when using a non-zero firstStreamableBlock. Hashes will now be the same even if the chain's first streamable block affects the initialBlock of a module.
+* [Operator] Node Manager HTTP `/v1/resume` call now accepts `extra-env=<key>=<value>&extra-env=<keyN>=<valueN>` enabling to override environment variables for the next restart **only**. Use `curl -XPOST "http://localhost:10011/v1/resume?sync=true&extra-env=NODE_DEBUG=true"` (change `localhost:10011` accordingly to your setup).
+
+  > This is **not** persistent upon restart
+
+* Substreams: revert module hash calculation from `v1.5.5`, when using a non-zero first streamable block via `--common-first-streamable-block`. Hashes will now be the same even if the chain's first streamable block affects the initialBlock of a module.
 * Substreams: add `--substreams-block-execution-timeout` flag (default 3 minutes) to prevent requests stalling
 
 ## v1.5.7
@@ -33,15 +37,15 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 #### Important Substreams BUG FIX
 
-* Fix a bug introduced in v1.6.0 that could result in corrupted store "state" file if all 
+* Fix a bug introduced in v1.6.0 that could result in corrupted store "state" file if all
   the "outputs" were already cached for a module in a given segment (rare occurence)
-* We recommend clearing your substreams cache after this upgrade and re-processing or 
+* We recommend clearing your substreams cache after this upgrade and re-processing or
   validating your data if you use stores.
 
 #### Added
 
 * Expose a new intrinsic to modules: `skip_empty_output`, which causes the module output to be skipped if it has zero bytes. (Watch out, a protobuf object with all its default values will have zero bytes)
-* Improve schedule order (faster time to first block) for substreams with multiple stages when starting mid-chain 
+* Improve schedule order (faster time to first block) for substreams with multiple stages when starting mid-chain
 
 ## v1.5.3
 

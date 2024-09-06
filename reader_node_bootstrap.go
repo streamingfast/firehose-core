@@ -31,9 +31,12 @@ func noOpReaderNodeBootstrapperFactory(ctx context.Context, logger *zap.Logger, 
 
 func DefaultReaderNodeBootstrapDataURLFlagDescription() string {
 	return cli.Dedent(`
-		When specified, if the reader node is emtpy (e.g. that 'reader-node-data-dir' location doesn't exist
-		or has no file within it), the 'reader-node' is going to be boostrapped from it. The exact bootstrapping
-		behavior depends on the URL received.
+		When specified, if the reader node is empty (e.g. that 'reader-node-data-dir' location doesn't exist
+		or has no file within it), the 'reader-node' is going to instantiate a bootstraper based on the URL
+		provided and will execute node enabling you to restore from a backup or run a script before starting
+		an empty node, maybe to fetch the initial state from a remote source.
+
+		The exact bootstrapping behavior depends on the URL received.
 
 		If the bootstrap URL is of the form 'bash:///<path/to/script>?<parameters>', the bash script at
 		'<path/to/script>' will be executed. The script is going to receive in environment variables the resolved
@@ -50,10 +53,10 @@ func DefaultReaderNodeBootstrapDataURLFlagDescription() string {
 		If the bootstrap URL ends with 'tar.zst' or 'tar.zstd', the archive is read and extracted into the
 		'reader-node-data-dir' location. The archive is expected to contain the full content of the 'reader-node-data-dir'
 		and is expanded as is.
-	`) + "\n"
+	`)
 }
 
-// DefaultReaderNodeBootstrapper is a constrtuction you can when you want the default bootstrapper logic to be applied
+// DefaultReaderNodeBootstrapper is a construction you can when you want the default bootstrapper logic to be applied
 // but you need support new bootstrap data URL(s) format or override the default behavior for some type.
 //
 // The `overrideFactory` argument is a factory function that will be called first, if it returns a non-nil bootstrapper,

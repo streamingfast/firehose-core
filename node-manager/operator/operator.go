@@ -59,7 +59,7 @@ type Options struct {
 
 type Command struct {
 	cmd      string
-	params   map[string]string
+	params   map[string]any
 	returnch chan error
 	closer   sync.Once
 	logger   *zap.Logger
@@ -69,6 +69,16 @@ func (c *Command) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
 	encoder.AddString("name", c.cmd)
 	encoder.AddReflected("params", c.params)
 	return nil
+}
+
+func GetCommandParamOr[T any](c *Command, key string, defaultValue T) T {
+	if value, found := c.params[key]; found {
+		if v, ok := value.(T); ok {
+			return v
+		}
+	}
+
+	return defaultValue
 }
 
 func New(zlogger *zap.Logger, chainSuperviser nodeManager.ChainSuperviser, chainReadiness nodeManager.Readiness, options *Options) (*Operator, error) {
@@ -209,7 +219,7 @@ func (o *Operator) runCommand(cmd *Command) error {
 		o.zlogger.Info("successfully put in maintenance")
 
 	case "restore":
-		restoreMod, err := selectRestoreModule(o.backupModules, cmd.params["name"])
+		restoreMod, err := selectRestoreModule(o.backupModules, GetCommandParamOr(cmd, "name", ""))
 		if err != nil {
 			cmd.Return(err)
 			return nil
@@ -222,12 +232,7 @@ func (o *Operator) runCommand(cmd *Command) error {
 			}
 		}
 
-		backupName := "latest"
-		if b, ok := cmd.params["backupName"]; ok {
-			backupName = b
-		}
-
-		if err := restoreMod.Restore(backupName); err != nil {
+		if err := restoreMod.Restore(GetCommandParamOr(cmd, "backupName", "latest")); err != nil {
 			return err
 		}
 
@@ -238,7 +243,7 @@ func (o *Operator) runCommand(cmd *Command) error {
 		return nil
 
 	case "backup":
-		backupMod, err := selectBackupModule(o.backupModules, cmd.params["name"])
+		backupMod, err := selectBackupModule(o.backupModules, GetCommandParamOr(cmd, "name", ""))
 		if err != nil {
 			cmd.Return(err)
 			return nil
@@ -379,6 +384,12 @@ func (o *Operator) runCommand(cmd *Command) error {
 			}
 		}
 
+		if value, found := cmd.params["extra-env"]; found {
+			if env, ok := value.(map[string]string); ok && len(env) > 0 {
+				options = append(options, nodeManager.ExtraEnvOption(env))
+			}
+		}
+
 		if err := o.Superviser.Start(options...); err != nil {
 			return fmt.Errorf("error starting chain superviser: %w", err)
 		}
@@ -419,7 +430,7 @@ func (o *Operator) LaunchBackupSchedules() {
 			}
 		}
 
-		cmdParams := map[string]string{"name": sched.BackuperName}
+		cmdParams := map[string]any{"name": sched.BackuperName}
 
 		if sched.TimeBetweenRuns > time.Second { //loose validation of not-zero (I've seen issues with .IsZero())
 			o.zlogger.Info("starting time-based schedule for backup",
@@ -438,7 +449,7 @@ func (o *Operator) LaunchBackupSchedules() {
 	}
 }
 
-func (o *Operator) RunEveryPeriod(period time.Duration, commandName string, params map[string]string) {
+func (o *Operator) RunEveryPeriod(period time.Duration, commandName string, params map[string]any) {
 	for {
 		time.Sleep(100 * time.Microsecond)
 
@@ -456,7 +467,7 @@ func (o *Operator) RunEveryPeriod(period time.Duration, commandName string, para
 	}
 }
 
-func (o *Operator) RunEveryXBlock(freq uint32, commandName string, params map[string]string) {
+func (o *Operator) RunEveryXBlock(freq uint32, commandName string, params map[string]any) {
 	var lastHeadReference uint64
 	for {
 		time.Sleep(1 * time.Second)
