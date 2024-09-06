@@ -13,6 +13,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 * Substreams: fix bad handling of modules with multiple inputs when only one of them is filtered, resulting in bad outputs in production-mode.
 * Substreams: fix stalling on some substreams with stores and mappers with different start block numbers on the same stage
 * Substreams: fix 'development mode' and LIVE mode executing some modules that should be skipped
+* Firehose: fix the endpoint in metering events for block streaming
 
 ## v1.6.1
 
