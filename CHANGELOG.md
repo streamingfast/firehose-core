@@ -8,9 +8,16 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.6.2
+
+### Core
 
 * [Operator] The flag `--advertise-block-id-encoding` now accepts shorter form: `hex`, `base64`, etc. The older longer form `BLOCK_ID_ENCODING_HEX` is still supported but we suggested using the shorter form from now on.
+
+### Substreams v1.10.2
+
+> **Note** Since a bug that affected substreams with "skipping blocks" was corrected in this release, any previously produced substreams cache should be considered as possibly corrupted and be eventually replaced
+
 * Substreams: fix bad handling of modules with multiple inputs when only one of them is filtered, resulting in bad outputs in production-mode.
 * Substreams: fix stalling on some substreams with stores and mappers with different start block numbers on the same stage
 * Substreams: fix 'development mode' and LIVE mode executing some modules that should be skipped
