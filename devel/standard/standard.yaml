@@ -7,6 +7,8 @@ start:
   - substreams-tier1
   - substreams-tier2
   flags:
+    advertise-block-id-encoding: "hex"
+    advertise-chain-name: "acme-dummy-blockchain"
     # Specifies the path to the binary, we assume you did
     # `go install github.com/streamingfast/dummy-blockchain@latest` (and that you have value
     # of `go env GOPATH` in your environment).

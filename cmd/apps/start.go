@@ -86,7 +86,16 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 
 	blockIDEncoding := pbfirehose.InfoResponse_BLOCK_ID_ENCODING_UNSET
 	if enc := sflags.MustGetString(cmd, "advertise-block-id-encoding"); enc != "" {
-		blockIDEncoding = pbfirehose.InfoResponse_BlockIdEncoding(pbfirehose.InfoResponse_BlockIdEncoding_value[enc])
+		v, found := pbfirehose.InfoResponse_BlockIdEncoding_value[enc]
+		if !found {
+			longCandidate := "BLOCK_ID_ENCODING_" + strings.ToUpper(enc)
+			v, found = pbfirehose.InfoResponse_BlockIdEncoding_value[longCandidate]
+			if !found {
+				return fmt.Errorf("invalid block id encoding: %s", enc)
+			}
+		}
+
+		blockIDEncoding = pbfirehose.InfoResponse_BlockIdEncoding(v)
 	}
 
 	infoServer := info.NewInfoServer(

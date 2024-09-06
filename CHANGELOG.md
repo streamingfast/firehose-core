@@ -10,6 +10,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+* [Operator] The flag `--advertise-block-id-encoding` now accepts shorter form: `hex`, `base64`, etc. The older longer form `BLOCK_ID_ENCODING_HEX` is still supported but we suggested using the shorter form from now on.
 * Substreams: fix bad handling of modules with multiple inputs when only one of them is filtered, resulting in bad outputs in production-mode.
 * Substreams: fix stalling on some substreams with stores and mappers with different start block numbers on the same stage
 * Substreams: fix 'development mode' and LIVE mode executing some modules that should be skipped
@@ -60,15 +61,15 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 #### Important Substreams BUG FIX
 
-* Fix a bug introduced in v1.6.0 that could result in corrupted store "state" file if all 
+* Fix a bug introduced in v1.6.0 that could result in corrupted store "state" file if all
   the "outputs" were already cached for a module in a given segment (rare occurence)
-* We recommend clearing your substreams cache after this upgrade and re-processing or 
+* We recommend clearing your substreams cache after this upgrade and re-processing or
   validating your data if you use stores.
 
 #### Added
 
 * Expose a new intrinsic to modules: `skip_empty_output`, which causes the module output to be skipped if it has zero bytes. (Watch out, a protobuf object with all its default values will have zero bytes)
-* Improve schedule order (faster time to first block) for substreams with multiple stages when starting mid-chain 
+* Improve schedule order (faster time to first block) for substreams with multiple stages when starting mid-chain
 
 ## v1.5.3
 

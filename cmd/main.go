@@ -182,11 +182,17 @@ func registerCommonFlags[B firecore.Block](chain *firecore.Chain[B]) {
 		i := 0
 		for encoding := range pbfirehose.InfoResponse_BlockIdEncoding_value {
 			if encoding != "BLOCK_ID_ENCODING_UNSET" {
-				acceptedEncodings[i] = encoding
+				acceptedEncodings[i] = strings.ToLower(strings.Replace(encoding, "BLOCK_ID_ENCODING_", "", 1))
 				i++
 			}
 		}
-		cmd.Flags().String("advertise-block-id-encoding", "", fmt.Sprintf("[firehose,substreams-tier1] Block ID encoding type to advertise in the Info Endpoint (%s). If unset, it may be inferred from the genesis block.", strings.Join(acceptedEncodings, ", ")))
+		cmd.Flags().String("advertise-block-id-encoding", "", FlagMultilineDescription(`
+			[firehose,substreams-tier1] Block ID encoding type to advertise in the Info Endpoint. If unset, it may be inferred
+			from the genesis block. Accepted encodings are: %s.
+
+			Previous versions accepted 'BLOCK_ID_ENCODING_<upper(encoding)>' as well, this still works but we
+			recommend using the short form lowercase version.
+		`, strings.Join(acceptedEncodings, ", ")))
 
 		cmd.Flags().String("common-index-store-url", firecore.IndexStoreURL, "[COMMON] Store URL where to read/write index files (if used on the chain).")
 		cmd.Flags().IntSlice("common-index-block-sizes", []int{100000, 10000, 1000, 100}, "Index bundle sizes that that are considered valid when looking for block indexes")
@@ -252,3 +258,7 @@ Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
 
 Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
 `
+
+func FlagMultilineDescription(input string, args ...any) string {
+	return cli.Dedent(fmt.Sprintf(input, args...))
+}
