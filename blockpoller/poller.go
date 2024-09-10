@@ -349,7 +349,7 @@ func (p *BlockPoller) fetchBlockWithHash(blkNum uint64, hash string) (*pbbstream
 	}
 
 	if skipped {
-		return nil, fmt.Errorf("block %d was skipped and sould not have been requested", blkNum)
+		return nil, fmt.Errorf("block %d was skipped and should not have been requested", blkNum)
 	}
 
 	if p.forceFinalityAfterBlocks != nil {
