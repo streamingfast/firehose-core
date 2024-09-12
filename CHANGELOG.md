@@ -10,6 +10,14 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Substreams fixes
+
+* Fix "cannot resolve 'old cursor' from files in passthrough mode" error on some requests with an old cursor
+* Fix handling of 'special case' substreams module with only "params" as its input: should not skip this execution (used in graph-node for head tracking) 
+  -> empty files in module cache with hash `d3b1920483180cbcd2fd10abcabbee431146f4c8` should be deleted for consistency
+
+### Core fixes
+
 * fix: reader-node-stdin not shutting down after receiving an EOF
 
 ## v1.6.2
