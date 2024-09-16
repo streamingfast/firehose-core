@@ -7,6 +7,7 @@ on:
     branches:
       - "develop"
       - "feature/*"
+      - "fix/*"
   workflow_dispatch:
 
 env:
