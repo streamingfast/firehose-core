@@ -195,7 +195,7 @@ func registerCommonFlags[B firecore.Block](chain *firecore.Chain[B]) {
 		`, strings.Join(acceptedEncodings, ", ")))
 
 		cmd.Flags().String("common-index-store-url", firecore.IndexStoreURL, "[COMMON] Store URL where to read/write index files (if used on the chain).")
-		cmd.Flags().IntSlice("common-index-block-sizes", []int{100000, 10000, 1000, 100}, "Index bundle sizes that that are considered valid when looking for block indexes")
+		cmd.Flags().IntSlice("common-index-block-sizes", []int{100000, 10000, 1000, 100}, "[COMMON] Index bundle sizes that that are considered valid when looking for block indexes")
 
 		cmd.Flags().Bool("common-blocks-cache-enabled", false, cli.FlagDescription(`
 			[COMMON] Use a disk cache to store the blocks data to disk and instead of keeping it in RAM. By enabling this, block's Protobuf content, in bytes,
