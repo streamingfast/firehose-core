@@ -20,10 +20,33 @@ import (
 	logplugin "github.com/streamingfast/firehose-core/node-manager/log_plugin"
 )
 
-type StartOption string
+type StartOptions struct {
+	EnableDebugDeepmind bool
+	ExtraEnv            map[string]string
+}
 
-var EnableDebugDeepmindOption = StartOption("enable-debug-firehose-logs")
-var DisableDebugDeepmindOption = StartOption("disable-debug-firehose-logs")
+type StartOption interface {
+	Apply(opts *StartOptions)
+}
+
+type startOptionFunc func(opts *StartOptions)
+
+func (f startOptionFunc) Apply(opts *StartOptions) {
+	f(opts)
+}
+
+var EnableDebugDeepmindOption = startOptionFunc(func(opts *StartOptions) {
+	opts.EnableDebugDeepmind = true
+})
+var DisableDebugDeepmindOption = startOptionFunc(func(opts *StartOptions) {
+	opts.EnableDebugDeepmind = false
+})
+
+type ExtraEnvOption map[string]string
+
+func (f ExtraEnvOption) Apply(opts *StartOptions) {
+	opts.ExtraEnv = map[string]string(f)
+}
 
 type ShutterInterface interface {
 	Shutdown(error)

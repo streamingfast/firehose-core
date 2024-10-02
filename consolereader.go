@@ -187,8 +187,7 @@ func (r *ConsoleReader) readInit(line string) error {
 	switch r.readerProtocolVersion {
 	// Implementation of RPC poller were set to use 1.0 so we keep support for it for now
 	case "1.0", "3.0":
-		r.logger.Info("console reader protocol version set", zap.String("version", r.readerProtocolVersion))
-
+		// Supported
 	default:
 		return fmt.Errorf("major version of Firehose exchange protocol is unsupported (expected: one of [1.0, 3.0], found %s), you are most probably running an incompatible version of the Firehose aware node client/node poller", r.readerProtocolVersion)
 	}
@@ -199,6 +198,11 @@ func (r *ConsoleReader) readInit(line string) error {
 	}
 
 	r.setProtoMessageType(protobufFullyQualifiedName)
+
+	r.logger.Info("console reader protocol version init",
+		zap.String("version", r.readerProtocolVersion),
+		zap.String("protobuf_fully_qualified_name", protobufFullyQualifiedName),
+	)
 
 	return nil
 }

@@ -16,6 +16,7 @@ package superviser
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -151,13 +152,9 @@ func (s *Superviser) LastSeenBlockNum() uint64 {
 }
 
 func (s *Superviser) Start(options ...nodeManager.StartOption) error {
+	var startOptions nodeManager.StartOptions
 	for _, opt := range options {
-		if opt == nodeManager.EnableDebugDeepmindOption {
-			s.setDeepMindDebug(true)
-		}
-		if opt == nodeManager.DisableDebugDeepmindOption {
-			s.setDeepMindDebug(false)
-		}
+		opt.Apply(&startOptions)
 	}
 
 	for _, plugin := range s.logPlugins {
@@ -179,17 +176,49 @@ func (s *Superviser) Start(options ...nodeManager.StartOption) error {
 		}
 	}
 
-	s.Logger.Info("creating new command instance and launch read loop", zap.String("binary", s.Binary), zap.Strings("arguments", s.Arguments))
-	var args []interface{}
-	for _, a := range s.Arguments {
-		args = append(args, a)
+	s.Logger.Info("creating new command instance and launch read loop",
+		zap.String("binary", s.Binary),
+		zap.Strings("arguments", s.Arguments),
+		zap.Any("env", ""))
+
+	env := s.Env
+	envToLog := []string{fmt.Sprintf("<inherited from process>={%d vars}", len(os.Environ()))}
+	if len(env) > 0 {
+		envToLog = env
 	}
 
-	s.cmd = overseer.NewCmd(s.Binary, s.Arguments, overseer.Options{Streaming: true, Env: s.Env})
+	if env == nil && len(startOptions.ExtraEnv) >= 1 {
+		// If there is extra env to add and the s.Env is nil, we need to inherit from the parent process
+		// otherwise, we would start with an empty env and have the extra env only.
+		env = os.Environ()
+	}
+
+	for k, v := range startOptions.ExtraEnv {
+		entry := fmt.Sprintf("%s=%s", k, v)
+
+		env = append(env, entry)
+		envToLog = append(envToLog, entry)
+	}
+
+	s.Logger.Info("creating new command instance and launch read loop",
+		zap.String("binary", s.Binary),
+		zap.Strings("arguments", s.Arguments),
+		zap.Any("env", explodeToMap(envToLog)))
+
+	s.cmd = overseer.NewCmd(s.Binary, s.Arguments, overseer.Options{Streaming: true, Env: env})
 
 	go s.start(s.cmd)
 
 	return nil
+}
+
+func explodeToMap(env []string) map[string]string {
+	out := make(map[string]string, len(env))
+	for _, entry := range env {
+		left, right, _ := strings.Cut(entry, "=")
+		out[left] = right
+	}
+	return out
 }
 
 func (s *Superviser) Stop() error {

@@ -20,6 +20,6 @@ start:
       start
       --tracer=firehose
       --store-dir="{node-data-dir}"
-      --block-rate=1200
+      --block-rate=120
       --genesis-height=0
       --genesis-block-burst=1000

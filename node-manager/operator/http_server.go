@@ -148,8 +148,8 @@ func (o *Operator) listBackupsHandler(w http.ResponseWriter, r *http.Request) {
 	o.triggerWebCommand("list", params, w, r)
 }
 
-func getRequestParams(r *http.Request, terms ...string) map[string]string {
-	params := make(map[string]string)
+func getRequestParams(r *http.Request, terms ...string) map[string]any {
+	params := make(map[string]any)
 	for _, p := range terms {
 		val := r.FormValue(p)
 		if val != "" {
@@ -168,18 +168,33 @@ func (o *Operator) maintenanceHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (o *Operator) resumeHandler(w http.ResponseWriter, r *http.Request) {
-	params := map[string]string{
+	params := map[string]any{
 		"debug-firehose-logs": r.FormValue("debug-firehose-logs"),
+	}
+
+	env := map[string]string{}
+	for _, rawValue := range r.Form["extra-env"] {
+		key, value, found := strings.Cut(rawValue, "=")
+		if !found {
+			http.Error(w, "invalid extra-env format, must be key=value", http.StatusBadRequest)
+			return
+		}
+
+		env[key] = value
 	}
 
 	if params["debug-firehose-logs"] == "" {
 		params["debug-firehose-logs"] = "false"
 	}
 
+	if len(env) > 0 {
+		params["extra-env"] = env
+	}
+
 	o.triggerWebCommand("resume", params, w, r)
 }
 
-func (o *Operator) triggerWebCommand(cmdName string, params map[string]string, w http.ResponseWriter, r *http.Request) {
+func (o *Operator) triggerWebCommand(cmdName string, params map[string]any, w http.ResponseWriter, r *http.Request) {
 	c := &Command{cmd: cmdName, logger: o.zlogger}
 	c.params = params
 	sync := r.FormValue("sync")
