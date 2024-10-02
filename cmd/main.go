@@ -23,6 +23,7 @@ import (
 	"github.com/streamingfast/firehose-core/cmd/tools"
 	"github.com/streamingfast/firehose-core/launcher"
 	paymentGatewayMetering "github.com/streamingfast/payment-gateway/metering"
+	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
@@ -72,7 +73,7 @@ func Main[B firecore.Block](chain *firecore.Chain[B]) {
 		flags.StringP("config-file", "c", "./firehose.yaml", "Configuration file to use. No config file loaded if set to an empty string.")
 
 		flags.String("log-format", "text", "Format for logging to stdout. Either 'text' or 'stackdriver'")
-		flags.Bool("log-to-file", true, "Also write logs to {data-dir}/firehose.log.json ")
+		flags.Bool("log-to-file", true, fmt.Sprintf("Also write logs to {data-dir}/%s ", launcher.DefaultLogFile))
 		flags.String("log-level-switcher-listen-addr", "localhost:1065", cli.FlagDescription(`
 			If non-empty, a JSON based HTTP server will listen on this address to let you switch the default logging level
 			of all registered loggers to a different one on the fly. This enables switching to debug level on
@@ -170,9 +171,31 @@ func registerCommonFlags[B firecore.Block](chain *firecore.Chain[B]) {
 		cmd.Flags().String("common-merged-blocks-store-url", firecore.MergedBlocksStoreURL, "[COMMON] Store URL where to read/write merged blocks.")
 		cmd.Flags().String("common-forked-blocks-store-url", firecore.ForkedBlocksStoreURL, "[COMMON] Store URL where to read/write forked block files that we want to keep.")
 		cmd.Flags().String("common-live-blocks-addr", firecore.RelayerServingAddr, "[COMMON] gRPC endpoint to get real-time blocks.")
+		cmd.Flags().String("common-tmp-dir", firecore.TmpDir, "[COMMON] Local directory to store temporary files")
+
+		cmd.Flags().String("advertise-chain-name", "", "[firehose,substreams-tier1] Chain name to advertise in the Info Endpoint. Required but it may be inferred from the genesis blocks.")
+		cmd.Flags().StringSlice("advertise-chain-aliases", nil, "[firehose,substreams-tier1] List of chain name aliases to advertise in the Info Endpoint. If unset, it may be inferred from the genesis blocks.")
+		cmd.Flags().StringSlice("advertise-block-features", nil, "[firehose,substreams-tier1] List of block features to advertise in the Info Endpoint. If unset, it may be inferred from the genesis block.")
+		cmd.Flags().Bool("ignore-advertise-validation", false, "[firehose,substreams-tier1] When true, runtime checks of chain name/features/encoding against the genesis block will no longer cause server to wait or fail.")
+
+		acceptedEncodings := make([]string, len(pbfirehose.InfoResponse_BlockIdEncoding_value)-1)
+		i := 0
+		for encoding := range pbfirehose.InfoResponse_BlockIdEncoding_value {
+			if encoding != "BLOCK_ID_ENCODING_UNSET" {
+				acceptedEncodings[i] = strings.ToLower(strings.Replace(encoding, "BLOCK_ID_ENCODING_", "", 1))
+				i++
+			}
+		}
+		cmd.Flags().String("advertise-block-id-encoding", "", FlagMultilineDescription(`
+			[firehose,substreams-tier1] Block ID encoding type to advertise in the Info Endpoint. If unset, it may be inferred
+			from the genesis block. Accepted encodings are: %s.
+
+			Previous versions accepted 'BLOCK_ID_ENCODING_<upper(encoding)>' as well, this still works but we
+			recommend using the short form lowercase version.
+		`, strings.Join(acceptedEncodings, ", ")))
 
 		cmd.Flags().String("common-index-store-url", firecore.IndexStoreURL, "[COMMON] Store URL where to read/write index files (if used on the chain).")
-		cmd.Flags().IntSlice("common-index-block-sizes", []int{100000, 10000, 1000, 100}, "Index bundle sizes that that are considered valid when looking for block indexes")
+		cmd.Flags().IntSlice("common-index-block-sizes", []int{100000, 10000, 1000, 100}, "[COMMON] Index bundle sizes that that are considered valid when looking for block indexes")
 
 		cmd.Flags().Bool("common-blocks-cache-enabled", false, cli.FlagDescription(`
 			[COMMON] Use a disk cache to store the blocks data to disk and instead of keeping it in RAM. By enabling this, block's Protobuf content, in bytes,
@@ -235,3 +258,7 @@ Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
 
 Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
 `
+
+func FlagMultilineDescription(input string, args ...any) string {
+	return cli.Dedent(fmt.Sprintf(input, args...))
+}

@@ -10,8 +10,8 @@ import (
 var Config map[string]*CommandConfig
 
 type CommandConfig struct {
-	Args  []string          `json:"args"`
-	Flags map[string]string `json:"flags"`
+	Args  []string       `json:"args"`
+	Flags map[string]any `json:"flags"`
 }
 
 // Load reads a YAML config, and sets the global DfuseConfig variable

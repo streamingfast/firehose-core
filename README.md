@@ -10,7 +10,7 @@ Or download the latest Release from https://github.com/streamingfast/firehose-co
 
 ## Running directly
 
-* firehose-core can run one or many of the following components:
+* `firehose-core` can run one or many of the following components:
   - reader-node
   - merger
   - relayer
@@ -33,6 +33,17 @@ start:
 
 * Run it with `firecore start --config-file=./firehose.yaml` or set an empty value for config-file (`--config-file=`) to use the default values.
 
+### Development
+
+For development purposes, the easiest set up is to install the [dummy-blockchain](https://github.com/streamingfast/dummy-blockchain) and then use the `./devel/standard/start.sh` script we provide in the repository that launches a full fledged `firehose-core` instance backed by this dummy blockchain:
+
+```
+# Needed only once, if you don't have the binary locally already
+go install github.com/streamingfast/dummy-blockchain@latest
+
+# The -c cleans any previous data, remove to keep data upon restarts
+./devel/standard/start.sh -c
+```
 
 ## Using as a library
 
@@ -40,7 +51,6 @@ For chains that implement "firehose block filters" and extensions like "eth_call
 
 * [firehose-ethereum](https://github.com/streamingfast/firehose-ethereum)
 * [firehose-antelope](https://github.com/pinax-network/firehose-antelope)
-
 
 ### Philosophy
 

@@ -2,6 +2,7 @@ package json
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -187,6 +188,10 @@ func (m *Marshaller) dynamicpbMessage(encoder *jsontext.Encoder, msg *dynamicpb.
 
 func ToBase58(encoder *jsontext.Encoder, t []byte, options json.Options) error {
 	return encoder.WriteToken(jsontext.String(base58.Encode(t)))
+}
+
+func ToBase64(encoder *jsontext.Encoder, t []byte, options json.Options) error {
+	return encoder.WriteToken(jsontext.String(base64.StdEncoding.EncodeToString(t)))
 }
 
 func ToHex(encoder *jsontext.Encoder, t []byte, options json.Options) error {

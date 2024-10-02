@@ -82,6 +82,11 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 				wasmExtensions = exts
 			}
 
+			tmpDir, err := firecore.GetTmpDir(runtime.AbsDataDir)
+			if err != nil {
+				return nil, fmt.Errorf("getting temporary directory: %w", err)
+			}
+
 			return app.NewTier2(appLogger,
 				&app.Tier2Config{
 					Tracing: tracing,
@@ -90,6 +95,7 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 					ServiceDiscoveryURL:   serviceDiscoveryURL,
 					WASMExtensions:        wasmExtensions,
 					BlockExecutionTimeout: executionTimeout,
+					TmpDir:                tmpDir,
 
 					MaximumConcurrentRequests: maximumConcurrentRequests,
 				}, &app.Tier2Modules{

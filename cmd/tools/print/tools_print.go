@@ -54,7 +54,7 @@ func NewToolsPrintCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra.Command
 	toolsPrintCmd.AddCommand(toolsPrintMergedBlocksCmd)
 
 	toolsPrintCmd.PersistentFlags().StringP("output", "o", "text", "Output mode for block printing, either 'text', 'json' or 'jsonl'")
-	toolsPrintCmd.PersistentFlags().String("bytes-encoding", "hex", "Encoding for bytes fields, either 'hex' or 'base58'")
+	toolsPrintCmd.PersistentFlags().String("bytes-encoding", "hex", "Encoding for bytes fields, either 'hex', 'base58' or 'base64'")
 	toolsPrintCmd.PersistentFlags().StringSlice("proto-paths", []string{""}, "Paths to proto files to use for dynamic decoding of blocks")
 	toolsPrintCmd.PersistentFlags().Bool("transactions", false, "When in 'text' output mode, also print transactions summary")
 
@@ -281,8 +281,13 @@ func SetupJsonMarshaller(cmd *cobra.Command, chainFileDescriptor protoreflect.Fi
 
 	var options []fcjson.MarshallerOption
 	bytesEncoding := sflags.MustGetString(cmd, "bytes-encoding")
+
 	if bytesEncoding == "base58" {
 		options = append(options, fcjson.WithBytesEncoderFunc(fcjson.ToBase58))
+	}
+
+	if bytesEncoding == "base64" {
+		options = append(options, fcjson.WithBytesEncoderFunc(fcjson.ToBase64))
 	}
 
 	return fcjson.NewMarshaller(registry, options...), nil

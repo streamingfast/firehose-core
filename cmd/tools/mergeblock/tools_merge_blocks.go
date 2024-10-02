@@ -24,8 +24,6 @@ func NewToolsMergeBlocksCmd[B firecore.Block](chain *firecore.Chain[B], zlog *za
 		RunE:  runMergeBlocksE(zlog),
 	}
 
-	cmd.Flags().String("force-block-type", "", "When set, will force the block type to the given value.")
-
 	return cmd
 }
 

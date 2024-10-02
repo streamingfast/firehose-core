@@ -6,6 +6,7 @@ import (
 	"runtime/debug"
 	"strings"
 
+	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"github.com/streamingfast/substreams/wasm"
 
 	"github.com/spf13/cobra"
@@ -154,6 +155,10 @@ type Chain[B Block] struct {
 	DefaultBlockType string
 
 	RegisterSubstreamsExtensions func() (wasm.WASMExtensioner, error)
+
+	// InfoResponseFiller is a function that fills the `pbfirehose.InfoResponse` from the first streamable block of the chain.
+	// It can validate that we are on the right chain by checking against a known hash, or populate missing fields.
+	InfoResponseFiller func(firstStreamableBlock *pbbstream.Block, resp *pbfirehose.InfoResponse, validate bool) error
 }
 
 type ToolsConfig[B Block] struct {
@@ -259,6 +264,10 @@ func (c *Chain[B]) Validate() {
 
 	if len(c.BlockIndexerFactories) > 1 {
 		err = multierr.Append(err, fmt.Errorf("field 'BlockIndexerFactories' must have at most one element"))
+	}
+
+	if c.InfoResponseFiller == nil {
+		err = multierr.Append(err, fmt.Errorf("field 'InfoResponseFiller' must be set"))
 	}
 
 	for key, indexerFactory := range c.BlockIndexerFactories {

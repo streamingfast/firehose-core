@@ -24,6 +24,8 @@ const (
 	AppStatusStopped
 )
 
+var ErrInvalidAppStatus = fmt.Errorf("not a valid AppStatus, try [%s]", strings.Join(_AppStatusNames, ", "))
+
 const _AppStatusName = "NotFoundCreatedRunningWarningStopped"
 
 var _AppStatusNames = []string{
@@ -57,6 +59,13 @@ func (x AppStatus) String() string {
 	return fmt.Sprintf("AppStatus(%d)", x)
 }
 
+// IsValid provides a quick way to determine if the typed value is
+// part of the allowed enumerated values
+func (x AppStatus) IsValid() bool {
+	_, ok := _AppStatusMap[x]
+	return ok
+}
+
 var _AppStatusValue = map[string]AppStatus{
 	_AppStatusName[0:8]:   AppStatusNotFound,
 	_AppStatusName[8:15]:  AppStatusCreated,
@@ -65,20 +74,20 @@ var _AppStatusValue = map[string]AppStatus{
 	_AppStatusName[29:36]: AppStatusStopped,
 }
 
-// ParseAppStatus attempts to convert a string to a AppStatus
+// ParseAppStatus attempts to convert a string to a AppStatus.
 func ParseAppStatus(name string) (AppStatus, error) {
 	if x, ok := _AppStatusValue[name]; ok {
 		return x, nil
 	}
-	return AppStatus(0), fmt.Errorf("%s is not a valid AppStatus, try [%s]", name, strings.Join(_AppStatusNames, ", "))
+	return AppStatus(0), fmt.Errorf("%s is %w", name, ErrInvalidAppStatus)
 }
 
-// MarshalText implements the text marshaller method
+// MarshalText implements the text marshaller method.
 func (x AppStatus) MarshalText() ([]byte, error) {
 	return []byte(x.String()), nil
 }
 
-// UnmarshalText implements the text unmarshaller method
+// UnmarshalText implements the text unmarshaller method.
 func (x *AppStatus) UnmarshalText(text []byte) error {
 	name := string(text)
 	tmp, err := ParseAppStatus(name)

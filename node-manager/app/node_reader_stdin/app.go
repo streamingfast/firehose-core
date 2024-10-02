@@ -158,6 +158,7 @@ func (a *App) Run() error {
 		}
 
 		a.zlogger.Info("done reading from stdin")
+		mindreaderLogPlugin.Shutdown(nil)
 	}()
 
 	return nil

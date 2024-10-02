@@ -16,7 +16,6 @@ type WellKnownType struct {
 }
 
 func RegisterWellKnownFileDescriptors(registry *Registry) error {
-
 	for _, wt := range wellKnownTypes {
 		fd, err := protoToFileDescriptor(registry, wt.proto)
 		if err != nil {

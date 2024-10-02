@@ -54,6 +54,7 @@ func getMergedBlockUpgrader(tweakFunc func(block *pbbstream.Block) (*pbbstream.B
 			LowBlockNum:  firecore.LowBoundary(start),
 			StopBlockNum: stop,
 			TweakBlock:   tweakFunc,
+			Logger:       rootLog,
 		}
 		stream := stream.New(nil, sourceStore, nil, int64(start), writer, stream.WithFinalBlocksOnly())
 

@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/streamingfast/dmetering"
+
+	"github.com/streamingfast/firehose-core/metering"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/bstream/transform"
 	"github.com/streamingfast/dauth"
-	"github.com/streamingfast/dmetering"
 	"github.com/streamingfast/dstore"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
@@ -44,7 +47,8 @@ func (sf *StreamFactory) New(
 	ctx context.Context,
 	handler bstream.Handler,
 	request *pbfirehose.Request,
-	logger *zap.Logger) (*stream.Stream, error) {
+	logger *zap.Logger,
+	extraOpts ...stream.Option) (*stream.Stream, error) {
 
 	reqLogger := logger.With(
 		zap.Int64("req_start_block", request.StartBlockNum),
@@ -108,21 +112,29 @@ func (sf *StreamFactory) New(
 	forkedBlocksStore := sf.forkedBlocksStore
 	if clonable, ok := forkedBlocksStore.(dstore.Clonable); ok {
 		var err error
-		forkedBlocksStore, err = clonable.Clone(ctx)
+		forkedBlocksStore, err = clonable.Clone(ctx, metering.WithForkedBlockBytesReadMeteringOptions(dmetering.GetBytesMeter(ctx), logger)...)
 		if err != nil {
 			return nil, err
 		}
+
+		//todo: (deprecated) remove this
 		forkedBlocksStore.SetMeter(dmetering.GetBytesMeter(ctx))
 	}
 
 	mergedBlocksStore := sf.mergedBlocksStore
 	if clonable, ok := mergedBlocksStore.(dstore.Clonable); ok {
 		var err error
-		mergedBlocksStore, err = clonable.Clone(ctx)
+		mergedBlocksStore, err = clonable.Clone(ctx, metering.WithBlockBytesReadMeteringOptions(dmetering.GetBytesMeter(ctx), logger)...)
 		if err != nil {
 			return nil, err
 		}
+
+		//todo: (deprecated) remove this
 		mergedBlocksStore.SetMeter(dmetering.GetBytesMeter(ctx))
+	}
+
+	for _, opt := range extraOpts {
+		options = append(options, opt)
 	}
 
 	str := stream.New(

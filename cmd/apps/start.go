@@ -26,7 +26,9 @@ import (
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dmetering"
 	firecore "github.com/streamingfast/firehose-core"
+	info "github.com/streamingfast/firehose-core/firehose/info"
 	"github.com/streamingfast/firehose-core/launcher"
+	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	tracing "github.com/streamingfast/sf-tracing"
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
@@ -45,7 +47,7 @@ func ConfigureStartCmd[B firecore.Block](chain *firecore.Chain[B], binaryName st
 		configFile := sflags.MustGetString(cmd, "config-file")
 		rootLog.Info(fmt.Sprintf("starting Firehose on %s with config file '%s'", chain.LongName, configFile))
 
-		err = start(cmd, dataDir, args, rootLog)
+		err = start(cmd, dataDir, args, chain, rootLog)
 		if err != nil {
 			return fmt.Errorf("unable to launch: %w", err)
 		}
@@ -55,7 +57,7 @@ func ConfigureStartCmd[B firecore.Block](chain *firecore.Chain[B], binaryName st
 	}
 }
 
-func start(cmd *cobra.Command, dataDir string, args []string, rootLog *zap.Logger) (err error) {
+func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, chain *firecore.Chain[B], rootLog *zap.Logger) (err error) {
 	dataDirAbs, err := filepath.Abs(dataDir)
 	if err != nil {
 		return fmt.Errorf("unable to setup directory structure: %w", err)
@@ -82,7 +84,32 @@ func start(cmd *cobra.Command, dataDir string, args []string, rootLog *zap.Logge
 	}()
 	dmetering.SetDefaultEmitter(eventEmitter)
 
-	launch := launcher.NewLauncher(rootLog, dataDirAbs)
+	blockIDEncoding := pbfirehose.InfoResponse_BLOCK_ID_ENCODING_UNSET
+	if enc := sflags.MustGetString(cmd, "advertise-block-id-encoding"); enc != "" {
+		v, found := pbfirehose.InfoResponse_BlockIdEncoding_value[enc]
+		if !found {
+			longCandidate := "BLOCK_ID_ENCODING_" + strings.ToUpper(enc)
+			v, found = pbfirehose.InfoResponse_BlockIdEncoding_value[longCandidate]
+			if !found {
+				return fmt.Errorf("invalid block id encoding: %s", enc)
+			}
+		}
+
+		blockIDEncoding = pbfirehose.InfoResponse_BlockIdEncoding(v)
+	}
+
+	infoServer := info.NewInfoServer(
+		sflags.MustGetString(cmd, "advertise-chain-name"),
+		sflags.MustGetStringSlice(cmd, "advertise-chain-aliases"),
+		blockIDEncoding,
+		sflags.MustGetStringSlice(cmd, "advertise-block-features"),
+		bstream.GetProtocolFirstStreamableBlock,
+		!sflags.MustGetBool(cmd, "ignore-advertise-validation"),
+		chain.InfoResponseFiller,
+		rootLog,
+	)
+
+	launch := launcher.NewLauncher(rootLog, dataDirAbs, infoServer)
 	rootLog.Debug("launcher created")
 
 	runByDefault := func(app string) bool {
