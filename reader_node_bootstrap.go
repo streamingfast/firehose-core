@@ -50,9 +50,18 @@ func DefaultReaderNodeBootstrapDataURLFlagDescription() string {
 			- interpreter=<path> | Use <path> as the interpreter to run the script
 			- interpreter_arg=<arg> | Pass <interpreter_arg> as arguments to the interpreter before the script path (multiple(s) allowed)
 
+		Security note: The script is executed as the same user as the reader node process, so it has the same
+		permissions as the reader node process. You **are** responsible of ensuring the script you execute is safe.
+
 		If the bootstrap URL ends with 'tar.zst' or 'tar.zstd', the archive is read and extracted into the
 		'reader-node-data-dir' location. The archive is expected to contain the full content of the 'reader-node-data-dir'
 		and is expanded as is.
+
+		Security note: The archive must be found a trusted source. The archive is uncompressed using the same
+		privileges as the reader node process. The paths in the archive are not sanitized and are extracted as is
+		relative to the 'reader-node-data-dir' location. A security consideration here is that it can unpack
+		file in parent directories, so the archive you unpack must be trusted. You **are** responsible of ensuring
+		the script you execute is safe.
 	`)
 }
 
