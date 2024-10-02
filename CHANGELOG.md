@@ -14,6 +14,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
   > This is **not** persistent upon restart!
 
+* [Metering] Revert undesired Firehose metric `Endpoint` changes, the correct new value used is `sf.firehose.v2.Firehose/Blocks` (had been mistakenly set to `sf.firehose.v2.Firehose/Block` between version v1.6.1 and v1.6.4 inclusively).
+
 ## v1.6.4
 
 ### Substreams fixes
@@ -47,7 +49,6 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 * Substreams: fix bad handling of modules with multiple inputs when only one of them is filtered, resulting in bad outputs in production-mode.
 * Substreams: fix stalling on some substreams with stores and mappers with different start block numbers on the same stage
 * Substreams: fix 'development mode' and LIVE mode executing some modules that should be skipped
-* Firehose: fix the endpoint in metering events for block streaming
 
 ## v1.6.1
 
