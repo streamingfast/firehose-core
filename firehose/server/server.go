@@ -79,7 +79,7 @@ func New(
 
 		meter := dmetering.GetBytesMeter(ctx)
 		auth := dauth.FromContext(ctx)
-		metering.Send(ctx, meter, auth.UserID(), auth.APIKeyID(), auth.RealIP(), auth.Meta(), "sf.firehose.v2.Firehose/Block", response)
+		metering.Send(ctx, meter, auth.UserID(), auth.APIKeyID(), auth.RealIP(), auth.Meta(), "sf.firehose.v2.Firehose/Blocks", response)
 	}
 
 	tracerProvider := otel.GetTracerProvider()
