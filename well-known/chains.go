@@ -30,6 +30,18 @@ type WellKnownProtocolList []WellKnownProtocol
 
 var WellKnownProtocols = WellKnownProtocolList([]WellKnownProtocol{
 	{
+		Name:          "acme",
+		BlockType:     "sf.acme.type.v1.Block",
+		BytesEncoding: pbfirehose.InfoResponse_BLOCK_ID_ENCODING_HEX,
+		KnownChains: []*Chain{
+			{
+				Name:               "acme-dummy-blockchain",
+				GenesisBlockID:     "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+				GenesisBlockNumber: 0,
+			},
+		},
+	},
+	{
 		Name:          "ethereum",
 		BlockType:     "sf.ethereum.type.v2.Block",
 		BufBuildURL:   "buf.build/streamingfast/firehose-ethereum",

@@ -108,6 +108,7 @@ func (s *InfoServer) getBlockFromMergedBlocksStore(ctx context.Context, blockNum
 			time.Sleep(time.Millisecond * 500)
 			continue
 		}
+
 		return block
 	}
 }

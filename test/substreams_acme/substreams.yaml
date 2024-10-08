@@ -1,0 +1,29 @@
+specVersion: v0.1.0
+package:
+  name: substreams_acme
+  version: v0.1.0
+
+protobuf:
+  files:
+    - testdata.proto
+    - sf/acme/type/v1/type.proto
+  importPaths:
+    - ./proto
+  excludePaths:
+    - sf/substreams
+    - google
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/substreams.wasm
+
+modules:
+ - name: map_test_data
+   kind: map
+   inputs:
+   - source: sf.acme.type.v1.Block
+   output :
+    type: proto:testdata.v1.TestData
+
+network: mainnet

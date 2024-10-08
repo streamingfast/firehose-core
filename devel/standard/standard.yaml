@@ -4,8 +4,6 @@ start:
   - merger
   - relayer
   - firehose
-  - substreams-tier1
-  - substreams-tier2
   flags:
     advertise-block-id-encoding: "hex"
     advertise-chain-name: "acme-dummy-blockchain"
