@@ -18,16 +18,22 @@ const (
 	PrintOutputModeJSON
 	// PrintOutputModeJSONL is a PrintOutputMode of type JSONL.
 	PrintOutputModeJSONL
+	// PrintOutputModeProtoJSON is a PrintOutputMode of type ProtoJSON.
+	PrintOutputModeProtoJSON
+	// PrintOutputModeProtoJSONL is a PrintOutputMode of type ProtoJSONL.
+	PrintOutputModeProtoJSONL
 )
 
 var ErrInvalidPrintOutputMode = fmt.Errorf("not a valid PrintOutputMode, try [%s]", strings.Join(_PrintOutputModeNames, ", "))
 
-const _PrintOutputModeName = "TextJSONJSONL"
+const _PrintOutputModeName = "TextJSONJSONLProtoJSONProtoJSONL"
 
 var _PrintOutputModeNames = []string{
 	_PrintOutputModeName[0:4],
 	_PrintOutputModeName[4:8],
 	_PrintOutputModeName[8:13],
+	_PrintOutputModeName[13:22],
+	_PrintOutputModeName[22:32],
 }
 
 // PrintOutputModeNames returns a list of possible string values of PrintOutputMode.
@@ -38,9 +44,11 @@ func PrintOutputModeNames() []string {
 }
 
 var _PrintOutputModeMap = map[PrintOutputMode]string{
-	PrintOutputModeText:  _PrintOutputModeName[0:4],
-	PrintOutputModeJSON:  _PrintOutputModeName[4:8],
-	PrintOutputModeJSONL: _PrintOutputModeName[8:13],
+	PrintOutputModeText:       _PrintOutputModeName[0:4],
+	PrintOutputModeJSON:       _PrintOutputModeName[4:8],
+	PrintOutputModeJSONL:      _PrintOutputModeName[8:13],
+	PrintOutputModeProtoJSON:  _PrintOutputModeName[13:22],
+	PrintOutputModeProtoJSONL: _PrintOutputModeName[22:32],
 }
 
 // String implements the Stringer interface.
@@ -59,12 +67,16 @@ func (x PrintOutputMode) IsValid() bool {
 }
 
 var _PrintOutputModeValue = map[string]PrintOutputMode{
-	_PrintOutputModeName[0:4]:                   PrintOutputModeText,
-	strings.ToLower(_PrintOutputModeName[0:4]):  PrintOutputModeText,
-	_PrintOutputModeName[4:8]:                   PrintOutputModeJSON,
-	strings.ToLower(_PrintOutputModeName[4:8]):  PrintOutputModeJSON,
-	_PrintOutputModeName[8:13]:                  PrintOutputModeJSONL,
-	strings.ToLower(_PrintOutputModeName[8:13]): PrintOutputModeJSONL,
+	_PrintOutputModeName[0:4]:                    PrintOutputModeText,
+	strings.ToLower(_PrintOutputModeName[0:4]):   PrintOutputModeText,
+	_PrintOutputModeName[4:8]:                    PrintOutputModeJSON,
+	strings.ToLower(_PrintOutputModeName[4:8]):   PrintOutputModeJSON,
+	_PrintOutputModeName[8:13]:                   PrintOutputModeJSONL,
+	strings.ToLower(_PrintOutputModeName[8:13]):  PrintOutputModeJSONL,
+	_PrintOutputModeName[13:22]:                  PrintOutputModeProtoJSON,
+	strings.ToLower(_PrintOutputModeName[13:22]): PrintOutputModeProtoJSON,
+	_PrintOutputModeName[22:32]:                  PrintOutputModeProtoJSONL,
+	strings.ToLower(_PrintOutputModeName[22:32]): PrintOutputModeProtoJSONL,
 }
 
 // ParsePrintOutputMode attempts to convert a string to a PrintOutputMode.

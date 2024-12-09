@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/cli"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/cmd/tools/check"
 	"github.com/streamingfast/firehose-core/cmd/tools/compare"
@@ -29,13 +30,37 @@ import (
 	"go.uber.org/zap"
 )
 
-var ToolsCmd = &cobra.Command{Use: "tools", Short: "Developer tools for operators and developers"}
+var ToolsCmd = &cobra.Command{
+	Use:   "tools",
+	Short: "Developer tools for operators and developers",
+}
 
 func ConfigureToolsCmd[B firecore.Block](
 	chain *firecore.Chain[B],
 	logger *zap.Logger,
 	tracer logging.Tracer,
 ) error {
+	if flags := ToolsCmd.PersistentFlags(); flags != nil {
+		flags.String("output", "", cli.Dedent(`
+			The default output printer to use to print responses and blocks across
+			tools sub-command.
+
+			If defined, has precedence over tools specific flags. Bytes encoding is
+			tried to be respected if possible, protojson and protojsonl are always
+			using base64 today for compatibility across Protobuf supported languages.
+
+			JSON and JSONL have the caveat to print enum value using the integer value
+			instead of the name which would be more convenient.
+
+			ProtoJSON and ProtoJSONL being able to print only Protobuf messages, they
+			are refused on commands that are not returning Protobuf messages.
+
+			One of: text, json, jsonl, protojson, protojsonl
+		`))
+
+		flags.String("bytes-encoding", "hex", "Encoding for bytes fields when printing in 'text', 'json' or 'jsonl' --output, either 'hex', 'base58' or 'base64'")
+		flags.StringSlice("proto-paths", []string{""}, "Paths to proto files to use for dynamic decoding of responses and blocks")
+	}
 
 	ToolsCmd.AddCommand(check.NewCheckCommand(chain, logger))
 	ToolsCmd.AddCommand(print2.NewToolsPrintCmd(chain))

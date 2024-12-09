@@ -73,9 +73,7 @@ func NewToolsCompareBlocksCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra
 
 	flags := cmd.PersistentFlags()
 	flags.Bool("diff", false, "When activated, difference is displayed for each block with a difference")
-	flags.String("bytes-encoding", "hex", "Encoding for bytes fields, either 'hex' or 'base58'")
 	flags.Bool("include-unknown-fields", false, "When activated, the 'unknown fields' in the protobuf message will also be compared. These would not generate any difference when unmarshalled with the current protobuf definition.")
-	flags.StringSlice("proto-paths", []string{""}, "Paths to proto files to use for dynamic decoding of blocks")
 
 	return cmd
 }

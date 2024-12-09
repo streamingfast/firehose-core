@@ -31,7 +31,12 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-func NewCheckCommand[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) *cobra.Command {
+// Super hackish way to get the *cobra.command needed for sflags call but where
+// CheckMergedBlocks public method doesn't receive the *cobra.Command
+var globalToolsCheckCmd *cobra.Command
+
+func NewCheckCommand[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) (out *cobra.Command) {
+	defer func() { globalToolsCheckCmd = out }()
 
 	toolsCheckCmd := &cobra.Command{Use: "check", Short: "Various checks for deployment, data integrity & debugging"}
 

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"strings"
 
 	"slices"
 
@@ -74,9 +75,9 @@ func (m *Marshaller) Marshal(in any) error {
 	return nil
 }
 
-func (m *Marshaller) MarshalToString(in any) (string, error) {
+func (m *Marshaller) MarshalToString(in any, jsonEncoderOption ...json.Options) (string, error) {
 	buf := bytes.NewBuffer(nil)
-	if err := json.MarshalEncode(jsontext.NewEncoder(buf), in, json.WithMarshalers(m.marshallers)); err != nil {
+	if err := json.MarshalEncode(jsontext.NewEncoder(buf, jsonEncoderOption...), in, json.WithMarshalers(m.marshallers)); err != nil {
 		return "", err
 	}
 	return buf.String(), nil
@@ -196,4 +197,32 @@ func ToBase64(encoder *jsontext.Encoder, t []byte, options json.Options) error {
 
 func ToHex(encoder *jsontext.Encoder, t []byte, options json.Options) error {
 	return encoder.WriteToken(jsontext.String(hex.EncodeToString(t)))
+}
+
+func EncodeBase58(bytes []byte) string {
+	return base58.Encode(bytes)
+}
+
+func EncodeBase64(bytes []byte) string {
+	return base64.StdEncoding.EncodeToString(bytes)
+}
+
+func EncodeHex(bytes []byte) string {
+	return hex.EncodeToString(bytes)
+}
+
+// Encode encodes the given bytes using the specified encoding.
+func Encode(bytesEncoding string, bytes []byte) string {
+	switch {
+	case strings.EqualFold(bytesEncoding, "base58"):
+		return base58.Encode(bytes)
+
+	case strings.EqualFold(bytesEncoding, "base64"):
+		return base64.StdEncoding.EncodeToString(bytes)
+
+	case strings.EqualFold(bytesEncoding, "hex"):
+		return hex.EncodeToString(bytes)
+	}
+
+	panic(fmt.Errorf("unsupported bytes encoding: %s", bytesEncoding))
 }

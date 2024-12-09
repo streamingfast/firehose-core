@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"strings"
 
+	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
 	"google.golang.org/protobuf/types/known/anypb"
 )
+
+var _ protoregistry.MessageTypeResolver = (*Registry)(nil)
+var _ protoregistry.ExtensionTypeResolver = (*Registry)(nil)
 
 // Generate the flags based on Go code in this project directly, this however
 // creates a chicken & egg problem if there is compilation error within the project
@@ -129,4 +133,24 @@ func urlToMessageFullName(url string) protoreflect.FullName {
 	}
 
 	return message
+}
+
+// FindMessageByName implements protoregistry.MessageTypeResolver.
+func (r *Registry) FindMessageByName(message protoreflect.FullName) (protoreflect.MessageType, error) {
+	return r.Types.FindMessageByName(message)
+}
+
+// FindMessageByURL implements protoregistry.MessageTypeResolver.
+func (r *Registry) FindMessageByURL(url string) (protoreflect.MessageType, error) {
+	return r.Types.FindMessageByURL(url)
+}
+
+// FindExtensionByName implements protoregistry.ExtensionTypeResolver.
+func (r *Registry) FindExtensionByName(field protoreflect.FullName) (protoreflect.ExtensionType, error) {
+	return r.Types.FindExtensionByName(field)
+}
+
+// FindExtensionByNumber implements protoregistry.ExtensionTypeResolver.
+func (r *Registry) FindExtensionByNumber(message protoreflect.FullName, field protowire.Number) (protoreflect.ExtensionType, error) {
+	return r.Types.FindExtensionByNumber(message, field)
 }

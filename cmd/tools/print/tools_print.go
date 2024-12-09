@@ -23,13 +23,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-	"github.com/streamingfast/cli/sflags"
+	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
-	fcjson "github.com/streamingfast/firehose-core/json"
-	"github.com/streamingfast/firehose-core/proto"
 	"github.com/streamingfast/firehose-core/types"
-	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 func NewToolsPrintCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra.Command {
@@ -53,9 +50,6 @@ func NewToolsPrintCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra.Command
 	toolsPrintCmd.AddCommand(toolsPrintOneBlockCmd)
 	toolsPrintCmd.AddCommand(toolsPrintMergedBlocksCmd)
 
-	toolsPrintCmd.PersistentFlags().StringP("output", "o", "text", "Output mode for block printing, either 'text', 'json' or 'jsonl'")
-	toolsPrintCmd.PersistentFlags().String("bytes-encoding", "hex", "Encoding for bytes fields, either 'hex', 'base58' or 'base64'")
-	toolsPrintCmd.PersistentFlags().StringSlice("proto-paths", []string{""}, "Paths to proto files to use for dynamic decoding of blocks")
 	toolsPrintCmd.PersistentFlags().Bool("transactions", false, "When in 'text' output mode, also print transactions summary")
 
 	toolsPrintOneBlockCmd.RunE = createToolsPrintOneBlockE(chain)
@@ -68,12 +62,8 @@ func createToolsPrintMergedBlocksE[B firecore.Block](chain *firecore.Chain[B]) f
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		outputMode, err := toolsPrintCmdGetOutputMode(cmd)
-		if err != nil {
-			return fmt.Errorf("invalid 'output' flag: %w", err)
-		}
-
-		printTransactions := sflags.MustGetBool(cmd, "transactions")
+		outputPrinter, err := GetOutputPrinter(cmd, chain.BlockFileDescriptor())
+		cli.NoError(err, "Unable to get output printer")
 
 		storeURL := args[0]
 		store, err := dstore.NewDBinStore(storeURL)
@@ -101,11 +91,6 @@ func createToolsPrintMergedBlocksE[B firecore.Block](chain *firecore.Chain[B]) f
 			return err
 		}
 
-		jencoder, err := SetupJsonMarshaller(cmd, chain.BlockFactory().ProtoReflect().Descriptor().ParentFile())
-		if err != nil {
-			return fmt.Errorf("unable to create json encoder: %w", err)
-		}
-
 		seenBlockCount := 0
 		for {
 			block, err := readerFactory.Read()
@@ -119,7 +104,7 @@ func createToolsPrintMergedBlocksE[B firecore.Block](chain *firecore.Chain[B]) f
 
 			seenBlockCount++
 
-			if err := displayBlock(block, chain, outputMode, printTransactions, jencoder); err != nil {
+			if err := displayBlock(block, chain, outputPrinter); err != nil {
 				// Error is ready to be passed to the user as-is
 				return err
 			}
@@ -131,17 +116,8 @@ func createToolsPrintOneBlockE[B firecore.Block](chain *firecore.Chain[B]) firec
 	return func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		outputMode, err := toolsPrintCmdGetOutputMode(cmd)
-		if err != nil {
-			return fmt.Errorf("invalid 'output' flag: %w", err)
-		}
-
-		printTransactions := sflags.MustGetBool(cmd, "transactions")
-
-		jencoder, err := SetupJsonMarshaller(cmd, chain.BlockFactory().ProtoReflect().Descriptor().ParentFile())
-		if err != nil {
-			return fmt.Errorf("unable to create json encoder: %w", err)
-		}
+		outputPrinter, err := GetOutputPrinter(cmd, chain.BlockFileDescriptor())
+		cli.NoError(err, "Unable to get output printer")
 
 		storeURL := args[0]
 		store, err := dstore.NewDBinStore(storeURL)
@@ -186,7 +162,7 @@ func createToolsPrintOneBlockE[B firecore.Block](chain *firecore.Chain[B]) firec
 				return fmt.Errorf("reading block: %w", err)
 			}
 
-			if err := displayBlock(block, chain, outputMode, printTransactions, jencoder); err != nil {
+			if err := displayBlock(block, chain, outputPrinter); err != nil {
 				// Error is ready to be passed to the user as-is
 				return err
 			}
@@ -195,31 +171,9 @@ func createToolsPrintOneBlockE[B firecore.Block](chain *firecore.Chain[B]) firec
 	}
 }
 
-//go:generate go-enum -f=$GOFILE --marshal --names --nocase
-
-type PrintOutputMode uint
-
-func toolsPrintCmdGetOutputMode(cmd *cobra.Command) (PrintOutputMode, error) {
-	outputModeRaw := sflags.MustGetString(cmd, "output")
-
-	var out PrintOutputMode
-	if err := out.UnmarshalText([]byte(outputModeRaw)); err != nil {
-		return out, fmt.Errorf("invalid value %q: %w", outputModeRaw, err)
-	}
-
-	return out, nil
-}
-
-func displayBlock[B firecore.Block](pbBlock *pbbstream.Block, chain *firecore.Chain[B], outputMode PrintOutputMode, printTransactions bool, encoder *fcjson.Marshaller) error {
+func displayBlock[B firecore.Block](pbBlock *pbbstream.Block, chain *firecore.Chain[B], printer OutputPrinter) error {
 	if pbBlock == nil {
 		return fmt.Errorf("block is nil")
-	}
-
-	if outputMode == PrintOutputModeText {
-		if err := PrintBStreamBlock(pbBlock, printTransactions, os.Stdout); err != nil {
-			return fmt.Errorf("pbBlock text printing: %w", err)
-		}
-		return nil
 	}
 
 	if !firecore.UnsafeRunningFromFirecore {
@@ -230,7 +184,7 @@ func displayBlock[B firecore.Block](pbBlock *pbbstream.Block, chain *firecore.Ch
 			return fmt.Errorf("pbBlock payload unmarshal: %w", err)
 		}
 
-		err := encoder.Marshal(marshallableBlock)
+		err := printer.PrintTo(marshallableBlock, os.Stdout)
 		if err != nil {
 			return fmt.Errorf("pbBlock JSON printing: json marshal: %w", err)
 		}
@@ -238,57 +192,10 @@ func displayBlock[B firecore.Block](pbBlock *pbbstream.Block, chain *firecore.Ch
 	}
 
 	// since we are running directly the firecore binary we will *NOT* use the BlockFactory
-	err := encoder.Marshal(pbBlock.Payload)
+	err := printer.PrintTo(pbBlock.Payload, os.Stdout)
 	if err != nil {
 		return fmt.Errorf("marshalling block to json: %w", err)
 	}
 
 	return nil
-}
-
-func PrintBStreamBlock(b *pbbstream.Block, printTransactions bool, out io.Writer) error {
-	_, err := out.Write(
-		[]byte(
-			fmt.Sprintf(
-				"Block #%d (%s)\n - Parent: #%d (%s)\n  - LIB: #%d\n  - Time: %s\n",
-				b.Number,
-				b.Id,
-				b.ParentNum,
-				b.ParentId,
-				b.LibNum,
-				b.Timestamp.AsTime(),
-			),
-		),
-	)
-	if err != nil {
-		return fmt.Errorf("writing block: %w", err)
-	}
-
-	if printTransactions {
-		if _, err = out.Write([]byte("warning: transaction printing not supported by bstream block")); err != nil {
-			return fmt.Errorf("writing transaction support warning: %w", err)
-		}
-	}
-
-	return nil
-}
-
-func SetupJsonMarshaller(cmd *cobra.Command, chainFileDescriptor protoreflect.FileDescriptor) (*fcjson.Marshaller, error) {
-	registry, err := proto.NewRegistry(chainFileDescriptor, sflags.MustGetStringSlice(cmd, "proto-paths")...)
-	if err != nil {
-		return nil, fmt.Errorf("new registry: %w", err)
-	}
-
-	var options []fcjson.MarshallerOption
-	bytesEncoding := sflags.MustGetString(cmd, "bytes-encoding")
-
-	if bytesEncoding == "base58" {
-		options = append(options, fcjson.WithBytesEncoderFunc(fcjson.ToBase58))
-	}
-
-	if bytesEncoding == "base64" {
-		options = append(options, fcjson.WithBytesEncoderFunc(fcjson.ToBase64))
-	}
-
-	return fcjson.NewMarshaller(registry, options...), nil
 }

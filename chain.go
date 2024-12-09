@@ -325,6 +325,13 @@ func (c *Chain[B]) LoggerPackageID(subPackage string) string {
 	return fmt.Sprintf("%s/%s", c.FullyQualifiedModule, subPackage)
 }
 
+// BlockFileDescriptor returns the `protoreflect.FileDescriptor` of the chain's block
+// extracted from the block factory defined on the chain. This would resolve for example
+// to Proto file descriptor `sf/ethereum/type/v2/type.proto` for Ethereum.
+func (c *Chain[B]) BlockFileDescriptor() protoreflect.FileDescriptor {
+	return c.BlockFactory().ProtoReflect().Descriptor().ParentFile()
+}
+
 // VersionString computes the version string that will be display when calling `firexxx --version`
 // and extract build information from Git via Golang `debug.ReadBuildInfo`.
 func (c *Chain[B]) VersionString() string {

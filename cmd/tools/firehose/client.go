@@ -1,6 +1,7 @@
 package firehose
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -24,10 +25,8 @@ func NewToolsFirehoseClientCmd[B firecore.Block](chain *firecore.Chain[B], logge
 
 	addFirehoseStreamClientFlagsToSet(cmd.Flags(), chain)
 
-	cmd.Flags().StringSlice("proto-paths", []string{""}, "Paths to proto files to use for dynamic decoding of blocks")
 	cmd.Flags().Bool("final-blocks-only", false, "Only ask for final blocks")
 	cmd.Flags().Bool("print-cursor-only", false, "Skip block decoding, only print the step cursor (useful for performance testing)")
-	cmd.Flags().String("bytes-encoding", "hex", "Encoding for bytes fields, either 'hex' or 'base58'")
 
 	return cmd
 }
@@ -90,9 +89,9 @@ func getFirehoseClientE[B firecore.Block](chain *firecore.Chain[B], rootLog *zap
 			}()
 		}
 
-		jencoder, err := print.SetupJsonMarshaller(cmd, chain.BlockFactory().ProtoReflect().Descriptor().ParentFile())
+		printer, err := print.GetOutputPrinter(cmd, chain.BlockFileDescriptor())
 		if err != nil {
-			return fmt.Errorf("unable to create json encoder: %w", err)
+			return fmt.Errorf("unable to create output printer: %w", err)
 		}
 
 		for {
@@ -116,12 +115,15 @@ func getFirehoseClientE[B firecore.Block](chain *firecore.Chain[B], rootLog *zap
 
 			// async process the response
 			go func() {
-				line, err := jencoder.MarshalToString(response)
+				buffer := bytes.NewBuffer(nil)
+				err := printer.PrintTo(response, buffer)
 				if err != nil {
 					rootLog.Error("marshalling to string", zap.Error(err))
+					resp.ch <- ""
+					return
 				}
 
-				resp.ch <- line
+				resp.ch <- buffer.String()
 			}()
 		}
 		if printCursorOnly {

@@ -3,12 +3,14 @@ package firehose
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/cli"
 	firecore "github.com/streamingfast/firehose-core"
-	"github.com/streamingfast/jsonpb"
+	"github.com/streamingfast/firehose-core/cmd/tools/print"
 	"github.com/streamingfast/logging"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
@@ -18,9 +20,16 @@ import (
 func NewToolsFirehoseSingleBlockClientCmd[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Logger, tracer logging.Tracer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "firehose-single-block-client {endpoint} {block_num|block_num:block_id|cursor}",
-		Short: "fetch a single block from firehose and print as JSON",
-		Args:  cobra.ExactArgs(2),
-		RunE:  getFirehoseSingleBlockClientE(chain, zlog, tracer),
+		Short: "Performs a FetchClient#Block call against a Firehose endpoint and print the response",
+		Long: string(cli.Description(`
+			Performs a sf.firehose.v2.Fetch/Block call against a Firehose endpoint and print the full response
+			object.
+
+			By default, the response is printed in JSON format, but you can use the --output flag to
+			choose a different output format (text, json, jsonl, protojson, protojsonl).
+		`)),
+		Args: cobra.ExactArgs(2),
+		RunE: getFirehoseSingleBlockClientE(chain, zlog, tracer),
 		Example: firecore.ExamplePrefixed(chain, "tools ", `
 			firehose-single-block-client --compression=gzip my.firehose.endpoint:443 2344:0x32d8e8d98a798da98d6as9d69899as86s9898d8ss8d87
 		`),
@@ -76,11 +85,11 @@ func getFirehoseSingleBlockClientE[B firecore.Block](chain *firecore.Chain[B], z
 			return err
 		}
 
-		line, err := jsonpb.MarshalToString(resp)
-		if err != nil {
-			return err
-		}
-		fmt.Println(line)
+		printer, err := print.GetOutputPrinter(cmd, chain.BlockFileDescriptor())
+		cli.NoError(err, "Unable to get output printer")
+
+		cli.NoError(printer.PrintTo(resp, os.Stdout), "Unable to print block")
+
 		return nil
 	}
 }

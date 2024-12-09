@@ -2,7 +2,6 @@ package check
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -181,6 +180,8 @@ func validateBlockSegment[B firecore.Block](
 		return
 	}
 
+	printer := print2.TextOutputPrinter{}
+
 	seenBlockCount := 0
 	for {
 		block, err := readerFactory.Read()
@@ -231,7 +232,7 @@ func validateBlockSegment[B firecore.Block](
 			seenBlockCount++
 
 			if printDetails == PrintStats {
-				err := print2.PrintBStreamBlock(block, false, os.Stdout)
+				err := printer.PrintTo(block, os.Stdout)
 				if err != nil {
 					fmt.Printf("❌ Unable to print block %s: %s\n", block.AsRef(), err)
 					continue
@@ -239,6 +240,12 @@ func validateBlockSegment[B firecore.Block](
 			}
 
 			if printDetails == PrintFull {
+				printer, err := print2.GetOutputPrinter(globalToolsCheckCmd, chain.BlockFileDescriptor())
+				if err != nil {
+					fmt.Printf("❌ Unable to create output printer: %s\n", err)
+					break
+				}
+
 				var b = chain.BlockFactory()
 
 				if _, ok := b.(*pbbstream.Block); ok {
@@ -251,14 +258,11 @@ func validateBlockSegment[B firecore.Block](
 					break
 				}
 
-				out, err := json.MarshalIndent(b, "", "  ")
-
+				err = printer.PrintTo(b, os.Stdout)
 				if err != nil {
 					fmt.Printf("❌ Unable to print full block %s: %s\n", block.AsRef(), err)
 					continue
 				}
-
-				fmt.Println(string(out))
 			}
 
 			continue
