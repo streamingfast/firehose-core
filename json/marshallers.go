@@ -242,7 +242,7 @@ func Encoder(bytesEncoding string) func([]byte) string {
 	panic(fmt.Errorf("unsupported bytes encoding: %s", bytesEncoding))
 }
 
-func jsonEncoder(bytesEncoding string) jsonEncoderFunc {
+func jsonEncoder(bytesEncoding string) CustomEncoderFunc {
 	switch {
 	case strings.EqualFold(bytesEncoding, "base58"):
 		return ToBase58
