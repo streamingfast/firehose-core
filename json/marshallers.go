@@ -26,11 +26,13 @@ type kv struct {
 	value any
 }
 
+type CustomEncoderFunc func(encoder *jsontext.Encoder, t []byte, options json.Options) error
+
 type Marshaller struct {
 	marshallers          *json.Marshalers
 	includeUnknownFields bool
 	registry             *proto.Registry
-	bytesEncoderFunc     func(encoder *jsontext.Encoder, t []byte, options json.Options) error
+	bytesEncoderFunc     CustomEncoderFunc
 }
 
 type MarshallerOption func(*Marshaller)
@@ -40,7 +42,15 @@ func WithoutUnknownFields() MarshallerOption {
 		e.includeUnknownFields = false
 	}
 }
-func WithBytesEncoderFunc(f func(encoder *jsontext.Encoder, t []byte, options json.Options) error) MarshallerOption {
+
+func WithBytesEncoding(bytesEncoding string) MarshallerOption {
+	return withBytesEncoderFunc(jsonEncoder(bytesEncoding))
+}
+
+// Deprecated: Use WithBytesEncoding instead passing the encoding directly.
+var WithBytesEncoderFunc = withBytesEncoderFunc
+
+func withBytesEncoderFunc(f CustomEncoderFunc) MarshallerOption {
 	return func(e *Marshaller) {
 		e.bytesEncoderFunc = f
 	}
@@ -125,8 +135,7 @@ func (m *Marshaller) dynamicpbMessage(encoder *jsontext.Encoder, msg *dynamicpb.
 		x := msg.GetUnknown()
 		fieldNumber, ofType, l := protowire.ConsumeField(x)
 		if l > 0 {
-			var unknownValue []byte
-			unknownValue = x[:l]
+			unknownValue := x[:l]
 			kvl = append(kvl, &kv{
 				key:   fmt.Sprintf("__unknown_fields_%d_with_type_%d__", fieldNumber, ofType),
 				value: hex.EncodeToString(unknownValue),
@@ -213,15 +222,36 @@ func EncodeHex(bytes []byte) string {
 
 // Encode encodes the given bytes using the specified encoding.
 func Encode(bytesEncoding string, bytes []byte) string {
+	return Encoder(bytesEncoding)(bytes)
+}
+
+// Encoder returns the encoder function that will converts received bytes
+// into a string of the specified encoding.
+func Encoder(bytesEncoding string) func([]byte) string {
 	switch {
 	case strings.EqualFold(bytesEncoding, "base58"):
-		return base58.Encode(bytes)
+		return base58.Encode
 
 	case strings.EqualFold(bytesEncoding, "base64"):
-		return base64.StdEncoding.EncodeToString(bytes)
+		return base64.StdEncoding.EncodeToString
 
 	case strings.EqualFold(bytesEncoding, "hex"):
-		return hex.EncodeToString(bytes)
+		return hex.EncodeToString
+	}
+
+	panic(fmt.Errorf("unsupported bytes encoding: %s", bytesEncoding))
+}
+
+func jsonEncoder(bytesEncoding string) jsonEncoderFunc {
+	switch {
+	case strings.EqualFold(bytesEncoding, "base58"):
+		return ToBase58
+
+	case strings.EqualFold(bytesEncoding, "base64"):
+		return ToBase64
+
+	case strings.EqualFold(bytesEncoding, "hex"):
+		return ToHex
 	}
 
 	panic(fmt.Errorf("unsupported bytes encoding: %s", bytesEncoding))

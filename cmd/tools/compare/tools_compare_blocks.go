@@ -30,7 +30,7 @@ import (
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/cmd/tools/check"
-	"github.com/streamingfast/firehose-core/json"
+	fcjson "github.com/streamingfast/firehose-core/json"
 	fcproto "github.com/streamingfast/firehose-core/proto"
 	"github.com/streamingfast/firehose-core/types"
 	"go.uber.org/multierr"
@@ -361,16 +361,16 @@ func Compare(reference proto.Message, current proto.Message, includeUnknownField
 
 	//todo: check if there is a equals that do not compare unknown fields
 	if !proto.Equal(reference, current) {
-		var opts []json.MarshallerOption
+		var opts []fcjson.MarshallerOption
 		if !includeUnknownFields {
-			opts = append(opts, json.WithoutUnknownFields())
+			opts = append(opts, fcjson.WithoutUnknownFields())
 		}
 
-		if bytesEncoding == "base58" {
-			opts = append(opts, json.WithBytesEncoderFunc(json.ToBase58))
+		if bytesEncoding != "" {
+			opts = append(opts, fcjson.WithBytesEncoding(bytesEncoding))
 		}
 
-		encoder := json.NewMarshaller(registry, opts...)
+		encoder := fcjson.NewMarshaller(registry, opts...)
 
 		referenceAsJSON, err := encoder.MarshalToString(reference)
 		cli.NoError(err, "marshal JSON reference")

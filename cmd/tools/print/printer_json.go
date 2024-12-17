@@ -34,12 +34,8 @@ type JSONOutputPrinter struct {
 func NewJSONOutputPrinter(bytesEncoding string, singleLine bool, registry *fcproto.Registry) (OutputPrinter, error) {
 	var options []fcjson.MarshallerOption
 
-	if bytesEncoding == "base58" {
-		options = append(options, fcjson.WithBytesEncoderFunc(fcjson.ToBase58))
-	}
-
-	if bytesEncoding == "base64" {
-		options = append(options, fcjson.WithBytesEncoderFunc(fcjson.ToBase64))
+	if bytesEncoding != "" {
+		options = append(options, fcjson.WithBytesEncoding(bytesEncoding))
 	}
 
 	return &JSONOutputPrinter{
