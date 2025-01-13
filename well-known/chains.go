@@ -215,7 +215,7 @@ var WellKnownProtocols = WellKnownProtocolList([]WellKnownProtocol{
 		BytesEncoding: pbfirehose.InfoResponse_BLOCK_ID_ENCODING_HEX, // even though the usual encoding is base64url, firehose blocks are written with the hex-encoded version
 		KnownChains: []*Chain{
 			{
-				Name:               "arweave",
+				Name:               "arweave-mainnet",
 				Aliases:            []string{},
 				GenesisBlockID:     "ef0214ecaa252020230a5325719dfc2d9cec86123bc46926dad0c2251ed6be17b7112528dbe678fb2d31d6e6a0951244",
 				GenesisBlockNumber: 0,
