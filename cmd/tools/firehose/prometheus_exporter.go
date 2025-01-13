@@ -53,7 +53,7 @@ func runPrometheusExporterE[B firecore.Block](chain *firecore.Chain[B], zlog *za
 			StartBlockNum:   start,
 			StopBlockNum:    stop,
 			Transforms:      requestInfo.Transforms,
-			FinalBlocksOnly: true,
+			FinalBlocksOnly: false,
 			Cursor:          requestInfo.Cursor,
 		}
 
@@ -61,6 +61,7 @@ func runPrometheusExporterE[B firecore.Block](chain *firecore.Chain[B], zlog *za
 		prometheus.MustRegister(propagationDelay)
 		prometheus.MustRegister(driftSec)
 
+		zlog.Info("starting firehose prometheus exporter", zap.String("endpoint", endpoint), zap.Reflect("request", request))
 		// update the drift based on last time
 		go func() {
 			for {
