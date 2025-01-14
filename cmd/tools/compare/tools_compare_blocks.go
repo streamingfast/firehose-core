@@ -198,8 +198,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 
 						var isDifferent bool
 						if existsInCurrent {
-							var differences []string
-							differences = Compare(referenceBlock, currentBlock, includeUnknownFields, registry, bytesEncoding)
+							differences := Compare(referenceBlock, currentBlock, includeUnknownFields, registry, bytesEncoding)
 
 							isDifferent = len(differences) > 0
 
@@ -225,6 +224,11 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 			return fmt.Errorf("walking files: %w", err)
 		}
 		processState.print()
+
+		if processState.totalDifferencesFound > 0 {
+			fmt.Println()
+			fmt.Println("Re-run with --diff <specific-range> flag to see differences over a specific range of block")
+		}
 
 		return nil
 	}
@@ -295,7 +299,9 @@ type state struct {
 	blocksCountedInThisSegment int
 	differencesFound           int
 	missingBlocks              int
-	totalBlocksCounted         int
+
+	totalBlocksCounted    int
+	totalDifferencesFound int
 }
 
 func (s *state) process(blockNum uint64, isDifferent bool, isMissing bool) {
@@ -317,8 +323,8 @@ func (s *state) process(blockNum uint64, isDifferent bool, isMissing bool) {
 		s.missingBlocks++
 	} else if isDifferent {
 		s.differencesFound++
+		s.totalDifferencesFound++
 	}
-
 }
 
 func (s *state) print() {
@@ -339,7 +345,7 @@ func (s *state) print() {
 		return
 	}
 
-	fmt.Printf("✖ Segment %d - %s has %d different blocks and %d missing blocks (%d blocks counted)\n", s.segments[s.currentSegmentIdx].Start, endBlock, s.differencesFound, s.missingBlocks, s.totalBlocksCounted)
+	fmt.Printf("✖ Segment %d - %s has %d different blocks!and %d missing blocks (%d blocks counted)\n", s.segments[s.currentSegmentIdx].Start, endBlock, s.differencesFound, s.missingBlocks, s.totalBlocksCounted)
 }
 
 func Compare(reference proto.Message, current proto.Message, includeUnknownFields bool, registry *fcproto.Registry, bytesEncoding string) (differences []string) {
@@ -353,10 +359,10 @@ func Compare(reference proto.Message, current proto.Message, includeUnknownField
 	referenceMsg := reference.ProtoReflect()
 	currentMsg := current.ProtoReflect()
 	if referenceMsg.IsValid() && !currentMsg.IsValid() {
-		return []string{fmt.Sprintf("reference block is valid protobuf message, but current block is invalid")}
+		return []string{"reference block is valid protobuf message, but current block is invalid"}
 	}
 	if !referenceMsg.IsValid() && currentMsg.IsValid() {
-		return []string{fmt.Sprintf("reference block is invalid protobuf message, but current block is valid")}
+		return []string{"reference block is invalid protobuf message, but current block is valid"}
 	}
 
 	//todo: check if there is a equals that do not compare unknown fields
