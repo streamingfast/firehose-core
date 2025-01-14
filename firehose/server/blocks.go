@@ -5,9 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"os"
+	"strings"
 	"time"
 
+	connect "connectrpc.com/connect"
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/bstream/stream"
@@ -19,16 +22,15 @@ import (
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func (s *Server) Block(ctx context.Context, request *pbfirehose.SingleBlockRequest) (*pbfirehose.SingleBlockResponse, error) {
+func (s *Server) Block(ctx context.Context, request *connect.Request[pbfirehose.SingleBlockRequest]) (*connect.Response[pbfirehose.SingleBlockResponse], error) {
 	var blockNum uint64
 	var blockHash string
-	switch ref := request.Reference.(type) {
+	switch ref := request.Msg.Reference.(type) {
 	case *pbfirehose.SingleBlockRequest_BlockHashAndNumber_:
 		blockNum = ref.BlockHashAndNumber.Num
 		blockHash = ref.BlockHashAndNumber.Hash
@@ -71,14 +73,21 @@ func (s *Server) Block(ctx context.Context, request *pbfirehose.SingleBlockReque
 	auth := dauth.FromContext(ctx)
 	metering.Send(ctx, meter, auth.UserID(), auth.APIKeyID(), auth.RealIP(), auth.Meta(), "sf.firehose.v2.Firehose/Block", resp)
 
-	return resp, nil
+	return connect.NewResponse(resp), nil
 }
 
-func (s *Server) Blocks(request *pbfirehose.Request, streamSrv pbfirehose.Stream_BlocksServer) error {
-	ctx := streamSrv.Context()
+// Blocks(context.Context, *connect.Request[v2.Request], *connect.ServerStream[v2.Response]) error
+func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose.Request], streamSrv *connect.ServerStream[pbfirehose.Response]) error {
 	metrics.RequestCounter.Inc()
 
 	logger := logging.Logger(ctx, s.logger)
+
+	if !matchHeader(request.Header(), acceptedCompressionValues) {
+		if s.enforceCompression {
+			return status.Error(codes.InvalidArgument, "client does not support compression")
+		}
+		logger.Info("client does not support compression")
+	}
 
 	if s.rateLimiter != nil {
 		rlCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -102,10 +111,7 @@ func (s *Server) Blocks(request *pbfirehose.Request, streamSrv pbfirehose.Stream
 			hostname = "unknown"
 			logger.Warn("cannot determine hostname, using 'unknown'", zap.Error(err))
 		}
-		md := metadata.New(map[string]string{"hostname": hostname})
-		if err := streamSrv.SendHeader(md); err != nil {
-			logger.Warn("cannot send metadata header", zap.Error(err))
-		}
+		streamSrv.ResponseHeader().Add("hostname", hostname)
 	}
 
 	var blockCount uint64
@@ -123,7 +129,7 @@ func (s *Server) Blocks(request *pbfirehose.Request, streamSrv pbfirehose.Stream
 			obj = block.Payload
 		}
 
-		protoStep, skip := stepToProto(step, request.FinalBlocksOnly)
+		protoStep, skip := stepToProto(step, request.Msg.FinalBlocksOnly)
 		if skip {
 			return nil
 		}
@@ -175,7 +181,7 @@ func (s *Server) Blocks(request *pbfirehose.Request, streamSrv pbfirehose.Stream
 		return nil
 	})
 
-	if len(request.Transforms) > 0 && s.transformRegistry == nil {
+	if len(request.Msg.Transforms) > 0 && s.transformRegistry == nil {
 		return status.Errorf(codes.Unimplemented, "no transforms registry configured within this instance")
 	}
 
@@ -209,11 +215,11 @@ func (s *Server) Blocks(request *pbfirehose.Request, streamSrv pbfirehose.Stream
 		})
 	}
 
-	ctx = s.initFunc(ctx, request)
+	ctx = s.initFunc(ctx, request.Msg)
 	str, err := s.streamFactory.New(
 		ctx,
 		handlerFunc,
-		request,
+		request.Msg,
 		logger,
 		stream.WithLiveSourceHandlerMiddleware(liveSourceMiddlewareHandler),
 		stream.WithFileSourceHandlerMiddleware(fileSourceMiddlewareHandler),
@@ -293,4 +299,23 @@ func stepToProto(step bstream.StepType, finalBlocksOnly bool) (outStep pbfirehos
 		return pbfirehose.ForkStep_STEP_UNDO, false
 	}
 	return 0, true // simply skip irreversible or stalled here
+}
+
+// must be lowercase
+var compressionHeader = map[string]bool{"grpc-accept-encoding": true, "connect-accept-encoding": true}
+var acceptedCompressionValues = map[string]bool{"gzip": true, "zstd": true}
+
+func matchHeader(headers http.Header, expected map[string]bool) bool {
+	for k, v := range headers {
+		if compressionHeader[strings.ToLower(k)] {
+			for _, vv := range v {
+				for _, vvv := range strings.Split(vv, ",") {
+					if expected[strings.TrimSpace(strings.ToLower(vvv))] {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
 }

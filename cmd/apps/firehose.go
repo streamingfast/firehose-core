@@ -35,6 +35,7 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 			cmd.Flags().String("firehose-discovery-service-url", "", "Url to configure the gRPC discovery service") //traffic-director://xds?vpc_network=vpc-global&use_xds_reds=true
 			cmd.Flags().Int("firehose-rate-limit-bucket-size", -1, "Rate limit bucket size (default: no rate limit)")
 			cmd.Flags().Duration("firehose-rate-limit-bucket-fill-rate", 10*time.Second, "Rate limit bucket refill rate (default: 10s)")
+			cmd.Flags().Bool("firehose-enforce-compression", true, "Reject any request that does not accept gzip or zstd encoding in their GRPC/Connect header")
 
 			return nil
 		},
@@ -79,6 +80,10 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 			}
 
 			var serverOptions []server.Option
+
+			if viper.GetBool("firehose-enforce-compression") {
+				serverOptions = append(serverOptions, server.WithEnforceCompression(true))
+			}
 
 			limiterSize := viper.GetInt("firehose-rate-limit-bucket-size")
 			limiterRefillRate := viper.GetDuration("firehose-rate-limit-bucket-fill-rate")
