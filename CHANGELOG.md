@@ -8,6 +8,14 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+* Enhanced `firecore tools print merged-blocks` with various small quality of life improvements:
+  - Now accepts a block range instead of a single start block.
+  - Passing a single block as the block range will print this single block alone.
+  - Block range is now optional, defaulting to run until there is no more files to read.
+  - It's possible to pass a merged blocks file directly, with or without an optional range.
+
 ## v1.6.9
 
 ### Substreams
@@ -19,7 +27,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## v1.6.8
 
-> [!NOTE]  
+> [!NOTE]
 > This release will reject connections from clients that don't support GZIP compression. Use `--substreams-tier1-enforce-compression=false` to keep previous behavior, then check the logs for `incoming Substreams Blocks request` logs with the value `compressed: false` to track users who are not using compressed HTTP connections.
 
 * Substreams: add `--substreams-tier1-enforce-compression` to reject connections from clients that do not support GZIP compression

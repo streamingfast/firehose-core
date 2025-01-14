@@ -75,6 +75,14 @@ func (b BlockRange) GetStopBlockOr(defaultIfOpenRange uint64) uint64 {
 	return *b.Stop
 }
 
+func (b BlockRange) MustGetStopBlock() uint64 {
+	if b.IsOpen() {
+		panic("cannot get stop block of an open range")
+	}
+
+	return *b.Stop
+}
+
 func (b BlockRange) ReprocRange() string {
 	if !b.IsClosed() {
 		return "<Invalid Unbounded Range>"
