@@ -40,6 +40,7 @@ func (o *Operator) RunHTTPServer(httpListenAddr string, options ...HTTPOption) *
 	r.HandleFunc("/v1/restore", o.restoreHandler).Methods("POST")
 	r.HandleFunc("/v1/list_backups", o.listBackupsHandler).Methods("GET")
 	r.HandleFunc("/v1/reload", o.reloadHandler).Methods("POST")
+	r.HandleFunc("/v1/restart", o.reloadHandler).Methods("POST")
 	r.HandleFunc("/v1/safely_reload", o.safelyReloadHandler).Methods("POST")
 	r.HandleFunc("/v1/safely_pause_production", o.safelyPauseProdHandler).Methods("POST")
 	r.HandleFunc("/v1/safely_resume_production", o.safelyResumeProdHandler).Methods("POST")

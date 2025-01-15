@@ -10,6 +10,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Reader
+
+* Reader Node Manager HTTP API now accepts `POST http://localhost:10011/v1/restart<?sync=true>` to restart the underlying reader node binary sub-process. This is a alias for `/v1/reload`.
+
 ### Tools
 
 * Enhanced `firecore tools print merged-blocks` with various small quality of life improvements:
@@ -24,7 +28,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 > This release will reject firehose connections from clients that don't support GZIP or ZSTD compression. Use `--firehose-enforce-compression=false` to keep previous behavior, then check the logs for `incoming Substreams Blocks request` logs with the value `compressed: false` to track users who are not using compressed HTTP connections.
 
 > [!IMPORTANT]
-> This release removes the old `sf.firehose.v1` protocol (replaced by `sf.firehose.v2` in 2022, this should not affect any reasonably recent client)
+> This release removes the old `sf.firehose.v1` protocol (replaced by `sf.firehose.v2` in 2022, this should not affect any reasonably recent client).
 
 * Add support for ConnectWeb firehose requests.
 * Always use gzip compression on firehose requests for clients that support it (instead of always answering with the same compression as the request).

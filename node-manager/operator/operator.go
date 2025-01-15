@@ -268,7 +268,7 @@ func (o *Operator) runCommand(cmd *Command) error {
 		}
 		return nil
 
-	case "reload":
+	case "reload", "restart":
 		o.zlogger.Info("preparing for reload")
 		if err := o.cleanSuperviserStop(); err != nil {
 			return err
