@@ -10,25 +10,42 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Tools
+
 * Enhanced `firecore tools print merged-blocks` with various small quality of life improvements:
   - Now accepts a block range instead of a single start block.
   - Passing a single block as the block range will print this single block alone.
   - Block range is now optional, defaulting to run until there is no more files to read.
   - It's possible to pass a merged blocks file directly, with or without an optional range.
 
+### Firehose
+
+> [!IMPORTANT]
+> This release will reject firehose connections from clients that don't support GZIP or ZSTD compression. Use `--firehose-enforce-compression=false` to keep previous behavior, then check the logs for `incoming Substreams Blocks request` logs with the value `compressed: false` to track users who are not using compressed HTTP connections.
+
+> [!IMPORTANT]
+> This release removes the old `sf.firehose.v1` protocol (replaced by `sf.firehose.v2` in 2022, this should not affect any reasonably recent client)
+
+* Add support for ConnectWeb firehose requests.
+* Always use gzip compression on firehose requests for clients that support it (instead of always answering with the same compression as the request).
+
 ## v1.6.9
 
 ### Substreams
 
 * Fix an issue preventing proper detection of gzip compression when multiple headers are set (ex: python grpc client)
+* Add support for zstd compression on server
 * Fix an issue preventing some tier2 requests on last-stage from correctly generating stores. This could lead to some missing "backfilling" jobs and slower time to first block on reconnection.
 * Fix a thread leak on cursor resolution resulting in bad counter for active connections
-* Add support for zstd encoding on server
 
 ## v1.6.8
 
 > [!NOTE]
+<<<<<<< HEAD
 > This release will reject connections from clients that don't support GZIP compression. Use `--substreams-tier1-enforce-compression=false` to keep previous behavior, then check the logs for `incoming Substreams Blocks request` logs with the value `compressed: false` to track users who are not using compressed HTTP connections.
+=======
+> This release will reject substreams connections from clients that don't support GZIP compression. Use `--substreams-tier1-enforce-compression=false` to keep previous behavior, then check the logs for `incoming Substreams Blocks request` logs with the value `compressed: false` to track users who are not using compressed HTTP connections.
+>>>>>>> 380546c (switch firehose to connectweb server, disable proxy for firehoseV1, add --firehose-enforce-compression true by default)
 
 * Substreams: add `--substreams-tier1-enforce-compression` to reject connections from clients that do not support GZIP compression
 * Substreams performance: reduced the number of `mallocs` (patching some third-party libraries)

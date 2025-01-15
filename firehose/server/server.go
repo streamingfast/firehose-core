@@ -2,24 +2,28 @@ package server
 
 import (
 	"context"
+	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
 
+	connect "connectrpc.com/connect"
+	connect_go "connectrpc.com/connect"
 	_ "github.com/mostynb/go-grpc-compression/zstd"
 	"github.com/streamingfast/bstream/transform"
 	"github.com/streamingfast/dauth"
 	dauthgrpc "github.com/streamingfast/dauth/middleware/grpc"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
-	"github.com/streamingfast/dgrpc/server/factory"
+	connectweb "github.com/streamingfast/dgrpc/server/connectrpc"
 	"github.com/streamingfast/dmetering"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/firehose"
 	"github.com/streamingfast/firehose-core/firehose/info"
 	"github.com/streamingfast/firehose-core/firehose/rate"
 	"github.com/streamingfast/firehose-core/metering"
-	pbfirehoseV1 "github.com/streamingfast/pbgo/sf/firehose/v1"
+	fhconnect "github.com/streamingfast/pbgo/sf/firehose/v2/pbfirehoseconnect"
+
 	pbfirehoseV2 "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
@@ -37,14 +41,15 @@ type Server struct {
 	initFunc     func(context.Context, *pbfirehoseV2.Request) context.Context
 	postHookFunc func(context.Context, *pbfirehoseV2.Response)
 
-	servers []*wrappedServer
-	logger  *zap.Logger
+	servers            []*wrappedServer
+	enforceCompression bool
+	logger             *zap.Logger
 
 	rateLimiter rate.Limiter
 }
 
 type wrappedServer struct {
-	dgrpcserver.Server
+	*connectweb.ConnectWebServer
 	listenAddr string
 }
 
@@ -53,6 +58,12 @@ type Option func(*Server)
 func WithLeakyBucketLimiter(size int, dripRate time.Duration) Option {
 	return func(s *Server) {
 		s.rateLimiter = rate.NewLeakyBucketLimiter(size, dripRate)
+	}
+}
+
+func WithEnforceCompression(enforce bool) Option {
+	return func(s *Server) {
+		s.enforceCompression = enforce
 	}
 }
 
@@ -86,7 +97,16 @@ func New(
 
 	tracerProvider := otel.GetTracerProvider()
 
-	var servers []*wrappedServer
+	s := &Server{
+		transformRegistry: transformRegistry,
+		blockGetter:       blockGetter,
+		streamFactory:     streamFactory,
+		initFunc:          initFunc,
+		postHookFunc:      postHookFunc,
+		logger:            logger,
+		servers:           []*wrappedServer{},
+	}
+
 	for _, addr := range strings.Split(listenAddr, ",") {
 		options := []dgrpcserver.Option{
 			dgrpcserver.WithLogger(logger),
@@ -96,6 +116,7 @@ func New(
 			dgrpcserver.WithGRPCServerOptions(grpc.MaxRecvMsgSize(25 * 1024 * 1024)),
 			dgrpcserver.WithPostUnaryInterceptor(dauthgrpc.UnaryAuthChecker(authenticator, logger)),
 			dgrpcserver.WithPostStreamInterceptor(dauthgrpc.StreamAuthChecker(authenticator, logger)),
+			dgrpcserver.WithConnectPermissiveCORS(),
 		}
 
 		if serviceDiscoveryURL != nil {
@@ -104,40 +125,39 @@ func New(
 
 		if strings.Contains(addr, "*") {
 			options = append(options, dgrpcserver.WithInsecureServer())
-			addr = strings.ReplaceAll(addr, "*", "")
 		} else {
 			options = append(options, dgrpcserver.WithPlainTextServer())
 		}
 
-		srv := factory.ServerFromOptions(options...)
+		streamHandlerGetter := func(opts ...connect_go.HandlerOption) (string, http.Handler) {
+			return fhconnect.NewStreamHandler(s, opts...)
+		}
+		options = append(options, dgrpcserver.WithConnectReflection(pbfirehoseV2.Stream_ServiceDesc.ServiceName))
 
-		servers = append(servers, &wrappedServer{
-			Server:     srv,
-			listenAddr: addr,
-		})
+		fetchHandlerGetter := func(opts ...connect_go.HandlerOption) (string, http.Handler) {
+			return fhconnect.NewFetchHandler(s, opts...)
+		}
+		options = append(options, dgrpcserver.WithConnectReflection(pbfirehoseV2.Fetch_ServiceDesc.ServiceName))
 
-	}
-
-	s := &Server{
-		servers:           servers,
-		transformRegistry: transformRegistry,
-		blockGetter:       blockGetter,
-		streamFactory:     streamFactory,
-		initFunc:          initFunc,
-		postHookFunc:      postHookFunc,
-		logger:            logger,
-	}
-
-	logger.Info("registering grpc services")
-	for _, srv := range servers {
-		srv.RegisterService(func(gs grpc.ServiceRegistrar) {
-			if blockGetter != nil {
-				pbfirehoseV2.RegisterFetchServer(gs, s)
+		handlerGetters := []connectweb.HandlerGetter{streamHandlerGetter, fetchHandlerGetter}
+		if infoServer != nil {
+			infoHandlerGetter := func(opts ...connect_go.HandlerOption) (string, http.Handler) {
+				out, outh := fhconnect.NewEndpointInfoHandler(&InfoServerWrapper{rpcInfoServer: infoServer}, opts...)
+				return out, outh
 			}
-			pbfirehoseV2.RegisterEndpointInfoServer(gs, infoServer)
-			pbfirehoseV2.RegisterStreamServer(gs, s)
-			pbfirehoseV1.RegisterStreamServer(gs, NewFirehoseProxyV1ToV2(s)) // compatibility with firehose
+			handlerGetters = append(handlerGetters, infoHandlerGetter)
+			options = append(options, dgrpcserver.WithConnectReflection(pbfirehoseV2.EndpointInfo_ServiceDesc.ServiceName))
+		}
+
+		cleanAddr := strings.ReplaceAll(addr, "*", "")
+
+		srv := connectweb.New(handlerGetters, options...)
+
+		s.servers = append(s.servers, &wrappedServer{
+			ConnectWebServer: srv,
+			listenAddr:       cleanAddr,
 		})
+
 	}
 
 	for _, opt := range opts {
@@ -154,8 +174,9 @@ func (s *Server) OnTerminated(f func(error)) {
 }
 
 func (s *Server) Shutdown(timeout time.Duration) {
+	// FIXME we need to implement the timeout here
 	for _, server := range s.servers {
-		server.Shutdown(timeout)
+		server.Shutdown(nil)
 	}
 }
 
@@ -166,7 +187,7 @@ func (s *Server) Launch() {
 		go func() {
 			server.Launch(server.listenAddr)
 			for _, srv := range s.servers {
-				srv.Shutdown(0) // immediately shutdown all other servers when one terminates, in case a single one failed
+				srv.Shutdown(nil) // immediately shutdown all other servers when one terminates, in case a single one failed
 			}
 			wg.Done()
 		}()
@@ -200,4 +221,17 @@ func withRequestMeter(ctx context.Context) context.Context {
 		return ctx
 	}
 	return context.WithValue(ctx, requestMeterKey, &requestMeter{})
+}
+
+type InfoServerWrapper struct {
+	rpcInfoServer *info.InfoServer
+}
+
+// Info implements pbsubstreamsrpcconnect.EndpointInfoHandler.
+func (i *InfoServerWrapper) Info(ctx context.Context, req *connect.Request[pbfirehoseV2.InfoRequest]) (*connect.Response[pbfirehoseV2.InfoResponse], error) {
+	resp, err := i.rpcInfoServer.Info(ctx, req.Msg)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(resp), nil
 }
