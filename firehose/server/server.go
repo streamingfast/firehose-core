@@ -13,7 +13,7 @@ import (
 	_ "github.com/mostynb/go-grpc-compression/zstd"
 	"github.com/streamingfast/bstream/transform"
 	"github.com/streamingfast/dauth"
-	dauthgrpc "github.com/streamingfast/dauth/middleware/grpc"
+	dauthconnect "github.com/streamingfast/dauth/middleware/connect"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	connectweb "github.com/streamingfast/dgrpc/server/connectrpc"
 	"github.com/streamingfast/dmetering"
@@ -114,8 +114,8 @@ func New(
 			dgrpcserver.WithPostUnaryInterceptor(otelgrpc.UnaryServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider))),
 			dgrpcserver.WithPostStreamInterceptor(otelgrpc.StreamServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider))),
 			dgrpcserver.WithGRPCServerOptions(grpc.MaxRecvMsgSize(25 * 1024 * 1024)),
-			dgrpcserver.WithPostUnaryInterceptor(dauthgrpc.UnaryAuthChecker(authenticator, logger)),
-			dgrpcserver.WithPostStreamInterceptor(dauthgrpc.StreamAuthChecker(authenticator, logger)),
+			dgrpcserver.WithConnectInterceptor(dauthconnect.NewAuthInterceptor(authenticator, logger)),
+			dgrpcserver.WithConnectStrictContentType(false),
 			dgrpcserver.WithConnectPermissiveCORS(),
 		}
 
