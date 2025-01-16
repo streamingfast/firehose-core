@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dauth"
 	discoveryservice "github.com/streamingfast/dgrpc/server/discovery-service"
 	firecore "github.com/streamingfast/firehose-core"
@@ -52,7 +53,21 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().Bool("substreams-tier1-enforce-compression", true, "Reject any request that does not accept gzip or zstd encoding in their GRPC/Connect header")
 			cmd.Flags().Int("substreams-tier1-max-subrequests", 4, "number of parallel subrequests that the tier1 can make to the tier2 per request")
 			cmd.Flags().String("substreams-tier1-block-type", "", "Block type to use for the substreams tier1 (Ex: sf.ethereum.type.v2.Block)")
+			cmd.Flags().Int("substreams-tier1-active-requests-soft-limit", 0, cli.FlagDescription(`
+				The number of client active requests that a tier1 accepts before starting to be report itself as 'unready' within the health
+				check endpoint. A limit of 0 or less means no limit.
 
+				This is useful to load balance active requests more easily across a pool of tier1 instance. When the instance reaches the soft
+				limit, it will start to be unready from the load balancer standpoint. The load balancer in return will remove it from the list
+				of available instances, and new connections will be routed to remaining clients, spreading the load.
+			`))
+			cmd.Flags().Int("substreams-tier1-active-requests-hard-limit", 0, cli.FlagDescription(`
+				The maximum number of client active requests that a tier1 accepts before rejecting incoming gRPC requests with 'Unavailable' code
+				and setting itself as unready. A limit of 0 or less means no limit.
+
+				This is useful to prevent the tier1 from being overwhelmed by too many requests, most client auto-reconnects on 'Unavailable' code
+				so they should end up on another tier1 instance, assuming you have proper auto-scaling of the number of instances available.
+			`))
 			// all substreams
 			registerCommonSubstreamsFlags(cmd)
 			return nil
@@ -86,6 +101,8 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			subrequestsInsecure := viper.GetBool("substreams-tier1-subrequests-insecure")
 			subrequestsPlaintext := viper.GetBool("substreams-tier1-subrequests-plaintext")
 			maxSubrequests := viper.GetUint64("substreams-tier1-max-subrequests")
+			activeRequestsSoftLimit := viper.GetInt("substreams-tier1-active-requests-soft-limit")
+			activeRequestsHardLimit := viper.GetInt("substreams-tier1-active-requests-hard-limit")
 
 			var blockType string
 			if chain.DefaultBlockType != "" {
@@ -137,16 +154,18 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 					BlockStreamAddr:      blockstreamAddr,
 					TmpDir:               tmpDir,
 
-					StateStoreURL:         stateStoreURL,
-					StateStoreDefaultTag:  stateStoreDefaultTag,
-					StateBundleSize:       stateBundleSize,
-					MaxSubrequests:        maxSubrequests,
-					SubrequestsEndpoint:   subrequestsEndpoint,
-					SubrequestsInsecure:   subrequestsInsecure,
-					SubrequestsPlaintext:  subrequestsPlaintext,
-					BlockType:             blockType,
-					WASMExtensions:        wasmExtensions,
-					BlockExecutionTimeout: executionTimeout,
+					StateStoreURL:           stateStoreURL,
+					StateStoreDefaultTag:    stateStoreDefaultTag,
+					StateBundleSize:         stateBundleSize,
+					MaxSubrequests:          maxSubrequests,
+					SubrequestsEndpoint:     subrequestsEndpoint,
+					ActiveRequestsSoftLimit: activeRequestsSoftLimit,
+					ActiveRequestsHardLimit: activeRequestsHardLimit,
+					SubrequestsInsecure:     subrequestsInsecure,
+					SubrequestsPlaintext:    subrequestsPlaintext,
+					BlockType:               blockType,
+					WASMExtensions:          wasmExtensions,
+					BlockExecutionTimeout:   executionTimeout,
 
 					Tracing: tracing,
 
