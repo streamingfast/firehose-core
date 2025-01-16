@@ -82,7 +82,7 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 
 	logger := logging.Logger(ctx, s.logger)
 
-	if !matchHeader(request.Header(), acceptedCompressionValues) {
+	if !matchHeader(request.Header()) {
 		if s.enforceCompression {
 			return status.Error(codes.InvalidArgument, "client does not support compression")
 		}
@@ -302,15 +302,18 @@ func stepToProto(step bstream.StepType, finalBlocksOnly bool) (outStep pbfirehos
 }
 
 // must be lowercase
-var compressionHeader = map[string]bool{"grpc-accept-encoding": true, "connect-accept-encoding": true}
-var acceptedCompressionValues = map[string]bool{"gzip": true, "zstd": true}
+var compressionHeader = map[string]map[string]bool{
+	"grpc-accept-encoding":    {"gzip": true, "zstd": true},
+	"connect-accept-encoding": {"gzip": true, "zstd": true},
+	"accept-encoding":         {"gzip": true}, // HTTP encoding for connect+proto in browser
+}
 
-func matchHeader(headers http.Header, expected map[string]bool) bool {
-	for k, v := range headers {
-		if compressionHeader[strings.ToLower(k)] {
+func matchHeader(header http.Header) bool {
+	for k, v := range header {
+		if validEncodings, ok := compressionHeader[strings.ToLower(k)]; ok {
 			for _, vv := range v {
 				for _, vvv := range strings.Split(vv, ",") {
-					if expected[strings.TrimSpace(strings.ToLower(vvv))] {
+					if validEncodings[strings.TrimSpace(strings.ToLower(vvv))] {
 						return true
 					}
 				}

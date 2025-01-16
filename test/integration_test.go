@@ -75,7 +75,7 @@ func TestIntegration(t *testing.T) {
 		meteringServer.Run()
 	}()
 
-	clientConfig := client.NewSubstreamsClientConfig("localhost:9003", "", 0, false, true)
+	clientConfig := client.NewSubstreamsClientConfig("localhost:9003", "", 0, false, true, "firecore_test")
 	substreamsClient, _, _, _, err := client.NewSubstreamsClient(clientConfig)
 	require.NoError(t, err)
 

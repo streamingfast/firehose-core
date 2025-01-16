@@ -33,6 +33,11 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 * Add support for ConnectWeb firehose requests.
 * Always use gzip compression on firehose requests for clients that support it (instead of always answering with the same compression as the request).
 
+### Substreams
+
+* Properly accept and compress responses with `gzip` for browser HTTP clients using ConnectWeb with `Accept-Encoding` header
+* Allow setting subscription channel max capacity via `SOURCE_CHAN_SIZE` env var (default: 100)
+
 ## v1.6.9
 
 ### Substreams
@@ -45,11 +50,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ## v1.6.8
 
 > [!NOTE]
-<<<<<<< HEAD
-> This release will reject connections from clients that don't support GZIP compression. Use `--substreams-tier1-enforce-compression=false` to keep previous behavior, then check the logs for `incoming Substreams Blocks request` logs with the value `compressed: false` to track users who are not using compressed HTTP connections.
-=======
 > This release will reject substreams connections from clients that don't support GZIP compression. Use `--substreams-tier1-enforce-compression=false` to keep previous behavior, then check the logs for `incoming Substreams Blocks request` logs with the value `compressed: false` to track users who are not using compressed HTTP connections.
->>>>>>> 380546c (switch firehose to connectweb server, disable proxy for firehoseV1, add --firehose-enforce-compression true by default)
 
 * Substreams: add `--substreams-tier1-enforce-compression` to reject connections from clients that do not support GZIP compression
 * Substreams performance: reduced the number of `mallocs` (patching some third-party libraries)
