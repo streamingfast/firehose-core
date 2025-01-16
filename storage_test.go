@@ -1,8 +1,10 @@
 package firecore
 
 import (
+	"path/filepath"
 	"testing"
 
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,4 +48,25 @@ func Test_searchBlockNum(t *testing.T) {
 
 func uptr(v uint64) *uint64 {
 	return &v
+}
+
+func TestGetTmpDir(t *testing.T) {
+	dataDir := t.TempDir()
+	testSetViper(t, "common-tmp-dir", "{data-dir}/value")
+
+	dir, err := GetTmpDir(dataDir)
+	assert.NoError(t, err)
+	assert.Equal(t, filepath.Join(dataDir, "value"), dir)
+
+	dir2, err2 := GetTmpDir(dataDir)
+	assert.NoError(t, err2)
+	assert.Equal(t, filepath.Join(dataDir, "value"), dir2)
+}
+
+func testSetViper(t *testing.T, key string, value string) {
+	current := viper.Get(key)
+	t.Cleanup(func() {
+		viper.Set(key, current)
+	})
+	viper.Set(key, value)
 }

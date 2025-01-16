@@ -17,11 +17,11 @@ var indexStoreCreated bool
 var tmpDirCreated bool
 
 func GetTmpDir(dataDir string) (tmpDir string, err error) {
+	tmpDir = MustReplaceDataDir(dataDir, viperExpandedEnvGetString("common-tmp-dir"))
 	if tmpDirCreated {
 		return
 	}
 
-	tmpDir = MustReplaceDataDir(dataDir, viperExpandedEnvGetString("common-tmp-dir"))
 	err = os.MkdirAll(tmpDir, 0755)
 	tmpDirCreated = true
 	return
