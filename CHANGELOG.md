@@ -8,7 +8,7 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.7.0
 
 ### Reader
 
@@ -51,13 +51,18 @@ helping better load balance active requests across a pool of `tier1` instances.
   This is useful to prevent the tier1 from being overwhelmed by too many requests, most client auto-reconnects on 'Unavailable' code
   so they should end up on another tier1 instance, assuming you have proper auto-scaling of the number of instances available.
 
+* The `substreams-tier1` app now exposes a new Prometheus metric `substreams_tier1_rejected_request_counter` that tracks rejected
+  requests. The counter is labelled by the gRPC/ConnectRPC returned code (`ok` and `canceled` are not considered rejected requests).
+
+* The `substreams-tier2` app now exposes a new Prometheus metric `substreams_tier2_rejected_request_counter` that tracks rejected
+  requests. The counter is labelled by the gRPC/ConnectRPC returned code (`ok` and `canceled` are not considered rejected requests).
+
 * Properly accept and compress responses with `gzip` for browser HTTP clients using ConnectWeb with `Accept-Encoding` header
 * Allow setting subscription channel max capacity via `SOURCE_CHAN_SIZE` env var (default: 100)
 
 ## v1.6.9
 
 ### Substreams
-
 * Fix an issue preventing proper detection of gzip compression when multiple headers are set (ex: python grpc client)
 * Add support for zstd compression on server
 * Fix an issue preventing some tier2 requests on last-stage from correctly generating stores. This could lead to some missing "backfilling" jobs and slower time to first block on reconnection.
