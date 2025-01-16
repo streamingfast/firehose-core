@@ -4,6 +4,8 @@ start:
   - merger
   - relayer
   - firehose
+  - substreams-tier1
+  - substreams-tier2
   flags:
     advertise-block-id-encoding: "hex"
     advertise-chain-name: "acme-dummy-blockchain"
@@ -20,4 +22,4 @@ start:
       --store-dir="{node-data-dir}"
       --block-rate=120
       --genesis-height=0
-      --genesis-block-burst=1000
+      --genesis-block-burst=100

@@ -50,7 +50,9 @@ func MakeDirs(directories []string) error {
 }
 
 // MustReplaceDataDir replaces `{data-dir}` from within the `in` received argument by the
-// `dataDir` argument
+// `dataDir` argument.
+//
+//	MustReplaceDataDir("/tmp/data", "{data-dir}/subdir") == "/tmp/data/subdir"
 func MustReplaceDataDir(dataDir, in string) string {
 	d, err := filepath.Abs(dataDir)
 	if err != nil {
