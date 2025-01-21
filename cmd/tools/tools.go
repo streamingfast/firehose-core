@@ -41,13 +41,15 @@ func ConfigureToolsCmd[B firecore.Block](
 	tracer logging.Tracer,
 ) error {
 	if flags := ToolsCmd.PersistentFlags(); flags != nil {
-		flags.String("output", "", cli.Dedent(`
+		flags.StringP("output", "o", "", cli.Dedent(`
 			The default output printer to use to print responses and blocks across
 			tools sub-command.
 
 			If defined, has precedence over tools specific flags. Bytes encoding is
-			tried to be respected if possible, protojson and protojsonl are always
-			using base64 today for compatibility across Protobuf supported languages.
+			tried to be respected if possible. The 'protojson' and 'protojsonl' output
+			are always using base64 for bytes values today for compatibility across
+			Protobuf supported languages. The 'bytes' output is using the bytes-encoding
+			flag value to determine how to encode Protobuf bytes to the console.
 
 			JSON and JSONL have the caveat to print enum value using the integer value
 			instead of the name which would be more convenient.
@@ -55,7 +57,11 @@ func ConfigureToolsCmd[B firecore.Block](
 			ProtoJSON and ProtoJSONL being able to print only Protobuf messages, they
 			are refused on commands that are not returning Protobuf messages.
 
-			One of: text, json, jsonl, protojson, protojsonl
+			The 'bytes' output marshals the Protobuf message to bytes and prints
+			the bytes as a string for which the encoding is determined by the
+			--bytes-encoding flag value, hexadecimal by default.
+
+			One of: text, json, jsonl, protojson, protojsonl, bytes
 		`))
 
 		flags.String("bytes-encoding", "hex", "Encoding for bytes fields when printing in 'text', 'json' or 'jsonl' --output, either 'hex', 'base58' or 'base64'")

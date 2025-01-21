@@ -22,11 +22,13 @@ const (
 	PrintOutputModeProtoJSON
 	// PrintOutputModeProtoJSONL is a PrintOutputMode of type ProtoJSONL.
 	PrintOutputModeProtoJSONL
+	// PrintOutputModeBytes is a PrintOutputMode of type Bytes.
+	PrintOutputModeBytes
 )
 
 var ErrInvalidPrintOutputMode = fmt.Errorf("not a valid PrintOutputMode, try [%s]", strings.Join(_PrintOutputModeNames, ", "))
 
-const _PrintOutputModeName = "TextJSONJSONLProtoJSONProtoJSONL"
+const _PrintOutputModeName = "TextJSONJSONLProtoJSONProtoJSONLBytes"
 
 var _PrintOutputModeNames = []string{
 	_PrintOutputModeName[0:4],
@@ -34,6 +36,7 @@ var _PrintOutputModeNames = []string{
 	_PrintOutputModeName[8:13],
 	_PrintOutputModeName[13:22],
 	_PrintOutputModeName[22:32],
+	_PrintOutputModeName[32:37],
 }
 
 // PrintOutputModeNames returns a list of possible string values of PrintOutputMode.
@@ -49,6 +52,7 @@ var _PrintOutputModeMap = map[PrintOutputMode]string{
 	PrintOutputModeJSONL:      _PrintOutputModeName[8:13],
 	PrintOutputModeProtoJSON:  _PrintOutputModeName[13:22],
 	PrintOutputModeProtoJSONL: _PrintOutputModeName[22:32],
+	PrintOutputModeBytes:      _PrintOutputModeName[32:37],
 }
 
 // String implements the Stringer interface.
@@ -77,6 +81,8 @@ var _PrintOutputModeValue = map[string]PrintOutputMode{
 	strings.ToLower(_PrintOutputModeName[13:22]): PrintOutputModeProtoJSON,
 	_PrintOutputModeName[22:32]:                  PrintOutputModeProtoJSONL,
 	strings.ToLower(_PrintOutputModeName[22:32]): PrintOutputModeProtoJSONL,
+	_PrintOutputModeName[32:37]:                  PrintOutputModeBytes,
+	strings.ToLower(_PrintOutputModeName[32:37]): PrintOutputModeBytes,
 }
 
 // ParsePrintOutputMode attempts to convert a string to a PrintOutputMode.

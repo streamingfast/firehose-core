@@ -77,12 +77,16 @@ func GetOutputPrinter(cmd *cobra.Command, chainFileDescriptor protoreflect.FileD
 		return NewTextOutputPrinter(bytesEncoding, registry, printTransactions), nil
 	}
 
+	if printer == "bytes" {
+		return NewBytesOutputPrinter(bytesEncoding, registry), nil
+	}
+
 	return nil, fmt.Errorf("unsupported output printer %q", printer)
 }
 
 //go:generate go-enum -f=$GOFILE --marshal --names --nocase
 
-// ENUM(Text, JSON, JSONL, ProtoJSON, ProtoJSONL)
+// ENUM(Text, JSON, JSONL, ProtoJSON, ProtoJSONL, Bytes)
 type PrintOutputMode uint
 
 type OutputPrinter interface {
