@@ -8,7 +8,9 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.7.2
+
+* Fixed `substreams-tier2` not setting itself ready correctly on startup since `v1.7.0`.
 
 * Added support for `--output=bytes` mode which prints the chain's specific Protobuf block as bytes, the encoding for the bytes string printed is determined by `--bytes-encoding`, uses `hex` by default.
 
