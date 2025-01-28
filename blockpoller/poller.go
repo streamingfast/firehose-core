@@ -31,6 +31,7 @@ type BlockPoller[C any] struct {
 	*shutter.Shutter
 	startBlockNumGate        uint64
 	fetchBlockRetryCount     uint64
+	delayBetweenFetch        time.Duration
 	stateStorePath           string
 	ignoreCursor             bool
 	forceFinalityAfterBlocks *uint64
@@ -79,6 +80,10 @@ func (p *BlockPoller[C]) Run(firstStreamableBlockNum uint64, stopBlock *uint64, 
 		zap.Uint64("first_streamable_block", firstStreamableBlockNum),
 		zap.Uint64("block_fetch_batch_size", uint64(blockFetchBatchSize)),
 	)
+	if p.delayBetweenFetch != 0 && blockFetchBatchSize > 1 {
+		p.logger.Warn("delayBetweenFetch is set, but blockFetchBatchSize is greater than 1: delayBetweenFetch will not be respected by the parallel fetching mechanism")
+	}
+
 	p.blockHandler.Init()
 
 	forkDB, resolvedStartBlock, err := p.initState(firstStreamableBlockNum, p.stateStorePath, p.ignoreCursor, p.logger)
@@ -99,6 +104,8 @@ func (p *BlockPoller[C]) run(resolvedStartBlock bstream.BlockRef, stopBlock uint
 	currentCursor := &cursor{state: ContinuousSegState, logger: p.logger}
 	blockToFetch := resolvedStartBlock.Num()
 	var hashToFetch *string
+
+	lastFetch := time.Time{}
 	for {
 
 		if blockToFetch >= stopBlock {
@@ -110,7 +117,15 @@ func (p *BlockPoller[C]) run(resolvedStartBlock bstream.BlockRef, stopBlock uint
 			p.logger.Info("block poller is terminating")
 		}
 
-		p.logger.Info("about to fetch block", zap.Uint64("block_to_fetch", blockToFetch))
+		delay := time.Duration(0)
+		if p.delayBetweenFetch > 0 {
+			delay = time.Since(lastFetch)
+			if delay < p.delayBetweenFetch {
+				time.Sleep(p.delayBetweenFetch - delay)
+			}
+		}
+
+		p.logger.Info("about to fetch block", zap.Uint64("block_to_fetch", blockToFetch), zap.Duration("delay", delay))
 		var fetchedBlock *pbbstream.Block
 		if hashToFetch != nil {
 			fetchedBlock, err = p.fetchBlockWithHash(blockToFetch, *hashToFetch)

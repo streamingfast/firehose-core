@@ -1,8 +1,18 @@
 package blockpoller
 
-import "go.uber.org/zap"
+import (
+	"time"
+
+	"go.uber.org/zap"
+)
 
 type Option[C any] func(*BlockPoller[C])
+
+func WithDelayBetweenFetch[C any](v time.Duration) Option[C] {
+	return func(p *BlockPoller[C]) {
+		p.delayBetweenFetch = v
+	}
+}
 
 func WithBlockFetchRetryCount[C any](v uint64) Option[C] {
 	return func(p *BlockPoller[C]) {
