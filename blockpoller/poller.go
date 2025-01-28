@@ -117,11 +117,9 @@ func (p *BlockPoller[C]) run(resolvedStartBlock bstream.BlockRef, stopBlock uint
 		} else {
 
 			for {
-				requestedBlockItem := p.requestBlock(blockToFetch, blockFetchBatchSize)
-				fetchedBlockItem, ok := <-requestedBlockItem
-				if !ok {
-					p.logger.Info("requested block channel was closed, quitting")
-					return nil
+				fetchedBlockItem, err := p.requestBlock(blockToFetch, blockFetchBatchSize)
+				if err != nil {
+					return err
 				}
 				if !fetchedBlockItem.skipped {
 					fetchedBlock = fetchedBlockItem.block
@@ -296,46 +294,41 @@ func (p *BlockPoller[C]) loadNextBlocks(requestedBlock uint64, numberOfBlockToFe
 	return nil
 }
 
-func (p *BlockPoller[C]) requestBlock(blockNumber uint64, numberOfBlockToFetch int) chan *BlockItem {
+func (p *BlockPoller[C]) requestBlock(blockNumber uint64, numberOfBlockToFetch int) (*BlockItem, error) {
 	p.logger.Info("requesting block", zap.Uint64("block_num", blockNumber))
-	requestedBlock := make(chan *BlockItem)
 
-	go func(requestedBlock chan *BlockItem) {
-		for {
-
-			if p.IsTerminating() {
-				close(requestedBlock)
-				p.logger.Info("block poller is terminating")
-				return
-			}
-
-			p.optimisticallyPolledBlocksLock.Lock()
-			blockItem, found := p.optimisticallyPolledBlocks[blockNumber]
-			p.optimisticallyPolledBlocksLock.Unlock()
-			if !found {
-				if !p.fetching {
-					go func() {
-						err := p.loadNextBlocks(blockNumber, numberOfBlockToFetch)
-						if err != nil {
-							p.Shutdown(err)
-							return
-						}
-					}()
-				}
-				p.logger.Debug("waiting for block to be fetched", zap.Uint64("block_num", blockNumber))
-				time.Sleep(100 * time.Millisecond)
-				continue
-			}
-
-			p.logger.Info("block was optimistically polled", zap.Uint64("block_num", blockNumber))
-			requestedBlock <- blockItem
-			close(requestedBlock)
-			break
+	lastLog := time.Time{}
+	for {
+		if p.IsTerminating() {
+			return nil, fmt.Errorf("block poller is terminating")
 		}
 
-	}(requestedBlock)
+		p.optimisticallyPolledBlocksLock.Lock()
+		blockItem, found := p.optimisticallyPolledBlocks[blockNumber]
+		p.optimisticallyPolledBlocksLock.Unlock()
+		if !found {
+			if !p.fetching {
+				go func() {
+					err := p.loadNextBlocks(blockNumber, numberOfBlockToFetch)
+					if err != nil {
+						p.Shutdown(err)
+						return
+					}
+				}()
+			}
+			if time.Since(lastLog) > 2*time.Second {
+				p.logger.Debug("waiting for block to be fetched", zap.Uint64("block_num", blockNumber))
+				lastLog = time.Now()
+			}
 
-	return requestedBlock
+			time.Sleep(20 * time.Millisecond)
+			continue
+		}
+
+		p.logger.Info("block was optimistically polled", zap.Uint64("block_num", blockNumber))
+		return blockItem, nil
+	}
+
 }
 
 type FetchResponse struct {
