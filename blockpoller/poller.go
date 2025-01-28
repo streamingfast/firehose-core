@@ -119,13 +119,16 @@ func (p *BlockPoller[C]) run(resolvedStartBlock bstream.BlockRef, stopBlock uint
 
 		delay := time.Duration(0)
 		if p.delayBetweenFetch > 0 {
-			delay = time.Since(lastFetch)
-			if delay < p.delayBetweenFetch {
-				time.Sleep(p.delayBetweenFetch - delay)
+			since := time.Since(lastFetch)
+			if since < p.delayBetweenFetch {
+				delay = p.delayBetweenFetch - since
 			}
 		}
 
 		p.logger.Info("about to fetch block", zap.Uint64("block_to_fetch", blockToFetch), zap.Duration("delay", delay))
+		if delay != 0 {
+			time.Sleep(delay)
+		}
 		var fetchedBlock *pbbstream.Block
 		if hashToFetch != nil {
 			fetchedBlock, err = p.fetchBlockWithHash(blockToFetch, *hashToFetch)
@@ -149,6 +152,7 @@ func (p *BlockPoller[C]) run(resolvedStartBlock bstream.BlockRef, stopBlock uint
 		if err != nil {
 			return fmt.Errorf("unable to fetch  block %d: %w", blockToFetch, err)
 		}
+		lastFetch = time.Now()
 
 		blockToFetch, hashToFetch, err = p.processBlock(currentCursor, fetchedBlock)
 		if err != nil {
