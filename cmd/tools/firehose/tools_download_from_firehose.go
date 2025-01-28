@@ -66,6 +66,10 @@ func createToolsDownloadFromFirehoseE[B firecore.Block](chain *firecore.Chain[B]
 			Logger:     zlog,
 		}
 
+		if lowBlock := uint64(blockRange.Start); lowBlock%100 == 0 {
+			mergeWriter.LowBlockNum = lowBlock
+		}
+
 		approximateLIBWarningIssued := false
 		fallbackBlockTypeChecked := false
 
