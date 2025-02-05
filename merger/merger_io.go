@@ -363,7 +363,13 @@ func (od *oneBlockFilesDeleter) Delete(oneBlockFiles []*bstream.OneBlockFile) er
 			fileNames = append(fileNames, filename)
 		}
 	}
-	od.logger.Info("deleting a bunch of one_block_files", zap.Int("number_of_files", len(fileNames)), zap.String("first_file", fileNames[0]), zap.String("last_file", fileNames[len(fileNames)-1]), zap.Stringer("store", od.store.BaseURL()))
+
+	od.logger.Info("deleting one block files",
+		zap.Int("count", len(fileNames)),
+		zap.String("first_file", fileNames[0]),
+		zap.String("last_file", fileNames[len(fileNames)-1]),
+		zap.Stringer("store", od.store.BaseURL()),
+	)
 
 	deletable := make(map[string]bool)
 
