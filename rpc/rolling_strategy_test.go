@@ -17,7 +17,7 @@ type rollClient struct {
 	sortValue uint64
 }
 
-func (r *rollClient) fetchSortValue(ctx context.Context) (sortValue uint64, err error) {
+func (r *rollClient) fetchSortValue(_ context.Context) (sortValue uint64, err error) {
 	return r.sortValue, nil
 }
 

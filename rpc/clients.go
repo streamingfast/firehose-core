@@ -39,7 +39,7 @@ func (c *Clients[C]) StartSorting(ctx context.Context, direction SortDirection, 
 
 			switch s := c.rollingStrategy.(type) {
 			case *StickyRollingStrategy[C]:
-				s.fistCallToNewClient = true
+				s.firstCallToNewClient = true
 				s.usedClientCount = 0
 				s.nextClientIndex = 0
 			case *RollingStrategyAlwaysUseFirst[C]:
