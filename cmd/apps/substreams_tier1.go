@@ -24,12 +24,16 @@ import (
 	"github.com/spf13/viper"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dauth"
+	"github.com/streamingfast/dgrpc"
 	discoveryservice "github.com/streamingfast/dgrpc/server/discovery-service"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/launcher"
 	"github.com/streamingfast/logging"
 	app "github.com/streamingfast/substreams/app"
+	"github.com/streamingfast/substreams/client"
+	"github.com/streamingfast/substreams/orchestrator/work"
 	"github.com/streamingfast/substreams/wasm"
+	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
 	"go.uber.org/zap"
 )
 
@@ -68,6 +72,8 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				This is useful to prevent the tier1 from being overwhelmed by too many requests, most client auto-reconnects on 'Unavailable' code
 				so they should end up on another tier1 instance, assuming you have proper auto-scaling of the number of instances available.
 			`))
+			cmd.Flags().String("substreams-tier1-global-worker-pool-address", "", "Address of the global worker pool to use for the substreams tier1.")
+			cmd.Flags().Duration("substreams-tier1-global-worker-pool-keep-alive-delay", 25*time.Second, "")
 			// all substreams
 			registerCommonSubstreamsFlags(cmd)
 			return nil
@@ -103,6 +109,8 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			maxSubrequests := viper.GetUint64("substreams-tier1-max-subrequests")
 			activeRequestsSoftLimit := viper.GetInt("substreams-tier1-active-requests-soft-limit")
 			activeRequestsHardLimit := viper.GetInt("substreams-tier1-active-requests-hard-limit")
+			substreamsGlobalWorkerPoolAddress := viper.GetString("substreams-tier1-global-worker-pool-address")
+			substreamsGlobalWorkerPoolKeepAliveDelay := viper.GetDuration("substreams-tier1-global-worker-pool-keep-alive-delay")
 
 			var blockType string
 			if chain.DefaultBlockType != "" {
@@ -143,6 +151,31 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				return nil, fmt.Errorf("getting temporary directory: %w", err)
 			}
 
+			subrequestsClientConfig := client.NewSubstreamsClientConfig(
+				subrequestsEndpoint,
+				"",
+				client.None,
+				subrequestsInsecure,
+				subrequestsPlaintext,
+				"substreams_tier1",
+			)
+
+			clientFactory := client.NewInternalClientFactory(subrequestsClientConfig)
+			workerPoolFactory := work.NewSimpleWorkerPoolFactory(clientFactory).WorkerPool
+
+			if substreamsGlobalWorkerPoolAddress != "" {
+				grpcClientConnection, err := dgrpc.NewInternalClientConn(substreamsGlobalWorkerPoolAddress)
+				if err != nil {
+					return nil, fmt.Errorf("unable to create grpc client connection to global worker pool: %w", err)
+				}
+				workerPoolClient := pbworker.NewWorkerPoolClient(grpcClientConnection)
+				workerPoolFactory = work.NewGlobalWorkerPoolFactory(
+					workerPoolClient,
+					clientFactory,
+					substreamsGlobalWorkerPoolKeepAliveDelay,
+				).WorkerPool
+			}
+
 			return app.NewTier1(appLogger,
 				&app.Tier1Config{
 					MeteringConfig:     GetCommonMeteringPluginValue(),
@@ -178,6 +211,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 					HeadBlockNumberMetric: ss1HeadBlockNumMetric,
 					CheckPendingShutDown:  runtime.IsPendingShutdown,
 					InfoServer:            runtime.InfoServer,
+					WorkerPoolFactory:     workerPoolFactory,
 				}), nil
 		},
 	})
