@@ -143,36 +143,33 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				return nil, fmt.Errorf("getting temporary directory: %w", err)
 			}
 
+			config := app.NewDefaultTier1Config()
+			config.MeteringConfig = GetCommonMeteringPluginValue()
+			config.EnforceCompression = viper.GetBool("substreams-tier1-enforce-compression")
+			config.MergedBlocksStoreURL = mergedBlocksStoreURL
+			config.OneBlocksStoreURL = oneBlocksStoreURL
+			config.ForkedBlocksStoreURL = forkedBlocksStoreURL
+			config.BlockStreamAddr = blockstreamAddr
+			config.TmpDir = tmpDir
+			config.StateStoreURL = stateStoreURL
+			config.StateStoreDefaultTag = stateStoreDefaultTag
+			config.StateBundleSize = stateBundleSize
+			config.MaxSubrequests = maxSubrequests
+			config.SubrequestsEndpoint = subrequestsEndpoint
+			config.ActiveRequestsSoftLimit = activeRequestsSoftLimit
+			config.ActiveRequestsHardLimit = activeRequestsHardLimit
+			config.SubrequestsInsecure = subrequestsInsecure
+			config.SubrequestsPlaintext = subrequestsPlaintext
+			config.BlockType = blockType
+			config.WASMExtensions = wasmExtensions
+			config.BlockExecutionTimeout = executionTimeout
+			config.Tracing = tracing
+			config.GRPCListenAddr = grpcListenAddr
+			config.GRPCShutdownGracePeriod = time.Second
+			config.ServiceDiscoveryURL = serviceDiscoveryURL
+
 			return app.NewTier1(appLogger,
-				&app.Tier1Config{
-					MeteringConfig:     GetCommonMeteringPluginValue(),
-					EnforceCompression: viper.GetBool("substreams-tier1-enforce-compression"),
-
-					MergedBlocksStoreURL: mergedBlocksStoreURL,
-					OneBlocksStoreURL:    oneBlocksStoreURL,
-					ForkedBlocksStoreURL: forkedBlocksStoreURL,
-					BlockStreamAddr:      blockstreamAddr,
-					TmpDir:               tmpDir,
-
-					StateStoreURL:           stateStoreURL,
-					StateStoreDefaultTag:    stateStoreDefaultTag,
-					StateBundleSize:         stateBundleSize,
-					MaxSubrequests:          maxSubrequests,
-					SubrequestsEndpoint:     subrequestsEndpoint,
-					ActiveRequestsSoftLimit: activeRequestsSoftLimit,
-					ActiveRequestsHardLimit: activeRequestsHardLimit,
-					SubrequestsInsecure:     subrequestsInsecure,
-					SubrequestsPlaintext:    subrequestsPlaintext,
-					BlockType:               blockType,
-					WASMExtensions:          wasmExtensions,
-					BlockExecutionTimeout:   executionTimeout,
-
-					Tracing: tracing,
-
-					GRPCListenAddr:          grpcListenAddr,
-					GRPCShutdownGracePeriod: time.Second,
-					ServiceDiscoveryURL:     serviceDiscoveryURL,
-				}, &app.Tier1Modules{
+				config, &app.Tier1Modules{
 					Authenticator:         authenticator,
 					HeadTimeDriftMetric:   ss1HeadTimeDriftmetric,
 					HeadBlockNumberMetric: ss1HeadBlockNumMetric,
