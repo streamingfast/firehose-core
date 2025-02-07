@@ -41,9 +41,12 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 		},
 
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
-			authenticator, err := dauth.New(viper.GetString("common-auth-plugin"), appLogger)
+			authPlugin := viper.GetString("common-auth-plugin")
+			appLogger.Info("auth plugin instantiation", zap.String("plugin_kind", authPluginScheme(authPlugin)))
+
+			authenticator, err := dauth.New(authPlugin, appLogger)
 			if err != nil {
-				return nil, fmt.Errorf("unable to initialize authenticator: %w", err)
+				return nil, fmt.Errorf("unable to initialize auth plugin: %w", err)
 			}
 
 			mergedBlocksStoreURL, oneBlocksStoreURL, forkedBlocksStoreURL, err := firecore.GetCommonStoresURLs(runtime.AbsDataDir)

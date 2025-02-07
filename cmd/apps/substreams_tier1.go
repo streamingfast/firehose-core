@@ -74,11 +74,12 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 		},
 
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
-			blockstreamAddr := viper.GetString("common-live-blocks-addr")
+			authPlugin := viper.GetString("common-auth-plugin")
+			appLogger.Info("auth plugin instantiation", zap.String("plugin_kind", authPluginScheme(authPlugin)))
 
-			authenticator, err := dauth.New(viper.GetString("common-auth-plugin"), appLogger)
+			authenticator, err := dauth.New(authPlugin, appLogger)
 			if err != nil {
-				return nil, fmt.Errorf("unable to initialize dauth: %w", err)
+				return nil, fmt.Errorf("unable to initialize auth plugin: %w", err)
 			}
 
 			mergedBlocksStoreURL, oneBlocksStoreURL, forkedBlocksStoreURL, err := firecore.GetCommonStoresURLs(runtime.AbsDataDir)
@@ -89,20 +90,6 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			sfDataDir := runtime.AbsDataDir
 
 			rawServiceDiscoveryURL := viper.GetString("substreams-tier1-discovery-service-url")
-			grpcListenAddr := viper.GetString("substreams-tier1-grpc-listen-addr")
-
-			stateStoreURL := firecore.MustReplaceDataDir(sfDataDir, viper.GetString("substreams-state-store-url"))
-			stateStoreDefaultTag := viper.GetString("substreams-state-store-default-tag")
-			executionTimeout := viper.GetDuration("substreams-block-execution-timeout")
-
-			stateBundleSize := viper.GetUint64("substreams-state-bundle-size")
-
-			subrequestsEndpoint := viper.GetString("substreams-tier1-subrequests-endpoint")
-			subrequestsInsecure := viper.GetBool("substreams-tier1-subrequests-insecure")
-			subrequestsPlaintext := viper.GetBool("substreams-tier1-subrequests-plaintext")
-			maxSubrequests := viper.GetUint64("substreams-tier1-max-subrequests")
-			activeRequestsSoftLimit := viper.GetInt("substreams-tier1-active-requests-soft-limit")
-			activeRequestsHardLimit := viper.GetInt("substreams-tier1-active-requests-hard-limit")
 
 			var blockType string
 			if chain.DefaultBlockType != "" {
@@ -114,8 +101,6 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			if blockTypeFromFlag != "" {
 				blockType = blockTypeFromFlag
 			}
-
-			tracing := os.Getenv("SUBSTREAMS_TRACING") == "modules_exec"
 
 			var serviceDiscoveryURL *url.URL
 			if rawServiceDiscoveryURL != "" {
@@ -149,22 +134,22 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			config.MergedBlocksStoreURL = mergedBlocksStoreURL
 			config.OneBlocksStoreURL = oneBlocksStoreURL
 			config.ForkedBlocksStoreURL = forkedBlocksStoreURL
-			config.BlockStreamAddr = blockstreamAddr
+			config.BlockStreamAddr = viper.GetString("common-live-blocks-addr")
 			config.TmpDir = tmpDir
-			config.StateStoreURL = stateStoreURL
-			config.StateStoreDefaultTag = stateStoreDefaultTag
-			config.StateBundleSize = stateBundleSize
-			config.MaxSubrequests = maxSubrequests
-			config.SubrequestsEndpoint = subrequestsEndpoint
-			config.ActiveRequestsSoftLimit = activeRequestsSoftLimit
-			config.ActiveRequestsHardLimit = activeRequestsHardLimit
-			config.SubrequestsInsecure = subrequestsInsecure
-			config.SubrequestsPlaintext = subrequestsPlaintext
+			config.StateStoreURL = firecore.MustReplaceDataDir(sfDataDir, viper.GetString("substreams-state-store-url"))
+			config.StateStoreDefaultTag = viper.GetString("substreams-state-store-default-tag")
+			config.StateBundleSize = viper.GetUint64("substreams-state-bundle-size")
+			config.MaxSubrequests = viper.GetUint64("substreams-tier1-max-subrequests")
+			config.SubrequestsEndpoint = viper.GetString("substreams-tier1-subrequests-endpoint")
+			config.ActiveRequestsSoftLimit = viper.GetInt("substreams-tier1-active-requests-soft-limit")
+			config.ActiveRequestsHardLimit = viper.GetInt("substreams-tier1-active-requests-hard-limit")
+			config.SubrequestsInsecure = viper.GetBool("substreams-tier1-subrequests-insecure")
+			config.SubrequestsPlaintext = viper.GetBool("substreams-tier1-subrequests-plaintext")
 			config.BlockType = blockType
 			config.WASMExtensions = wasmExtensions
-			config.BlockExecutionTimeout = executionTimeout
-			config.Tracing = tracing
-			config.GRPCListenAddr = grpcListenAddr
+			config.BlockExecutionTimeout = viper.GetDuration("substreams-block-execution-timeout")
+			config.Tracing = os.Getenv("SUBSTREAMS_TRACING") == "modules_exec"
+			config.GRPCListenAddr = viper.GetString("substreams-tier1-grpc-listen-addr")
 			config.GRPCShutdownGracePeriod = time.Second
 			config.ServiceDiscoveryURL = serviceDiscoveryURL
 
