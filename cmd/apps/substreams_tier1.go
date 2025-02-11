@@ -151,7 +151,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				return nil, fmt.Errorf("getting temporary directory: %w", err)
 			}
 
-			subrequestsClientConfig := client.NewSubstreamsClientConfig(
+			subRequestsClientConfig := client.NewSubstreamsClientConfig(
 				subrequestsEndpoint,
 				"",
 				client.None,
@@ -160,7 +160,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				"substreams_tier1",
 			)
 
-			clientFactory := client.NewInternalClientFactory(subrequestsClientConfig)
+			clientFactory := client.NewInternalClientFactory(subRequestsClientConfig)
 			workerPoolFactory := work.NewSimpleWorkerPoolFactory(clientFactory).WorkerPool
 
 			if substreamsGlobalWorkerPoolAddress != "" {

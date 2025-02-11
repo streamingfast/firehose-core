@@ -2186,10 +2186,12 @@ github.com/streamingfast/shutter v1.5.0 h1:NpzDYzj0HVpSiDJVO/FFSL6QIK/YKOxY0gJAt
 github.com/streamingfast/shutter v1.5.0/go.mod h1:B/T6efqdeMGbGwjzPS1ToXzYZI4kDzI5/u4I+7qbjY8=
 github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0 h1:Y15G1Z4fpEdm2b+/70owI7TLuXadlqBtGM7rk4Hxrzk=
 github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0/go.mod h1:/Rnz2TJvaShjUct0scZ9kKV2Jr9/+KBAoWy4UMYxgv4=
+github.com/streamingfast/substreams v1.12.3-0.20250210184322-1656ca15e459 h1:0Ancj+w9UA4YF+n9cjiGEoLOlwOCY6TZyR+yV15is0g=
+github.com/streamingfast/substreams v1.12.3-0.20250210184322-1656ca15e459/go.mod h1:yas1ICJA3/8Tr3Im5wcUBk8sSKDkvWaRm9s4Qy7iEYA=
 github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed h1:LU6/c376zP1cMAo9L6rFLyjo0W7RU+hIh7BegH8Zo5M=
 github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed/go.mod h1:yAI0XTsMBhREkM/YDAK/zNou3GoiAce1P6+rp/wQhjs=
-github.com/streamingfast/worker-pool-protocol v0.0.0-20250204145450-8595cd6a7f6a h1:hIb/iuCda8mJS6ZtzMYqF2oxjioAuqoxCP0r59ApgzQ=
-github.com/streamingfast/worker-pool-protocol v0.0.0-20250204145450-8595cd6a7f6a/go.mod h1:fq44dFx8K9S3/9QOoIVk0s+ptEscfpQmftLog/9WYU4=
+github.com/streamingfast/worker-pool-protocol v0.0.0-20250210151327-520c44e547ab h1:sJk0iTPWMBi0fOHf7yI5489JHBZUWvWcdP7xzAV5ROA=
+github.com/streamingfast/worker-pool-protocol v0.0.0-20250210151327-520c44e547ab/go.mod h1:fq44dFx8K9S3/9QOoIVk0s+ptEscfpQmftLog/9WYU4=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.4.0/go.mod h1:YvHI0jy2hoMjB+UWwv71VJQ9isScKT/TqJzVSSt89Yw=
