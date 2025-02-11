@@ -13,6 +13,7 @@ start:
     substreams-tier1-subrequests-insecure: false
     substreams-tier1-subrequests-plaintext: true
     substreams-tier1-subrequests-endpoint: :9001
+
     substreams-tier1-global-worker-pool-address: :9002
     substreams-tier1-global-worker-pool-keep-alive-delay: 25s
 
