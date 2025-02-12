@@ -48,11 +48,11 @@ func NewToolsCompareBlocksCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra
 		Use:   "compare-blocks <reference_blocks_store> <current_blocks_store> [<block_range>]",
 		Short: "Checks for any differences between two block stores between a specified range. (To compare the likeness of two block ranges, for example)",
 		Long: cli.Dedent(`
-			The 'compare-blocks' takes in two paths to stores of merged blocks and a range specifying the blocks you
-			want to compare, written as: '<start>:<finish>'. It will output the status of the likeness of every
-			100,000 blocks, on completion, or on encountering a difference. Increments that contain a difference will
-			be communicated as well as the blocks within that contain differences. Increments that do not have any
-			differences will be outputted as identical.
+			The 'compare-blocks' takes in two paths to stores of either merged blocks or one-blocks and a range
+			specifying the blocks you want to compare, written as: '<start>:<finish>'. It will output the status
+			of the likeness of every 100,000 blocks, on completion, or on encountering a difference. Increments that
+			contain a difference will be communicated as well as the blocks within that contain differences. Increments
+			that do not have any differences will be outputted as identical.
 
 			After passing through the blocks, it will output instructions on how to locate a specific difference
 			based on the blocks that were given. This is done by applying the '--diff' flag before your args.
@@ -125,9 +125,12 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 		sanitizer := chain.Tools.GetSanitizeBlockForCompare()
 
 		err = storeReference.Walk(ctx, check.WalkBlockPrefix(blockRange, 100), func(filename string) (err error) {
-			fileStartBlock, err := strconv.Atoi(filename)
+			fileStartBlock, err := strconv.ParseUint(filename, 10, 64)
 			if err != nil {
-				return fmt.Errorf("parsing filename: %w", err)
+				fileStartBlock, _, _, _, _, err = bstream.ParseFilename(filename)
+				if err != nil {
+					return fmt.Errorf("parsing filename: %w", err)
+				}
 			}
 
 			// If reached end of range
