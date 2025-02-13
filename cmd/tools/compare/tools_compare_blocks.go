@@ -125,12 +125,14 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 		sanitizer := chain.Tools.GetSanitizeBlockForCompare()
 
 		err = storeReference.Walk(ctx, check.WalkBlockPrefix(blockRange, 100), func(filename string) (err error) {
+			var isOneBlock bool
 			fileStartBlock, err := strconv.ParseUint(filename, 10, 64)
 			if err != nil {
 				fileStartBlock, _, _, _, _, err = bstream.ParseFilename(filename)
 				if err != nil {
 					return fmt.Errorf("parsing filename: %w", err)
 				}
+				isOneBlock = true
 			}
 
 			// If reached end of range
@@ -146,6 +148,27 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 				var referenceBlocks map[string]*dynamicpb.Message
 				var referenceBlocksNum map[string]uint64
 				var currentBlocks map[string]*dynamicpb.Message
+
+				rightSideFilename := filename
+
+				exists, err := storeCurrent.FileExists(ctx, filename)
+				if err != nil {
+					return fmt.Errorf("checking file %q exists in current store: %w", filename, err)
+				}
+				if !exists {
+					if isOneBlock {
+						prefix := fmt.Sprintf("%010d-", fileStartBlock)
+						matchingFiles, err := storeCurrent.ListFiles(ctx, prefix, 1)
+						if err != nil {
+							return fmt.Errorf("listing files with prefix %q", prefix)
+						}
+						if len(matchingFiles) == 0 {
+							fmt.Printf("Bundle file %s does not exist in current store, skipping\n", filename)
+							return nil
+						}
+						rightSideFilename = matchingFiles[0]
+					}
+				}
 
 				wg.Add(1)
 				go func() {
@@ -171,7 +194,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 				go func() {
 					defer wg.Done()
 					_, currentBlocks, _, err = readBundle(ctx,
-						filename,
+						rightSideFilename,
 						storeCurrent,
 						uint64(fileStartBlock),
 						stopBlock,
@@ -250,7 +273,7 @@ func readBundle(
 	fileReader, err := store.OpenObject(ctx, filename)
 
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("creating reader: %w", err)
+		return nil, nil, nil, fmt.Errorf("creating reader for filename %q: %w", filename, err)
 	}
 
 	blockReader, err := bstream.NewDBinBlockReader(fileReader)
