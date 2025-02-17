@@ -164,7 +164,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			workerPoolFactory := work.NewSimpleWorkerPoolFactory(clientFactory).WorkerPool
 
 			if substreamsGlobalWorkerPoolAddress != "" {
-				grpcClientConnection, err := dgrpc.NewInternalClientConn(substreamsGlobalWorkerPoolAddress)
+				grpcClientConnection, err := dgrpc.NewInternalNoWaitClientConn(substreamsGlobalWorkerPoolAddress)
 				if err != nil {
 					return nil, fmt.Errorf("unable to create grpc client connection to global worker pool: %w", err)
 				}
