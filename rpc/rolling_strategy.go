@@ -6,28 +6,28 @@ type RollingStrategy[C any] interface {
 }
 
 type StickyRollingStrategy[C any] struct {
-	fistCallToNewClient bool
-	usedClientCount     int
-	nextClientIndex     int
+	firstCallToNewClient bool
+	usedClientCount      int
+	nextClientIndex      int
 }
 
 func NewStickyRollingStrategy[C any]() *StickyRollingStrategy[C] {
 	return &StickyRollingStrategy[C]{
-		fistCallToNewClient: true,
+		firstCallToNewClient: true,
 	}
 }
 
 func (s *StickyRollingStrategy[C]) reset() {
 	s.usedClientCount = 0
 }
-func (s *StickyRollingStrategy[C]) next(clients *Clients[C]) (client C, err error) {
 
+func (s *StickyRollingStrategy[C]) next(clients *Clients[C]) (client C, err error) {
 	if len(clients.clients) == s.usedClientCount {
 		return client, ErrorNoMoreClient
 	}
 
-	if s.fistCallToNewClient {
-		s.fistCallToNewClient = false
+	if s.firstCallToNewClient {
+		s.firstCallToNewClient = false
 		client = clients.clients[0]
 		s.usedClientCount = s.usedClientCount + 1
 		s.nextClientIndex = s.nextClientIndex + 1

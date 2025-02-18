@@ -48,11 +48,11 @@ func NewToolsCompareBlocksCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra
 		Use:   "compare-blocks <reference_blocks_store> <current_blocks_store> [<block_range>]",
 		Short: "Checks for any differences between two block stores between a specified range. (To compare the likeness of two block ranges, for example)",
 		Long: cli.Dedent(`
-			The 'compare-blocks' takes in two paths to stores of merged blocks and a range specifying the blocks you
-			want to compare, written as: '<start>:<finish>'. It will output the status of the likeness of every
-			100,000 blocks, on completion, or on encountering a difference. Increments that contain a difference will
-			be communicated as well as the blocks within that contain differences. Increments that do not have any
-			differences will be outputted as identical.
+			The 'compare-blocks' takes in two paths to stores of either merged blocks or one-blocks and a range
+			specifying the blocks you want to compare, written as: '<start>:<finish>'. It will output the status
+			of the likeness of every 100,000 blocks, on completion, or on encountering a difference. Increments that
+			contain a difference will be communicated as well as the blocks within that contain differences. Increments
+			that do not have any differences will be outputted as identical.
 
 			After passing through the blocks, it will output instructions on how to locate a specific difference
 			based on the blocks that were given. This is done by applying the '--diff' flag before your args.
@@ -125,9 +125,14 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 		sanitizer := chain.Tools.GetSanitizeBlockForCompare()
 
 		err = storeReference.Walk(ctx, check.WalkBlockPrefix(blockRange, 100), func(filename string) (err error) {
-			fileStartBlock, err := strconv.Atoi(filename)
+			var isOneBlock bool
+			fileStartBlock, err := strconv.ParseUint(filename, 10, 64)
 			if err != nil {
-				return fmt.Errorf("parsing filename: %w", err)
+				fileStartBlock, _, _, _, _, err = bstream.ParseFilename(filename)
+				if err != nil {
+					return fmt.Errorf("parsing filename: %w", err)
+				}
+				isOneBlock = true
 			}
 
 			// If reached end of range
@@ -143,6 +148,27 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 				var referenceBlocks map[string]*dynamicpb.Message
 				var referenceBlocksNum map[string]uint64
 				var currentBlocks map[string]*dynamicpb.Message
+
+				rightSideFilename := filename
+
+				exists, err := storeCurrent.FileExists(ctx, filename)
+				if err != nil {
+					return fmt.Errorf("checking file %q exists in current store: %w", filename, err)
+				}
+				if !exists {
+					if isOneBlock {
+						prefix := fmt.Sprintf("%010d-", fileStartBlock)
+						matchingFiles, err := storeCurrent.ListFiles(ctx, prefix, 1)
+						if err != nil {
+							return fmt.Errorf("listing files with prefix %q", prefix)
+						}
+						if len(matchingFiles) == 0 {
+							fmt.Printf("Bundle file %s does not exist in current store, skipping\n", filename)
+							return nil
+						}
+						rightSideFilename = matchingFiles[0]
+					}
+				}
 
 				wg.Add(1)
 				go func() {
@@ -168,7 +194,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 				go func() {
 					defer wg.Done()
 					_, currentBlocks, _, err = readBundle(ctx,
-						filename,
+						rightSideFilename,
 						storeCurrent,
 						uint64(fileStartBlock),
 						stopBlock,
@@ -247,7 +273,7 @@ func readBundle(
 	fileReader, err := store.OpenObject(ctx, filename)
 
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("creating reader: %w", err)
+		return nil, nil, nil, fmt.Errorf("creating reader for filename %q: %w", filename, err)
 	}
 
 	blockReader, err := bstream.NewDBinBlockReader(fileReader)
