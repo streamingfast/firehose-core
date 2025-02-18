@@ -4,11 +4,18 @@ start:
   - substreams-tier2
   flags:
     common-live-blocks-addr:
+    common-auth-plugin: trust://
     common-merged-blocks-store-url: "$COMMON_MERGED_BLOCKS_STORE_URL"
+    substreams-tier1-block-type: "sf.ethereum.type.v2.Block"
     # Also set FIRECORE_COMMON_FIRST_STREAMABLE_BLOCK to your local value, if not starting at 0
     ignore-advertise-validation: true
-    substreams-tier1-grpc-listen-addr: :9000
+    substreams-tier1-grpc-listen-addr: :9000*
     substreams-tier1-subrequests-insecure: false
     substreams-tier1-subrequests-plaintext: true
     substreams-tier1-subrequests-endpoint: :9001
+
+    substreams-tier1-global-worker-pool-address: :9002
+    substreams-tier1-global-worker-pool-keep-alive-delay: 25s
+
     substreams-tier2-grpc-listen-addr: :9001
+    substreams-tier2-global-worker-pool-address: :9002

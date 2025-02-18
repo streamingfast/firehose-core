@@ -1,6 +1,6 @@
 module github.com/streamingfast/firehose-core
 
-go 1.22.7
+go 1.23.4
 
 require (
 	buf.build/gen/go/bufbuild/reflect/connectrpc/go v1.16.1-20240117202343-bf8f65e8876c.1
@@ -31,7 +31,8 @@ require (
 	github.com/streamingfast/payment-gateway v0.0.0-20240426151444-581e930c76e2
 	github.com/streamingfast/pbgo v0.0.6-0.20250114182320-0b43084f4000
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.12.5-0.20250206200955-a523a786b3ef
+	github.com/streamingfast/substreams v1.12.5-0.20250218151206-f976e8686cfe
+	github.com/streamingfast/worker-pool-protocol v0.0.0-20250211140743-fb8ffbc05fbc
 	github.com/stretchr/testify v1.10.0
 	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.10.0
@@ -51,7 +52,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.49.0 // indirect
 	github.com/alecthomas/participle v0.7.1 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
-	github.com/bobg/go-generics/v3 v3.4.0 // indirect
+	github.com/bobg/go-generics/v3 v3.5.0 // indirect
 	github.com/bufbuild/protocompile v0.4.0 // indirect
 	github.com/charmbracelet/lipgloss v1.0.0 // indirect
 	github.com/charmbracelet/x/ansi v0.4.2 // indirect
@@ -69,6 +70,7 @@ require (
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.58.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.32.0 // indirect
+	go.uber.org/mock v0.5.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250124145028-65684f501c47 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250124145028-65684f501c47 // indirect
 )
@@ -87,14 +89,14 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.25.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.26.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.50.0 // indirect
-	github.com/GoogleCloudPlatform/opentelemetry-operations-go/propagator v0.0.0-20221018185641-36f91511cfd7 // indirect
+	github.com/GoogleCloudPlatform/opentelemetry-operations-go/propagator v0.39.0 // indirect
 	github.com/KimMachineGun/automemlimit v0.2.4
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/RoaringBitmap/roaring v1.9.1 // indirect
 	github.com/ShinyTrinkets/meta-logger v0.2.0 // indirect
 	github.com/abourget/llerrgroup v0.2.0
-	github.com/aws/aws-sdk-go v1.44.325 // indirect
+	github.com/aws/aws-sdk-go v1.49.6 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.12.0 // indirect
 	github.com/blendle/zapdriver v1.3.2-0.20200203083823-9200777f8a3d // indirect
@@ -186,7 +188,7 @@ require (
 	go.uber.org/atomic v1.10.0
 	go.uber.org/automaxprocs v1.5.1
 	golang.org/x/crypto v0.32.0 // indirect
-	golang.org/x/mod v0.17.0 // indirect
+	golang.org/x/mod v0.18.0 // indirect
 	golang.org/x/net v0.34.0
 	golang.org/x/oauth2 v0.25.0
 	golang.org/x/sync v0.10.0 // indirect
@@ -194,8 +196,8 @@ require (
 	golang.org/x/term v0.28.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
-	google.golang.org/api v0.218.0 // indirect
-	google.golang.org/genproto v0.0.0-20250122153221-138b5a5a4fd4 // indirect
+	google.golang.org/api v0.219.0 // indirect
+	google.golang.org/genproto v0.0.0-20250106144421-5f5ef82da422 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/olivere/elastic.v3 v3.0.75

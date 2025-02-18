@@ -21,12 +21,14 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/streamingfast/dgrpc"
 	discoveryservice "github.com/streamingfast/dgrpc/server/discovery-service"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/launcher"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams/app"
 	"github.com/streamingfast/substreams/wasm"
+	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
 	"go.uber.org/zap"
 )
 
@@ -44,7 +46,7 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().String("substreams-tier2-grpc-listen-addr", firecore.SubstreamsTier2GRPCServingAddr, "Address on which the substreams tier2 will listen. Default is plain-text, appending a '*' to the end to jkkkj")
 			cmd.Flags().String("substreams-tier2-discovery-service-url", "", "URL to advertise presence to the grpc discovery service") //traffic-director://xds?vpc_network=vpc-global&use_xds_reds=true
 			cmd.Flags().Uint64("substreams-tier2-max-concurrent-requests", 0, "Maximum number of concurrent requests allowed on the server. When the tier2 service hits this limit, it will set itself as 'Not Ready' until requests are processed. Default 0 (no limit)")
-
+			cmd.Flags().String("substreams-tier2-global-worker-pool-address", "", "Address of the global worker pool to use for the substreams tier1. (disabled if empty)")
 			// all substreams
 			registerCommonSubstreamsFlags(cmd)
 			return nil
@@ -56,6 +58,7 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 
 			maximumConcurrentRequests := viper.GetUint64("substreams-tier2-max-concurrent-requests")
 			executionTimeout := viper.GetDuration("substreams-block-execution-timeout")
+			substreamsGlobalWorkerPoolAddress := viper.GetString("substreams-tier2-global-worker-pool-address")
 
 			tracing := os.Getenv("SUBSTREAMS_TRACING") == "modules_exec"
 
@@ -87,6 +90,16 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 				return nil, fmt.Errorf("getting temporary directory: %w", err)
 			}
 
+			var remoteWorkerPoolClient pbworker.WorkerPoolClient
+			if substreamsGlobalWorkerPoolAddress != "" {
+				grpcClientConnection, err := dgrpc.NewInternalClientConn(substreamsGlobalWorkerPoolAddress)
+				if err != nil {
+					return nil, fmt.Errorf("unable to create grpc client connection to global worker pool: %w", err)
+				}
+				remoteWorkerPoolClient = pbworker.NewWorkerPoolClient(grpcClientConnection)
+
+			}
+
 			return app.NewTier2(appLogger,
 				&app.Tier2Config{
 					Tracing: tracing,
@@ -100,6 +113,7 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 					MaximumConcurrentRequests: maximumConcurrentRequests,
 				}, &app.Tier2Modules{
 					CheckPendingShutDown: runtime.IsPendingShutdown,
+					RemoteWorkerClient:   remoteWorkerPoolClient,
 				}), nil
 		},
 	})
