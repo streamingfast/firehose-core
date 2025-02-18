@@ -13,6 +13,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### Substreams
 
 * Add shared cache for tier1 execution near HEAD, to prevent multiple tier1 instances from reprocessing the same module on the same block when it comes in (ex: foundational modules)
+* Improved fetching of state caches on tier1 requests to speed up "time to first data"
 
 ### Tools
 
