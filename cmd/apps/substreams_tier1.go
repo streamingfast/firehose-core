@@ -77,7 +77,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().Duration("substreams-tier1-global-worker-pool-keep-alive-delay", 25*time.Second, "Delay between two keep alive call to the global worker pool. Default is 25s")
 			cmd.Flags().Duration("substreams-tier1-global-request-pool-keep-alive-delay", 25*time.Second, "Delay between two keep alive call to the global worker pool for request. Default is 25s")
 			cmd.Flags().Uint64("substreams-tier1-default-max-request-per-user", 3, "default max request per user, this will be use of the global worker pool is not reachable. Default is 5")
-			cmd.Flags().Uint64("substreams-tier1-default-minimal-request-life-time-second", 180, "default max request per user, this will be use of the global worker pool is not reachable. Default is 5")
+			cmd.Flags().Uint64("substreams-tier1-default-minimal-request-life-time-second", 180, "default minimal request request life time, this will be use of the global worker pool is not reachable.")
 			// all substreams
 			registerCommonSubstreamsFlags(cmd)
 			return nil
