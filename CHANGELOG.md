@@ -23,6 +23,11 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 * Added flag `substreams-tier1-default-max-request-per-user` default max request per user, this will be use of the global worker pool is not reachable. Default is 5
 * Added flag `substreams-tier1-default-minimal-request-life-time-second` default minimal request life time, this will be use of the global worker pool is not reachable. . Default is 180
 
+* Limit parallel execution of a stage's layer: Previously, the engine was executing modules in a stage's layer all in parallel.
+  We now change that behavior, development mode will from now on execute every sequentially and when in production mode will
+  limit parallelism to 2 (hard-coded) for now.
+  The auth plugin can control that value dynamically by providing a trusted header `X-Sf-Substreams-Stage-Layer-Parallel-Executor-Max-Count`.
+
 #### Performance
 
 * Fixed a regression since "v1.7.3" where the SkipEmptyOutput instruction was ignored in substreams mappers
