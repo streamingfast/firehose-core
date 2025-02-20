@@ -74,6 +74,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				so they should end up on another tier1 instance, assuming you have proper auto-scaling of the number of instances available.
 			`))
 			cmd.Flags().String("substreams-tier1-global-worker-pool-address", "", "Address of the global worker pool to use for the substreams tier1. (disabled if empty)")
+			cmd.Flags().String("substreams-tier1-global-request-pool-address", "", "Address of the global worker pool to use for the substreams tier1. (disabled if empty)")
 			cmd.Flags().Duration("substreams-tier1-global-worker-pool-keep-alive-delay", 25*time.Second, "Delay between two keep alive call to the global worker pool. Default is 25s")
 			cmd.Flags().Duration("substreams-tier1-global-request-pool-keep-alive-delay", 25*time.Second, "Delay between two keep alive call to the global worker pool for request. Default is 25s")
 			cmd.Flags().Uint64("substreams-tier1-default-max-request-per-user", 3, "default max request per user, this will be use of the global worker pool is not reachable. Default is 5")
@@ -189,6 +190,16 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 					clientFactory,
 					viper.GetDuration("substreams-tier1-global-worker-pool-keep-alive-delay"),
 				).WorkerPool
+
+			}
+
+			substreamsGlobalRequestPoolAddress := viper.GetString("substreams-tier1-global-request-pool-address")
+			if substreamsGlobalRequestPoolAddress != "" {
+				grpcClientConnection, err := dgrpc.NewInternalNoWaitClientConn(substreamsGlobalRequestPoolAddress)
+				if err != nil {
+					return nil, fmt.Errorf("unable to create grpc client connection to global rewquest pool: %w", err)
+				}
+				workerPoolClient := pbworker.NewWorkerPoolClient(grpcClientConnection)
 
 				defaultMinimalWorkerLifeDuration := time.Duration(viper.GetInt("substreams-tier1-default-minimal-request-life-time-second")) * time.Second
 				globalRequestPool = service.NewGlobalRequestPool(
