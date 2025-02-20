@@ -12,13 +12,20 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Substreams
 
+#### Capacity Management
+
 * Integrated the `GlobalRequestPool` service in the `Tier1App` to manage global requests pooling.
-* 
+* Integrated the `GlobalWorkerPool` service in the `Tier1App` to manage global worker pooling.
 
-* Added new flag `substreams-tier1-global-request-pool-keep-alive-delay` delay between two keep alive call to the global worker pool for request. Default is 25s 
-* Added new flag `substreams-tier1-default-max-request-per-user` default max request per user, this will be use of the global worker pool is not reachable. Default is 5
-* Added new flag `substreams-tier1-default-minimal-request-life-time-second` default minimal request life time, this will be use of the global worker pool is not reachable. . Default is 180
+* Added flag `substreams-tier1-global-worker-pool-address`, the address of the global worker pool to use for the substreams tier1. (disabled if empty)
+* Added flag `substreams-tier1-global-worker-pool-keep-alive-delay` delay between two keep alive call to the global worker pool. Default is 25s")
+* Added flag `substreams-tier1-global-request-pool-keep-alive-delay` delay between two keep alive call to the global worker pool for request. Default is 25s
+* Added flag `substreams-tier1-default-max-request-per-user` default max request per user, this will be use of the global worker pool is not reachable. Default is 5
+* Added flag `substreams-tier1-default-minimal-request-life-time-second` default minimal request life time, this will be use of the global worker pool is not reachable. . Default is 180
 
+#### Performance
+
+* Fixed a regression since "v1.7.3" where the SkipEmptyOutput instruction was ignored in substreams mappers
 * Add shared cache for tier1 execution near HEAD, to prevent multiple tier1 instances from reprocessing the same module on the same block when it comes in (ex: foundational modules)
 * Improved fetching of state caches on tier1 requests to speed up "time to first data"
 
