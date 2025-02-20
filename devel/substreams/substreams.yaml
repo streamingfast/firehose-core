@@ -15,6 +15,7 @@ start:
     substreams-tier1-subrequests-endpoint: :9001
 
     substreams-tier1-global-worker-pool-address: :9002
+    substreams-tier1-global-request-pool-address: :9002
     substreams-tier1-global-worker-pool-keep-alive-delay: 1s
 
     substreams-tier2-grpc-listen-addr: :9001
