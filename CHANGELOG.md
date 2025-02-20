@@ -12,6 +12,13 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Substreams
 
+* Integrated the `GlobalRequestPool` service in the `Tier1App` to manage global requests pooling.
+* 
+
+* Added new flag `substreams-tier1-global-request-pool-keep-alive-delay` delay between two keep alive call to the global worker pool for request. Default is 25s 
+* Added new flag `substreams-tier1-default-max-request-per-user` default max request per user, this will be use of the global worker pool is not reachable. Default is 5
+* Added new flag `substreams-tier1-default-minimal-request-life-time-second` default minimal request life time, this will be use of the global worker pool is not reachable. . Default is 180
+
 * Add shared cache for tier1 execution near HEAD, to prevent multiple tier1 instances from reprocessing the same module on the same block when it comes in (ex: foundational modules)
 * Improved fetching of state caches on tier1 requests to speed up "time to first data"
 
