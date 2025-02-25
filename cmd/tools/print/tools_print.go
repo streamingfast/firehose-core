@@ -15,6 +15,7 @@
 package print
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -42,24 +43,23 @@ func NewToolsPrintCmd[B firecore.Block](chain *firecore.Chain[B], logger *zap.Lo
 	}
 
 	toolsPrintOneBlockCmd := &cobra.Command{
-		Use:   "one-block <store> <block_num>",
-		Short: "Prints a block from a one-block file",
-		Args:  cobra.ExactArgs(2),
+		Use:   "one-block (<file> | <store> <block_num>)",
+		Short: "Prints a block from a one-block file or from a store a block number",
+		Args:  cobra.RangeArgs(1, 2),
+		RunE:  createToolsPrintOneBlockE(chain),
 	}
 
 	toolsPrintMergedBlocksCmd := &cobra.Command{
 		Use:   "merged-blocks <store|file> [<start_block>[:<end_block>]]",
 		Short: "Prints merged blocks file from store, using range if specified",
 		Args:  cobra.RangeArgs(1, 2),
+		RunE:  createToolsPrintMergedBlocksE(chain, logger),
 	}
 
 	toolsPrintCmd.AddCommand(toolsPrintOneBlockCmd)
 	toolsPrintCmd.AddCommand(toolsPrintMergedBlocksCmd)
 
 	toolsPrintCmd.PersistentFlags().Bool("transactions", false, "When in 'text' output mode, also print transactions summary")
-
-	toolsPrintOneBlockCmd.RunE = createToolsPrintOneBlockE(chain)
-	toolsPrintMergedBlocksCmd.RunE = createToolsPrintMergedBlocksE(chain, logger)
 
 	return toolsPrintCmd
 }
@@ -85,7 +85,7 @@ func createToolsPrintMergedBlocksE[B firecore.Block](chain *firecore.Chain[B], l
 			cli.Ensure(blockRange.IsResolved(), "Invalid block range %q: print only accepts fully resolved range", blockRange)
 		}
 
-		if looksLikeStoreURLFile(args[0]) {
+		if looksLikeMergedBlocksFile(args[0]) {
 			store, err = dstore.NewDBinStore(storeURLFromFileInput(args[0]))
 			cli.NoError(err, "Unable to create store %q", path.Dir(args[0]))
 
@@ -125,9 +125,16 @@ func createToolsPrintMergedBlocksE[B firecore.Block](chain *firecore.Chain[B], l
 	}
 }
 
+var oneBlockFileRegex = regexp.MustCompile(`^(\d{10}).+(?:.dbin(?:.zst)?)?$`)
 var mergedBlocksFileRegex = regexp.MustCompile(`^(\d{10})(?:.dbin(?:.zst)?)?$`)
 
-func looksLikeStoreURLFile(path string) bool {
+func looksLikeOneBlockFile(path string) bool {
+	base := filepath.Base(path)
+
+	return oneBlockFileRegex.MatchString(base)
+}
+
+func looksLikeMergedBlocksFile(path string) bool {
 	base := filepath.Base(path)
 
 	return mergedBlocksFileRegex.MatchString(base)
@@ -160,25 +167,35 @@ func createToolsPrintOneBlockE[B firecore.Block](chain *firecore.Chain[B]) firec
 		outputPrinter, err := GetOutputPrinter(cmd, chain.BlockFileDescriptor())
 		cli.NoError(err, "Unable to get output printer")
 
-		storeURL := args[0]
-		store, err := dstore.NewDBinStore(storeURL)
-		if err != nil {
-			return fmt.Errorf("unable to create store at path %q: %w", store, err)
-		}
+		storeInput := args[0]
 
-		blockNum, err := strconv.ParseUint(args[1], 10, 64)
-		if err != nil {
-			return fmt.Errorf("unable to parse block number %q: %w", args[1], err)
-		}
-
+		var store dstore.Store
 		var files []string
-		filePrefix := fmt.Sprintf("%010d", blockNum)
-		err = store.Walk(ctx, filePrefix, func(filename string) (err error) {
-			files = append(files, filename)
-			return nil
-		})
-		if err != nil {
-			return fmt.Errorf("unable to find on block files: %w", err)
+
+		if looksLikeOneBlockFile(storeInput) {
+			var filename string
+			store, filename, err = dstore.NewStoreFromFileURL(storeInput, dstore.Compression("zstd"))
+			if err != nil {
+				return fmt.Errorf("unable to create store at path %q: %w", store, err)
+			}
+			files = []string{filename}
+		} else {
+			store, err = dstore.NewDBinStore(storeInput)
+			if err != nil {
+				return fmt.Errorf("unable to create store at path %q: %w", store, err)
+			}
+
+			cli.Ensure(len(args) == 2, "Missing block number argument")
+
+			blockNum, err := strconv.ParseUint(args[1], 10, 64)
+			if err != nil {
+				return fmt.Errorf("unable to parse block number %q: %w", args[1], err)
+			}
+
+			files, err = findOneBlockFiles(ctx, store, blockNum)
+			if err != nil {
+				return fmt.Errorf("find one blocks file: %w", err)
+			}
 		}
 
 		for _, filepath := range files {
@@ -239,4 +256,21 @@ func displayBlock[B firecore.Block](pbBlock *pbbstream.Block, chain *firecore.Ch
 	}
 
 	return nil
+}
+
+// findOneBlockFiles finds all the files in the store that are prefixed with
+// the block number. There could be multiple files for a single block number,
+// this function will return all of them.
+func findOneBlockFiles(ctx context.Context, store dstore.Store, blockNum uint64) ([]string, error) {
+	var files []string
+	filePrefix := fmt.Sprintf("%010d", blockNum)
+	err := store.Walk(ctx, filePrefix, func(filename string) (err error) {
+		files = append(files, filename)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("walk files: %w", err)
+	}
+
+	return files, nil
 }

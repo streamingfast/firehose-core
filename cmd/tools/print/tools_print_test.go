@@ -58,7 +58,7 @@ func Test_doesLookLikeStoreURLFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := looksLikeStoreURLFile(tt.args.path); got != tt.want {
+			if got := looksLikeMergedBlocksFile(tt.args.path); got != tt.want {
 				t.Errorf("doesLookLikeStoreURLFile() = %v, want %v", got, tt.want)
 			}
 		})
