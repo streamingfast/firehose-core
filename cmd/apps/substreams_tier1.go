@@ -73,6 +73,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				This is useful to prevent the tier1 from being overwhelmed by too many requests, most client auto-reconnects on 'Unavailable' code
 				so they should end up on another tier1 instance, assuming you have proper auto-scaling of the number of instances available.
 			`))
+			cmd.Flags().String("substreams-tier1-quicksave-store", "", "If enabled, substreams will use this store to put 'quicksave' data when shutting down while running requests with 'stores'. Use this flag with a non-zero --common-system-shutdown-signal-delay")
 			cmd.Flags().String("substreams-tier1-global-worker-pool-address", "", "Address of the global worker pool to use for the substreams tier1. (disabled if empty)")
 			cmd.Flags().String("substreams-tier1-global-request-pool-address", "", "Address of the global worker pool to use for the substreams tier1. (disabled if empty)")
 			cmd.Flags().Duration("substreams-tier1-global-worker-pool-keep-alive-delay", 25*time.Second, "Delay between two keep alive call to the global worker pool. Default is 25s")
@@ -163,6 +164,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			config.GRPCListenAddr = viper.GetString("substreams-tier1-grpc-listen-addr")
 			config.GRPCShutdownGracePeriod = time.Second
 			config.ServiceDiscoveryURL = serviceDiscoveryURL
+			config.QuickSaveStoreURL = viper.GetString("substreams-tier1-quicksave-store")
 
 			subRequestsClientConfig := client.NewSubstreamsClientConfig(
 				config.SubrequestsEndpoint,

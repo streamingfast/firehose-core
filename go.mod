@@ -17,7 +17,7 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
-	github.com/streamingfast/bstream v0.0.2-0.20250129191551-5539724f4b12
+	github.com/streamingfast/bstream v0.0.2-0.20250221181559-fb0809660f91
 	github.com/streamingfast/cli v0.0.4-0.20250116003948-fbf66c930cce
 	github.com/streamingfast/dauth v0.0.0-20250130223258-c615a033a660
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
@@ -31,7 +31,7 @@ require (
 	github.com/streamingfast/payment-gateway v0.0.0-20240426151444-581e930c76e2
 	github.com/streamingfast/pbgo v0.0.6-0.20250114182320-0b43084f4000
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.12.5-0.20250220140015-91e8dc3e5576
+	github.com/streamingfast/substreams v1.13.1-0.20250226131308-66bde512c25e
 	github.com/streamingfast/worker-pool-protocol v0.0.0-20250218145136-4ad271e36e39
 	github.com/stretchr/testify v1.10.0
 	github.com/test-go/testify v1.1.4
@@ -54,6 +54,7 @@ require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bobg/go-generics/v3 v3.5.0 // indirect
 	github.com/bufbuild/protocompile v0.4.0 // indirect
+	github.com/bytecodealliance/wasmtime-go/v30 v30.0.0 // indirect
 	github.com/charmbracelet/lipgloss v1.0.0 // indirect
 	github.com/charmbracelet/x/ansi v0.4.2 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -217,7 +218,6 @@ require (
 replace (
 	cloud.google.com/go => github.com/streamingfast/google-cloud-go v0.0.0-20241202194114-f77ff78d4f66
 	github.com/ShinyTrinkets/overseer => github.com/streamingfast/overseer v0.2.1-0.20210326144022-ee491780e3ef
-	github.com/bytecodealliance/wasmtime-go/v4 => github.com/streamingfast/wasmtime-go/v4 v4.0.0-freemem3
 	github.com/jhump/protoreflect => github.com/streamingfast/protoreflect v0.0.0-20231205191344-4b629d20ce8d
 	github.com/tetratelabs/wazero => github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed
 
