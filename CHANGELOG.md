@@ -8,17 +8,27 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.9.0
+
+### Substreams
+
+* Rust modules will now be executed with `wasmtime` by default instead of `wazero`.
+  - Prevents the whole server from stalling in certain memory-intensive operations in wazero.
+  - Speed improvement: cuts the execution time in half in some circumstances.
+  - Wazero is still used for modules with `wbindgen` and modules compiled with `tinygo`.
+  - Set env var `SUBSTREAMS_WASM_RUNTIME=wazero` to revert to previous behavior.
+
+* Implement "QuickSave" feature to save the state of "live running" substreams stores when shutting down, and then resume processing from that point if the cursor matches.
+  - Added flag `substreams-tier1-quicksave-store` to enable quicksave when non-empty
+    (requires `--common-system-shutdown-signal-delay` to be set to a long enough value to save the in-flight stores)
+
+### Misc
 
 * The `firecore tools print one-block` is now able to print from a file directly.
 
 ## v1.8.0
 
 ### Substreams
-
-#### Reconnection time
-
-* Added flag `substreams-tier1-quicksave-store` to enable quicksave of stores on tier1, allowing for a fast reconnection of clients using stores.
 
 #### Capacity Management
 
@@ -40,12 +50,6 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 * Add shared cache for tier1 execution near HEAD, to prevent multiple tier1 instances from reprocessing the same module on the same block when it comes in (ex: foundational modules)
 * Improved fetching of state caches on tier1 requests to speed up "time to first data"
-
-* Rust modules will now be executed with `wasmtime` by default instead of `wazero`.
-  - Prevents the whole server from stalling in certain memory-intensive operations in wazero.
-  - Speed improvement: cuts the execution time in half in some circumstances.
-  - Wazero is still used for modules with `wbindgen` and modules compiled with `tinygo`.
-  - Set env var `SUBSTREAMS_WASM_RUNTIME=wazero` to revert to previous behavior.
 
 * Fixed a regression since "v1.7.3" where the SkipEmptyOutput instruction was ignored in substreams mappers
 
