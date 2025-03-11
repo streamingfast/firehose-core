@@ -51,34 +51,15 @@ func NewTextOutputPrinter(bytesEncoding string, registry *fcproto.Registry, prin
 
 func (p *TextOutputPrinter) PrintTo(input any, out io.Writer) error {
 	if pbblock, ok := input.(*pbbstream.Block); ok {
-		err := writeStringFToWriter(out, "Block #%d (%s)\n - Parent: #%d (%s)\n - LIB: #%d\n - Time: %s (age %s)\n\n",
-			pbblock.Number,
-			pbblock.Id,
-			pbblock.ParentNum,
-			pbblock.ParentId,
-			pbblock.LibNum,
-			pbblock.Timestamp.AsTime(),
-			time.Since(pbblock.Timestamp.AsTime()),
-		)
-		if err != nil {
-			return fmt.Errorf("writing block: %w", err)
-		}
-
-		if p.printTransactions {
-			if _, err = out.Write([]byte("warning: transaction printing not supported by bstream block")); err != nil {
-				return fmt.Errorf("writing transaction support warning: %w", err)
-			}
-		}
-
-		return nil
+		return p.printPbBlock(pbblock, out)
 	}
 
 	if v, ok := input.(*pbfirehose.Response); ok {
-		return p.printBlock(v.Block, out)
+		return p.printFirehoseStreamBlockResponse(v, out)
 	}
 
 	if v, ok := input.(*pbfirehose.SingleBlockResponse); ok {
-		return p.printBlock(v.Block, out)
+		return p.printFirehoseSingleBlockResponse(v, out)
 	}
 
 	if v, ok := input.(proto.Message); ok {
@@ -87,6 +68,56 @@ func (p *TextOutputPrinter) PrintTo(input any, out io.Writer) error {
 
 	return writeStringFToWriter(out, "%T", input)
 }
+
+func (p *TextOutputPrinter) printFirehoseStreamBlockResponse(input *pbfirehose.Response, out io.Writer) error {
+	return p.printPbBlock(&pbbstream.Block{
+		Number:    input.Metadata.Num,
+		Id:        input.Metadata.Id,
+		ParentId:  input.Metadata.ParentId,
+		Timestamp: input.Metadata.Time,
+		LibNum:    input.Metadata.LibNum,
+		ParentNum: input.Metadata.ParentNum,
+		Payload:   input.Block,
+	}, out)
+}
+
+func (p *TextOutputPrinter) printFirehoseSingleBlockResponse(input *pbfirehose.SingleBlockResponse, out io.Writer) error {
+	return p.printPbBlock(&pbbstream.Block{
+		Number:    input.Metadata.Num,
+		Id:        input.Metadata.Id,
+		ParentId:  input.Metadata.ParentId,
+		Timestamp: input.Metadata.Time,
+		LibNum:    input.Metadata.LibNum,
+		ParentNum: input.Metadata.ParentNum,
+		Payload:   input.Block,
+	}, out)
+}
+
+func (p *TextOutputPrinter) printPbBlock(pbblock *pbbstream.Block, out io.Writer) error {
+	err := writeStringFToWriter(out, "Block #%d (%s)\n - Parent: #%d (%s)\n - LIB: #%d\n - Time: %s (age %s)\n",
+		pbblock.Number,
+		pbblock.Id,
+		pbblock.ParentNum,
+		pbblock.ParentId,
+		pbblock.LibNum,
+		pbblock.Timestamp.AsTime(),
+		time.Since(pbblock.Timestamp.AsTime()),
+	)
+	if err != nil {
+		return fmt.Errorf("writing block: %w", err)
+	}
+
+	if p.printTransactions {
+		if _, err = out.Write([]byte("warning: transaction printing not supported by bstream block")); err != nil {
+			return fmt.Errorf("writing transaction support warning: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// Suppress unused warning, let's keep the function for now
+var _ = (*TextOutputPrinter)(nil).printBlock
 
 func (p *TextOutputPrinter) printBlock(anyBlock *anypb.Any, out io.Writer) error {
 	block, err := anypb.UnmarshalNew(anyBlock, proto.UnmarshalOptions{Resolver: p.registry})
