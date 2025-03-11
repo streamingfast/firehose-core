@@ -32,6 +32,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 * The `firecore tools print one-block` is now able to print from a file directly.
 
+* Added `firecore tools relayer stream <endpoint> [(+<count>|<stopBlock>)]` to connect to a relayer component through gRPC and stream data out, output controlled by `tools --output` flag.
+
 ## v1.8.0
 
 ### Substreams

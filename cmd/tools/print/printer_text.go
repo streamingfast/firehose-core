@@ -21,6 +21,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	fcjson "github.com/streamingfast/firehose-core/json"
@@ -50,13 +51,14 @@ func NewTextOutputPrinter(bytesEncoding string, registry *fcproto.Registry, prin
 
 func (p *TextOutputPrinter) PrintTo(input any, out io.Writer) error {
 	if pbblock, ok := input.(*pbbstream.Block); ok {
-		err := writeStringFToWriter(out, "Block #%d (%s)\n - Parent: #%d (%s)\n  - LIB: #%d\n  - Time: %s\n",
+		err := writeStringFToWriter(out, "Block #%d (%s)\n - Parent: #%d (%s)\n - LIB: #%d\n - Time: %s (age %s)\n\n",
 			pbblock.Number,
 			pbblock.Id,
 			pbblock.ParentNum,
 			pbblock.ParentId,
 			pbblock.LibNum,
 			pbblock.Timestamp.AsTime(),
+			time.Since(pbblock.Timestamp.AsTime()),
 		)
 		if err != nil {
 			return fmt.Errorf("writing block: %w", err)
@@ -67,6 +69,8 @@ func (p *TextOutputPrinter) PrintTo(input any, out io.Writer) error {
 				return fmt.Errorf("writing transaction support warning: %w", err)
 			}
 		}
+
+		return nil
 	}
 
 	if v, ok := input.(*pbfirehose.Response); ok {
