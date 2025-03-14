@@ -9,6 +9,12 @@ Operators, you should copy/paste content of this content straight to your projec
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
 
+## v1.9.4
+
+### Substreams (v1.14.5)
+
+* Bugfix for panics on some requests
+
 ## v1.9.3
 
 ### Substreams (v1.14.4)
