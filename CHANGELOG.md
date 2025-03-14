@@ -8,6 +8,34 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+
+## v1.9.2
+
+### Substreams (v1.14.3)
+
+#### Bugfixes
+
+* Fixed `runtime error: slice bounds out of range` error on heavy memory usage with wasmtime engin
+
+* Added a validation on a module for the existence of 'triggering' inputs: the server will now fail with a clear error message
+  when the only available inputs are stores used with mode 'get' (not 'deltas'), instead of silenlty skipping the module on every block.
+
+#### Performance
+
+* Added a mechanism for 'production-mode' requests where the tier1 will not schedule tier2 jobs over { max_parallel_subrequests } segments above the current block being streamed to the user.
+  This will ensure that a user slowly reading blocks 1, 2, 3... will not trigger a flood of tier2 jobs for higher blocks, let's say 300_000_000, that might never get read.
+
+#### Service lifecycle
+
+* Improved connection draining on shutdown: Now waits for the end of the 'shutdown-delay' before draining and refusing new connections, then waits for 'quicksaves' and successful signaling of clients, up to a max of 30 sec.
+
+#### Logging / errors
+
+* Added information about the number of blocks that need to be processed for a given request in the `sf.substreams.rpc.v2.SessionInit` message
+* Added an optional field `limit_processed_blocks` to the `sf.substreams.rpc.v2.Request`. When set to a non-zero value, the server will reject a request that would process more blocks than the given value with the `FailedPrecondition` GRPC error code.
+* Improved error messages when a module execution is timing out on a block (ex: due to a slow external call) and now return a `DeadlineExceeded` Connect/GRPC error code instead of a Internal. Removed 'panic' from wording.
+* In 'substreams request stats' log, add fields: `remote_jobs_completed`, `remote_blocks_processed` and `total_uncompressed_read_bytes`
+
 ## v1.9.1
 
 ### Substreams
