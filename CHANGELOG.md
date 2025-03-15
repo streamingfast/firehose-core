@@ -8,6 +8,13 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Substreams
+
+* Fix a panic when a module times out on tier2 while being executed from cached outputs
+* Add environment variables to control retry behavior, "SUBSTREAMS_WORKER_MAX_RETRIES" (default 10) and "SUBSTREAMS_WORKER_MAX_TIMEOUT_RETRIES" (default 2), changing from previous defaults (720 and 3)
+  The worker_max_timeout_retries is the number of retries specifically applied to block execution timing out (ex: because of external calls)
 
 ## v1.9.4
 
