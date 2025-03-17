@@ -27,6 +27,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
+	"github.com/streamingfast/firehose-core/internal/utils"
 	"github.com/streamingfast/firehose-core/merger/metrics"
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
@@ -80,7 +81,22 @@ func (b *Bundler) BaseBlockNum() uint64 {
 	return b.baseBlockNum
 }
 
+var forceFinalityAfterBlocks = utils.GetEnvForceFinalityAfterBlocks()
+
+func tweakBlockFinality(obf *bstream.OneBlockFile, maxDistanceToBlock uint64) {
+	if obf.Num < maxDistanceToBlock {
+		return // prevent uin64 underflow at the beginning of the chain
+	}
+	if (obf.Num - obf.LibNum) >= maxDistanceToBlock {
+		obf.LibNum = obf.Num - maxDistanceToBlock // force finality
+	}
+}
+
 func (b *Bundler) HandleBlockFile(obf *bstream.OneBlockFile) error {
+	if forceFinalityAfterBlocks != nil {
+		tweakBlockFinality(obf, *forceFinalityAfterBlocks)
+	}
+
 	b.seenBlockFiles[obf.CanonicalName] = obf
 	return b.forkable.ProcessBlock(obf.ToBstreamBlock(), obf) // forkable will call our own b.ProcessBlock() on irreversible blocks only
 }
