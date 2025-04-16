@@ -53,6 +53,9 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 				  {start-block-num}		The resolved start block number defined by the flag 'reader-node-start-block-num' (can be overwritten)
 				  {stop-block-num}		The stop block number defined by the flag 'reader-node-stop-block-num'
 
+				Furthermore, environment variables expansion is also performed on the arguments passed to the node, so that every occurence
+				of ${ENV_VAR} will be replaced with the value of the environment variable ENV_VAR if defined, or empty string if not.
+
 				Example: 'run blockchain -start {start-block-num} -end {stop-block-num}' may yield 'run blockchain -start 200 -end 500'
 			`)))
 			cmd.Flags().StringSlice("reader-node-backups", []string{}, "Repeatable, space-separated key=values definitions for backups. Example: 'type=gke-pvc-snapshot prefix= tag=v1 freq-blocks=1000 freq-time= project=myproj'")
@@ -224,6 +227,9 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 
 var variablesRegex = regexp.MustCompile(`\{(data-dir|node-data-dir|hostname|start-block-num|stop-block-num)\}`)
 
+// overridable for testing purposes
+var osEnvExpandGetter = os.Getenv
+
 // buildNodeArguments will resolve and split the given string into arguments, replacing the variables with the appropriate values.
 //
 // We are using a function for testing purposes, so that we can test arguments resolving and splitting correctly.
@@ -232,6 +238,13 @@ func buildNodeArguments(in string, resolver firecore.ReaderNodeArgumentResolver)
 	nodeArguments, err := shellquote.Split(resolver(in))
 	if err != nil {
 		return nil, fmt.Errorf("cannot split 'reader-node-arguments' value: %w", err)
+	}
+
+	// Replace environment variables, we do it per argument so that if the env var contains space,
+	// it will not be extra split into multiple arguments, which would have been the case if we did it
+	// before splitting the arguments using shell rules.
+	for i, arg := range nodeArguments {
+		nodeArguments[i] = os.Expand(arg, osEnvExpandGetter)
 	}
 
 	return nodeArguments, nil
