@@ -47,11 +47,12 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 			cmd.Flags().String("reader-node-arguments", "", string(cli.Description(`
 				Defines the node arguments that will be passed to the node on execution. Supports templating, where we will replace certain sub-string with the appropriate value
 
-				  {data-dir}			The current data-dir path defined by the flag 'data-dir'
-				  {node-data-dir}		The node data dir path defined by the flag 'reader-node-data-dir'
-				  {hostname}			The machine's hostname
-				  {start-block-num}		The resolved start block number defined by the flag 'reader-node-start-block-num' (can be overwritten)
-				  {stop-block-num}		The stop block number defined by the flag 'reader-node-stop-block-num'
+				  {data-dir}		 	   The current data-dir path defined by the flag 'data-dir'
+				  {node-data-dir}		   The node data dir path defined by the flag 'reader-node-data-dir'
+				  {hostname}			   The machine's hostname
+				  {first-streamable-block} The first streamable block number defined by the flag 'common-first-streamable-block'
+				  {start-block-num}		   The resolved start block number defined by the flag 'reader-node-start-block-num' (can be overwritten)
+				  {stop-block-num}		   The stop block number defined by the flag 'reader-node-stop-block-num'
 
 				Furthermore, environment variables expansion is also performed on the arguments passed to the node, so that every occurence
 				of ${ENV_VAR} will be replaced with the value of the environment variable ENV_VAR if defined, or empty string if not.
@@ -112,13 +113,12 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 				if err != nil {
 					return nil, fmt.Errorf("resolve start block: %w", err)
 				}
-
 			}
 
 			stopBlockNum := viper.GetUint64("reader-node-stop-block-num")
 
 			hostname, _ := os.Hostname()
-			nodeArgumentResolver := createNodeArgumentsResolver(sfDataDir, nodeDataDir, hostname, resolveStartBlockNum, stopBlockNum)
+			nodeArgumentResolver := createNodeArgumentsResolver(sfDataDir, nodeDataDir, hostname, firstStreamableBlock, resolveStartBlockNum, stopBlockNum)
 
 			nodeArguments, err := buildNodeArguments(viper.GetString("reader-node-arguments"), nodeArgumentResolver)
 			if err != nil {
@@ -225,7 +225,7 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 	})
 }
 
-var variablesRegex = regexp.MustCompile(`\{(data-dir|node-data-dir|hostname|start-block-num|stop-block-num)\}`)
+var variablesRegex = regexp.MustCompile(`\{(data-dir|node-data-dir|hostname|first-streamable-block|start-block-num|stop-block-num)\}`)
 
 // overridable for testing purposes
 var osEnvExpandGetter = os.Getenv
@@ -250,7 +250,7 @@ func buildNodeArguments(in string, resolver firecore.ReaderNodeArgumentResolver)
 	return nodeArguments, nil
 }
 
-func createNodeArgumentsResolver(dataDir, nodeDataDir, hostname string, startBlockNum, stopBlockNum uint64) firecore.ReaderNodeArgumentResolver {
+func createNodeArgumentsResolver(dataDir, nodeDataDir, hostname string, firstStreamableBlock, startBlockNum, stopBlockNum uint64) firecore.ReaderNodeArgumentResolver {
 	return func(in string) string {
 		return variablesRegex.ReplaceAllStringFunc(in, func(match string) string {
 			switch match {
@@ -260,6 +260,8 @@ func createNodeArgumentsResolver(dataDir, nodeDataDir, hostname string, startBlo
 				return nodeDataDir
 			case "{hostname}":
 				return hostname
+			case "{first-streamable-block}":
+				return fmt.Sprintf("%d", firstStreamableBlock)
 			case "{start-block-num}":
 				return fmt.Sprintf("%d", startBlockNum)
 			case "{stop-block-num}":

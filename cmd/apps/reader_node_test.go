@@ -23,21 +23,23 @@ func Test_buildNodeArguments(t *testing.T) {
 	}
 
 	tests := []struct {
-		name          string
-		args          string
-		withEnv       func(k string) string
-		want          []string
-		startBlockNum uint64
-		stopBlockNum  uint64
-		assertion     require.ErrorAssertionFunc
+		name                 string
+		args                 string
+		withEnv              func(k string) string
+		want                 []string
+		firstStreamableBlock uint64
+		startBlockNum        uint64
+		stopBlockNum         uint64
+		assertion            require.ErrorAssertionFunc
 	}{
-		{"no variables", "arg1 arg2", nil, []string{"arg1", "arg2"}, 10, 20, require.NoError},
-		{"variable data-dir", "{data-dir} arg2", nil, []string{"/data", "arg2"}, 10, 20, require.NoError},
-		{"variable node-data-dir", "{node-data-dir} arg2", nil, []string{"/data/node", "arg2"}, 10, 20, require.NoError},
-		{"variable hostname", "{hostname} arg2", nil, []string{"host", "arg2"}, 10, 20, require.NoError},
-		{"variable start block num", "{start-block-num} arg2", nil, []string{"10", "arg2"}, 10, 20, require.NoError},
-		{"variable stop block num", "{stop-block-num} arg2", nil, []string{"20", "arg2"}, 10, 20, require.NoError},
-		{"variable data-dir double quotes", `"{hostname} with spaces" arg2`, nil, []string{"host with spaces", "arg2"}, 10, 20, require.NoError},
+		{"no variables", "arg1 arg2", nil, []string{"arg1", "arg2"}, 0, 10, 20, require.NoError},
+		{"variable data-dir", "{data-dir} arg2", nil, []string{"/data", "arg2"}, 0, 10, 20, require.NoError},
+		{"variable node-data-dir", "{node-data-dir} arg2", nil, []string{"/data/node", "arg2"}, 0, 10, 20, require.NoError},
+		{"variable hostname", "{hostname} arg2", nil, []string{"host", "arg2"}, 0, 10, 20, require.NoError},
+		{"variable first-streamable-block", "{first-streamable-block} arg2", nil, []string{"0", "arg2"}, 0, 10, 20, require.NoError},
+		{"variable start block num", "{start-block-num} arg2", nil, []string{"10", "arg2"}, 0, 10, 20, require.NoError},
+		{"variable stop block num", "{stop-block-num} arg2", nil, []string{"20", "arg2"}, 0, 10, 20, require.NoError},
+		{"variable data-dir double quotes", `"{hostname} with spaces" arg2`, nil, []string{"host with spaces", "arg2"}, 0, 10, 20, require.NoError},
 		{"variable all", `--home="{data-dir}" --data={node-data-dir} --id={hostname} --other --start={start-block-num} -stop {stop-block-num} --foo`, nil, []string{
 			"--home=/data",
 			"--data=/data/node",
@@ -47,14 +49,14 @@ func Test_buildNodeArguments(t *testing.T) {
 			"-stop",
 			"20",
 			"--foo",
-		}, 10, 20, require.NoError},
+		}, 0, 10, 20, require.NoError},
 
-		{"env variable plain", `--endpoint=${myhostname}`, envVar, []string{"--endpoint=host with spaces"}, 10, 20, require.NoError},
-		{"env variable that expand with spaces is split correctly", `"${myhostname}" arg2`, envVar, []string{"host with spaces", "arg2"}, 10, 20, require.NoError},
+		{"env variable plain", `--endpoint=${myhostname}`, envVar, []string{"--endpoint=host with spaces"}, 0, 10, 20, require.NoError},
+		{"env variable that expand with spaces is split correctly", `"${myhostname}" arg2`, envVar, []string{"host with spaces", "arg2"}, 0, 10, 20, require.NoError},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resolver := createNodeArgumentsResolver(dataDir, nodeDataDir, hostname, tt.startBlockNum, tt.stopBlockNum)
+			resolver := createNodeArgumentsResolver(dataDir, nodeDataDir, hostname, tt.firstStreamableBlock, tt.startBlockNum, tt.stopBlockNum)
 
 			if tt.withEnv != nil {
 				osEnvExpandGetter = tt.withEnv
