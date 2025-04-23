@@ -212,11 +212,17 @@ func (b *Bundler) ProcessBlock(_ *pbbstream.Block, obj interface{}) error {
 	b.irreversibleBlocks = []*bstream.OneBlockFile{lastBlock, obf}
 	b.baseBlockNum += b.bundleSize
 	for obf.Num > b.baseBlockNum+b.bundleSize { // skip more merged-block-files
-		b.inProcess.Lock()
-		if err := b.io.MergeAndStore(context.Background(), b.baseBlockNum, []*bstream.OneBlockFile{lastBlock}); err != nil { // lastBlock will be excluded from bundle but is useful to bundler
+		var err error
+		func() {
+			b.inProcess.Lock()
+			defer b.inProcess.Unlock()
+			err = b.io.MergeAndStore(context.Background(), b.baseBlockNum, []*bstream.OneBlockFile{lastBlock})
+		}()
+		
+		if err != nil {
 			return err
 		}
-		b.inProcess.Unlock()
+		
 		b.baseBlockNum += b.bundleSize
 	}
 	b.Unlock()
