@@ -1,0 +1,14 @@
+start:
+  args:
+  - reader-node-firehose
+  - merger
+  - relayer
+  - firehose
+  - substreams-tier1
+  - substreams-tier2
+  flags:
+    advertise-block-features: extended
+
+    reader-node-firehose-endpoint: "polygon.streamingfast.io:443"
+    reader-node-firehose-insecure: false
+    reader-node-firehose-plaintext: false

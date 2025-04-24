@@ -3,11 +3,11 @@ package node_manager
 import (
 	"time"
 
+	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 
 	"github.com/streamingfast/dmetrics"
 	"go.uber.org/atomic"
-	"go.uber.org/zap"
 )
 
 type Readiness interface {
@@ -25,7 +25,7 @@ type MetricsAndReadinessManager struct {
 	// now before /healthz starts returning success
 	readinessMaxLatency time.Duration
 
-	logger *zap.Logger
+	lastSeenBlock *atomic.Pointer[pbbstream.Block]
 }
 
 func NewMetricsAndReadinessManager(headBlockTimeDrift *dmetrics.HeadTimeDrift, headBlockNumber *dmetrics.HeadBlockNum, appReadiness *dmetrics.AppReadiness, readinessMaxLatency time.Duration) *MetricsAndReadinessManager {
@@ -36,16 +36,18 @@ func NewMetricsAndReadinessManager(headBlockTimeDrift *dmetrics.HeadTimeDrift, h
 		headBlockTimeDrift:  headBlockTimeDrift,
 		headBlockNumber:     headBlockNumber,
 		readinessMaxLatency: readinessMaxLatency,
+
+		lastSeenBlock: atomic.NewPointer[pbbstream.Block](nil),
 	}
 }
 
 func (m *MetricsAndReadinessManager) setReadinessProbeOn() {
-	m.readinessProbe.CAS(false, true)
+	m.readinessProbe.CompareAndSwap(false, true)
 	m.appReadiness.SetReady()
 }
 
 func (m *MetricsAndReadinessManager) setReadinessProbeOff() {
-	m.readinessProbe.CAS(true, false)
+	m.readinessProbe.CompareAndSwap(true, false)
 	m.appReadiness.SetNotReady()
 }
 
@@ -55,31 +57,31 @@ func (m *MetricsAndReadinessManager) IsReady() bool {
 
 func (m *MetricsAndReadinessManager) Launch() {
 	for {
-		var lastSeenBlock *pbbstream.Block
 		select {
 		case block := <-m.headBlockChan:
-			lastSeenBlock = block
+			m.lastSeenBlock.Store(block)
 		case <-time.After(time.Second):
 		}
 
-		if lastSeenBlock == nil {
+		block := m.lastSeenBlock.Load()
+		if block == nil {
 			continue
 		}
 
 		// metrics
 		if m.headBlockNumber != nil {
-			m.headBlockNumber.SetUint64(lastSeenBlock.Number)
+			m.headBlockNumber.SetUint64(block.Number)
 		}
 
-		if lastSeenBlock.Time().IsZero() { // never act upon zero timestamps
+		if block.Time().IsZero() { // never act upon zero timestamps
 			continue
 		}
 		if m.headBlockTimeDrift != nil {
-			m.headBlockTimeDrift.SetBlockTime(lastSeenBlock.Time())
+			m.headBlockTimeDrift.SetBlockTime(block.Time())
 		}
 
 		// readiness
-		if m.readinessMaxLatency == 0 || time.Since(lastSeenBlock.Time()) < m.readinessMaxLatency {
+		if m.readinessMaxLatency == 0 || time.Since(block.Time()) < m.readinessMaxLatency {
 			m.setReadinessProbeOn()
 		} else {
 			m.setReadinessProbeOff()
@@ -90,4 +92,13 @@ func (m *MetricsAndReadinessManager) Launch() {
 func (m *MetricsAndReadinessManager) UpdateHeadBlock(block *pbbstream.Block) error {
 	m.headBlockChan <- block
 	return nil
+}
+
+func (m *MetricsAndReadinessManager) GetHeadBlock() bstream.BlockRef {
+	block := m.lastSeenBlock.Load()
+	if block == nil {
+		return bstream.BlockRefEmpty
+	}
+
+	return block.AsRef()
 }

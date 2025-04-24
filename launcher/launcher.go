@@ -187,8 +187,6 @@ func (l *Launcher) shutdownDueToApp(appID string, err error) {
 
 		if err != nil {
 			l.FatalAppError(appID, err)
-		} else {
-			l.logger.Info(fmt.Sprintf("app %s triggered clean shutdown", appID))
 		}
 	})
 

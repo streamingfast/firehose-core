@@ -15,16 +15,17 @@
 package apps
 
 import (
+	"fmt"
+	"os"
+	"path"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/launcher"
-	nodeManager "github.com/streamingfast/firehose-core/node-manager"
 	"github.com/streamingfast/firehose-core/node-manager/app/firehose_reader"
-	"github.com/streamingfast/firehose-core/node-manager/metrics"
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
-	"os"
 )
 
 func RegisterReaderNodeFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) {
@@ -47,33 +48,33 @@ func RegisterReaderNodeFirehoseApp[B firecore.Block](chain *firecore.Chain[B], r
 		},
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
 			sfDataDir := runtime.AbsDataDir
-			archiveStoreURL := firecore.MustReplaceDataDir(sfDataDir, viper.GetString("common-one-block-store-url"))
+			_, oneBlockStoreURL, _, err := firecore.GetCommonStoresURLs(runtime.AbsDataDir)
+			if err != nil {
+				return nil, fmt.Errorf("getting common stores URLs: %w", err)
+			}
 
-			metricID := "reader-node-firehose"
-			headBlockTimeDrift := metrics.NewHeadBlockTimeDrift(metricID)
-			headBlockNumber := metrics.NewHeadBlockNumber(metricID)
-			appReadiness := metrics.NewAppReadiness(metricID)
-			metricsAndReadinessManager := nodeManager.NewMetricsAndReadinessManager(headBlockTimeDrift, headBlockNumber, appReadiness, viper.GetDuration("reader-node-readiness-max-latency"))
-			return firehose_reader.New(&firehose_reader.Config{
-				GRPCAddr:                   viper.GetString("reader-node-grpc-listen-addr"),
-				OneBlocksStoreURL:          archiveStoreURL,
-				MindReadBlocksChanCapacity: viper.GetInt("reader-node-blocks-chan-capacity"),
-				StartBlockNum:              viper.GetUint64("reader-node-start-block-num"),
-				StopBlockNum:               viper.GetUint64("reader-node-stop-block-num"),
-				WorkingDir:                 firecore.MustReplaceDataDir(sfDataDir, viper.GetString("reader-node-working-dir")),
-				OneBlockSuffix:             viper.GetString("reader-node-one-block-suffix"),
+			stateFile := firecore.MustReplaceDataDir(sfDataDir, viper.GetString("reader-node-firehose-state"))
+			if err := firecore.MakeDirs([]string{path.Dir(stateFile)}); err != nil {
+				return nil, fmt.Errorf("creating state file directory: %w", err)
+			}
+
+			return firehose_reader.New(firehose_reader.Config{
+				GRPCAddr:            viper.GetString("reader-node-grpc-listen-addr"),
+				OneBlocksStoreURL:   oneBlockStoreURL,
+				OneBlockSuffix:      viper.GetString("reader-node-one-block-suffix"),
+				StartBlockNum:       viper.GetUint64("reader-node-start-block-num"),
+				StopBlockNum:        viper.GetUint64("reader-node-stop-block-num"),
+				StateFile:           stateFile,
+				ReadinessMaxLatency: viper.GetDuration("reader-node-readiness-max-latency"),
 
 				FirehoseConfig: firehose_reader.FirehoseConfig{
+					ApiKey:        os.Getenv(viper.GetString("reader-node-firehose-api-key-env-var")),
+					ApiToken:      os.Getenv(viper.GetString("reader-node-firehose-api-token-env-var")),
 					Endpoint:      viper.GetString("reader-node-firehose-endpoint"),
-					StateFile:     firecore.MustReplaceDataDir(sfDataDir, viper.GetString("reader-node-firehose-state")),
 					InsecureConn:  viper.GetBool("reader-node-firehose-insecure"),
 					PlaintextConn: viper.GetBool("reader-node-firehose-plaintext"),
 					Compression:   viper.GetString("reader-node-firehose-compression"),
-					ApiKey:        os.Getenv(viper.GetString("reader-node-firehose-api-key-env-var")),
-					Jwt:           os.Getenv(viper.GetString("reader-node-firehose-api-token-env-var")),
 				},
-			}, &firehose_reader.Modules{
-				MetricsAndReadinessManager: metricsAndReadinessManager,
 			}, appLogger, appTracer), nil
 		},
 	})
