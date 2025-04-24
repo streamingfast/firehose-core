@@ -113,7 +113,7 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 	rootLog.Debug("launcher created")
 
 	runByDefault := func(app string) bool {
-		appsNotRunningByDefault := []string{"reader-node-stdin"}
+		appsNotRunningByDefault := []string{"reader-node-stdin", "reader-node-firehose"}
 		return !slices.Contains(appsNotRunningByDefault, app)
 	}
 
