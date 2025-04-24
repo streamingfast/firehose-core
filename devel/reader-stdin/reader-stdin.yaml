@@ -1,0 +1,10 @@
+start:
+  args:
+  - reader-node-stdin
+  - merger
+  - relayer
+  - firehose
+  - substreams-tier1
+  - substreams-tier2
+  flags:
+    advertise-block-features: extended
