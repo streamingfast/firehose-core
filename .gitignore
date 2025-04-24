@@ -7,3 +7,5 @@
 .DS_Store
 firehose-data*
 /.fleet/settings.json
+/firecore
+/firehose.yaml
