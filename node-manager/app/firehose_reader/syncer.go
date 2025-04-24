@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"time"
 
@@ -112,10 +111,6 @@ func (s *syncer) Run() error {
 					case codes.InvalidArgument:
 						return fmt.Errorf("stream invalid: %w", err)
 					}
-				}
-
-				if dnsError := (*net.DNSError)(nil); errors.As(err, &dnsError) {
-					return fmt.Errorf("invalid endpoint or invalid DNS configuration: %w", err)
 				}
 
 				if errors.Is(err, context.Canceled) {
