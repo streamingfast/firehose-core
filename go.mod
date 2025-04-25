@@ -27,7 +27,7 @@ require (
 	github.com/streamingfast/dgrpc v0.0.0-20250227145723-9bc2e4941b4e
 	github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4
 	github.com/streamingfast/dmetering v0.0.0-20241101155221-489f5a9d9139
-	github.com/streamingfast/dmetrics v0.0.0-20250424203843-16ec8b5df13e
+	github.com/streamingfast/dmetrics v0.0.0-20250425183830-ffcef0cc9f87
 	github.com/streamingfast/dstore v0.1.1-0.20250217165048-d508dcc6b33e
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	github.com/streamingfast/payment-gateway v0.0.0-20240426151444-581e930c76e2

@@ -52,19 +52,17 @@ type FirehoseConfig struct {
 
 type App struct {
 	*shutter.Shutter
-	config    Config
-	ReadyFunc func()
-	zlogger   *zap.Logger
-	tracer    logging.Tracer
+	config  Config
+	zlogger *zap.Logger
+	tracer  logging.Tracer
 }
 
 func New(config Config, zlogger *zap.Logger, tracer logging.Tracer) *App {
 	n := &App{
-		Shutter:   shutter.New(),
-		config:    config,
-		ReadyFunc: func() {},
-		zlogger:   zlogger,
-		tracer:    tracer,
+		Shutter: shutter.New(),
+		config:  config,
+		zlogger: zlogger,
+		tracer:  tracer,
 	}
 	return n
 }
@@ -85,20 +83,24 @@ func (a *App) Run() error {
 		blockstream.ServerOptionWithBuffer(1),
 	)
 
-	server := &server{
-		Shutter:    shutter.New(),
-		listenAddr: a.config.GRPCAddr,
-		logger:     a.zlogger,
-	}
-
 	syncer := &syncer{
-		Shutter:           server.Shutter,
+		Shutter:           shutter.New(),
 		appCtx:            appWrapper.Context(),
 		blockStreamServer: blockStreamServer,
 		config:            a.config,
 		firehoseConfig:    a.config.FirehoseConfig,
 		logger:            a.zlogger,
 		store:             store,
+	}
+
+	server := &server{
+		Shutter:           shutter.New(),
+		listenAddr:        a.config.GRPCAddr,
+		blockStreamServer: blockStreamServer,
+		healthCheck: func(ctx context.Context) (isReady bool, out interface{}, err error) {
+			return AppReadiness.IsReady(), nil, nil
+		},
+		logger: a.zlogger,
 	}
 
 	appWrapper.SuperviseAndStart(server)
@@ -117,23 +119,23 @@ func (a *App) Run() error {
 	return nil
 }
 
-func (a *App) OnReady(f func()) {
-	a.ReadyFunc = f
-}
-
 func (a *App) IsReady() bool {
-	return true
+	return AppReadiness.IsReady()
 }
 
 type server struct {
 	*shutter.Shutter
 	listenAddr        string
 	blockStreamServer *blockstream.Server
+	healthCheck       dgrpcserver.HealthCheck
 	logger            *zap.Logger
 }
 
 func (s *server) Run() {
-	gs := dgrpcfactory.ServerFromOptions(dgrpcserver.WithLogger(s.logger))
+	gs := dgrpcfactory.ServerFromOptions(
+		dgrpcserver.WithLogger(s.logger),
+		dgrpcserver.WithHealthCheck(dgrpcserver.HealthCheckOverGRPC|dgrpcserver.HealthCheckOverHTTP, s.healthCheck),
+	)
 
 	serviceRegistrar := gs.ServiceRegistrar()
 	pbheadinfo.RegisterHeadInfoServer(serviceRegistrar, s.blockStreamServer)
