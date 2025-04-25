@@ -22,4 +22,10 @@ WORKDIR /app
 
 COPY --from=build /app/firecore /app/firecore
 
+ENV PATH="$PATH:/app"
+
+COPY docker/motd /etc/motd
+COPY docker/99-firehose-core.sh /etc/profile.d/
+RUN echo ". /etc/profile.d/99-firehose-core.sh" > /root/.bash_aliases
+
 ENTRYPOINT [ "/app/firecore" ]

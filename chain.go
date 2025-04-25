@@ -349,7 +349,7 @@ func (c *Chain[B]) VersionString() string {
 	}
 
 	if date != "" {
-		labels = append(labels, fmt.Sprintf("Built %s", date))
+		labels = append(labels, fmt.Sprintf("Commit Date %s", date))
 	}
 
 	if len(labels) == 0 {
