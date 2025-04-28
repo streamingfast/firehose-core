@@ -134,14 +134,18 @@ jobs:
           push: true
 
   slack-notifications:
-    if: ${{ !startsWith(github.ref, 'refs/tags/') && github.event_name != 'workflow_dispatch' }}
     needs: [push]
     runs-on: ubuntu-24.04
     steps:
+      - name: Extract Metadata Tags
+        id: metadata
+        run: |
+            echo "tags=${{ needs.push.outputs.tags }}" | sed 's/,/ /g' >> "$GITHUB_OUTPUT"
+
       - name: Slack notification
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
         uses: Ilshidur/action-slack@2.0.2
         with:
           args: |
-            :done: *${{ github.repository }}* Success building docker image from ${{ github.ref_type }} _${{ github.ref_name }}_ (${{ github.actor }}) :sparkling_heart: ```${{ join(needs.push.outputs.tags, ' ') }}```
+            :done: *${{ github.repository }}* Success building docker image from ${{ github.ref_type }} _${{ github.ref_name }}_ (${{ github.actor }}) :sparkling_heart: ```${{ steps.metadata.outputs.tags }}```
