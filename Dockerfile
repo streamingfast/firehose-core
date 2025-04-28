@@ -12,9 +12,15 @@ RUN go build -v -ldflags "-X main.version=${VERSION}" ./cmd/firecore
 
 FROM ubuntu:24.10
 
-RUN apt-get update && apt-get -y install ca-certificates htop iotop sysstat strace lsof curl jq tzdata
+ARG TARGETPLATFORM
 
-RUN mkdir -p /app/ && curl -Lo /app/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.4.12/grpc_health_probe-linux-amd64 && chmod +x /app/grpc_health_probe
+RUN apt-get update && apt-get -y install ca-certificates htop iotop sysstat strace lsof curl jq tzdata file
+
+RUN mkdir -p /app/ && \
+    export repository="https://github.com/grpc-ecosystem/grpc-health-probe/releases/download" && \
+    export version="v0.4.12" && \
+    curl --fail-with-body -Lo /app/grpc_health_probe "$repository/$version/grpc_health_probe-$(echo $TARGETPLATFORM | sed 's|/|-|')" && \
+    chmod +x /app/grpc_health_probe
 
 WORKDIR /app
 
