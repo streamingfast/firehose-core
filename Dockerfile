@@ -1,4 +1,4 @@
-FROM golang:1.24.0-bookworm as build
+FROM golang:1.24-bookworm AS build
 WORKDIR /app
 
 COPY go.mod go.sum ./
@@ -10,9 +10,7 @@ ARG VERSION="dev"
 RUN apt-get update && apt-get install git
 RUN go build -v -ldflags "-X main.version=${VERSION}" ./cmd/firecore
 
-####
-
-FROM ubuntu:24.04
+FROM ubuntu:24.10
 
 RUN apt-get update && apt-get -y install ca-certificates htop iotop sysstat strace lsof curl jq tzdata
 
