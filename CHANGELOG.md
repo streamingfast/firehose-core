@@ -10,9 +10,19 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
-* Now building `amd64` and `arm64` Docker images on push & release.
+### Substreams performance improvements
 
-* Add `reader-node-firehose` which creates one-blocks by consuming blocks from an already existing Firehose endpoint. This can be used to set up an indexer stack without having to run an instrumented blockchain node.
+* (RAM+CPU) dedupe execution of modules with same hash but different name when computing dependency graph. (#619)
+* (RAM) prevent memory usage burst on tier2 when writing mapper by streaming protobuf items to writer
+
+### New 'firehose' reader
+
+* Add `reader-node-firehose` which creates one-blocks by consuming blocks from an already existing Firehose endpoint. This can be used to set up an indexer stack without having to run an instrumented blockchain node, or getting redundancy from another firehose provider.
+
+### Other
+
+* Bumped grpc-go lib to 1.72.0
+* Now building `amd64` and `arm64` Docker images on push & release.
 
 ## v1.9.8
 

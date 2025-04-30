@@ -7,6 +7,16 @@ import (
 	pbhealth "google.golang.org/grpc/health/grpc_health_v1"
 )
 
+func (r *Relayer) List(ctx context.Context, in *pbhealth.HealthListRequest) (*pbhealth.HealthListResponse, error) {
+	return &pbhealth.HealthListResponse{
+		Statuses: map[string]*pbhealth.HealthCheckResponse{
+			"relayer": &pbhealth.HealthCheckResponse{
+				Status: r.healthStatus(),
+			},
+		},
+	}, nil
+}
+
 func (r *Relayer) Check(ctx context.Context, in *pbhealth.HealthCheckRequest) (*pbhealth.HealthCheckResponse, error) {
 	return &pbhealth.HealthCheckResponse{
 		Status: r.healthStatus(),

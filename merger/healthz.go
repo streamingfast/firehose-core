@@ -28,6 +28,17 @@ func (m *Merger) Check(ctx context.Context, in *pbhealth.HealthCheckRequest) (*p
 	}, nil
 }
 
+func (m *Merger) List(ctx context.Context, in *pbhealth.HealthListRequest) (*pbhealth.HealthListResponse, error) {
+	status := pbhealth.HealthCheckResponse_SERVING
+	return &pbhealth.HealthListResponse{
+		Statuses: map[string]*pbhealth.HealthCheckResponse{
+			"merger": &pbhealth.HealthCheckResponse{
+				Status: status,
+			},
+		},
+	}, nil
+}
+
 // Watch is basic GRPC Healthcheck as a stream
 func (m *Merger) Watch(req *pbhealth.HealthCheckRequest, stream pbhealth.Health_WatchServer) error {
 	err := stream.Send(&pbhealth.HealthCheckResponse{
