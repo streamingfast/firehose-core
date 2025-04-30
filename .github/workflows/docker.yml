@@ -139,8 +139,7 @@ jobs:
     steps:
       - name: Extract Metadata Tags
         id: metadata
-        run: |
-            echo "tags=${{ needs.push.outputs.tags }}" | sed 's/,/ /g' >> "$GITHUB_OUTPUT"
+        run: echo "tags=${{ needs.push.outputs.tags }}" | sed 's/,/ /g' >> "$GITHUB_OUTPUT"
 
       - name: Slack notification
         env:
