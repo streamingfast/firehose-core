@@ -308,6 +308,20 @@ var WellKnownProtocols = WellKnownProtocolList([]WellKnownProtocol{
 			},
 		},
 	},
+	{
+		Name:          "tron",
+		BlockType:     "sf.tron.type.v1.Block",
+		BufBuildURL:   "buf.build/streamingfast/firehose-tron",
+		BytesEncoding: pbfirehose.InfoResponse_BLOCK_ID_ENCODING_HEX,
+		KnownChains: []*Chain{
+			{
+				Name:               "tron-mainnet",
+				Aliases:            []string{},
+				GenesisBlockID:     "00000000000000001ebf88508a03865c71d452e25f4d51194196a1d22b6653dc",
+				GenesisBlockNumber: 0,
+			},
+		},
+	},
 })
 
 func (p WellKnownProtocolList) ChainByGenesisBlock(blockNum uint64, blockID string) *Chain {
