@@ -8,9 +8,9 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.9.9
 
-### Substreams performance improvements
+### Substreams performance improvements v1.15.4
 
 * (RAM+CPU) dedupe execution of modules with same hash but different name when computing dependency graph. (#619)
 * (RAM) prevent memory usage burst on tier2 when writing mapper by streaming protobuf items to writer
