@@ -13,9 +13,9 @@ var DefaultInfoResponseFiller = func(firstStreamableBlock *pbbstream.Block, resp
 	resp.FirstStreamableBlockId = firstStreamableBlock.Id
 
 	shortTypeURL := strings.TrimPrefix(firstStreamableBlock.Payload.TypeUrl, "type.googleapis.com/")
-	for _, protocol := range wellknown.WellKnownProtocols {
-		if protocol.BlockType == shortTypeURL {
-			resp.BlockIdEncoding = protocol.BytesEncoding
+	for _, protocol := range wellknown.GetRegistryNetworks() {
+		if protocol.Firehose.BlockType == shortTypeURL {
+			resp.BlockIdEncoding = wellknown.BlockIdEncodingForNetwork(protocol)
 			break
 		}
 	}
@@ -23,8 +23,8 @@ var DefaultInfoResponseFiller = func(firstStreamableBlock *pbbstream.Block, resp
 	if !validate {
 		if resp.ChainName == "" {
 			// still try to fill the chain name if it is not given
-			if chain := wellknown.WellKnownProtocols.ChainByGenesisBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
-				resp.ChainName = chain.Name
+			if chain := wellknown.ChainByGenesisBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
+				resp.ChainName = chain.ShortName
 				resp.ChainNameAliases = chain.Aliases
 			}
 		}
@@ -32,18 +32,18 @@ var DefaultInfoResponseFiller = func(firstStreamableBlock *pbbstream.Block, resp
 	}
 
 	if resp.ChainName != "" {
-		if chain := wellknown.WellKnownProtocols.ChainByName(resp.ChainName); chain != nil {
-			if firstStreamableBlock.Number == chain.GenesisBlockNumber && chain.GenesisBlockID != firstStreamableBlock.Id { // we don't check if the firstStreamableBlock is something other than our well-known genesis block
-				return fmt.Errorf("chain name defined in flag: %q inconsistent with the genesis block ID %q (expected: %q)", resp.ChainName, ox(firstStreamableBlock.Id), ox(chain.GenesisBlockID))
+		if chain := wellknown.ChainByName(resp.ChainName); chain != nil {
+			if firstStreamableBlock.Number == uint64(chain.Genesis.Height) && chain.Genesis.Hash != firstStreamableBlock.Id { // we don't check if the firstStreamableBlock is something other than our well-known genesis block
+				return fmt.Errorf("chain name defined in flag: %q inconsistent with the genesis block ID %q (expected: %q)", resp.ChainName, ox(firstStreamableBlock.Id), ox(chain.Genesis.Hash))
 			}
-			resp.ChainName = chain.Name // ensure we use the canonical name if the user provided one of the aliases
+			resp.ChainName = chain.ShortName // ensure we use the canonical name if the user provided one of the aliases
 			resp.ChainNameAliases = chain.Aliases
-		} else if chain := wellknown.WellKnownProtocols.ChainByGenesisBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
-			return fmt.Errorf("chain name defined in flag: %q inconsistent with the one discovered from genesis block %q", resp.ChainName, chain.Name)
+		} else if chain := wellknown.ChainByGenesisBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
+			return fmt.Errorf("chain name defined in flag: %q inconsistent with the one discovered from genesis block %q", resp.ChainName, chain.ShortName)
 		}
 	} else {
-		if chain := wellknown.WellKnownProtocols.ChainByGenesisBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
-			resp.ChainName = chain.Name
+		if chain := wellknown.ChainByGenesisBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
+			resp.ChainName = chain.ShortName
 			resp.ChainNameAliases = chain.Aliases
 		}
 	}

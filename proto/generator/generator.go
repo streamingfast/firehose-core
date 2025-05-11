@@ -46,11 +46,11 @@ func main() {
 
 	var protofiles []ProtoFile
 
-	for _, protocol := range wellknown.WellKnownProtocols {
-		if protocol.BufBuildURL == "" {
+	for _, protocol := range wellknown.GetRegistryNetworks() {
+		if protocol.Firehose.BufURL == "" {
 			continue
 		}
-		wellKnownProtoRepo := protocol.BufBuildURL
+		wellKnownProtoRepo := protocol.Firehose.BufURL
 		request := connect.NewRequest(&reflectv1beta1.GetFileDescriptorSetRequest{
 			Module: wellKnownProtoRepo,
 		})
