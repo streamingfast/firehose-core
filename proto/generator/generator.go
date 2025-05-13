@@ -20,7 +20,8 @@ import (
 	connect "connectrpc.com/connect"
 	"github.com/iancoleman/strcase"
 	"github.com/streamingfast/cli"
-	wellknown "github.com/streamingfast/firehose-core/well-known"
+	"github.com/streamingfast/substreams/networks"
+
 	"google.golang.org/protobuf/proto"
 )
 
@@ -46,7 +47,7 @@ func main() {
 
 	var protofiles []ProtoFile
 
-	for _, protocol := range wellknown.GetRegistryNetworks() {
+	for _, protocol := range networks.GetRegistryNetworksWithFirehose() {
 		if protocol.Firehose.BufURL == "" {
 			continue
 		}

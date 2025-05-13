@@ -4,18 +4,21 @@ import (
 	"fmt"
 	"strings"
 
+	registry "github.com/pinax-network/graph-networks-libs/packages/golang/lib"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-	wellknown "github.com/streamingfast/firehose-core/well-known"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
+	"github.com/streamingfast/substreams/networks"
 )
 
 var DefaultInfoResponseFiller = func(firstStreamableBlock *pbbstream.Block, resp *pbfirehose.InfoResponse, validate bool) error {
 	resp.FirstStreamableBlockId = firstStreamableBlock.Id
 
+	networksWithFirehose := networks.GetRegistryNetworksWithFirehose()
+
 	shortTypeURL := strings.TrimPrefix(firstStreamableBlock.Payload.TypeUrl, "type.googleapis.com/")
-	for _, protocol := range wellknown.GetRegistryNetworks() {
+	for _, protocol := range networksWithFirehose {
 		if protocol.Firehose.BlockType == shortTypeURL {
-			resp.BlockIdEncoding = wellknown.BlockIdEncodingForNetwork(protocol)
+			resp.BlockIdEncoding = blockIdEncodingForNetwork(protocol)
 			break
 		}
 	}
@@ -23,7 +26,7 @@ var DefaultInfoResponseFiller = func(firstStreamableBlock *pbbstream.Block, resp
 	if !validate {
 		if resp.ChainName == "" {
 			// still try to fill the chain name if it is not given
-			if chain := wellknown.ChainByGenesisBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
+			if chain := networksWithFirehose.FindByGenesisBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
 				resp.ChainName = chain.ShortName
 				resp.ChainNameAliases = chain.Aliases
 			}
@@ -32,17 +35,17 @@ var DefaultInfoResponseFiller = func(firstStreamableBlock *pbbstream.Block, resp
 	}
 
 	if resp.ChainName != "" {
-		if chain := wellknown.ChainByName(resp.ChainName); chain != nil {
+		if chain := networksWithFirehose.Find(resp.ChainName); chain != nil {
 			if firstStreamableBlock.Number == uint64(chain.Genesis.Height) && chain.Genesis.Hash != firstStreamableBlock.Id { // we don't check if the firstStreamableBlock is something other than our well-known genesis block
 				return fmt.Errorf("chain name defined in flag: %q inconsistent with the genesis block ID %q (expected: %q)", resp.ChainName, ox(firstStreamableBlock.Id), ox(chain.Genesis.Hash))
 			}
 			resp.ChainName = chain.ShortName // ensure we use the canonical name if the user provided one of the aliases
 			resp.ChainNameAliases = chain.Aliases
-		} else if chain := wellknown.ChainByGenesisBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
+		} else if chain := networksWithFirehose.FindByGenesisBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
 			return fmt.Errorf("chain name defined in flag: %q inconsistent with the one discovered from genesis block %q", resp.ChainName, chain.ShortName)
 		}
 	} else {
-		if chain := wellknown.ChainByGenesisBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
+		if chain := networksWithFirehose.FindByGenesisBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
 			resp.ChainName = chain.ShortName
 			resp.ChainNameAliases = chain.Aliases
 		}
@@ -63,6 +66,27 @@ var DefaultInfoResponseFiller = func(firstStreamableBlock *pbbstream.Block, resp
 	}
 
 	return nil
+}
+
+// blockIdEncodingForNetwork returns the InfoResponse_BlockIdEncoding for a given network based on its Firehose.BytesEncoding.
+func blockIdEncodingForNetwork(network *registry.Network) pbfirehose.InfoResponse_BlockIdEncoding {
+	if network == nil || network.Firehose == nil {
+		return pbfirehose.InfoResponse_BLOCK_ID_ENCODING_UNSET
+	}
+	switch network.Firehose.BytesEncoding {
+	case "hex":
+		return pbfirehose.InfoResponse_BLOCK_ID_ENCODING_HEX
+	case "0xhex":
+		return pbfirehose.InfoResponse_BLOCK_ID_ENCODING_0X_HEX
+	case "base58":
+		return pbfirehose.InfoResponse_BLOCK_ID_ENCODING_BASE58
+	case "base64":
+		return pbfirehose.InfoResponse_BLOCK_ID_ENCODING_BASE64
+	case "base64url":
+		return pbfirehose.InfoResponse_BLOCK_ID_ENCODING_BASE64URL
+	default:
+		return pbfirehose.InfoResponse_BLOCK_ID_ENCODING_UNSET
+	}
 }
 
 func ox(s string) string {
