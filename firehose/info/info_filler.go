@@ -18,7 +18,7 @@ var DefaultInfoResponseFiller = func(firstStreamableBlock *pbbstream.Block, resp
 	shortTypeURL := strings.TrimPrefix(firstStreamableBlock.Payload.TypeUrl, "type.googleapis.com/")
 	for _, protocol := range networksWithFirehose {
 		if protocol.Firehose.BlockType == shortTypeURL {
-			resp.BlockIdEncoding = blockIdEncodingForNetwork(protocol)
+			resp.BlockIdEncoding = BlockIdEncodingForNetwork(protocol)
 			break
 		}
 	}
@@ -68,8 +68,8 @@ var DefaultInfoResponseFiller = func(firstStreamableBlock *pbbstream.Block, resp
 	return nil
 }
 
-// blockIdEncodingForNetwork returns the InfoResponse_BlockIdEncoding for a given network based on its Firehose.BytesEncoding.
-func blockIdEncodingForNetwork(network *registry.Network) pbfirehose.InfoResponse_BlockIdEncoding {
+// BlockIdEncodingForNetwork returns the InfoResponse_BlockIdEncoding for a given network based on its Firehose.BytesEncoding.
+func BlockIdEncodingForNetwork(network *registry.Network) pbfirehose.InfoResponse_BlockIdEncoding {
 	if network == nil || network.Firehose == nil {
 		return pbfirehose.InfoResponse_BLOCK_ID_ENCODING_UNSET
 	}

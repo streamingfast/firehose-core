@@ -30,6 +30,7 @@ import (
 	"github.com/streamingfast/firehose-core/launcher"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	tracing "github.com/streamingfast/sf-tracing"
+	"github.com/streamingfast/substreams/networks"
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 )
@@ -84,26 +85,48 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 	}()
 	dmetering.SetDefaultEmitter(eventEmitter)
 
-	blockIDEncoding := pbfirehose.InfoResponse_BLOCK_ID_ENCODING_UNSET
-	if enc := sflags.MustGetString(cmd, "advertise-block-id-encoding"); enc != "" {
-		v, found := pbfirehose.InfoResponse_BlockIdEncoding_value[enc]
+	chainName := sflags.MustGetString(cmd, "advertise-chain-name")
+	aliases := sflags.MustGetStringSlice(cmd, "advertise-chain-aliases")
+	blockIdEncoding := sflags.MustGetString(cmd, "advertise-block-id-encoding")
+
+	blockIDEncodingEnum := pbfirehose.InfoResponse_BLOCK_ID_ENCODING_UNSET
+	firstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
+
+	// If --advertise-chain-name is set, but any of the other advertise flags are not, fill them from the registry
+	if cmd.Flags().Changed("advertise-chain-name") &&
+		(!cmd.Flags().Changed("advertise-chain-aliases") ||
+			!cmd.Flags().Changed("advertise-block-id-encoding")) {
+
+		network := networks.GetRegistryNetworksWithFirehose().Find(chainName)
+		if network != nil {
+			if !cmd.Flags().Changed("advertise-chain-aliases") {
+				aliases = network.Aliases
+			}
+			if !cmd.Flags().Changed("advertise-block-id-encoding") {
+				blockIDEncodingEnum = info.BlockIdEncodingForNetwork(network)
+			}
+			firstStreamableBlock = uint64(network.Genesis.Height)
+		}
+	}
+
+	if blockIdEncoding != "" && blockIDEncodingEnum == pbfirehose.InfoResponse_BLOCK_ID_ENCODING_UNSET {
+		v, found := pbfirehose.InfoResponse_BlockIdEncoding_value[blockIdEncoding]
 		if !found {
-			longCandidate := "BLOCK_ID_ENCODING_" + strings.ToUpper(enc)
+			longCandidate := "BLOCK_ID_ENCODING_" + strings.ToUpper(blockIdEncoding)
 			v, found = pbfirehose.InfoResponse_BlockIdEncoding_value[longCandidate]
 			if !found {
-				return fmt.Errorf("invalid block id encoding: %s", enc)
+				return fmt.Errorf("invalid block id encoding: %s", blockIdEncoding)
 			}
 		}
-
-		blockIDEncoding = pbfirehose.InfoResponse_BlockIdEncoding(v)
+		blockIDEncodingEnum = pbfirehose.InfoResponse_BlockIdEncoding(v)
 	}
 
 	infoServer := info.NewInfoServer(
-		sflags.MustGetString(cmd, "advertise-chain-name"),
-		sflags.MustGetStringSlice(cmd, "advertise-chain-aliases"),
-		blockIDEncoding,
+		chainName,
+		aliases,
+		blockIDEncodingEnum,
 		sflags.MustGetStringSlice(cmd, "advertise-block-features"),
-		bstream.GetProtocolFirstStreamableBlock,
+		firstStreamableBlock,
 		!sflags.MustGetBool(cmd, "ignore-advertise-validation"),
 		chain.InfoResponseFiller,
 		rootLog,
