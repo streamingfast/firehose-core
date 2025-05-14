@@ -87,9 +87,9 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 
 	chainName := sflags.MustGetString(cmd, "advertise-chain-name")
 	aliases := sflags.MustGetStringSlice(cmd, "advertise-chain-aliases")
-	blockIdEncoding := sflags.MustGetString(cmd, "advertise-block-id-encoding")
+	encoding := sflags.MustGetString(cmd, "advertise-block-id-encoding")
 
-	blockIDEncodingEnum := pbfirehose.InfoResponse_BLOCK_ID_ENCODING_UNSET
+	blockIdEncoding := pbfirehose.InfoResponse_BLOCK_ID_ENCODING_UNSET
 	firstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
 
 	// If --advertise-chain-name is set, but any of the other advertise flags are not, fill them from the registry
@@ -103,28 +103,28 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 				aliases = network.Aliases
 			}
 			if !cmd.Flags().Changed("advertise-block-id-encoding") {
-				blockIDEncodingEnum = info.BlockIdEncodingForNetwork(network)
+				blockIdEncoding = info.BlockIdEncodingForNetwork(network)
 			}
 			firstStreamableBlock = uint64(network.Genesis.Height)
 		}
 	}
 
-	if blockIdEncoding != "" && blockIDEncodingEnum == pbfirehose.InfoResponse_BLOCK_ID_ENCODING_UNSET {
-		v, found := pbfirehose.InfoResponse_BlockIdEncoding_value[blockIdEncoding]
+	if encoding != "" && blockIdEncoding == pbfirehose.InfoResponse_BLOCK_ID_ENCODING_UNSET {
+		v, found := pbfirehose.InfoResponse_BlockIdEncoding_value[encoding]
 		if !found {
-			longCandidate := "BLOCK_ID_ENCODING_" + strings.ToUpper(blockIdEncoding)
+			longCandidate := "BLOCK_ID_ENCODING_" + strings.ToUpper(encoding)
 			v, found = pbfirehose.InfoResponse_BlockIdEncoding_value[longCandidate]
 			if !found {
-				return fmt.Errorf("invalid block id encoding: %s", blockIdEncoding)
+				return fmt.Errorf("invalid block id encoding: %s", encoding)
 			}
 		}
-		blockIDEncodingEnum = pbfirehose.InfoResponse_BlockIdEncoding(v)
+		blockIdEncoding = pbfirehose.InfoResponse_BlockIdEncoding(v)
 	}
 
 	infoServer := info.NewInfoServer(
 		chainName,
 		aliases,
-		blockIDEncodingEnum,
+		blockIdEncoding,
 		sflags.MustGetStringSlice(cmd, "advertise-block-features"),
 		firstStreamableBlock,
 		!sflags.MustGetBool(cmd, "ignore-advertise-validation"),
