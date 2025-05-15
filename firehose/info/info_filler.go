@@ -13,7 +13,7 @@ import (
 var DefaultInfoResponseFiller = func(firstStreamableBlock *pbbstream.Block, resp *pbfirehose.InfoResponse, validate bool) error {
 	resp.FirstStreamableBlockId = firstStreamableBlock.Id
 
-	networksWithFirehose := networks.GetRegistryNetworksWithFirehose()
+	networksWithFirehose := networks.GetFirehoseRegistry()
 
 	shortTypeURL := strings.TrimPrefix(firstStreamableBlock.Payload.TypeUrl, "type.googleapis.com/")
 	for _, protocol := range networksWithFirehose {

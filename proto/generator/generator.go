@@ -47,7 +47,7 @@ func main() {
 
 	var protofiles []ProtoFile
 
-	for _, protocol := range networks.GetRegistryNetworksWithFirehose() {
+	for _, protocol := range networks.GetFirehoseRegistry() {
 		if protocol.Firehose.BufURL == "" {
 			continue
 		}

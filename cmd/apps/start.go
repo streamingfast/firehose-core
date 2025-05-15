@@ -97,7 +97,7 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 		(!cmd.Flags().Changed("advertise-chain-aliases") ||
 			!cmd.Flags().Changed("advertise-block-id-encoding")) {
 
-		network := networks.GetRegistryNetworksWithFirehose().Find(chainName)
+		network := networks.GetFirehoseRegistry().Find(chainName)
 		if network != nil {
 			if !cmd.Flags().Changed("advertise-chain-aliases") {
 				aliases = network.Aliases
