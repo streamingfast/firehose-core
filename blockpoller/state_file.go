@@ -73,6 +73,10 @@ func (p *BlockPoller[C]) saveState(blocks []*forkable.Block) error {
 		return nil
 	}
 
+	if len(blocks) == 0 {
+		return nil
+	}
+
 	lastFiredBlock := blocks[len(blocks)-1]
 
 	sf := stateFile{
