@@ -14,6 +14,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 * Tier2 jobs now write mapper outputs "as they progress", preventing memory usage spikes when saving them to disk.
 * Tier2 jobs now limit writing and loading mapper output files to a maximum size of 8GiB by default.
+* Tier2 jobs now release existingExecOuts memory as blocks progress
+* Speed up DeleteByPrefix operations on all tiers (5x perf improvement on some heavy substreams)
 * Added`SUBSTREAMS_OUTPUT_SIZE_LIMIT_PER_SEGMENT` (int) environment variable to control this new limit.
 * Added `SUBSTREAMS_STORE_SIZE_LIMIT` (uint64) env var to allow overwriting the default 1GiB value
 * Added `SUBSTREAMS_PRINT_STACK` (bool) env var to enable printing full stack traces when caught panic occurs
