@@ -74,6 +74,7 @@ func (p *BlockPoller[C]) saveState(blocks []*forkable.Block) error {
 	}
 
 	if len(blocks) == 0 {
+		p.logger.Warn("skipping saving state because of an empty block list")
 		return nil
 	}
 
