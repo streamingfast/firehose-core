@@ -173,7 +173,7 @@ func (p *BlockPoller[C]) processBlock(currentState *cursor, block *pbbstream.Blo
 
 	// On the first run, we will fetch the blk for the `startBlockRef`, since we have a `Ref` it stands
 	// to reason that we may already have the block. We could potentially optimize this
-
+	p.logger.Debug("adding link", zap.String("block_ref", block.AsRef().String()), zap.String("parent_id", block.ParentId))
 	seenBlk, seenParent := p.forkDB.AddLink(block.AsRef(), block.ParentId, newBlock(block))
 	p.logger.Debug("added link", zap.String("block_ref", block.AsRef().String()), zap.Bool("seen_block", seenBlk), zap.Bool("seen_parent", seenParent), zap.Bool("exist", p.forkDB.Exists(block.Id)))
 
