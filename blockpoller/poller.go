@@ -175,6 +175,7 @@ func (p *BlockPoller[C]) processBlock(currentState *cursor, block *pbbstream.Blo
 	// to reason that we may already have the block. We could potentially optimize this
 
 	seenBlk, seenParent := p.forkDB.AddLink(block.AsRef(), block.ParentId, newBlock(block))
+	p.logger.Debug("added link", zap.String("block_ref", block.AsRef().String()), zap.Bool("seen_block", seenBlk), zap.Bool("seen_parent", seenParent))
 
 	currentState.addBlk(block, seenBlk, seenParent)
 
