@@ -20,7 +20,8 @@ import (
 	connect "connectrpc.com/connect"
 	"github.com/iancoleman/strcase"
 	"github.com/streamingfast/cli"
-	wellknown "github.com/streamingfast/firehose-core/well-known"
+	"github.com/streamingfast/substreams/networks"
+
 	"google.golang.org/protobuf/proto"
 )
 
@@ -46,11 +47,11 @@ func main() {
 
 	var protofiles []ProtoFile
 
-	for _, protocol := range wellknown.WellKnownProtocols {
-		if protocol.BufBuildURL == "" {
+	for _, protocol := range networks.GetFirehoseRegistry() {
+		if protocol.Firehose.BufURL == "" {
 			continue
 		}
-		wellKnownProtoRepo := protocol.BufBuildURL
+		wellKnownProtoRepo := protocol.Firehose.BufURL
 		request := connect.NewRequest(&reflectv1beta1.GetFileDescriptorSetRequest{
 			Module: wellKnownProtoRepo,
 		})
