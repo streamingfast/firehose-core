@@ -90,7 +90,6 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 	encoding := sflags.MustGetString(cmd, "advertise-block-id-encoding")
 
 	blockIdEncoding := pbfirehose.InfoResponse_BLOCK_ID_ENCODING_UNSET
-	firstStreamableBlock := bstream.GetProtocolFirstStreamableBlock
 
 	// If --advertise-chain-name is set, but any of the other advertise flags are not, fill them from the registry
 	if cmd.Flags().Changed("advertise-chain-name") &&
@@ -105,7 +104,6 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 			if !cmd.Flags().Changed("advertise-block-id-encoding") {
 				blockIdEncoding = info.BlockIdEncodingForNetwork(network)
 			}
-			firstStreamableBlock = uint64(network.Genesis.Height)
 		}
 	}
 
@@ -126,7 +124,7 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 		aliases,
 		blockIdEncoding,
 		sflags.MustGetStringSlice(cmd, "advertise-block-features"),
-		firstStreamableBlock,
+		bstream.GetProtocolFirstStreamableBlock,
 		!sflags.MustGetBool(cmd, "ignore-advertise-validation"),
 		chain.InfoResponseFiller,
 		rootLog,

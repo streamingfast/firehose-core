@@ -18,7 +18,9 @@ var DefaultInfoResponseFiller = func(firstStreamableBlock *pbbstream.Block, resp
 	shortTypeURL := strings.TrimPrefix(firstStreamableBlock.Payload.TypeUrl, "type.googleapis.com/")
 	for _, protocol := range networksWithFirehose {
 		if protocol.Firehose.BlockType == shortTypeURL {
-			resp.BlockIdEncoding = BlockIdEncodingForNetwork(protocol)
+			if resp.BlockIdEncoding == pbfirehose.InfoResponse_BLOCK_ID_ENCODING_UNSET {
+				resp.BlockIdEncoding = BlockIdEncodingForNetwork(protocol)
+			}
 			break
 		}
 	}
@@ -27,8 +29,10 @@ var DefaultInfoResponseFiller = func(firstStreamableBlock *pbbstream.Block, resp
 		if resp.ChainName == "" {
 			// still try to fill the chain name if it is not given
 			if chain := networksWithFirehose.FindByGenesisBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
-				resp.ChainName = chain.ShortName
-				resp.ChainNameAliases = chain.Aliases
+				resp.ChainName = chain.ID
+				if len(resp.ChainNameAliases) == 0 {
+					resp.ChainNameAliases = chain.Aliases
+				}
 			}
 		}
 		return nil
@@ -39,15 +43,19 @@ var DefaultInfoResponseFiller = func(firstStreamableBlock *pbbstream.Block, resp
 			if firstStreamableBlock.Number == uint64(chain.Genesis.Height) && chain.Genesis.Hash != firstStreamableBlock.Id { // we don't check if the firstStreamableBlock is something other than our well-known genesis block
 				return fmt.Errorf("chain name defined in flag: %q inconsistent with the genesis block ID %q (expected: %q)", resp.ChainName, ox(firstStreamableBlock.Id), ox(chain.Genesis.Hash))
 			}
-			resp.ChainName = chain.ShortName // ensure we use the canonical name if the user provided one of the aliases
-			resp.ChainNameAliases = chain.Aliases
+			resp.ChainName = chain.ID // ensure we use the canonical name if the user provided one of the aliases
+			if len(resp.ChainNameAliases) == 0 {
+				resp.ChainNameAliases = chain.Aliases
+			}
 		} else if chain := networksWithFirehose.FindByGenesisBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
-			return fmt.Errorf("chain name defined in flag: %q inconsistent with the one discovered from genesis block %q", resp.ChainName, chain.ShortName)
+			return fmt.Errorf("chain name defined in flag: %q inconsistent with the one discovered from genesis block %q", resp.ChainName, chain.ID)
 		}
 	} else {
 		if chain := networksWithFirehose.FindByGenesisBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
-			resp.ChainName = chain.ShortName
-			resp.ChainNameAliases = chain.Aliases
+			resp.ChainName = chain.ID
+			if len(resp.ChainNameAliases) == 0 {
+				resp.ChainNameAliases = chain.Aliases
+			}
 		}
 	}
 
