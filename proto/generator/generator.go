@@ -49,16 +49,16 @@ func main() {
 	)
 
 	var protofiles []ProtoFile
-	registeredNetwork := make([]*registry.Network, 0, len(networks.GetFirehoseRegistry()))
+	registeredNetworks := make([]*registry.Network, 0, len(networks.GetFirehoseRegistry()))
 	for _, n := range networks.GetFirehoseRegistry() {
-		registeredNetwork = append(registeredNetwork, n)
+		registeredNetworks = append(registeredNetworks, n)
 	}
 
-	sort.Slice(registeredNetwork, func(i, j int) bool {
-		return registeredNetwork[i].ID < registeredNetwork[j].ID
+	sort.Slice(registeredNetworks, func(i, j int) bool {
+		return registeredNetworks[i].ID < registeredNetworks[j].ID
 	})
 
-	for _, protocol := range registeredNetwork {
+	for _, protocol := range registeredNetworks {
 		if protocol.Firehose.BufURL == "" {
 			continue
 		}
