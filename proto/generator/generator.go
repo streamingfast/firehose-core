@@ -6,11 +6,13 @@ import (
 	"embed"
 	"encoding/hex"
 	"fmt"
+	registry "github.com/pinax-network/graph-networks-libs/packages/golang/lib"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"text/template"
@@ -47,7 +49,16 @@ func main() {
 	)
 
 	var protofiles []ProtoFile
-	for _, protocol := range networks.GetFirehoseRegistry() {
+	registeredNetwork := make([]*registry.Network, 0, len(networks.GetFirehoseRegistry()))
+	for _, n := range networks.GetFirehoseRegistry() {
+		registeredNetwork = append(registeredNetwork, n)
+	}
+
+	sort.Slice(registeredNetwork, func(i, j int) bool {
+		return registeredNetwork[i].ID < registeredNetwork[j].ID
+	})
+
+	for _, protocol := range registeredNetwork {
 		if protocol.Firehose.BufURL == "" {
 			continue
 		}
@@ -79,7 +90,7 @@ func main() {
 				bytesEncoding = "base58"
 			}
 
-			if !protoFileExists(name, protofiles) {
+			if !protoFileExists(name, cnt, protofiles) {
 				protofiles = append(protofiles, ProtoFile{
 					Name:                  name,
 					Data:                  cnt,
@@ -92,10 +103,6 @@ func main() {
 		// avoid hitting the buf.build rate limit
 		time.Sleep(1 * time.Second)
 	}
-
-	sort.Slice(protofiles, func(i, j int) bool {
-		return protofiles[i].Name < protofiles[j].Name
-	})
 
 	tmpl, err := template.New("wellknown").Funcs(templateFunctions()).ParseFS(templates, "*.gotmpl")
 	cli.NoError(err, "Unable to instantiate template")
@@ -130,9 +137,9 @@ func buildBufRegistryPackageURL(module string, fullyQualifiedPackage string, rev
 	return fmt.Sprintf("https://%s/docs/%s:%s", module, revision, fullyQualifiedPackage)
 }
 
-func protoFileExists(name string, protofiles []ProtoFile) bool {
+func protoFileExists(name string, data []byte, protofiles []ProtoFile) bool {
 	for _, pf := range protofiles {
-		if pf.Name == name {
+		if pf.Name == name && slices.Equal(pf.Data, data) {
 			return true
 		}
 	}
