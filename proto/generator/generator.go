@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/template"
 	"time"
@@ -46,12 +47,11 @@ func main() {
 	)
 
 	var protofiles []ProtoFile
-
 	for _, protocol := range networks.GetFirehoseRegistry() {
 		if protocol.Firehose.BufURL == "" {
 			continue
 		}
-		wellKnownProtoRepo := protocol.Firehose.BufURL
+		wellKnownProtoRepo := strings.TrimPrefix(protocol.Firehose.BufURL, "https://")
 		request := connect.NewRequest(&reflectv1beta1.GetFileDescriptorSetRequest{
 			Module: wellKnownProtoRepo,
 		})
@@ -79,16 +79,23 @@ func main() {
 				bytesEncoding = "base58"
 			}
 
-			protofiles = append(protofiles, ProtoFile{
-				Name:                  name,
-				Data:                  cnt,
-				BufRegistryPackageURL: buildBufRegistryPackageURL(wellKnownProtoRepo, deferPtr(file.Package, ""), fileDescriptorSet.Msg.Version),
-				BytesEncoding:         bytesEncoding,
-			})
+			if !protoFileExists(name, protofiles) {
+				protofiles = append(protofiles, ProtoFile{
+					Name:                  name,
+					Data:                  cnt,
+					BufRegistryPackageURL: buildBufRegistryPackageURL(wellKnownProtoRepo, deferPtr(file.Package, ""), fileDescriptorSet.Msg.Version),
+					BytesEncoding:         bytesEncoding,
+				})
+				log.Printf("Added proto %s", name)
+			}
 		}
 		// avoid hitting the buf.build rate limit
 		time.Sleep(1 * time.Second)
 	}
+
+	sort.Slice(protofiles, func(i, j int) bool {
+		return protofiles[i].Name < protofiles[j].Name
+	})
 
 	tmpl, err := template.New("wellknown").Funcs(templateFunctions()).ParseFS(templates, "*.gotmpl")
 	cli.NoError(err, "Unable to instantiate template")
@@ -121,6 +128,15 @@ func main() {
 func buildBufRegistryPackageURL(module string, fullyQualifiedPackage string, revision string) string {
 	// Example full URL is https://buf.build/streamingfast/firehose-near/docs/146e2ae8bd9b49e29b132b8627f29a70:sf.near.type.v1
 	return fmt.Sprintf("https://%s/docs/%s:%s", module, revision, fullyQualifiedPackage)
+}
+
+func protoFileExists(name string, protofiles []ProtoFile) bool {
+	for _, pf := range protofiles {
+		if pf.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 type ProtoFile struct {
