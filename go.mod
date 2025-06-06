@@ -15,6 +15,7 @@ require (
 	github.com/iancoleman/strcase v0.3.0
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/mostynb/go-grpc-compression v1.2.3
+	github.com/pinax-network/graph-networks-libs/packages/golang v0.6.3
 	github.com/prometheus/client_golang v1.16.0
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
@@ -33,7 +34,7 @@ require (
 	github.com/streamingfast/payment-gateway v0.0.0-20240426151444-581e930c76e2
 	github.com/streamingfast/pbgo v0.0.6-0.20250114182320-0b43084f4000
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.15.7
+	github.com/streamingfast/substreams v1.15.8-0.20250606131659-e3d05039a2f7
 	github.com/streamingfast/worker-pool-protocol v0.0.0-20250218145136-4ad271e36e39
 	github.com/stretchr/testify v1.10.0
 	github.com/test-go/testify v1.1.4
@@ -68,7 +69,6 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/muesli/termenv v0.15.3-0.20240618155329-98d742f6907a // indirect
-	github.com/pinax-network/graph-networks-libs/packages/golang v0.6.3 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/protocolbuffers/protoscope v0.0.0-20221109213918-8e7a6aafa2c9 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
@@ -81,6 +81,7 @@ require (
 	go.uber.org/mock v0.5.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250218202821-56aae31c358a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250414145226-207652e42e2e // indirect
+	rogchap.com/v8go v0.9.0 // indirect
 )
 
 require (
@@ -163,7 +164,6 @@ require (
 	github.com/openzipkin/zipkin-go v0.4.2 // indirect
 	github.com/paulbellamy/ratecounter v0.2.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
-	github.com/pinax-network/graph-networks-libs/packages/golang v0.6.3
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.44.0 // indirect
@@ -227,4 +227,5 @@ replace (
 	github.com/ShinyTrinkets/overseer => github.com/streamingfast/overseer v0.2.1-0.20210326144022-ee491780e3ef
 	github.com/jhump/protoreflect => github.com/streamingfast/protoreflect v0.0.0-20231205191344-4b629d20ce8d
 	github.com/tetratelabs/wazero => github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed
+	rogchap.com/v8go => github.com/streamingfast/v8go v0.0.0-20250530143322-fe2ca23f76b3
 )
