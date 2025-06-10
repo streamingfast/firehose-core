@@ -13,6 +13,7 @@ import (
 	"github.com/streamingfast/firehose-core/types"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 )
 
 func NewToolsFirehoseClientCmd[B firecore.Block](chain *firecore.Chain[B], logger *zap.Logger) *cobra.Command {
@@ -94,14 +95,17 @@ func getFirehoseClientE[B firecore.Block](chain *firecore.Chain[B], rootLog *zap
 			return fmt.Errorf("unable to create output printer: %w", err)
 		}
 
+		var totalEgress int
 		for {
 			response, err := stream.Recv()
+
 			if err != nil {
 				if err == io.EOF {
 					break
 				}
 				return fmt.Errorf("stream error while receiving: %w", err)
 			}
+			totalEgress += proto.Size(response)
 
 			if printCursorOnly {
 				fmt.Printf("%s - %s\n", response.Step.String(), response.Cursor)
@@ -132,6 +136,8 @@ func getFirehoseClientE[B firecore.Block](chain *firecore.Chain[B], rootLog *zap
 
 		close(resps)
 		<-allDone
+		fmt.Fprintln(os.Stderr, "Total received data (uncompressed egress):", totalEgress)
 		return nil
 	}
+}
 }
