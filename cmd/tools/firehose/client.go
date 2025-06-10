@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli/sflags"
@@ -139,5 +140,4 @@ func getFirehoseClientE[B firecore.Block](chain *firecore.Chain[B], rootLog *zap
 		fmt.Fprintln(os.Stderr, "Total received data (uncompressed egress):", totalEgress)
 		return nil
 	}
-}
 }
