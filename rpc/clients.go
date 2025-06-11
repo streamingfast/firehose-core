@@ -56,8 +56,7 @@ func (c *Clients[C]) Add(client C) {
 	defer c.lock.Unlock()
 	c.clients = append(c.clients, client)
 }
-
-func WithClients[C any, V any](clients *Clients[C], f func(context.Context, C) (v V, err error)) (v V, err error) {
+func WithClientsContext[C any, V any](clients *Clients[C], ctx context.Context, f func(context.Context, C) (v V, err error)) (v V, err error) {
 	clients.lock.Lock()
 	defer clients.lock.Unlock()
 	var errs error
@@ -70,8 +69,6 @@ func WithClients[C any, V any](clients *Clients[C], f func(context.Context, C) (
 	}
 
 	for {
-
-		ctx := context.Background()
 		ctx, cancel := context.WithTimeout(ctx, clients.maxBlockFetchDuration)
 
 		v, err := f(ctx, client)
@@ -89,4 +86,8 @@ func WithClients[C any, V any](clients *Clients[C], f func(context.Context, C) (
 		}
 		return v, nil
 	}
+}
+
+func WithClients[C any, V any](clients *Clients[C], f func(context.Context, C) (v V, err error)) (v V, err error) {
+	return WithClientsContext(clients, context.Background(), f)
 }
