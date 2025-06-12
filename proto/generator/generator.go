@@ -6,11 +6,14 @@ import (
 	"embed"
 	"encoding/hex"
 	"fmt"
+	registry "github.com/pinax-network/graph-networks-libs/packages/golang/lib"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
+	"sort"
 	"strings"
 	"text/template"
 	"time"
@@ -46,12 +49,20 @@ func main() {
 	)
 
 	var protofiles []ProtoFile
+	registeredNetworks := make([]*registry.Network, 0, len(networks.GetFirehoseRegistry()))
+	for _, n := range networks.GetFirehoseRegistry() {
+		registeredNetworks = append(registeredNetworks, n)
+	}
 
-	for _, protocol := range networks.GetFirehoseRegistry() {
+	sort.Slice(registeredNetworks, func(i, j int) bool {
+		return registeredNetworks[i].ID < registeredNetworks[j].ID
+	})
+
+	for _, protocol := range registeredNetworks {
 		if protocol.Firehose.BufURL == "" {
 			continue
 		}
-		wellKnownProtoRepo := protocol.Firehose.BufURL
+		wellKnownProtoRepo := strings.TrimPrefix(protocol.Firehose.BufURL, "https://")
 		request := connect.NewRequest(&reflectv1beta1.GetFileDescriptorSetRequest{
 			Module: wellKnownProtoRepo,
 		})
@@ -79,12 +90,15 @@ func main() {
 				bytesEncoding = "base58"
 			}
 
-			protofiles = append(protofiles, ProtoFile{
-				Name:                  name,
-				Data:                  cnt,
-				BufRegistryPackageURL: buildBufRegistryPackageURL(wellKnownProtoRepo, deferPtr(file.Package, ""), fileDescriptorSet.Msg.Version),
-				BytesEncoding:         bytesEncoding,
-			})
+			if !protoFileExists(name, cnt, protofiles) {
+				protofiles = append(protofiles, ProtoFile{
+					Name:                  name,
+					Data:                  cnt,
+					BufRegistryPackageURL: buildBufRegistryPackageURL(wellKnownProtoRepo, deferPtr(file.Package, ""), fileDescriptorSet.Msg.Version),
+					BytesEncoding:         bytesEncoding,
+				})
+				log.Printf("Added proto %s", name)
+			}
 		}
 		// avoid hitting the buf.build rate limit
 		time.Sleep(1 * time.Second)
@@ -121,6 +135,15 @@ func main() {
 func buildBufRegistryPackageURL(module string, fullyQualifiedPackage string, revision string) string {
 	// Example full URL is https://buf.build/streamingfast/firehose-near/docs/146e2ae8bd9b49e29b132b8627f29a70:sf.near.type.v1
 	return fmt.Sprintf("https://%s/docs/%s:%s", module, revision, fullyQualifiedPackage)
+}
+
+func protoFileExists(name string, data []byte, protofiles []ProtoFile) bool {
+	for _, pf := range protofiles {
+		if pf.Name == name && slices.Equal(pf.Data, data) {
+			return true
+		}
+	}
+	return false
 }
 
 type ProtoFile struct {

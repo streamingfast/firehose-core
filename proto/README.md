@@ -7,10 +7,10 @@ The well-known Protobuf definitions are pulled from Buf Build Registry. This mak
 To re-generate the well-known types, simply do:
 
 ```bash
-go generate ./protoregistry
+go generate registry.go
 ```
 
-While being at the root of the **project** (if you run from this directory here, adjust `./protoregistry` to `.`). Before re-generating, ensure you have push to Buf Registry the latest version of the definitions.
+Before re-generating, ensure you have push to Buf Registry the latest version of the definitions.
 
 #### Add new well-known types
 
