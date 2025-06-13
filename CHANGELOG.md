@@ -8,14 +8,32 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.9.11
+
+### Substreams improvements v1.15.8
+
+Rework the execout File read/write to improve memory efficiency:
+
+* This reduces the RAM usage necessary to read and stream data to the user on tier1,
+  as well as to read the existing execouts on tier2 jobs (in multi-stage scenario)
+
+* The cached execouts need to be rewritten to take advantage of this, since their data is currently not ordered:
+  the system will automatically load and rewrite existing execout when they are used.
+
+* Code changes include:
+  - new FileReader / FileWriter that "read as you go" or "write as you go"
+  - No more 'KV' map attached to the File
+  - Split the IndexWriter away from its dependencies on execoutMappers.
+  - Clock distributor now also reads "as you go", using a small "one-block-cache"
+
+* Removed `SUBSTREAMS_OUTPUT_SIZE_LIMIT_PER_SEGMENT` env var (since this is not a RAM issue anymore)
+* Add `uncompressed_egress_bytes` field to `substreams request stats` log message
+
+### Various
 
 * (dstore) Add storageClass query parameter for s3:// urls on stores (@fschoell)
-* update the firehose-beacon proto to include the new Electra spec in the 'well-known' protobuf definitions (@fschoell)
-
-### Substreams
-
-* Add `uncompressed_egress_bytes` field to `substreams request stats` log message
+* Update the firehose-beacon proto to include the new Electra spec in the 'well-known' protobuf definitions (@fschoell)
+* Use The Graph's Network Registry to recognize chains by genesis blocks and fill the 'advertise' server on substreams/firehose
 
 ## v1.9.10
 
