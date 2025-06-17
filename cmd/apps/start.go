@@ -28,9 +28,9 @@ import (
 	firecore "github.com/streamingfast/firehose-core"
 	info "github.com/streamingfast/firehose-core/firehose/info"
 	"github.com/streamingfast/firehose-core/launcher"
+	networks "github.com/streamingfast/firehose-networks"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	tracing "github.com/streamingfast/sf-tracing"
-	"github.com/streamingfast/substreams/networks"
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 )

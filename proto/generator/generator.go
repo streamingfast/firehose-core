@@ -6,7 +6,6 @@ import (
 	"embed"
 	"encoding/hex"
 	"fmt"
-	registry "github.com/pinax-network/graph-networks-libs/packages/golang/lib"
 	"io"
 	"log"
 	"net/http"
@@ -22,9 +21,9 @@ import (
 	reflectv1beta1 "buf.build/gen/go/bufbuild/reflect/protocolbuffers/go/buf/reflect/v1beta1"
 	connect "connectrpc.com/connect"
 	"github.com/iancoleman/strcase"
+	registry "github.com/pinax-network/graph-networks-libs/packages/golang/lib"
 	"github.com/streamingfast/cli"
-	"github.com/streamingfast/substreams/networks"
-
+	networks "github.com/streamingfast/firehose-networks"
 	"google.golang.org/protobuf/proto"
 )
 

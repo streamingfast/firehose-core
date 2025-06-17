@@ -6,8 +6,8 @@ import (
 
 	registry "github.com/pinax-network/graph-networks-libs/packages/golang/lib"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	networks "github.com/streamingfast/firehose-networks"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
-	"github.com/streamingfast/substreams/networks"
 )
 
 var DefaultInfoResponseFiller = func(firstStreamableBlock *pbbstream.Block, resp *pbfirehose.InfoResponse, validate bool) error {
