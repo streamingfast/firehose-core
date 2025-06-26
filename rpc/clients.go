@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 )
 
 var ErrorNoMoreClient = errors.New("no more clients")
+var ErrorNoClientsAvailable = errors.New("no clients available")
 
 type Clients[C any] struct {
 	clients               []C
@@ -56,6 +58,33 @@ func (c *Clients[C]) Add(client C) {
 	defer c.lock.Unlock()
 	c.clients = append(c.clients, client)
 }
+
+func (c *Clients[C]) GetClientByIndex(index int) (C, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	var client C
+	if len(c.clients) == 0 {
+		return client, ErrorNoClientsAvailable
+	}
+
+	if index < 0 || index >= len(c.clients) {
+		return client, fmt.Errorf("client index out of range: %d", index)
+	}
+
+	return c.clients[index], nil
+}
+
+func (c *Clients[C]) GetClientCount() int {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	return len(c.clients)
+}
+
+func (c *Clients[C]) GetMaxBlockFetchDuration() time.Duration {
+	return c.maxBlockFetchDuration
+}
+
 func WithClientsContext[C any, V any](clients *Clients[C], ctx context.Context, f func(context.Context, C) (v V, err error)) (v V, err error) {
 	clients.lock.Lock()
 	defer clients.lock.Unlock()

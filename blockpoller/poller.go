@@ -226,45 +226,63 @@ func (p *BlockPoller[C]) loadNextBlocks(requestedBlock uint64, numberOfBlockToFe
 	p.optimisticallyPolledBlocks = map[uint64]*BlockItem{}
 	p.fetching = true
 
-	nailer := dhammer.NewNailer(10, func(ctx context.Context, blockToFetch uint64) (*BlockItem, error) {
+	clientCount := p.clients.GetClientCount()
+	if clientCount == 0 {
+		return fmt.Errorf("no clients available")
+	}
+
+	blockToClientIndex := make(map[uint64]int)
+	nextClientIndex := 0
+
+	for i := 0; i < numberOfBlockToFetch; i++ {
+		blockNum := requestedBlock + uint64(i)
+		blockToClientIndex[blockNum] = nextClientIndex
+		nextClientIndex = (nextClientIndex + 1) % clientCount
+	}
+
+	nailer := dhammer.NewNailer(numberOfBlockToFetch, func(ctx context.Context, blockToFetch uint64) (*BlockItem, error) {
 		var blockItem *BlockItem
 		err := derr.Retry(p.fetchBlockRetryCount, func(ctx context.Context) error {
-
-			bi, err := rpc.WithClients(p.clients, func(ctx context.Context, client C) (*BlockItem, error) {
-				b, skipped, err := p.blockFetcher.Fetch(ctx, client, blockToFetch)
-				if err != nil {
-					return nil, fmt.Errorf("fetching block %d: %w", blockToFetch, err)
-				}
-
-				if skipped {
-					return &BlockItem{
-						blockNumber: blockToFetch,
-						block:       nil,
-						skipped:     true,
-					}, nil
-				}
-
-				return &BlockItem{
-					blockNumber: blockToFetch,
-					block:       b,
-					skipped:     false,
-				}, nil
-			})
-
-			if err != nil {
-				return fmt.Errorf("fetching block %d with retry : %w", blockToFetch, err)
+			clientIndex, exists := blockToClientIndex[blockToFetch]
+			if !exists {
+				clientIndex = 0
 			}
-			blockItem = bi
 
+			client, err := p.clients.GetClientByIndex(clientIndex)
+			if err != nil {
+				return fmt.Errorf("getting client at index %d for block %d: %w", clientIndex, blockToFetch, err)
+			}
+
+			clientCtx, clientCancel := context.WithTimeout(ctx, p.clients.GetMaxBlockFetchDuration())
+			defer clientCancel()
+
+			b, skipped, err := p.blockFetcher.Fetch(clientCtx, client, blockToFetch)
+			if err != nil {
+				return fmt.Errorf("fetching block %d with client %d: %w", blockToFetch, clientIndex, err)
+			}
+
+			if skipped {
+				blockItem = &BlockItem{
+					blockNumber: blockToFetch,
+					block:       nil,
+					skipped:     true,
+				}
+				return nil
+			}
+
+			blockItem = &BlockItem{
+				blockNumber: blockToFetch,
+				block:       b,
+				skipped:     false,
+			}
 			return nil
-
 		})
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch block with retries %d: %w", blockToFetch, err)
 		}
 
-		return blockItem, err
+		return blockItem, nil
 	})
 
 	ctx := context.Background()
@@ -362,27 +380,33 @@ func (p *BlockPoller[C]) fetchBlockWithHash(blkNum uint64, hash string) (*pbbstr
 
 	p.optimisticallyPolledBlocks = map[uint64]*BlockItem{}
 
+	clientCount := p.clients.GetClientCount()
+	if clientCount == 0 {
+		return nil, fmt.Errorf("no clients available")
+	}
+
+	clientIndex := 0
+
 	var out *pbbstream.Block
 	var skipped bool
 
 	err := derr.Retry(p.fetchBlockRetryCount, func(ctx context.Context) error {
-		br, err := rpc.WithClients(p.clients, func(ctx context.Context, client C) (br *FetchResponse, err error) {
-			b, skipped, err := p.blockFetcher.Fetch(ctx, client, blkNum)
-			if err != nil {
-				return nil, fmt.Errorf("fetching block  block %d: %w", blkNum, err)
-			}
-			return &FetchResponse{
-				Block:   b,
-				Skipped: skipped,
-			}, nil
-		})
-
+		client, err := p.clients.GetClientByIndex(clientIndex)
 		if err != nil {
-			return fmt.Errorf("fetching block with retry %d: %w", blkNum, err)
+			return fmt.Errorf("getting client at index %d for block %d: %w", clientIndex, blkNum, err)
 		}
 
-		out = br.Block
-		skipped = br.Skipped
+		clientCtx, clientCancel := context.WithTimeout(ctx, p.clients.GetMaxBlockFetchDuration())
+		defer clientCancel()
+
+		b, skip, err := p.blockFetcher.Fetch(clientCtx, client, blkNum)
+		if err != nil {
+			clientIndex = (clientIndex + 1) % clientCount
+			return fmt.Errorf("fetching block %d with client %d: %w", blkNum, clientIndex, err)
+		}
+
+		out = b
+		skipped = skip
 		return nil
 	})
 
