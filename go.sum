@@ -2213,10 +2213,8 @@ github.com/streamingfast/shutter v1.5.0 h1:NpzDYzj0HVpSiDJVO/FFSL6QIK/YKOxY0gJAt
 github.com/streamingfast/shutter v1.5.0/go.mod h1:B/T6efqdeMGbGwjzPS1ToXzYZI4kDzI5/u4I+7qbjY8=
 github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0 h1:Y15G1Z4fpEdm2b+/70owI7TLuXadlqBtGM7rk4Hxrzk=
 github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0/go.mod h1:/Rnz2TJvaShjUct0scZ9kKV2Jr9/+KBAoWy4UMYxgv4=
-github.com/streamingfast/substreams v1.15.9-0.20250616133405-432e58897ceb h1:YiRYVCPanvOhq4YYJYzXzT1lpnSOaMEIzimEcvTb23k=
-github.com/streamingfast/substreams v1.15.9-0.20250616133405-432e58897ceb/go.mod h1:q73jcxz8270osAXh8cNf+4WE/jGPPLcsyuRtSHjPYBk=
-github.com/streamingfast/substreams v1.15.9-0.20250617190236-60cf06e02371 h1:n992sjHx0LOkQuHQ7ruaHSEW1Y4GOaVUf0YKcRXTg1o=
-github.com/streamingfast/substreams v1.15.9-0.20250617190236-60cf06e02371/go.mod h1:tPar3vTjNQoQkGVKOqa2W4OaFNAlHU3cdB++C/0OYnA=
+github.com/streamingfast/substreams v1.15.9-0.20250702201324-b5533b370559 h1:xHUX6hiJ4NuqnTGYFJiyrugG5KyD2j0SyxgKBQZ8fak=
+github.com/streamingfast/substreams v1.15.9-0.20250702201324-b5533b370559/go.mod h1:tPar3vTjNQoQkGVKOqa2W4OaFNAlHU3cdB++C/0OYnA=
 github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed h1:LU6/c376zP1cMAo9L6rFLyjo0W7RU+hIh7BegH8Zo5M=
 github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed/go.mod h1:yAI0XTsMBhREkM/YDAK/zNou3GoiAce1P6+rp/wQhjs=
 github.com/streamingfast/worker-pool-protocol v0.0.0-20250218145136-4ad271e36e39 h1:NBBLx99rrGz/hxwHjHi+QyN07DfqcDC4zzuBEsH0/vE=
@@ -2349,8 +2347,6 @@ go.uber.org/tools v0.0.0-20190618225709-2cfd321de3ee/go.mod h1:vJERXedbb3MVM5f9E
 go.uber.org/zap v1.10.0/go.mod h1:vwi/ZaCAaUcBkycHslxD9B2zi4UTXhF60s6SWpuDF0Q=
 go.uber.org/zap v1.14.0/go.mod h1:zwrFLgMcdUuIBviXEYEH1YKNaOBnKXsx2IPda5bBwHM=
 go.uber.org/zap v1.21.0/go.mod h1:wjWOCqI0f2ZZrJF/UufIOkiC8ii6tm1iqIsLo76RfJw=
-go.uber.org/zap v1.26.0 h1:sI7k6L95XOKS281NhVKOFCUNIvv9e0w4BF8N3u+tCRo=
-go.uber.org/zap v1.26.0/go.mod h1:dtElttAiwGvoJ/vj4IwHBS/gXsEu/pZ50mUIRWuG0so=
 go.uber.org/zap v1.27.0 h1:aJMhYGrd5QSmlpLMr2MftRKl7t8J8PTZPA732ud/XR8=
 go.uber.org/zap v1.27.0/go.mod h1:GB2qFLM7cTU87MWRP2mPIjqfIDnGu+VIO4V/SdhGo2E=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
