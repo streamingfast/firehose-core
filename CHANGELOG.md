@@ -8,17 +8,20 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## v1.10.0
+## v1.11.1
 
 ### Substreams
 
 * [OPERATORS] Tier2 servers must be upgraded BEFORE tier1 servers
-
 * tier2 servers will now stream outputs for the 'first segment', to speed up time to first block
 * Progress notifications will only be sent every 500ms for the first minute, then reduce rate up to every 5 seconds (can be overridden per request)
 * Return 'processed blocks' counter to client at the end of the request
 * Added `dev_output_modules` to protobuf request (if present, in dev mode, only send the output of the modules listed)
 * Added `progress_messages_interval_ms` to protobuf request (if present, overrides the rate of progress messages to that many milliseconds)
+
+## v1.10.0
+
+[Broken release, do not use]
 
 ## v1.9.12
 
