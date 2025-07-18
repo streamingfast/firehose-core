@@ -13,7 +13,7 @@ require (
 	github.com/iancoleman/strcase v0.3.0
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/mostynb/go-grpc-compression v1.2.3
-	github.com/pinax-network/graph-networks-libs/packages/golang v0.6.3
+	github.com/pinax-network/graph-networks-libs/packages/golang v0.7.0
 	github.com/prometheus/client_golang v1.16.0
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
@@ -28,7 +28,7 @@ require (
 	github.com/streamingfast/dmetering v0.0.0-20250606124734-944cf3e4959e
 	github.com/streamingfast/dmetrics v0.0.0-20250425183830-ffcef0cc9f87
 	github.com/streamingfast/dstore v0.1.1-0.20250609173504-95368d3441ee
-	github.com/streamingfast/firehose-networks v0.1.0
+	github.com/streamingfast/firehose-networks v0.2.0
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	github.com/streamingfast/payment-gateway v0.0.0-20250606152645-3614ea533458
 	github.com/streamingfast/pbgo v0.0.6-0.20250114182320-0b43084f4000

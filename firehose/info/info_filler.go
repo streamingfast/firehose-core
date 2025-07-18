@@ -40,18 +40,18 @@ var DefaultInfoResponseFiller = func(firstStreamableBlock *pbbstream.Block, resp
 
 	if resp.ChainName != "" {
 		if chain := networksWithFirehose.Find(resp.ChainName); chain != nil {
-			if firstStreamableBlock.Number == uint64(chain.Genesis.Height) && nox(chain.Genesis.Hash) != nox(firstStreamableBlock.Id) { // we don't check if the firstStreamableBlock is something other than our well-known genesis block
-				return fmt.Errorf("chain name defined in flag: %q inconsistent with the genesis block ID %q (expected: %q)", resp.ChainName, nox(firstStreamableBlock.Id), nox(chain.Genesis.Hash))
+			if firstStreamableBlock.Number == uint64(chain.Firehose.FirstStreamableBlock.Height) && nox(chain.Firehose.FirstStreamableBlock.ID) != nox(firstStreamableBlock.Id) { // we don't check if the firstStreamableBlock is something other than our well-known genesis block
+				return fmt.Errorf("chain name defined in flag: %q inconsistent with the genesis block ID %q (expected: %q)", resp.ChainName, nox(firstStreamableBlock.Id), nox(chain.Firehose.FirstStreamableBlock.ID))
 			}
 			resp.ChainName = chain.ID // ensure we use the canonical name if the user provided one of the aliases
 			if len(resp.ChainNameAliases) == 0 {
 				resp.ChainNameAliases = chain.Aliases
 			}
-		} else if chain := networksWithFirehose.FindByGenesisBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
+		} else if chain := networksWithFirehose.FindByFirstStreamableBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
 			return fmt.Errorf("chain name defined in flag: %q inconsistent with the one discovered from genesis block %q", resp.ChainName, chain.ID)
 		}
 	} else {
-		if chain := networksWithFirehose.FindByGenesisBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
+		if chain := networksWithFirehose.FindByFirstStreamableBlock(firstStreamableBlock.Number, firstStreamableBlock.Id); chain != nil {
 			resp.ChainName = chain.ID
 			if len(resp.ChainNameAliases) == 0 {
 				resp.ChainNameAliases = chain.Aliases
