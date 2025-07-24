@@ -29,7 +29,10 @@ COPY --from=build /app/firecore /app/firecore
 ENV PATH="$PATH:/app"
 
 COPY docker/motd /etc/motd
+COPY docker/motd_reader /etc/motd_reader
 COPY docker/99-firehose-core.sh /etc/profile.d/
+COPY docker/scripts/ /app/
+RUN chmod +x /app/reader-*
 RUN echo ". /etc/profile.d/99-firehose-core.sh" > /root/.bash_aliases
 
 ENTRYPOINT [ "/app/firecore" ]
