@@ -26,14 +26,14 @@ require (
 	github.com/streamingfast/dgrpc v0.0.0-20250423172640-223250ed2391
 	github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4
 	github.com/streamingfast/dmetering v0.0.0-20250606124734-944cf3e4959e
-	github.com/streamingfast/dmetrics v0.0.0-20250425183830-ffcef0cc9f87
+	github.com/streamingfast/dmetrics v0.0.0-20250711072030-f023e918a175
 	github.com/streamingfast/dstore v0.1.1-0.20250609173504-95368d3441ee
 	github.com/streamingfast/firehose-networks v0.2.0
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	github.com/streamingfast/payment-gateway v0.0.0-20250606152645-3614ea533458
 	github.com/streamingfast/pbgo v0.0.6-0.20250114182320-0b43084f4000
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.15.9-0.20250704192321-19ee3ca8adbf
+	github.com/streamingfast/substreams v1.16.2-0.20250724195001-b1f02fb29e2f
 	github.com/streamingfast/worker-pool-protocol v0.0.0-20250218145136-4ad271e36e39
 	github.com/stretchr/testify v1.10.0
 	github.com/test-go/testify v1.1.4
@@ -74,6 +74,7 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
+	github.com/streamingfast/substreams-foundational-store v0.0.0-20250617193409-beadb4d795d7 // indirect
 	github.com/zeebo/errs v1.4.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0 // indirect
