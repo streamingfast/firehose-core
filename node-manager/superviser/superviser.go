@@ -275,8 +275,7 @@ nodeProcessDone:
 }
 
 func (s *Superviser) getProcessOutputStats() (stdoutLineCount, stderrLineCount int) {
-	cmd := s.cmd
-	if cmd != nil {
+	if cmd := s.cmd; cmd != nil {
 		return len(cmd.Stdout), len(cmd.Stderr)
 	}
 
@@ -305,11 +304,11 @@ func (s *Superviser) isRunning() bool {
 }
 
 func (s *Superviser) isBufferEmpty() bool {
-	cmd := s.cmd
-	if cmd == nil {
-		return true
+	if cmd := s.cmd; cmd != nil {
+		return len(cmd.Stdout) == 0 && len(cmd.Stderr) == 0
 	}
-	return len(cmd.Stdout) == 0 && len(cmd.Stderr) == 0
+	
+	return true
 }
 
 func (s *Superviser) start(cmd *overseer.Cmd) {
