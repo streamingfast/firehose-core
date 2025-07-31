@@ -275,6 +275,9 @@ nodeProcessDone:
 }
 
 func (s *Superviser) getProcessOutputStats() (stdoutLineCount, stderrLineCount int) {
+	s.cmdLock.Lock()
+	defer s.cmdLock.Unlock()
+	
 	if s.cmd != nil {
 		return len(s.cmd.Stdout), len(s.cmd.Stderr)
 	}
@@ -304,6 +307,9 @@ func (s *Superviser) isRunning() bool {
 }
 
 func (s *Superviser) isBufferEmpty() bool {
+	s.cmdLock.Lock()
+	defer s.cmdLock.Unlock()
+	
 	if s.cmd == nil {
 		return true
 	}
