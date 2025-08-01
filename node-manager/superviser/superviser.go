@@ -275,8 +275,9 @@ nodeProcessDone:
 }
 
 func (s *Superviser) getProcessOutputStats() (stdoutLineCount, stderrLineCount int) {
-	if s.cmd != nil {
-		return len(s.cmd.Stdout), len(s.cmd.Stderr)
+	// Capture s.cmd in local variable to prevent race condition with termination
+	if cmd := s.cmd; cmd != nil {
+		return len(cmd.Stdout), len(cmd.Stderr)
 	}
 
 	return
@@ -304,10 +305,12 @@ func (s *Superviser) isRunning() bool {
 }
 
 func (s *Superviser) isBufferEmpty() bool {
-	if s.cmd == nil {
-		return true
+	// Capture s.cmd in local variable to prevent race condition with termination
+	if cmd := s.cmd; cmd != nil {
+		return len(cmd.Stdout) == 0 && len(cmd.Stderr) == 0
 	}
-	return len(s.cmd.Stdout) == 0 && len(s.cmd.Stderr) == 0
+	
+	return true
 }
 
 func (s *Superviser) start(cmd *overseer.Cmd) {
