@@ -250,7 +250,7 @@ func displayBlock[B firecore.Block](pbBlock *pbbstream.Block, chain *firecore.Ch
 	}
 
 	// since we are running directly the firecore binary we will *NOT* use the BlockFactory
-	err := printer.PrintTo(pbBlock.Payload, os.Stdout)
+	err := printer.PrintTo(pbBlock, os.Stdout)
 	if err != nil {
 		return fmt.Errorf("marshalling block to json: %w", err)
 	}

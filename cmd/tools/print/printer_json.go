@@ -20,14 +20,18 @@ import (
 
 	"github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	fcjson "github.com/streamingfast/firehose-core/json"
 	fcproto "github.com/streamingfast/firehose-core/proto"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 var _ OutputPrinter = (*JSONOutputPrinter)(nil)
 
 type JSONOutputPrinter struct {
 	singleLine bool
+	registry   *fcproto.Registry
 	marshaller *fcjson.Marshaller
 }
 
@@ -40,6 +44,7 @@ func NewJSONOutputPrinter(bytesEncoding string, singleLine bool, registry *fcpro
 
 	return &JSONOutputPrinter{
 		singleLine: singleLine,
+		registry:   registry,
 		marshaller: fcjson.NewMarshaller(registry, options...),
 	}, nil
 }
@@ -48,6 +53,16 @@ func (p *JSONOutputPrinter) PrintTo(input any, w io.Writer) error {
 	var encoderOptions []json.Options
 	if !p.singleLine {
 		encoderOptions = append(encoderOptions, jsontext.WithIndent("  "))
+	}
+
+	if block, ok := input.(*pbbstream.Block); ok {
+		// Special case for Block, we want to print it as a Block
+		unmarshalled, err := anypb.UnmarshalNew(block.Payload, proto.UnmarshalOptions{
+			Resolver: p.registry,
+		})
+		if err == nil {
+			input = unmarshalled
+		}
 	}
 
 	out, err := p.marshaller.MarshalToString(input, encoderOptions...)
