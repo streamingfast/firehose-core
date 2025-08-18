@@ -14,6 +14,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 * Improved how `firecore tools --output=protojson` and `firecore tools --output=json` renders `pbbstream.Block` type now printing the underlying chain's specific block.
 
+### Substreams
+
+* Fix thread leak on filereader
+
 ## v1.10.2
 
 ### Substreams (v1.6.2)
