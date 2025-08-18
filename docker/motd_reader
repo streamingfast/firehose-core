@@ -4,7 +4,7 @@
     /_/ /_/_/  \__/_//_/\___/___/\__/
 
 Welcome to this shell, common commands:
- - Show version                   firecore --version
+ - Show version                   ${FIREHOSE_BINARY} --version
 
  - Change log level on the fly    curl -d '{"level":"debug","inputs":".*"}' http://localhost:1065
 

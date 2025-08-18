@@ -14,7 +14,8 @@ FROM ubuntu:24.10
 
 ARG TARGETPLATFORM
 
-RUN apt-get update && apt-get -y install ca-certificates htop iotop sysstat strace lsof curl jq tzdata file
+# gettext-base is needed for envsubst
+RUN apt-get update && apt-get -y install ca-certificates htop iotop sysstat strace lsof curl jq tzdata file gettext-base
 
 RUN mkdir -p /app/ && \
     export repository="https://github.com/grpc-ecosystem/grpc-health-probe/releases/download" && \
