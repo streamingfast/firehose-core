@@ -11,7 +11,7 @@ import (
 )
 
 func TestUnmarshal(t *testing.T) {
-	acme := readTestProto(t, "testdata/acme")
+	chainTest := readTestProto(t, "testdata/test")
 
 	type args struct {
 		typeURL string
@@ -27,7 +27,7 @@ func TestUnmarshal(t *testing.T) {
 	}{
 		{
 			name:    "chain alone",
-			typeURL: "sf.acme.type.v1.Block",
+			typeURL: "sf.test.type.v1.Block",
 			want: func(tt *testing.T, out *dynamicpb.Message) {
 				h := out.Get(out.Descriptor().Fields().ByName("hash")).String()
 				blockNum := out.Get(out.Descriptor().Fields().ByName("num")).Uint()
@@ -38,8 +38,8 @@ func TestUnmarshal(t *testing.T) {
 		},
 		{
 			name:       "overriding built-in chain with proto path",
-			protoPaths: []string{"testdata/override_acme"},
-			typeURL:    "sf.acme.type.v1.Block",
+			protoPaths: []string{"testdata/override_test"},
+			typeURL:    "sf.test.type.v1.Block",
 			want: func(tt *testing.T, out *dynamicpb.Message) {
 				// If you reach this point following a panic in the Go test, the reason there
 				// is a panic here is because the override_ethereum.proto file is taking
@@ -81,7 +81,7 @@ func TestUnmarshal(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			registry, err := NewRegistry(acme, tt.protoPaths...)
+			registry, err := NewRegistry(chainTest, tt.protoPaths...)
 			require.NoError(t, err)
 
 			a := &anypb.Any{TypeUrl: "type.googleapis.com/" + tt.typeURL, Value: tt.value}
