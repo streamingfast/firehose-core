@@ -17,6 +17,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### Substreams
 
 * Fix thread leak on filereader
+* Add `tgm://?key=indexer_auth_key` authentication provider. Use with an 'indexer auth key' to prevent JWT rate-limiting.
 
 ## v1.10.2
 
