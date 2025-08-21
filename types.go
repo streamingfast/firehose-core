@@ -147,6 +147,7 @@ func EncodeBlock(b Block) (blk *pbbstream.Block, err error) {
 		Id:        b.GetFirehoseBlockID(),
 		Number:    b.GetFirehoseBlockNumber(),
 		ParentId:  b.GetFirehoseBlockParentID(),
+		ParentNum: b.GetFirehoseBlockParentNumber(),
 		Timestamp: timestamppb.New(b.GetFirehoseBlockTime()),
 		LibNum:    v.GetFirehoseBlockLIBNum(),
 		Payload:   anyBlock,
