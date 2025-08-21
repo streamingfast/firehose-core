@@ -18,6 +18,7 @@ import (
 type InfoServer struct {
 	sync.Mutex
 
+	blockType      string
 	validate       bool
 	responseFiller func(block *pbbstream.Block, resp *pbfirehose.InfoResponse, validate bool) error
 	response       *pbfirehose.InfoResponse
@@ -39,6 +40,7 @@ func (s *InfoServer) Info(ctx context.Context, request *pbfirehose.InfoRequest) 
 func NewInfoServer(
 	chainName string,
 	chainNameAliases []string,
+	blockType string,
 	blockIDEncoding pbfirehose.InfoResponse_BlockIdEncoding,
 	blockFeatures []string,
 	firstStreamableBlock uint64,
@@ -56,6 +58,7 @@ func NewInfoServer(
 	}
 
 	return &InfoServer{
+		blockType:      blockType,
 		responseFiller: responseFiller,
 		response:       resp,
 		validate:       validate,
@@ -232,4 +235,12 @@ func (s *InfoServer) init(ctx context.Context, fhub *hub.ForkableHub, mergedBloc
 
 	close(s.ready)
 	return nil
+}
+
+// GetBlockType returns the block type for the InfoServer, e.g. sf.ethereum.type.v2.Block, which
+// is usually inferred from the networks registry and picked from the `advertised-chain-name` flag.
+//
+// It can be the empty string if the chain name was not passed or it was not a known chain (yet).
+func (s *InfoServer) GetBlockType() string {
+	return s.blockType
 }

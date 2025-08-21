@@ -103,15 +103,9 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 
 			rawServiceDiscoveryURL := viper.GetString("substreams-tier1-discovery-service-url")
 
-			var blockType string
-			if chain.DefaultBlockType != "" {
-				blockType = chain.DefaultBlockType
-			}
-
-			blockTypeFromFlag := viper.GetString("substreams-tier1-block-type")
-
-			if blockTypeFromFlag != "" {
-				blockType = blockTypeFromFlag
+			blockType := runtime.InfoServer.GetBlockType()
+			if fromFlag := viper.GetString("substreams-tier1-block-type"); fromFlag != "" {
+				blockType = fromFlag
 			}
 
 			var serviceDiscoveryURL *url.URL
