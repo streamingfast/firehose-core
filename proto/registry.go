@@ -18,7 +18,7 @@ var _ protoregistry.ExtensionTypeResolver = (*Registry)(nil)
 // Generate the flags based on Go code in this project directly, this however
 // creates a chicken & egg problem if there is compilation error within the project
 // but to fix them we must re-generate it.
-//go:generate go run ./generator well_known_types.go proto
+//go:generate go run ./generator wkp wkp
 
 type Registry struct {
 	Types *protoregistry.Types
@@ -83,7 +83,6 @@ func (r *Registry) RegisterFileDescriptor(fd protoreflect.FileDescriptor) error 
 
 	if err != nil {
 		if errors.Is(err, protoregistry.NotFound) {
-			// NewRegistry the new file descriptor.
 			if err := r.Files.RegisterFile(fd); err != nil {
 				return fmt.Errorf("registering proto file: %w", err)
 			}

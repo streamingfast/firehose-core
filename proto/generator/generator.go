@@ -4,13 +4,14 @@ import (
 	"bufio"
 	"context"
 	"embed"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -31,16 +32,20 @@ import (
 var templates embed.FS
 
 func main() {
-	cli.Ensure(len(os.Args) == 3, "go run ./generator <output_file> <package_name>")
+	cli.Ensure(len(os.Args) == 3 || len(os.Args) == 4, "go run ./generator <output_package> <package_name> [<block-type-filter-regex>]")
 
 	authToken := os.Getenv("BUFBUILD_AUTH_TOKEN")
-	if authToken == "" {
-		log.Fatalf("You must set the BUFBUILD_AUTH_TOKEN environment variable to generate well known registry. See https://buf.build/docs/bsr/authentication")
-		return
+	cli.Ensure(authToken != "", "You must set the BUFBUILD_AUTH_TOKEN environment variable to generate well known registry. See https://buf.build/docs/bsr/authentication")
+
+	outputPackage := os.Args[1]
+	packageName := os.Args[2]
+	blockTypeFilterRaw := ".*"
+	if len(os.Args) == 4 {
+		blockTypeFilterRaw = os.Args[3]
 	}
 
-	output := os.Args[1]
-	packageName := os.Args[2]
+	blockTypeFilter, err := regexp.Compile(blockTypeFilterRaw)
+	cli.NoError(err, "Unable to compile filter regex %q", blockTypeFilterRaw)
 
 	client := reflectv1beta1connect.NewFileDescriptorSetServiceClient(
 		http.DefaultClient,
@@ -61,10 +66,16 @@ func main() {
 		if protocol.Firehose.BufURL == "" {
 			continue
 		}
+
+		if !blockTypeFilter.MatchString(protocol.Firehose.BlockType) {
+			continue
+		}
+
 		wellKnownProtoRepo := strings.TrimPrefix(protocol.Firehose.BufURL, "https://")
 		request := connect.NewRequest(&reflectv1beta1.GetFileDescriptorSetRequest{
 			Module: wellKnownProtoRepo,
 		})
+
 		request.Header().Set("Authorization", "Bearer "+authToken)
 		fileDescriptorSet, err := client.GetFileDescriptorSet(context.Background(), request)
 		if err != nil {
@@ -83,18 +94,11 @@ func main() {
 				name = *file.Name
 			}
 
-			bytesEncoding := "hex"
-
-			if strings.Contains(name, "solana") {
-				bytesEncoding = "base58"
-			}
-
 			if !protoFileExists(name, cnt, protofiles) {
 				protofiles = append(protofiles, ProtoFile{
 					Name:                  name,
 					Data:                  cnt,
-					BufRegistryPackageURL: buildBufRegistryPackageURL(wellKnownProtoRepo, deferPtr(file.Package, ""), fileDescriptorSet.Msg.Version),
-					BytesEncoding:         bytesEncoding,
+					BufRegistryPackageURL: buildBufRegistryPackageURL(wellKnownProtoRepo, derefPtr(file.Package, ""), fileDescriptorSet.Msg.Version),
 				})
 				log.Printf("Added proto %s", name)
 			}
@@ -106,27 +110,52 @@ func main() {
 	tmpl, err := template.New("wellknown").Funcs(templateFunctions()).ParseFS(templates, "*.gotmpl")
 	cli.NoError(err, "Unable to instantiate template")
 
-	var out io.Writer = os.Stdout
-	if output != "-" {
-		cli.NoError(os.MkdirAll(filepath.Dir(output), os.ModePerm), "Unable to create output file directories")
+	if outputPackage == "-" {
+		// Output to stdout (single file for compatibility)
+		err = tmpl.ExecuteTemplate(os.Stdout, "template.gotmpl", map[string]any{
+			"Package":    packageName,
+			"ProtoFiles": protofiles,
+		})
+		cli.NoError(err, "Unable to render template")
+	} else {
+		// Create output directory
+		cli.NoError(os.MkdirAll(outputPackage, os.ModePerm), "Unable to create output directory")
 
-		file, err := os.Create(output)
-		cli.NoError(err, "Unable to open output file")
+		// Generate registry file
+		registryFile := filepath.Join(outputPackage, "registry.go")
+		file, err := os.Create(registryFile)
+		cli.NoError(err, "Unable to create registry file")
 
 		bufferedOut := bufio.NewWriter(file)
-		out = bufferedOut
+		err = tmpl.ExecuteTemplate(bufferedOut, "registry.gotmpl", map[string]any{
+			"Package": packageName,
+		})
+		cli.NoError(err, "Unable to render registry template")
+		bufferedOut.Flush()
+		file.Close()
 
-		defer func() {
+		// Generate individual proto files
+		for _, protoFile := range protofiles {
+			filename := generateFilename(protoFile.Name)
+			filepath := filepath.Join(outputPackage, filename+".go")
+
+			file, err := os.Create(filepath)
+			cli.NoError(err, "Unable to create proto file %s", filepath)
+
+			bufferedOut := bufio.NewWriter(file)
+			err = tmpl.ExecuteTemplate(bufferedOut, "protofile.gotmpl", map[string]any{
+				"Package":               packageName,
+				"Name":                  protoFile.Name,
+				"Data":                  protoFile.Data,
+				"BufRegistryPackageURL": protoFile.BufRegistryPackageURL,
+			})
+			cli.NoError(err, "Unable to render proto file template")
 			bufferedOut.Flush()
 			file.Close()
-		}()
-	}
 
-	err = tmpl.ExecuteTemplate(out, "template.gotmpl", map[string]any{
-		"Package":    packageName,
-		"ProtoFiles": protofiles,
-	})
-	cli.NoError(err, "Unable to render template")
+			log.Printf("Generated %s", filepath)
+		}
+	}
 
 	fmt.Println("Done creating well known registry")
 }
@@ -160,10 +189,18 @@ func templateFunctions() template.FuncMap {
 		"toHex": func(in []byte) string {
 			return hex.EncodeToString(in)
 		},
+		"toBase64": func(in []byte) string {
+			return base64.StdEncoding.EncodeToString(in)
+		},
 	}
 }
 
-func deferPtr[T any](in *T, orValue T) T {
+func generateFilename(name string) string {
+	// Replace separators with dots: sf/ethereum/type/v2/block.proto -> sf.ethereum.type.v2.block.proto
+	return strings.ReplaceAll(name, "/", ".")
+}
+
+func derefPtr[T any](in *T, orValue T) T {
 	if in == nil {
 		return orValue
 	}
