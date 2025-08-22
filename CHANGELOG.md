@@ -17,7 +17,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### Substreams
 
 #### Tier1 thread / memory leak
-* Fix thread leak on filereader
+
+* Fix thread leak on filereader.
+
+* If `--advertise-chain-name` is sey, `substreams-tier1` app will now infer default `--substreams-tier1-block-type` value by using chain's name and extracting chain's block type Protobuf package id, which will fix some cases where `substreams-tier1` waits for 100 blocks before starting up.
 
 #### Authentication changes
 
