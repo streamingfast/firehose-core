@@ -16,8 +16,25 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Substreams
 
+#### Tier1 thread / memory leak
 * Fix thread leak on filereader
-* Add `tgm://?key=indexer_auth_key` authentication provider. Use with an 'indexer auth key' to prevent JWT rate-limiting.
+
+#### Authentication changes
+
+People using their own authentication layer will need to consider these changes before upgrading!
+
+* Renamed config headers that come from authentication layer:
+  - `x-sf-user-id` renamed to `x-user-id` (from dauth module)
+  - `x-sf-api-key-id` renamed to `x-api-key-id` (from dauth module)
+  - `x-sf-meta` renamed to `x-meta` (from dauth module)
+  - `x-sf-substreams-parallel-jobs` renamed to `x-substreams-parallel-workers`
+* Allow decreasing `x-substreams-parallel-workers` through an HTTP headers (auth layer determines higher bound)
+* Detect value for the 'stage layer parallel executor max count' based on the `x-plan-tier` header (removed `x-sf-substreams-stage-layer-parallel-executor-max-count` handling)
+
+#### New authentication plugin
+
+* Added `tgm://auth.thegraph.market?indexer-api-key=<API_KEY>&reissue-jwt-max-age-secs=600` plugin that allows an indexer to use The Graph Market as the authentication source.
+  An API key with special "indexer" feature is needed to allow repeated calls to the API without rate limiting (for Key-based authentication and reissuance of "untrusted long-lived JWTs").
 
 ## v1.10.2
 

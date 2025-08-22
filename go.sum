@@ -2188,8 +2188,8 @@ github.com/streamingfast/bstream v0.0.2-0.20250416133616-23bdc92e0e9c h1:cKT8z2b
 github.com/streamingfast/bstream v0.0.2-0.20250416133616-23bdc92e0e9c/go.mod h1:YXtnOZbqcqU4fzGqdi8B7rMcp2iQePQGf4oTIPBnzgc=
 github.com/streamingfast/cli v0.0.4-0.20250424204306-678ec20cedec h1:7TZFCh5oGDoAA0+lWrYcPS3xRH7EC/cgaqiVxVhTA6E=
 github.com/streamingfast/cli v0.0.4-0.20250424204306-678ec20cedec/go.mod h1:qOksW3DPhHVYBo8dcYxS7K3Q09wlcOChSdopeOjLWng=
-github.com/streamingfast/dauth v0.0.0-20250820114409-1f350c4304cc h1:EIsGvt0cQZpGhlfQFVjn0NyLlSA1w1hCbfbncjuNWo0=
-github.com/streamingfast/dauth v0.0.0-20250820114409-1f350c4304cc/go.mod h1:d8NTrjIoiqplrZEYOUXwwFaeB2C8fVeHYLvaJFfa9Xo=
+github.com/streamingfast/dauth v0.0.0-20250821195214-8e2a3c300f97 h1:Lcack+Yv9KWBeKfRrjQ+KUegwHbh6/aFLJuDyYzcXZ4=
+github.com/streamingfast/dauth v0.0.0-20250821195214-8e2a3c300f97/go.mod h1:d8NTrjIoiqplrZEYOUXwwFaeB2C8fVeHYLvaJFfa9Xo=
 github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c h1:6WjE2yInE+5jnI7cmCcxOiGZiEs2FQm9Zsg2a9Ivp0Q=
 github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c/go.mod h1:dbfiy9ORrL8c6ldSq+L0H9pg8TOqqu/FsghsgUEWK54=
 github.com/streamingfast/derr v0.0.0-20250321151415-6b4fbbcb1bb5 h1:Lj4MlmrciCrXWOkIvseI3oovghtMzl2g+/arxJkgsPc=
@@ -2219,8 +2219,8 @@ github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308 h1:xlWSfi1BoP
 github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308/go.mod h1:K1p8Bj/wG34KJvYzPUqtzpndffmpkrVY11u2hkyxCWQ=
 github.com/streamingfast/overseer v0.2.1-0.20210326144022-ee491780e3ef h1:9IVFHRsqvI+vKJwgF1OMV6L55jHbaV/ZLoU4IAG/dME=
 github.com/streamingfast/overseer v0.2.1-0.20210326144022-ee491780e3ef/go.mod h1:cq8CvbZ3ioFmGrHokSAJalS0lC+pVXLKhITScItUGXY=
-github.com/streamingfast/payment-gateway v0.0.0-20250820140113-ad81a133a085 h1:gSkvyqvV3Vi/342tm1jht/KekLjtCBa6iw0AELs+TMo=
-github.com/streamingfast/payment-gateway v0.0.0-20250820140113-ad81a133a085/go.mod h1:T56hI2H+7foSXoxA8+EDh8exWqFyQ+JVASUUM8JwJJs=
+github.com/streamingfast/payment-gateway v0.0.0-20250822140829-053f10fb9b5d h1:sjpnSk6P1n9DJeajIs/oYvhqR2wstOFmAVD7CuZhDxc=
+github.com/streamingfast/payment-gateway v0.0.0-20250822140829-053f10fb9b5d/go.mod h1:P/oiBRgAjiVgkTaTm2Oy1drZWDWIz0BOBdMd6fSr/cU=
 github.com/streamingfast/pbgo v0.0.6-0.20250114182320-0b43084f4000 h1:1YdNfouYACMSCCWddsyBWZzX7c9s0tBUIoAbMb7mSAM=
 github.com/streamingfast/pbgo v0.0.6-0.20250114182320-0b43084f4000/go.mod h1:MHb9nR5zyNyvA1Zi2wud+hWpoILpll7vpLUijvh3YV0=
 github.com/streamingfast/protoreflect v0.0.0-20231205191344-4b629d20ce8d h1:33VIARqUqBUKXJcuQoOS1rVSms54tgxhhNCmrLptpLg=
@@ -2231,8 +2231,8 @@ github.com/streamingfast/shutter v1.5.0 h1:NpzDYzj0HVpSiDJVO/FFSL6QIK/YKOxY0gJAt
 github.com/streamingfast/shutter v1.5.0/go.mod h1:B/T6efqdeMGbGwjzPS1ToXzYZI4kDzI5/u4I+7qbjY8=
 github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0 h1:Y15G1Z4fpEdm2b+/70owI7TLuXadlqBtGM7rk4Hxrzk=
 github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0/go.mod h1:/Rnz2TJvaShjUct0scZ9kKV2Jr9/+KBAoWy4UMYxgv4=
-github.com/streamingfast/substreams v1.16.4-0.20250820115458-b77289ecdb51 h1:Wx+WZSiVkXWah1AfHdz2Gv4dGvGhkHXC3rqEDlS+g00=
-github.com/streamingfast/substreams v1.16.4-0.20250820115458-b77289ecdb51/go.mod h1:JB2FVBIKeQVgW1EUawq9Ku9y/hIN9R8kxpBRu89fOZo=
+github.com/streamingfast/substreams v1.16.4-0.20250822142127-d8d77ce08300 h1:tEVhaUeHBUuU5M6usIFyOBmCVOh6yebamYyQmG9vL1g=
+github.com/streamingfast/substreams v1.16.4-0.20250822142127-d8d77ce08300/go.mod h1:3fXiGg4ittvOqVQdaCgWAJ57tQRZlHHV9QVWxUYpi9c=
 github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed h1:LU6/c376zP1cMAo9L6rFLyjo0W7RU+hIh7BegH8Zo5M=
 github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed/go.mod h1:yAI0XTsMBhREkM/YDAK/zNou3GoiAce1P6+rp/wQhjs=
 github.com/streamingfast/worker-pool-protocol v0.0.0-20250218145136-4ad271e36e39 h1:NBBLx99rrGz/hxwHjHi+QyN07DfqcDC4zzuBEsH0/vE=
