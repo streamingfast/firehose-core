@@ -2,7 +2,7 @@
 package wkp
 
 func init() {
-	// https://buf.build/streamingfast/firehose-ethereum/docs/34da8f52c41b487987aadcadacd8d61f:google.protobuf
+	// https://buf.build/streamingfast/firehose-ethereum/docs/e9c43f3fa0094625935cf66e9cc3888e:google.protobuf
 	register("google/protobuf/timestamp.proto", &WellKnownProto{
 		FileDescriptor: "Ch9nb29nbGUvcHJvdG9idWYvdGltZXN0YW1wLnByb3RvEg9nb29nbGUucHJvdG9idWYiOwoJVGltZXN0YW1wEhgKB3NlY29uZHMYASABKANSB3NlY29uZHMSFAoFbmFub3MYAiABKAVSBW5hbm9zQoUBChNjb20uZ29vZ2xlLnByb3RvYnVmQg5UaW1lc3RhbXBQcm90b1ABWjJnb29nbGUuZ29sYW5nLm9yZy9wcm90b2J1Zi90eXBlcy9rbm93bi90aW1lc3RhbXBwYvgBAaICA0dQQqoCHkdvb2dsZS5Qcm90b2J1Zi5XZWxsS25vd25UeXBlc2IGcHJvdG8z",
 	})

@@ -32,7 +32,7 @@ import (
 var templates embed.FS
 
 func main() {
-	cli.Ensure(len(os.Args) == 3 || len(os.Args) == 4, "go run ./generator <output_package> <package_name> [<block-type-filter-regex>]")
+	cli.Ensure(len(os.Args) >= 3 && len(os.Args) <= 5, "go run ./generator <output_package> <package_name> [<block-type-filter-regex>] [<buf-revision>]")
 
 	authToken := os.Getenv("BUFBUILD_AUTH_TOKEN")
 	cli.Ensure(authToken != "", "You must set the BUFBUILD_AUTH_TOKEN environment variable to generate well known registry. See https://buf.build/docs/bsr/authentication")
@@ -40,8 +40,13 @@ func main() {
 	outputPackage := os.Args[1]
 	packageName := os.Args[2]
 	blockTypeFilterRaw := ".*"
-	if len(os.Args) == 4 {
+	bufRevision := "main"
+	if len(os.Args) >= 4 {
 		blockTypeFilterRaw = os.Args[3]
+	}
+
+	if len(os.Args) >= 5 {
+		bufRevision = os.Args[4]
 	}
 
 	blockTypeFilter, err := regexp.Compile(blockTypeFilterRaw)
@@ -51,6 +56,9 @@ func main() {
 		http.DefaultClient,
 		"https://buf.build",
 	)
+
+	// Some networks specifies the same Buf Type, we discard duplicates if we already generated
+	seenBufTypes := make(map[string]bool)
 
 	var protofiles []ProtoFile
 	registeredNetworks := make([]*registry.Network, 0, len(networks.GetFirehoseRegistry()))
@@ -72,8 +80,15 @@ func main() {
 		}
 
 		wellKnownProtoRepo := strings.TrimPrefix(protocol.Firehose.BufURL, "https://")
+		if seenBufTypes[wellKnownProtoRepo] {
+			continue
+		}
+
+		seenBufTypes[wellKnownProtoRepo] = true
+
 		request := connect.NewRequest(&reflectv1beta1.GetFileDescriptorSetRequest{
-			Module: wellKnownProtoRepo,
+			Module:  wellKnownProtoRepo,
+			Version: bufRevision,
 		})
 
 		request.Header().Set("Authorization", "Bearer "+authToken)
