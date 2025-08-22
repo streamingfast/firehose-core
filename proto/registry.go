@@ -46,7 +46,7 @@ func NewRegistry(chainFileDescriptor protoreflect.FileDescriptor, protoPaths ...
 		}
 	}
 
-	//Last are well known types, they have the lowest precedence
+	// Last are well known types, they have the lowest precedence
 	err := RegisterWellKnownFileDescriptors(r)
 	if err != nil {
 		return nil, fmt.Errorf("registering well known file descriptors: %w", err)
