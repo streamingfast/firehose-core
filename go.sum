@@ -2219,6 +2219,7 @@ github.com/streamingfast/substreams v1.16.3-0.20250827175254-e126ddc5ea2d h1:7jC
 github.com/streamingfast/substreams v1.16.3-0.20250827175254-e126ddc5ea2d/go.mod h1:XjcF9g7niVzq54CpmtaS0kgcDHZ7xQY/sHsTRTT0Czc=
 github.com/streamingfast/substreams-foundational-store v0.0.0-20250617193409-beadb4d795d7 h1:K74Li5erhtuRutLWTqtgalfbT8ksGGbxR5B1bY/0kMY=
 github.com/streamingfast/substreams-foundational-store v0.0.0-20250617193409-beadb4d795d7/go.mod h1:fq9R7F408M9lmADkOcBqGCe7qb8brm3wYcpMs3lBa2Y=
+github.com/streamingfast/substreams-foundational-store v0.0.0-20250826200255-be68544ccc6c h1:OQ/DgZh83YHNNmOqlXT/SmO/2NUrq3zoxJ2IoSwuYo0=
 github.com/streamingfast/substreams-foundational-store v0.0.0-20250826200255-be68544ccc6c/go.mod h1:hjroz2u2NCNkfZSUrn2GQAfbRxIcc6WRCH8XG00OqS4=
 github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed h1:LU6/c376zP1cMAo9L6rFLyjo0W7RU+hIh7BegH8Zo5M=
 github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed/go.mod h1:yAI0XTsMBhREkM/YDAK/zNou3GoiAce1P6+rp/wQhjs=
