@@ -2213,8 +2213,8 @@ github.com/streamingfast/shutter v1.5.0 h1:NpzDYzj0HVpSiDJVO/FFSL6QIK/YKOxY0gJAt
 github.com/streamingfast/shutter v1.5.0/go.mod h1:B/T6efqdeMGbGwjzPS1ToXzYZI4kDzI5/u4I+7qbjY8=
 github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0 h1:Y15G1Z4fpEdm2b+/70owI7TLuXadlqBtGM7rk4Hxrzk=
 github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0/go.mod h1:/Rnz2TJvaShjUct0scZ9kKV2Jr9/+KBAoWy4UMYxgv4=
-github.com/streamingfast/substreams v1.16.2-0.20250724195001-b1f02fb29e2f h1:YdfMZqjYHGPJcXQsfAazNP6a5C3DR3qM24HKc+5GIKo=
-github.com/streamingfast/substreams v1.16.2-0.20250724195001-b1f02fb29e2f/go.mod h1:kbf40QE6+k8XlUm6KgVFX2t873le2Jgtg/pB2db6YuE=
+github.com/streamingfast/substreams v1.16.3-0.20250819150516-43ee2e63209c h1:GYQ9ioqxgqrgSn4QECcQ/CdJO8I+U9NivZJTOc9wIi0=
+github.com/streamingfast/substreams v1.16.3-0.20250819150516-43ee2e63209c/go.mod h1:kbf40QE6+k8XlUm6KgVFX2t873le2Jgtg/pB2db6YuE=
 github.com/streamingfast/substreams-foundational-store v0.0.0-20250617193409-beadb4d795d7 h1:K74Li5erhtuRutLWTqtgalfbT8ksGGbxR5B1bY/0kMY=
 github.com/streamingfast/substreams-foundational-store v0.0.0-20250617193409-beadb4d795d7/go.mod h1:fq9R7F408M9lmADkOcBqGCe7qb8brm3wYcpMs3lBa2Y=
 github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed h1:LU6/c376zP1cMAo9L6rFLyjo0W7RU+hIh7BegH8Zo5M=
