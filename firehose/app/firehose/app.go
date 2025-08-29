@@ -27,6 +27,7 @@ import (
 	"github.com/streamingfast/bstream/transform"
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetrics"
+	"github.com/streamingfast/dsession"
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/firehose"
@@ -53,6 +54,7 @@ type Config struct {
 type Modules struct {
 	// Required dependencies
 	Authenticator         dauth.Authenticator
+	SessionPool           dsession.SessionPool
 	HeadTimeDriftMetric   *dmetrics.HeadTimeDrift
 	HeadBlockNumberMetric *dmetrics.HeadBlockNum
 	TransformRegistry     *transform.Registry

@@ -25,6 +25,7 @@ import (
 	"github.com/streamingfast/firehose-core/launcher"
 	paymentGatewayAuth "github.com/streamingfast/payment-gateway/auth"
 	paymentGatewayMetering "github.com/streamingfast/payment-gateway/metering"
+	paymentGatewaySession "github.com/streamingfast/payment-gateway/session"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 
 	"github.com/streamingfast/logging"
@@ -48,6 +49,7 @@ func Main[B firecore.Block](chain *firecore.Chain[B]) {
 	dmeteringlogger.Register()
 	dmeteringfile.Register()
 	paymentGatewayMetering.Register()
+	paymentGatewaySession.Register()
 
 	chain.Validate()
 	chain.Init()

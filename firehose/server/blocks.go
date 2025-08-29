@@ -16,6 +16,7 @@ import (
 	"github.com/streamingfast/bstream/stream"
 	"github.com/streamingfast/dauth"
 	"github.com/streamingfast/dmetering"
+	"github.com/streamingfast/dsession"
 	"github.com/streamingfast/firehose-core/firehose/metrics"
 	"github.com/streamingfast/firehose-core/metering"
 	"github.com/streamingfast/logging"
@@ -79,6 +80,37 @@ func (s *Server) Block(ctx context.Context, request *connect.Request[pbfirehose.
 // Blocks(context.Context, *connect.Request[v2.Request], *connect.ServerStream[v2.Response]) error
 func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose.Request], streamSrv *connect.ServerStream[pbfirehose.Response]) error {
 	metrics.RequestCounter.Inc()
+
+	ctx, cancelRunning := context.WithCancelCause(ctx)
+	defer cancelRunning(nil)
+
+	if s.sessionPool != nil {
+		auth := dauth.FromContext(ctx)
+		userID := auth.UserID()
+		apiKeyID := auth.APIKeyID()
+		traceID := "default" // Can be extracted from tracing context if needed
+		service := "t1r"
+
+		sessionID, err := s.sessionPool.Get(ctx, service, userID, apiKeyID, traceID, func(err error) {
+			if cancelRunning != nil { // in tests, this might be nil
+				err, _ = dsession.ToConnectError(err)
+				cancelRunning(err)
+			}
+		})
+
+		if err != nil {
+			s.logger.Error("failed to acquire session", zap.Error(err))
+			err, _ = dsession.ToConnectError(err)
+			return err
+		}
+
+		s.logger.Debug("acquired session", zap.String("session_id", sessionID))
+
+		defer func() {
+			s.logger.Debug("releasing session", zap.String("session_id", sessionID))
+			s.sessionPool.Release(sessionID)
+		}()
+	}
 
 	logger := logging.Logger(ctx, s.logger)
 
@@ -225,6 +257,7 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 		stream.WithFileSourceHandlerMiddleware(fileSourceMiddlewareHandler),
 	)
 	if err != nil {
+		fmt.Println("returning new stream factory")
 		return err
 	}
 
@@ -245,10 +278,12 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 			zap.String("real_ip", auth.RealIP()),
 		)
 	}
+
 	logger.Info("firehose process completed", fields...)
 	if err != nil {
 		if errors.Is(err, stream.ErrStopBlockReached) {
 			logger.Info("stream of blocks reached end block")
+			fmt.Println("end of block")
 			return nil
 		}
 
@@ -256,30 +291,38 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 			if ctx.Err() != context.Canceled {
 				logger.Debug("stream of blocks ended with context canceled, but our own context was not canceled", zap.Error(err))
 			}
+			if err, ok := context.Cause(ctx).(*connect.Error); ok {
+				return err
+			}
 			return status.Error(codes.Canceled, "source canceled")
 		}
 
 		if errors.Is(err, context.DeadlineExceeded) {
 			logger.Info("stream of blocks ended with context deadline exceeded", zap.Error(err))
+			fmt.Println("dealdine exceed")
 			return status.Error(codes.DeadlineExceeded, "source deadline exceeded")
 		}
 
 		var errInvalidArg *stream.ErrInvalidArg
 		if errors.As(err, &errInvalidArg) {
+			fmt.Println("invalid")
 			return status.Error(codes.InvalidArgument, errInvalidArg.Error())
 		}
 
 		var errSendBlock *ErrSendBlock
 		if errors.As(err, &errSendBlock) {
 			logger.Info("unable to send block probably due to client disconnecting", zap.Error(errSendBlock.inner))
+			fmt.Println("unavailable")
 			return status.Error(codes.Unavailable, errSendBlock.inner.Error())
 		}
 
 		logger.Info("unexpected stream of blocks termination", zap.Error(err))
+		fmt.Println("internal")
 		return status.Errorf(codes.Internal, "unexpected stream termination")
 	}
 
 	logger.Error("source is not expected to terminate gracefully, should stop at block or continue forever")
+	fmt.Println("internal unexpected")
 	return status.Error(codes.Internal, "unexpected stream completion")
 
 }

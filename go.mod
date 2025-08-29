@@ -27,15 +27,16 @@ require (
 	github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4
 	github.com/streamingfast/dmetering v0.0.0-20250606124734-944cf3e4959e
 	github.com/streamingfast/dmetrics v0.0.0-20250711072030-f023e918a175
+	github.com/streamingfast/dsession v0.0.0-20250828190456-5201082654e0
 	github.com/streamingfast/dstore v0.1.1-0.20250609173504-95368d3441ee
 	github.com/streamingfast/firehose-networks v0.2.1
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
-	github.com/streamingfast/payment-gateway v0.0.0-20250825184251-4c08f2a91f22
+	github.com/streamingfast/payment-gateway v0.0.0-20250828154205-12d179bd2d3d
 	github.com/streamingfast/pbgo v0.0.6-0.20250114182320-0b43084f4000
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
 	github.com/streamingfast/substreams v1.16.4
-	github.com/streamingfast/worker-pool-protocol v0.0.0-20250218145136-4ad271e36e39
-	github.com/stretchr/testify v1.10.0
+	github.com/streamingfast/worker-pool-protocol v0.0.0-20250826200931-136a043ecece
+	github.com/stretchr/testify v1.11.1
 	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.10.0
 	go.uber.org/zap v1.27.0
@@ -237,3 +238,7 @@ replace (
 	github.com/jhump/protoreflect => github.com/streamingfast/protoreflect v0.0.0-20231205191344-4b629d20ce8d
 	github.com/tetratelabs/wazero => github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed
 )
+
+replace github.com/streamingfast/substreams => /Users/stepd/repos/substreams
+
+replace github.com/streamingfast/payment-gateway => /Users/stepd/repos/payment-gateway
