@@ -18,9 +18,9 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
-	github.com/streamingfast/bstream v0.0.2-0.20250416133616-23bdc92e0e9c
-	github.com/streamingfast/cli v0.0.4-0.20250424204306-678ec20cedec
-	github.com/streamingfast/dauth v0.0.0-20250130223258-c615a033a660
+	github.com/streamingfast/bstream v0.0.2-0.20250903174843-9c884c3356fd
+	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b
+	github.com/streamingfast/dauth v0.0.0-20250821195214-8e2a3c300f97
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20250321151415-6b4fbbcb1bb5
 	github.com/streamingfast/dgrpc v0.0.0-20250423172640-223250ed2391
@@ -33,7 +33,7 @@ require (
 	github.com/streamingfast/payment-gateway v0.0.0-20250606152645-3614ea533458
 	github.com/streamingfast/pbgo v0.0.6-0.20250114182320-0b43084f4000
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.16.3-0.20250827190247-062860216b43
+	github.com/streamingfast/substreams v1.16.5-0.20250904203256-cac96f0dbbc5
 	github.com/streamingfast/worker-pool-protocol v0.0.0-20250218145136-4ad271e36e39
 	github.com/stretchr/testify v1.10.0
 	github.com/test-go/testify v1.1.4
@@ -74,7 +74,7 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
-	github.com/streamingfast/substreams-foundational-store v0.0.0-20250826200255-be68544ccc6c // indirect
+	github.com/streamingfast/substreams-foundational-store v0.1.0 // indirect
 	github.com/zeebo/errs v1.4.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0 // indirect

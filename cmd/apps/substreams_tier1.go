@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -80,6 +81,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().Duration("substreams-tier1-global-request-pool-keep-alive-delay", 25*time.Second, "Delay between two keep alive call to the global worker pool for request. Default is 25s")
 			cmd.Flags().Uint64("substreams-tier1-default-max-request-per-user", 3, "default max request per user, this will be use of the global worker pool is not reachable. Default is 5")
 			cmd.Flags().Uint64("substreams-tier1-default-minimal-request-life-time-second", 180, "default minimal request request life time, this will be use of the global worker pool is not reachable.")
+			cmd.Flags().String("substreams-tier1-foundational-stores-endpoints", "", "Comma-separated list of foundational store endpoints in format: package@version=endpoint")
 			// all substreams
 			registerCommonSubstreamsFlags(cmd)
 			return nil
@@ -165,6 +167,17 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			config.GRPCShutdownGracePeriod = time.Second
 			config.ServiceDiscoveryURL = serviceDiscoveryURL
 			config.QuickSaveStoreURL = viper.GetString("substreams-tier1-quicksave-store")
+
+			foundationalStoresEndpoints := viper.GetString("substreams-tier1-foundational-stores-endpoints")
+			if foundationalStoresEndpoints != "" {
+				foundationalStores := make(map[string]string)
+				for _, pair := range strings.Split(foundationalStoresEndpoints, ",") {
+					if parts := strings.SplitN(strings.TrimSpace(pair), "=", 2); len(parts) == 2 {
+						foundationalStores[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+					}
+				}
+				config.FoundationalStores = foundationalStores
+			}
 
 			subRequestsClientConfig := client.NewSubstreamsClientConfig(
 				config.SubrequestsEndpoint,
