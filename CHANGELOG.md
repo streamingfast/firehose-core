@@ -8,6 +8,20 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Substreams
+
+* Removed the following flags, now handled by the "session" plugin:
+  - `substreams-tier1-global-worker-pool-address`
+  - `substreams-tier1-global-request-pool-address`
+  - `substreams-tier1-global-worker-pool-keep-alive-delay`
+  - `substreams-tier1-global-request-pool-keep-alive-delay`
+  - `substreams-tier1-default-max-request-per-use`
+  - `substreams-tier1-default-minimal-request-life-time-second` (mechanism removed)
+  use `--common-session-plugin=local://?max_sessions=30&max_sessions_per_user=3&max_workers_per_user=10&max_workers_per_session=10` for local session manager (see https://github.com/streamingfast/dsession)
+  or `--common-session-plugin=tgm://session.thegraph.market?default-max-requests-per-user=10` if you are using the The Graph Market as your session provider (see https://github.com/streamingfast/tgm-gateway)
+
 ## v1.11.0
 
 ### CLI

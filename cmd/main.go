@@ -230,6 +230,7 @@ func registerCommonFlags[B firecore.Block](chain *firecore.Chain[B]) {
 		// Authentication, metering and rate limiter plugins
 		cmd.Flags().String("common-auth-plugin", "null://", "[COMMON] Auth plugin URI, see streamingfast/dauth repository")
 		cmd.Flags().String("common-metering-plugin", "null://", "[COMMON] Metering plugin URI, see streamingfast/dmetering repository")
+		cmd.Flags().String("common-session-plugin", "local://?max_sessions_per_user=3&max_sessions=30", "[COMMON] Session plugin URI, see streamingfast/dsession repository")
 
 		// System Behavior
 		cmd.Flags().Uint64("common-auto-mem-limit-percent", 0, "[COMMON] Automatically sets GOMEMLIMIT to a percentage of memory limit from cgroup (useful for container environments)")

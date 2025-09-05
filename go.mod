@@ -18,7 +18,7 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
-	github.com/streamingfast/bstream v0.0.2-0.20250416133616-23bdc92e0e9c
+	github.com/streamingfast/bstream v0.0.2-0.20250903174843-9c884c3356fd
 	github.com/streamingfast/cli v0.0.4-0.20250424204306-678ec20cedec
 	github.com/streamingfast/dauth v0.0.0-20250821195214-8e2a3c300f97
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
@@ -27,15 +27,14 @@ require (
 	github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4
 	github.com/streamingfast/dmetering v0.0.0-20250606124734-944cf3e4959e
 	github.com/streamingfast/dmetrics v0.0.0-20250711072030-f023e918a175
-	github.com/streamingfast/dsession v0.0.0-20250828190456-5201082654e0
+	github.com/streamingfast/dsession v0.0.0-20250904235523-ffe9952a12d3
 	github.com/streamingfast/dstore v0.1.1-0.20250609173504-95368d3441ee
 	github.com/streamingfast/firehose-networks v0.2.1
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
-	github.com/streamingfast/payment-gateway v0.0.0-20250828154205-12d179bd2d3d
+	github.com/streamingfast/payment-gateway v0.0.0-20250905193727-1cdc6bad1866
 	github.com/streamingfast/pbgo v0.0.6-0.20250114182320-0b43084f4000
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.16.4
-	github.com/streamingfast/worker-pool-protocol v0.0.0-20250826200931-136a043ecece
+	github.com/streamingfast/substreams v1.16.5-0.20250905195410-c5e663fcbfd8
 	github.com/stretchr/testify v1.11.1
 	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.10.0
@@ -84,6 +83,7 @@ require (
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
+	github.com/streamingfast/worker-pool-protocol v0.0.0-20250826200931-136a043ecece // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
 	github.com/zeebo/errs v1.4.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
@@ -238,7 +238,3 @@ replace (
 	github.com/jhump/protoreflect => github.com/streamingfast/protoreflect v0.0.0-20231205191344-4b629d20ce8d
 	github.com/tetratelabs/wazero => github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed
 )
-
-replace github.com/streamingfast/substreams => /Users/stepd/repos/substreams
-
-replace github.com/streamingfast/payment-gateway => /Users/stepd/repos/payment-gateway
