@@ -19,6 +19,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -46,6 +47,7 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().String("substreams-tier2-discovery-service-url", "", "URL to advertise presence to the grpc discovery service") //traffic-director://xds?vpc_network=vpc-global&use_xds_reds=true
 			cmd.Flags().Uint64("substreams-tier2-max-concurrent-requests", 0, "Maximum number of concurrent requests allowed on the server. When the tier2 service hits this limit, it will set itself as 'Not Ready' until requests are processed. Default 0 (no limit)")
 			cmd.Flags().String("substreams-tier2-foundational-stores-endpoints", "", "Comma-separated list of foundational store endpoints in format: package@version=endpoint")
+			cmd.Flags().Duration("substreams-tier2-segment-execution-timeout", time.Hour, "Maximum duration a segment can take to execute before being forcefully stopped with DeadlineExceeded error")
 			// all substreams
 			registerCommonSubstreamsFlags(cmd)
 			return nil
@@ -57,6 +59,7 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 
 			maximumConcurrentRequests := viper.GetUint64("substreams-tier2-max-concurrent-requests")
 			executionTimeout := viper.GetDuration("substreams-block-execution-timeout")
+			segmentExecutionTimeout := viper.GetDuration("substreams-tier2-segment-execution-timeout")
 
 			tracing := os.Getenv("SUBSTREAMS_TRACING") == "modules_exec"
 
@@ -101,15 +104,14 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 
 			return app.NewTier2(appLogger,
 				&app.Tier2Config{
-					Tracing: tracing,
-
-					GRPCListenAddr:        grpcListenAddr,
-					ServiceDiscoveryURL:   serviceDiscoveryURL,
-					FoundationalStores:    foundationalStores,
-					WASMExtensions:        wasmExtensions,
-					BlockExecutionTimeout: executionTimeout,
-					TmpDir:                tmpDir,
-
+					Tracing:                   tracing,
+					GRPCListenAddr:            grpcListenAddr,
+					ServiceDiscoveryURL:       serviceDiscoveryURL,
+					WASMExtensions:            wasmExtensions,
+					BlockExecutionTimeout:     executionTimeout,
+					FoundationalStores:        foundationalStores,
+					SegmentExecutionTimeout:   segmentExecutionTimeout,
+					TmpDir:                    tmpDir,
 					MaximumConcurrentRequests: maximumConcurrentRequests,
 				}, &app.Tier2Modules{
 					CheckPendingShutDown: runtime.IsPendingShutdown,

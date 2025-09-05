@@ -18,9 +18,11 @@ import (
 	"fmt"
 	"io"
 
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	fcproto "github.com/streamingfast/firehose-core/proto"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 var _ OutputPrinter = (*ProtoJSONOutputPrinter)(nil)
@@ -43,6 +45,16 @@ func (p *ProtoJSONOutputPrinter) PrintTo(input any, w io.Writer) error {
 	v, ok := input.(proto.Message)
 	if !ok {
 		return fmt.Errorf("we accept only proto.Message input")
+	}
+
+	if block, ok := v.(*pbbstream.Block); ok {
+		// Special case for Block, we want to print it as a Block
+		unmarshalled, err := anypb.UnmarshalNew(block.Payload, proto.UnmarshalOptions{
+			Resolver: p.marshaller.Resolver,
+		})
+		if err == nil {
+			v = unmarshalled
+		}
 	}
 
 	out, err := p.marshaller.Marshal(v)

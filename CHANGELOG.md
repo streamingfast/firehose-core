@@ -8,6 +8,55 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Substreams
+
+* Fix a slow memory leak around metering plugin on tier2
+* Add a maximum execution time for a full tier2 segment. By default, this is 60 minutes. It will fail with `rpc error: code = DeadlineExceeded desc = request active for too long`.
+  It can be configured from the --substreams-tier2-segment-execution-timeout flag
+* Fix `subscription channel at max capacity` error: when the LIVE channel is full (ex: slow module execution or slow client reader), the request will be continued from merged files instead of failing, and gracefully recover if performance is restored.
+* Improve log message for 'request active for a long time', adding stats.
+
+## v1.11.0
+
+### CLI
+
+* Improved how `firecore tools --output=protojson` and `firecore tools --output=json` renders `pbbstream.Block` type now printing the underlying chain's specific block.
+
+### Substreams (v1.16.4)
+
+#### Tier1 thread / memory leak
+
+* Fix thread leak on filereader.
+
+* If `--advertise-chain-name` is sey, `substreams-tier1` app will now infer default `--substreams-tier1-block-type` value by using chain's name and extracting chain's block type Protobuf package id, which will fix some cases where `substreams-tier1` waits for 100 blocks before starting up.
+
+#### Authentication changes
+
+People using their own authentication layer will need to consider these changes before upgrading!
+
+* Renamed config headers that come from authentication layer:
+  - `x-sf-user-id` renamed to `x-user-id` (from dauth module)
+  - `x-sf-api-key-id` renamed to `x-api-key-id` (from dauth module)
+  - `x-sf-meta` renamed to `x-meta` (from dauth module)
+  - `x-sf-substreams-parallel-jobs` renamed to `x-substreams-parallel-workers`
+* Allow decreasing `x-substreams-parallel-workers` through an HTTP headers (auth layer determines higher bound)
+* Detect value for the 'stage layer parallel executor max count' based on the `x-plan-tier` header (removed `x-sf-substreams-stage-layer-parallel-executor-max-count` handling)
+
+#### New authentication plugin
+
+* Added `tgm://auth.thegraph.market?indexer-api-key=<API_KEY>&reissue-jwt-max-age-secs=600` plugin that allows an indexer to use The Graph Market as the authentication source.
+  An API key with special "indexer" feature is needed to allow repeated calls to the API without rate limiting (for Key-based authentication and reissuance of "untrusted long-lived JWTs").
+
+## v1.10.2
+
+### Substreams (v1.6.2)
+
+* **Added** mechanism to immediately cancel pending requests that are doing an 'external call' (ex: eth_call) on a given block when it gets forked out (UNDO because of a reorg).
+* **Fixed** handling of invalid module kind: prevent heavy logging from recovered panic
+* Error considered deterministic which will cache the error forever are now suffixed with `<original message> (deterministic error)`.
+
 ## v1.10.1
 
 ### Substreams

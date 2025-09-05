@@ -85,23 +85,25 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 	}()
 	dmetering.SetDefaultEmitter(eventEmitter)
 
-	chainName := sflags.MustGetString(cmd, "advertise-chain-name")
-	aliases := sflags.MustGetStringSlice(cmd, "advertise-chain-aliases")
-	encoding := sflags.MustGetString(cmd, "advertise-block-id-encoding")
+	chainName, chainNameProvided := sflags.MustGetStringProvided(cmd, "advertise-chain-name")
+	aliases, aliasesProvided := sflags.MustGetStringSliceProvided(cmd, "advertise-chain-aliases")
+	encoding, encodingProvided := sflags.MustGetStringProvided(cmd, "advertise-block-id-encoding")
 
 	blockIdEncoding := pbfirehose.InfoResponse_BLOCK_ID_ENCODING_UNSET
+	blockType := ""
 
 	// If --advertise-chain-name is set, but any of the other advertise flags are not, fill them from the registry
-	if cmd.Flags().Changed("advertise-chain-name") &&
-		(!cmd.Flags().Changed("advertise-chain-aliases") ||
-			!cmd.Flags().Changed("advertise-block-id-encoding")) {
 
+	if chainNameProvided {
 		network := networks.GetFirehoseRegistry().Find(chainName)
 		if network != nil {
-			if !cmd.Flags().Changed("advertise-chain-aliases") {
+			blockType = network.Firehose.BlockType
+
+			if !aliasesProvided {
 				aliases = network.Aliases
 			}
-			if !cmd.Flags().Changed("advertise-block-id-encoding") {
+
+			if !encodingProvided {
 				blockIdEncoding = info.BlockIdEncodingForNetwork(network)
 			}
 		}
@@ -116,12 +118,14 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 				return fmt.Errorf("invalid block id encoding: %s", encoding)
 			}
 		}
+
 		blockIdEncoding = pbfirehose.InfoResponse_BlockIdEncoding(v)
 	}
 
 	infoServer := info.NewInfoServer(
 		chainName,
 		aliases,
+		blockType,
 		blockIdEncoding,
 		sflags.MustGetStringSlice(cmd, "advertise-block-features"),
 		bstream.GetProtocolFirstStreamableBlock,
