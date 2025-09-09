@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -46,7 +45,6 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().String("substreams-tier2-grpc-listen-addr", firecore.SubstreamsTier2GRPCServingAddr, "Address on which the substreams tier2 will listen. Default is plain-text, appending a '*' to the end to jkkkj")
 			cmd.Flags().String("substreams-tier2-discovery-service-url", "", "URL to advertise presence to the grpc discovery service") //traffic-director://xds?vpc_network=vpc-global&use_xds_reds=true
 			cmd.Flags().Uint64("substreams-tier2-max-concurrent-requests", 0, "Maximum number of concurrent requests allowed on the server. When the tier2 service hits this limit, it will set itself as 'Not Ready' until requests are processed. Default 0 (no limit)")
-			cmd.Flags().String("substreams-tier2-foundational-stores-endpoints", "", "Comma-separated list of foundational store endpoints in format: package@version=endpoint")
 			cmd.Flags().Duration("substreams-tier2-segment-execution-timeout", time.Hour, "Maximum duration a segment can take to execute before being forcefully stopped with DeadlineExceeded error")
 			// all substreams
 			registerCommonSubstreamsFlags(cmd)
@@ -91,27 +89,17 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 				return nil, fmt.Errorf("getting temporary directory: %w", err)
 			}
 
-			foundationalStoresEndpoints := viper.GetString("substreams-tier2-foundational-stores-endpoints")
-			var foundationalStores map[string]string
-			if foundationalStoresEndpoints != "" {
-				foundationalStores = make(map[string]string)
-				for _, pair := range strings.Split(foundationalStoresEndpoints, ",") {
-					if parts := strings.SplitN(strings.TrimSpace(pair), "=", 2); len(parts) == 2 {
-						foundationalStores[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
-					}
-				}
-			}
-
 			return app.NewTier2(appLogger,
 				&app.Tier2Config{
-					Tracing:                   tracing,
-					GRPCListenAddr:            grpcListenAddr,
-					ServiceDiscoveryURL:       serviceDiscoveryURL,
-					WASMExtensions:            wasmExtensions,
-					BlockExecutionTimeout:     executionTimeout,
-					FoundationalStores:        foundationalStores,
-					SegmentExecutionTimeout:   segmentExecutionTimeout,
-					TmpDir:                    tmpDir,
+					Tracing: tracing,
+
+					GRPCListenAddr:          grpcListenAddr,
+					ServiceDiscoveryURL:     serviceDiscoveryURL,
+					WASMExtensions:          wasmExtensions,
+					BlockExecutionTimeout:   executionTimeout,
+					SegmentExecutionTimeout: segmentExecutionTimeout,
+					TmpDir:                  tmpDir,
+
 					MaximumConcurrentRequests: maximumConcurrentRequests,
 				}, &app.Tier2Modules{
 					CheckPendingShutDown: runtime.IsPendingShutdown,
