@@ -17,6 +17,7 @@ import (
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	connectweb "github.com/streamingfast/dgrpc/server/connectrpc"
 	"github.com/streamingfast/dmetering"
+	"github.com/streamingfast/dsession"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/firehose"
 	"github.com/streamingfast/firehose-core/firehose/info"
@@ -41,6 +42,7 @@ type Server struct {
 	initFunc     func(context.Context, *pbfirehoseV2.Request) context.Context
 	postHookFunc func(context.Context, *pbfirehoseV2.Response)
 
+	sessionPool        dsession.SessionPool
 	servers            []*wrappedServer
 	enforceCompression bool
 	logger             *zap.Logger
@@ -58,6 +60,12 @@ type Option func(*Server)
 func WithLeakyBucketLimiter(size int, dripRate time.Duration) Option {
 	return func(s *Server) {
 		s.rateLimiter = rate.NewLeakyBucketLimiter(size, dripRate)
+	}
+}
+
+func WithSessionPool(sessionPool dsession.SessionPool) Option {
+	return func(s *Server) {
+		s.sessionPool = sessionPool
 	}
 }
 
