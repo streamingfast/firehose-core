@@ -283,7 +283,6 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 	if err != nil {
 		if errors.Is(err, stream.ErrStopBlockReached) {
 			logger.Info("stream of blocks reached end block")
-			fmt.Println("end of block")
 			return nil
 		}
 
