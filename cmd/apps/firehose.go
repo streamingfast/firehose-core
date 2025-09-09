@@ -11,6 +11,8 @@ import (
 	"github.com/streamingfast/dauth"
 	discoveryservice "github.com/streamingfast/dgrpc/server/discovery-service"
 	"github.com/streamingfast/dmetrics"
+	"github.com/streamingfast/dsession"
+	_ "github.com/streamingfast/dsession/local"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/firehose/app/firehose"
 	"github.com/streamingfast/firehose-core/firehose/server"
@@ -48,7 +50,6 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 			if err != nil {
 				return nil, fmt.Errorf("unable to initialize auth plugin: %w", err)
 			}
-
 			mergedBlocksStoreURL, oneBlocksStoreURL, forkedBlocksStoreURL, err := firecore.GetCommonStoresURLs(runtime.AbsDataDir)
 			if err != nil {
 				return nil, err
@@ -88,6 +89,13 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 				serverOptions = append(serverOptions, server.WithEnforceCompression(true))
 			}
 
+			sessionPlugin := viper.GetString("common-session-plugin")
+			sessionPool, err := dsession.New(sessionPlugin, appLogger)
+			if err != nil {
+				return nil, fmt.Errorf("unable to create session pool: %w", err)
+			}
+			serverOptions = append(serverOptions, server.WithSessionPool(sessionPool))
+
 			limiterSize := viper.GetInt("firehose-rate-limit-bucket-size")
 			limiterRefillRate := viper.GetDuration("firehose-rate-limit-bucket-fill-rate")
 			if limiterSize > 0 {
@@ -105,6 +113,7 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 				ServerOptions:           serverOptions,
 			}, &firehose.Modules{
 				Authenticator:         authenticator,
+				SessionPool:           sessionPool,
 				HeadTimeDriftMetric:   headTimeDriftmetric,
 				HeadBlockNumberMetric: headBlockNumMetric,
 				TransformRegistry:     registry,

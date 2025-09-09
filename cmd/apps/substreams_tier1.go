@@ -25,17 +25,14 @@ import (
 	"github.com/spf13/viper"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dauth"
-	"github.com/streamingfast/dgrpc"
 	discoveryservice "github.com/streamingfast/dgrpc/server/discovery-service"
+	"github.com/streamingfast/dsession"
+	_ "github.com/streamingfast/dsession/local"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/launcher"
 	"github.com/streamingfast/logging"
 	app "github.com/streamingfast/substreams/app"
-	"github.com/streamingfast/substreams/client"
-	"github.com/streamingfast/substreams/orchestrator/work"
-	"github.com/streamingfast/substreams/service"
 	"github.com/streamingfast/substreams/wasm"
-	pbworker "github.com/streamingfast/worker-pool-protocol/pb/sf/worker/v1"
 	"go.uber.org/zap"
 )
 
@@ -57,7 +54,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().Bool("substreams-tier1-subrequests-insecure", false, "Connect to tier2 without checking certificate validity")
 			cmd.Flags().Bool("substreams-tier1-subrequests-plaintext", true, "Connect to tier2 without client in plaintext mode")
 			cmd.Flags().Bool("substreams-tier1-enforce-compression", true, "Reject any request that does not accept gzip or zstd encoding in their GRPC/Connect header")
-			cmd.Flags().Int("substreams-tier1-max-subrequests", 4, "number of parallel subrequests that the tier1 can make to the tier2 per request")
+			cmd.Flags().Int("substreams-tier1-max-subrequests", 4, "default number of parallel subrequests that the tier1 makes to the tier2 per request")
 			cmd.Flags().String("substreams-tier1-block-type", "", "Block type to use for the substreams tier1 (Ex: sf.ethereum.type.v2.Block)")
 			cmd.Flags().Int("substreams-tier1-active-requests-soft-limit", 0, cli.FlagDescription(`
 				The number of client active requests that a tier1 accepts before starting to be report itself as 'unready' within the health
@@ -81,7 +78,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().Duration("substreams-tier1-global-request-pool-keep-alive-delay", 25*time.Second, "Delay between two keep alive call to the global worker pool for request. Default is 25s")
 			cmd.Flags().Uint64("substreams-tier1-default-max-request-per-user", 3, "default max request per user, this will be use of the global worker pool is not reachable. Default is 5")
 			cmd.Flags().Uint64("substreams-tier1-default-minimal-request-life-time-second", 180, "default minimal request request life time, this will be use of the global worker pool is not reachable.")
-			cmd.Flags().String("substreams-tier1-foundational-stores-endpoints", "", "Comma-separated list of foundational store endpoints in format: package@version=endpoint")
+			cmd.Flags().String("substreams-tier1-foundational-stores-config-path", "", "default path for foundational stores endpoint configuration file")
 			// all substreams
 			registerCommonSubstreamsFlags(cmd)
 			return nil
@@ -161,63 +158,12 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			config.GRPCShutdownGracePeriod = time.Second
 			config.ServiceDiscoveryURL = serviceDiscoveryURL
 			config.QuickSaveStoreURL = viper.GetString("substreams-tier1-quicksave-store")
+			config.FoundationalStoresConfigPath = viper.GetString("substreams-tier1-foundational-stores-config-path")
 
-			foundationalStoresEndpoints := viper.GetString("substreams-tier1-foundational-stores-endpoints")
-			if foundationalStoresEndpoints != "" {
-				foundationalStores := make(map[string]string)
-				for _, pair := range strings.Split(foundationalStoresEndpoints, ",") {
-					if parts := strings.SplitN(strings.TrimSpace(pair), "=", 2); len(parts) == 2 {
-						foundationalStores[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
-					}
-				}
-				config.FoundationalStores = foundationalStores
-			}
-
-			subRequestsClientConfig := client.NewSubstreamsClientConfig(
-				config.SubrequestsEndpoint,
-				"",
-				client.None,
-				config.SubrequestsInsecure,
-				config.SubrequestsPlaintext,
-				"substreams_tier1",
-			)
-
-			clientFactory := client.NewInternalClientFactory(subRequestsClientConfig)
-			workerPoolFactory := work.NewSimpleWorkerPoolFactory(clientFactory).WorkerPool
-			var globalRequestPool *service.GlobalRequestPool
-
-			substreamsGlobalWorkerPoolAddress := viper.GetString("substreams-tier1-global-worker-pool-address")
-
-			if substreamsGlobalWorkerPoolAddress != "" {
-				grpcClientConnection, err := dgrpc.NewInternalNoWaitClientConn(substreamsGlobalWorkerPoolAddress)
-				if err != nil {
-					return nil, fmt.Errorf("unable to create grpc client connection to global worker pool: %w", err)
-				}
-				workerPoolClient := pbworker.NewWorkerPoolClient(grpcClientConnection)
-				workerPoolFactory = work.NewGlobalWorkerPoolFactory(
-					workerPoolClient,
-					clientFactory,
-					viper.GetDuration("substreams-tier1-global-worker-pool-keep-alive-delay"),
-				).WorkerPool
-
-			}
-
-			substreamsGlobalRequestPoolAddress := viper.GetString("substreams-tier1-global-request-pool-address")
-			if substreamsGlobalRequestPoolAddress != "" {
-				grpcClientConnection, err := dgrpc.NewInternalNoWaitClientConn(substreamsGlobalRequestPoolAddress)
-				if err != nil {
-					return nil, fmt.Errorf("unable to create grpc client connection to global rewquest pool: %w", err)
-				}
-				workerPoolClient := pbworker.NewWorkerPoolClient(grpcClientConnection)
-
-				defaultMinimalWorkerLifeDuration := time.Duration(viper.GetInt("substreams-tier1-default-minimal-request-life-time-second")) * time.Second
-				globalRequestPool = service.NewGlobalRequestPool(
-					workerPoolClient,
-					viper.GetDuration("substreams-tier1-global-request-pool-keep-alive-delay"),
-					viper.GetUint64("substreams-tier1-default-max-request-per-user"),
-					defaultMinimalWorkerLifeDuration,
-					appLogger,
-				)
+			sessionPlugin := viper.GetString("common-session-plugin")
+			sessionPool, err := dsession.New(sessionPlugin, appLogger)
+			if err != nil {
+				return nil, fmt.Errorf("unable to create session pool: %w", err)
 			}
 
 			return app.NewTier1(appLogger,
@@ -227,8 +173,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 					HeadBlockNumberMetric: ss1HeadBlockNumMetric,
 					CheckPendingShutDown:  runtime.IsPendingShutdown,
 					InfoServer:            runtime.InfoServer,
-					WorkerPoolFactory:     workerPoolFactory,
-					GlobalRequestPool:     globalRequestPool,
+					SessionPool:           sessionPool,
 				}), nil
 		},
 	})
