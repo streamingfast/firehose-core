@@ -31,10 +31,10 @@ require (
 	github.com/streamingfast/dstore v0.1.1-0.20250609173504-95368d3441ee
 	github.com/streamingfast/firehose-networks v0.2.1
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
-	github.com/streamingfast/payment-gateway v0.0.0-20250909154213-47fe68ec6f34
+	github.com/streamingfast/payment-gateway v0.0.0-20250910202938-cfd594178cb1
 	github.com/streamingfast/pbgo v0.0.6-0.20250114182320-0b43084f4000
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.16.5-0.20250909173306-f28c1dbdd21a
+	github.com/streamingfast/substreams v1.16.5-0.20250910202959-d61bce3c4b43
 	github.com/stretchr/testify v1.11.1
 	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.10.0
