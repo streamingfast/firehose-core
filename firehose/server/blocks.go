@@ -21,6 +21,7 @@ import (
 	"github.com/streamingfast/firehose-core/metering"
 	"github.com/streamingfast/logging"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
+	tracing "github.com/streamingfast/sf-tracing"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -88,7 +89,7 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 		auth := dauth.FromContext(ctx)
 		userID := auth.UserID()
 		apiKeyID := auth.APIKeyID()
-		traceID := "default" // Can be extracted from tracing context if needed
+		traceID := tracing.GetTraceID(ctx).String()
 		service := "t1r"
 
 		sessionID, err := s.sessionPool.Get(ctx, service, userID, apiKeyID, traceID, func(err error) {
