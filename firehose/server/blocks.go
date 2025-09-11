@@ -100,8 +100,14 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 		})
 
 		if err != nil {
-			s.logger.Error("failed to acquire session", zap.Error(err))
-			err, _ = dsession.ToConnectError(err)
+			switch {
+			case errors.Is(err, dsession.ErrConcurrentStreamLimitExceeded),
+				errors.Is(err, dsession.ErrPermissionDenied),
+				errors.Is(err, dsession.ErrQuotaExceeded):
+				s.logger.Info("session denied to user", zap.String("user_id", userID), zap.String("api_key_id", apiKeyID), zap.String("trace_id", traceID), zap.Error(err))
+			default:
+				s.logger.Error("failed to acquire session", zap.Error(err), zap.String("service", service), zap.String("user_id", userID), zap.String("api_key_id", apiKeyID), zap.String("trace_id", traceID))
+			}
 			return err
 		}
 
