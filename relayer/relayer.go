@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/streamingfast/dstore"
+	"go.uber.org/zap"
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 
@@ -98,6 +99,9 @@ func NewMultiplexedSource(handler bstream.Handler, sourceAddresses []string, max
 			gate := bstream.NewRealtimeGate(maxSourceLatency, subHandler, bstream.GateOptionWithLogger(logger))
 			var upstreamHandler bstream.Handler
 			upstreamHandler = bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+				if ztrace.Enabled() {
+					logger.Debug("received block", zap.Uint64("number", blk.Number), zap.String("id", blk.Id), zap.Int64("latency_ms", time.Since(blk.Timestamp.AsTime()).Milliseconds()))
+				}
 				return gate.ProcessBlock(blk, &namedObj{
 					Obj:  obj,
 					Name: sourceName,
