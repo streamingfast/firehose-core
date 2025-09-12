@@ -34,7 +34,7 @@ require (
 	github.com/streamingfast/payment-gateway v0.0.0-20250909154213-47fe68ec6f34
 	github.com/streamingfast/pbgo v0.0.6-0.20250114182320-0b43084f4000
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.16.6-0.20250911152157-a7f27071911a
+	github.com/streamingfast/substreams v1.16.6-0.20250912145143-c463cb988537
 	github.com/stretchr/testify v1.11.1
 	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.10.0
@@ -83,7 +83,7 @@ require (
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
-	github.com/streamingfast/substreams-foundational-store v0.1.1-0.20250911140508-5c260f615ebc // indirect
+	github.com/streamingfast/substreams-foundational-store v0.1.1-0.20250912144020-b075d35bf78a // indirect
 	github.com/streamingfast/worker-pool-protocol v0.0.0-20250826200931-136a043ecece // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
 	github.com/zeebo/errs v1.4.0 // indirect
@@ -239,3 +239,6 @@ replace (
 	github.com/jhump/protoreflect => github.com/streamingfast/protoreflect v0.0.0-20231205191344-4b629d20ce8d
 	github.com/tetratelabs/wazero => github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed
 )
+
+// replace github.com/streamingfast/substreams => ../substreams
+// replace github.com/streamingfast/substreams-foundational-store => ../substreams-foundational-store
