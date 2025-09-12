@@ -10,7 +10,7 @@ ARG VERSION="dev"
 RUN apt-get update && apt-get install git
 RUN go build -v -ldflags "-X main.version=${VERSION}" ./cmd/firecore
 
-FROM ubuntu:24.10
+FROM ubuntu:24.04
 
 ARG TARGETPLATFORM
 
