@@ -240,5 +240,3 @@ replace (
 	github.com/tetratelabs/wazero => github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed
 )
 
-// replace github.com/streamingfast/substreams => ../substreams
-// replace github.com/streamingfast/substreams-foundational-store => ../substreams-foundational-store
