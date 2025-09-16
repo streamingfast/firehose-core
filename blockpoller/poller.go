@@ -115,6 +115,7 @@ func (p *BlockPoller[C]) run(resolvedStartBlock bstream.BlockRef, stopBlock uint
 
 		if p.IsTerminating() {
 			p.logger.Info("block poller is terminating")
+			return nil
 		}
 
 		delay := time.Duration(0)
@@ -159,9 +160,6 @@ func (p *BlockPoller[C]) run(resolvedStartBlock bstream.BlockRef, stopBlock uint
 			return fmt.Errorf("unable to fetch  block %d: %w", blockToFetch, err)
 		}
 
-		if p.IsTerminating() {
-			p.logger.Info("block poller is terminating")
-		}
 	}
 }
 
