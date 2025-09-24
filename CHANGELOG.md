@@ -8,6 +8,16 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## v1.11.2
+
+### Substreams v1.16.6
+
+* Updated Wasmtime runtime from v30.0.0 to v36.0.0, bringing performance improvements, inlining support, Component Model async implementation, and enhanced security features.
+* Added WASM bindgen shims support for Wasmtime runtime to handle WASM modules with WASM bindgen imports (when Substreams Module binary is defined as type `wasm/rust-v1+wasm-bindgen-shims`).
+* Added support for foundational-store (in wasmtime and wazero).
+* Added foundational-store grpc client to substreams engine.
+* Fixed module caching to properly handle modules with different runtime extensions.
+
 ## v1.11.1
 
 ### Substreams

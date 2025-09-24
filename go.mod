@@ -34,7 +34,7 @@ require (
 	github.com/streamingfast/payment-gateway v0.0.0-20250910205031-eaa05d2fd1b7
 	github.com/streamingfast/pbgo v0.0.6-0.20250114182320-0b43084f4000
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.16.6-0.20250912150824-d291f5f6c1c7
+	github.com/streamingfast/substreams v1.16.6-0.20250924125432-bee8c3d20e4c
 	github.com/stretchr/testify v1.11.1
 	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.10.0
@@ -56,7 +56,7 @@ require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bobg/go-generics/v3 v3.5.0 // indirect
 	github.com/bufbuild/protocompile v0.4.0 // indirect
-	github.com/bytecodealliance/wasmtime-go/v30 v30.0.0 // indirect
+	github.com/bytecodealliance/wasmtime-go/v36 v36.0.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.2 // indirect
 	github.com/charmbracelet/lipgloss v1.0.0 // indirect
 	github.com/charmbracelet/x/ansi v0.4.2 // indirect
@@ -240,3 +240,4 @@ replace (
 	github.com/tetratelabs/wazero => github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed
 )
 
+replace github.com/streamingfast/substreams => /Users/stepd/repos/substreams
