@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net/url"
 
 	"github.com/streamingfast/dgrpc"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
@@ -15,10 +16,48 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+// parseEndpointURL parses HTTP/HTTPS URLs and extracts endpoint configuration
+// Returns the processed endpoint and whether to use plaintext connection
+func parseEndpointURL(endpoint string, usePlainTextConnection bool) (string, bool) {
+	// Check for http:// or https:// prefix and adjust settings accordingly
+	if len(endpoint) > 7 && endpoint[:7] == "http://" {
+		usePlainTextConnection = true
+		parsedURL, err := url.Parse(endpoint)
+		if err == nil && parsedURL.Port() == "" {
+			// No port specified, append default port for HTTP
+			endpoint = parsedURL.Host + ":80"
+		} else if err == nil {
+			// Port is already specified or there was an error, just strip the scheme
+			endpoint = parsedURL.Host
+		} else {
+			// Fallback to simple stripping if parsing fails
+			endpoint = endpoint[7:]
+		}
+	} else if len(endpoint) > 8 && endpoint[:8] == "https://" {
+		usePlainTextConnection = false
+		parsedURL, err := url.Parse(endpoint)
+		if err == nil && parsedURL.Port() == "" {
+			// No port specified, append default port for HTTPS
+			endpoint = parsedURL.Host + ":443"
+		} else if err == nil {
+			// Port is already specified or there was an error, just strip the scheme
+			endpoint = parsedURL.Host
+		} else {
+			// Fallback to simple stripping if parsing fails
+			endpoint = endpoint[8:]
+		}
+	}
+
+	return endpoint, usePlainTextConnection
+}
+
 // firehoseClient, closeFunc, grpcCallOpts, err := NewFirehoseClient(endpoint, jwt, insecure, plaintext)
 // defer closeFunc()
 // stream, err := firehoseClient.Blocks(context.Background(), request, grpcCallOpts...)
 func NewFirehoseClient(endpoint, jwt, apiKey string, useInsecureTSLConnection, usePlainTextConnection bool) (cli pbfirehose.StreamClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
+
+	// Parse endpoint URL and adjust plaintext setting if http:// or https:// prefix is used
+	endpoint, usePlainTextConnection = parseEndpointURL(endpoint, usePlainTextConnection)
 
 	if useInsecureTSLConnection && usePlainTextConnection {
 		return nil, nil, nil, fmt.Errorf("option --insecure and --plaintext are mutually exclusive, they cannot be both specified at the same time")
@@ -78,6 +117,9 @@ func (a *ApiKeyAuth) RequireTransportSecurity() bool {
 }
 
 func NewFirehoseFetchClient(endpoint, jwt, apiKey string, useInsecureTSLConnection, usePlainTextConnection bool) (cli pbfirehose.FetchClient, closeFunc func() error, callOpts []grpc.CallOption, err error) {
+
+	// Parse endpoint URL and adjust plaintext setting if http:// or https:// prefix is used
+	endpoint, usePlainTextConnection = parseEndpointURL(endpoint, usePlainTextConnection)
 
 	if useInsecureTSLConnection && usePlainTextConnection {
 		return nil, nil, nil, fmt.Errorf("option --insecure and --plaintext are mutually exclusive, they cannot be both specified at the same time")

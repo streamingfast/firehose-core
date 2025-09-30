@@ -21,6 +21,14 @@ func NewToolsFirehoseClientCmd[B firecore.Block](chain *firecore.Chain[B], logge
 	cmd := &cobra.Command{
 		Use:   "firehose-client <endpoint> <range>",
 		Short: "Connects to a Firehose endpoint over gRPC and print block stream as JSON to terminal",
+		Long: `Connects to a Firehose endpoint over gRPC and print block stream as JSON to terminal.
+
+The endpoint can be specified in the following formats:
+  - host:port (traditional format, uses --plaintext flag to determine connection type)
+  - http://host[:port] (automatically uses plaintext connection, defaults to port 80)
+  - https://host[:port] (automatically uses SSL connection, defaults to port 443)
+
+When using http:// or https:// prefixes, the --plaintext flag is automatically determined from the URL scheme.`,
 		Args:  cobra.ExactArgs(2),
 		RunE:  getFirehoseClientE(chain, logger),
 	}
