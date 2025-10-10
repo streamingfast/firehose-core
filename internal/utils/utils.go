@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 
@@ -19,7 +20,8 @@ func GetEnvForceFinalityAfterBlocks() *uint64 {
 
 func TweakBlockFinality(blk *pbbstream.Block, maxDistanceToBlock uint64) {
 	if blk.LibNum > blk.Number {
-		panic("libnum cannot be greater than block number")
+		distance := blk.LibNum - blk.Number
+		panic(fmt.Sprintf("libnum cannot be greater than block number (lib_num=%d, block_num=%d, distance=%d, max_distance=%d)", blk.LibNum, blk.Number, distance, maxDistanceToBlock))
 	}
 	if blk.Number < maxDistanceToBlock {
 		return // prevent uin64 underflow at the beginning of the chain
