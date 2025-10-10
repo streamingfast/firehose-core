@@ -10,6 +10,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+* Updated `firehose-networks` dependency to `v0.2.2` (latest).
+
 * Fixed `common-one-block-store-url` flag not expanding environment variables in all apps.
 
 ## v1.11.2
