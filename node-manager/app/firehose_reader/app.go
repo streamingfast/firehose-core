@@ -24,6 +24,7 @@ import (
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	dgrpcfactory "github.com/streamingfast/dgrpc/server/factory"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/firehose-core/node-manager/mindreader"
 	"github.com/streamingfast/logging"
 	pbheadinfo "github.com/streamingfast/pbgo/sf/headinfo/v1"
 	"github.com/streamingfast/shutter"
@@ -52,23 +53,28 @@ type FirehoseConfig struct {
 
 type App struct {
 	*shutter.Shutter
-	config  Config
-	zlogger *zap.Logger
-	tracer  logging.Tracer
+	config             Config
+	testModeComparator *mindreader.TestModeComparator
+	zlogger            *zap.Logger
+	tracer             logging.Tracer
 }
 
-func New(config Config, zlogger *zap.Logger, tracer logging.Tracer) *App {
+func New(config Config, testModeComparator *mindreader.TestModeComparator, zlogger *zap.Logger, tracer logging.Tracer) *App {
 	n := &App{
-		Shutter: shutter.New(),
-		config:  config,
-		zlogger: zlogger,
-		tracer:  tracer,
+		Shutter:            shutter.New(),
+		config:             config,
+		testModeComparator: testModeComparator,
+		zlogger:            zlogger,
+		tracer:             tracer,
 	}
 	return n
 }
 
 func (a *App) Run() error {
-	a.zlogger.Info("launching reader-node-firehose app (reading from firehose)", zap.Reflect("config", a.config))
+	a.zlogger.Info("launching reader-node-firehose app (reading from firehose)",
+		zap.Reflect("config", a.config),
+		zap.Object("test_mode", a.testModeComparator),
+	)
 	appCtx, cancel := context.WithCancelCause(context.Background())
 	defer cancel(nil)
 	a.OnTerminating(func(err error) { cancel(err) })
@@ -84,13 +90,14 @@ func (a *App) Run() error {
 	)
 
 	syncer := &syncer{
-		Shutter:           shutter.New(),
-		appCtx:            appWrapper.Context(),
-		blockStreamServer: blockStreamServer,
-		config:            a.config,
-		firehoseConfig:    a.config.FirehoseConfig,
-		logger:            a.zlogger,
-		store:             store,
+		Shutter:            shutter.New(),
+		appCtx:             appWrapper.Context(),
+		blockStreamServer:  blockStreamServer,
+		config:             a.config,
+		firehoseConfig:     a.config.FirehoseConfig,
+		logger:             a.zlogger,
+		store:              store,
+		testModeComparator: a.testModeComparator,
 	}
 
 	server := &server{

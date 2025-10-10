@@ -10,4 +10,7 @@ type Runtime struct {
 	// received which can be used to turn a healthz monitor as unhealthy so that a load balancer can
 	// remove the node from the pool and has 'common-system-shutdown-signal-delay' to do it.
 	IsPendingShutdown func() bool
+
+	OnTerminating func(func(error))
+	OnTerminated  func(func(error))
 }

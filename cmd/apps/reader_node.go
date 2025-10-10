@@ -20,6 +20,7 @@ import (
 	"github.com/streamingfast/firehose-core/node-manager/metrics"
 	reader "github.com/streamingfast/firehose-core/node-manager/mindreader"
 	"github.com/streamingfast/firehose-core/node-manager/operator"
+	fcproto "github.com/streamingfast/firehose-core/proto"
 	sv "github.com/streamingfast/firehose-core/superviser"
 	"github.com/streamingfast/logging"
 	pbheadinfo "github.com/streamingfast/pbgo/sf/headinfo/v1"
@@ -36,15 +37,17 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 		Title:       fmt.Sprintf("%s Reader Node", chain.LongName),
 		Description: fmt.Sprintf("%s node with built-in operational manager", chain.LongName),
 		RegisterFlags: func(cmd *cobra.Command) error {
-			cmd.Flags().String("reader-node-path", chain.ExecutableName, cli.FlagDescription(`
+			flags := cmd.Flags()
+
+			flags.String("reader-node-path", chain.ExecutableName, cli.FlagDescription(`
 				Process that will be invoked to sync the chain, can be a full path or just the binary's name, in which case the binary is
 				searched for paths listed by the PATH environment variable (following operating system rules around PATH handling).
 			`))
-			cmd.Flags().String("reader-node-data-dir", "{data-dir}/reader/data", "Directory for node data")
-			cmd.Flags().Bool("reader-node-debug-firehose-logs", false, "[DEV] Prints firehose instrumentation logs to standard output, should be use for debugging purposes only")
-			cmd.Flags().String("reader-node-manager-api-addr", firecore.ReaderNodeManagerAPIAddr, "Acme node manager API address")
-			cmd.Flags().Duration("reader-node-readiness-max-latency", 30*time.Second, "Determine the maximum head block latency at which the instance will be determined healthy. Some chains have more regular block production than others.")
-			cmd.Flags().String("reader-node-arguments", "", string(cli.Description(`
+			flags.String("reader-node-data-dir", "{data-dir}/reader/data", "Directory for node data")
+			flags.Bool("reader-node-debug-firehose-logs", false, "[DEV] Prints firehose instrumentation logs to standard output, should be use for debugging purposes only")
+			flags.String("reader-node-manager-api-addr", firecore.ReaderNodeManagerAPIAddr, "Acme node manager API address")
+			flags.Duration("reader-node-readiness-max-latency", 30*time.Second, "Determine the maximum head block latency at which the instance will be determined healthy. Some chains have more regular block production than others.")
+			flags.String("reader-node-arguments", "", string(cli.Description(`
 				Defines the node arguments that will be passed to the node on execution. Supports templating, where we will replace certain sub-string with the appropriate value
 
 				  {data-dir}		 	   The current data-dir path defined by the flag 'data-dir'
@@ -59,18 +62,32 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 
 				Example: 'run blockchain -start {start-block-num} -end {stop-block-num}' may yield 'run blockchain -start 200 -end 500'
 			`)))
-			cmd.Flags().StringSlice("reader-node-backups", []string{}, "Repeatable, space-separated key=values definitions for backups. Example: 'type=gke-pvc-snapshot prefix= tag=v1 freq-blocks=1000 freq-time= project=myproj'")
-			cmd.Flags().String("reader-node-grpc-listen-addr", firecore.ReaderNodeGRPCAddr, "The gRPC listening address to use for serving real-time blocks")
-			cmd.Flags().Bool("reader-node-discard-after-stop-num", false, "Ignore remaining blocks being processed after stop num (only useful if we discard the reader data after reprocessing a chunk of blocks)")
-			cmd.Flags().String("reader-node-working-dir", "{data-dir}/reader/work", "Path where reader will stores its files")
-			cmd.Flags().Uint("reader-node-start-block-num", 0, "Blocks that were produced with smaller block number then the given block num are skipped")
-			cmd.Flags().Uint("reader-node-stop-block-num", 0, "Shutdown reader when we the following 'stop-block-num' has been reached, inclusively.")
-			cmd.Flags().Int("reader-node-blocks-chan-capacity", 100, "Capacity of the channel holding blocks read by the reader. Process will shutdown reader-node if the channel gets over 90% of that capacity to prevent horrible consequences. Raise this number when processing tiny blocks very quickly")
-			cmd.Flags().Uint64("reader-node-line-buffer-size", 209715200, "Capacity of the buffer for reading a single line out of the node, in bytes (This is a hard limit. Some future enormouse blocks may require raising this to process them).")
-			cmd.Flags().String("reader-node-one-block-suffix", "default", cli.FlagDescription(`
+			flags.StringSlice("reader-node-backups", []string{}, "Repeatable, space-separated key=values definitions for backups. Example: 'type=gke-pvc-snapshot prefix= tag=v1 freq-blocks=1000 freq-time= project=myproj'")
+			flags.String("reader-node-grpc-listen-addr", firecore.ReaderNodeGRPCAddr, "The gRPC listening address to use for serving real-time blocks")
+			flags.Bool("reader-node-discard-after-stop-num", false, "Ignore remaining blocks being processed after stop num (only useful if we discard the reader data after reprocessing a chunk of blocks)")
+			flags.String("reader-node-working-dir", "{data-dir}/reader/work", "Path where reader will stores its files")
+			flags.Uint("reader-node-start-block-num", 0, "Blocks that were produced with smaller block number then the given block num are skipped")
+			flags.Uint("reader-node-stop-block-num", 0, "Shutdown reader when we the following 'stop-block-num' has been reached, inclusively.")
+			flags.Int("reader-node-blocks-chan-capacity", 100, "Capacity of the channel holding blocks read by the reader. Process will shutdown reader-node if the channel gets over 90% of that capacity to prevent horrible consequences. Raise this number when processing tiny blocks very quickly")
+			flags.Uint64("reader-node-line-buffer-size", 209715200, "Capacity of the buffer for reading a single line out of the node, in bytes (This is a hard limit. Some future enormouse blocks may require raising this to process them).")
+			flags.String("reader-node-one-block-suffix", "default", cli.FlagDescription(`
 				Unique identifier for reader, so that it can produce 'oneblock files' in the same store as another instance without competing
 				for writes. You should set this flag if you have multiple reader running, each one should get a unique identifier, the
 				hostname value is a good value to use.
+			`))
+			flags.Bool("reader-node-test-mode", false, cli.FlagDescription(`
+				[DEV] Reader node will run in test mode which disables writing of blocks to directory, instead, they are compared as received
+				against another test instance defined by flag 'reader-node-test-mode-against'
+			`))
+			flags.String("reader-node-test-mode-against", "", cli.FlagDescription(`
+				[DEV] When in test mode, the reader node will compare blocks it reads against the blocks read by the instance defined by
+				this flag, should be an address like http://localhost:9090, http:// for plain text, https:// for TLS, with 'insecure=true' as
+				query param if the TLS certificate is self-signed, 'apiKey=<key>' if the server requires API key authentication, environment
+				variable FIREHOSE_API_KEY/FIREHOSE_API_TOKEN are also supported for defining the API key/token.
+			`))
+			flags.String("reader-node-test-mode-diff-output", "-", cli.FlagDescription(`
+				[DEV] When in test mode, the reader will write diff output to the given file path, if empty, diffs are written to
+				the standard output.
 			`))
 			return nil
 		},
@@ -79,6 +96,12 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 		},
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
 			sfDataDir := runtime.AbsDataDir
+
+			// Initialize test mode comparator if enabled
+			testModeComparator, err := createTestModeComparator(chain, appLogger)
+			if err != nil {
+				return nil, err
+			}
 
 			nodePath := viper.GetString("reader-node-path")
 			if nodePath == "" {
@@ -202,6 +225,7 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 				},
 				oneBlockFileSuffix,
 				blockStreamServer,
+				testModeComparator,
 				appLogger,
 				appTracer,
 			)
@@ -224,7 +248,7 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 
 					return nil
 				},
-			}, appLogger), nil
+			}, testModeComparator, appLogger), nil
 		},
 	})
 }
@@ -279,4 +303,41 @@ func createNodeArgumentsResolver(dataDir, nodeDataDir, hostname string, firstStr
 
 func gkeSnapshotterFactory(conf operator.BackupModuleConfig) (operator.BackupModule, error) {
 	return snapshotter.NewGKEPVCSnapshotter(conf)
+}
+
+// createTestModeComparator creates a test mode comparator if test mode is enabled.
+// Returns nil if test mode is not enabled.
+func createTestModeComparator[B firecore.Block](chain *firecore.Chain[B], logger *zap.Logger) (*reader.TestModeComparator, error) {
+	testModeEnabled := viper.GetBool("reader-node-test-mode")
+	if !testModeEnabled {
+		return nil, nil
+	}
+
+	testModeConfig := &reader.TestModeConfig{
+		Enabled:    testModeEnabled,
+		AgainstDSN: viper.GetString("reader-node-test-mode-against"),
+		DiffOutput: viper.GetString("reader-node-test-mode-diff-output"),
+	}
+
+	logger.Warn("========================================")
+	logger.Warn("🧪 TEST MODE ENABLED 🧪")
+	logger.Warn("Blocks will NOT be written to disk")
+	logger.Warn("Blocks will NOT be relayed through live source")
+	logger.Warn("Blocks will be compared against production endpoint")
+	logger.Warn("========================================")
+
+	chainBlock := chain.BlockFactory()
+	sanitizer := chain.Tools.GetSanitizeBlockForCompare()
+
+	registry, err := fcproto.NewRegistry(chainBlock.ProtoReflect().Descriptor().ParentFile())
+	if err != nil {
+		return nil, fmt.Errorf("creating proto registry: %w", err)
+	}
+
+	testModeComparator, err := reader.NewTestModeComparator(testModeConfig, registry, sanitizer, logger)
+	if err != nil {
+		return nil, fmt.Errorf("create test mode comparator: %w", err)
+	}
+
+	return testModeComparator, nil
 }

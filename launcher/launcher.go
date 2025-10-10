@@ -161,6 +161,14 @@ func (l *Launcher) Launch(appNames []string) error {
 	return nil
 }
 
+func (l *Launcher) OnTerminating(f func(error)) {
+	l.shutter.OnTerminating(f)
+}
+
+func (l *Launcher) OnTerminated(f func(error)) {
+	l.shutter.OnTerminated(f)
+}
+
 func (l *Launcher) Terminating() <-chan string {
 
 	ch := make(chan string, 1)

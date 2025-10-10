@@ -34,9 +34,18 @@ func RegisterReaderNodeStdinApp[B firecore.Block](chain *firecore.Chain[B], root
 		ID:            "reader-node-stdin",
 		Title:         "Reader Node (stdin)",
 		Description:   "Blocks reading node, unmanaged, reads Firehose logs from standard input and transform them into Firehose chain specific blocks",
-		RegisterFlags: func(cmd *cobra.Command) error { return nil },
+		RegisterFlags: func(cmd *cobra.Command) error {
+			// Test mode flags are registered at the global level in reader_node.go
+			return nil
+		},
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
 			sfDataDir := runtime.AbsDataDir
+
+			// Initialize test mode comparator if enabled
+			testModeComparator, err := createTestModeComparator(chain, appLogger)
+			if err != nil {
+				return nil, err
+			}
 
 			_, oneBlocksStoreURL, _, err := firecore.GetCommonStoresURLs(sfDataDir)
 			if err != nil {
@@ -65,7 +74,7 @@ func RegisterReaderNodeStdinApp[B firecore.Block](chain *firecore.Chain[B], root
 			}, &nodeReaderStdinApp.Modules{
 				ConsoleReaderFactory:       consoleReaderFactory,
 				MetricsAndReadinessManager: metricsAndReadinessManager,
-			}, appLogger, appTracer), nil
+			}, testModeComparator, appLogger, appTracer), nil
 		},
 	})
 }

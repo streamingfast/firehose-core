@@ -31,6 +31,7 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose-core/firehose/client"
 	nodeManager "github.com/streamingfast/firehose-core/node-manager"
+	"github.com/streamingfast/firehose-core/node-manager/mindreader"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
@@ -40,12 +41,13 @@ import (
 
 type syncer struct {
 	*shutter.Shutter
-	appCtx            context.Context
-	blockStreamServer *blockstream.Server
-	config            Config
-	firehoseConfig    FirehoseConfig
-	logger            *zap.Logger
-	store             dstore.Store
+	appCtx             context.Context
+	blockStreamServer  *blockstream.Server
+	config             Config
+	firehoseConfig     FirehoseConfig
+	logger             *zap.Logger
+	store              dstore.Store
+	testModeComparator *mindreader.TestModeComparator
 }
 
 func (s *syncer) Run() error {
@@ -133,49 +135,66 @@ func (s *syncer) Run() error {
 				Payload:   response.Block,
 			}
 
-			oneBlockFilename := bstream.BlockFileNameWithSuffix(pbBlock, s.config.OneBlockSuffix)
-			s.logger.Debug("writing block", zap.Uint64("block_num", pbBlock.Number), zap.String("filename", oneBlockFilename))
+			// In test mode, compare blocks instead of writing them
+			if s.testModeComparator != nil {
+				if err := s.testModeComparator.CompareBlock(s.appCtx, pbBlock); err != nil {
+					s.logger.Warn("failed to compare block in test mode",
+						zap.Uint64("block_num", pbBlock.Number),
+						zap.String("block_id", pbBlock.Id),
+						zap.Error(err),
+					)
+					// Don't fail on comparison errors, just log and continue
+				}
+			} else {
+				// Normal mode: write blocks to disk
+				oneBlockFilename := bstream.BlockFileNameWithSuffix(pbBlock, s.config.OneBlockSuffix)
+				s.logger.Debug("writing block", zap.Uint64("block_num", pbBlock.Number), zap.String("filename", oneBlockFilename))
 
-			pr, pw := io.Pipe()
+				pr, pw := io.Pipe()
 
-			//write block data to pipe, and then close to signal end of data
-			go func(block *pbbstream.Block) {
-				var err error
-				defer func() {
-					pw.CloseWithError(err)
-				}()
+				//write block data to pipe, and then close to signal end of data
+				go func(block *pbbstream.Block) {
+					var err error
+					defer func() {
+						pw.CloseWithError(err)
+					}()
 
-				bw, err := bstream.NewDBinBlockWriter(pw)
+					bw, err := bstream.NewDBinBlockWriter(pw)
+					if err != nil {
+						s.Shutdown(fmt.Errorf("creating block writer: %w", err))
+						return
+					}
+
+					err = bw.Write(block)
+					if err != nil {
+						s.Shutdown(fmt.Errorf("writing block: %w", err))
+						return
+					}
+				}(pbBlock)
+
+				err = s.store.WriteObject(s.appCtx, oneBlockFilename, pr)
 				if err != nil {
-					s.Shutdown(fmt.Errorf("creating block writer: %w", err))
-					return
+					if errors.Is(err, context.Canceled) {
+						s.logger.Info("context canceled, stopping syncer")
+						return nil
+					}
+
+					return fmt.Errorf("writing block %d to %s: %w", pbBlock.Number, oneBlockFilename, err)
 				}
 
-				err = bw.Write(block)
-				if err != nil {
-					s.Shutdown(fmt.Errorf("writing block: %w", err))
-					return
-				}
-			}(pbBlock)
-
-			err = s.store.WriteObject(s.appCtx, oneBlockFilename, pr)
-			if err != nil {
-				if errors.Is(err, context.Canceled) {
-					s.logger.Info("context canceled, stopping syncer")
-					return nil
-				}
-
-				return fmt.Errorf("writing block %d to %s: %w", pbBlock.Number, oneBlockFilename, err)
+				s.logger.Debug("block written", zap.Uint64("block_num", pbBlock.Number), zap.String("filename", oneBlockFilename))
 			}
 
-			if err := s.blockStreamServer.PushBlock(pbBlock); err != nil {
-				return fmt.Errorf("pushing block %d to blockstream server: %w", pbBlock.Number, err)
+			// Only push blocks to block stream server in normal mode (not in test mode)
+			if s.testModeComparator == nil {
+				if err := s.blockStreamServer.PushBlock(pbBlock); err != nil {
+					return fmt.Errorf("pushing block %d to blockstream server: %w", pbBlock.Number, err)
+				}
 			}
 
 			BlockWriteCount.Inc()
 			metricsManager.UpdateHeadBlock(pbBlock)
 
-			s.logger.Debug("block written", zap.Uint64("block_num", pbBlock.Number), zap.String("filename", oneBlockFilename))
 			lastCursor = response.Cursor
 
 			err = s.writeCursor(lastCursor)

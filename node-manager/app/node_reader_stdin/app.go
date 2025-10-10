@@ -57,27 +57,32 @@ type Modules struct {
 
 type App struct {
 	*shutter.Shutter
-	Config    *Config
-	ReadyFunc func()
-	modules   *Modules
-	zlogger   *zap.Logger
-	tracer    logging.Tracer
+	Config             *Config
+	testModeComparator *mindreader.TestModeComparator
+	ReadyFunc          func()
+	modules            *Modules
+	zlogger            *zap.Logger
+	tracer             logging.Tracer
 }
 
-func New(c *Config, modules *Modules, zlogger *zap.Logger, tracer logging.Tracer) *App {
+func New(c *Config, modules *Modules, testModeComparator *mindreader.TestModeComparator, zlogger *zap.Logger, tracer logging.Tracer) *App {
 	n := &App{
-		Shutter:   shutter.New(),
-		Config:    c,
-		ReadyFunc: func() {},
-		modules:   modules,
-		zlogger:   zlogger,
-		tracer:    tracer,
+		Shutter:            shutter.New(),
+		Config:             c,
+		testModeComparator: testModeComparator,
+		ReadyFunc:          func() {},
+		modules:            modules,
+		zlogger:            zlogger,
+		tracer:             tracer,
 	}
 	return n
 }
 
 func (a *App) Run() error {
-	a.zlogger.Info("launching reader-node app (reading from stdin)", zap.Reflect("config", a.Config))
+	a.zlogger.Info("launching reader-node app (reading from stdin)",
+		zap.Reflect("config", a.Config),
+		zap.Object("test_mode", a.testModeComparator),
+	)
 
 	gs := dgrpcfactory.ServerFromOptions(dgrpcserver.WithLogger(a.zlogger))
 
@@ -98,6 +103,7 @@ func (a *App) Run() error {
 		func(_ error) {},
 		a.Config.OneBlockSuffix,
 		blockStreamServer,
+		a.testModeComparator,
 		a.zlogger,
 		a.tracer,
 	)

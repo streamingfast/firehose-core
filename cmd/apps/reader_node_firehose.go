@@ -48,6 +48,13 @@ func RegisterReaderNodeFirehoseApp[B firecore.Block](chain *firecore.Chain[B], r
 		},
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
 			sfDataDir := runtime.AbsDataDir
+
+			// Initialize test mode comparator if enabled
+			testModeComparator, err := createTestModeComparator(chain, appLogger)
+			if err != nil {
+				return nil, err
+			}
+
 			_, oneBlockStoreURL, _, err := firecore.GetCommonStoresURLs(runtime.AbsDataDir)
 			if err != nil {
 				return nil, fmt.Errorf("getting common stores URLs: %w", err)
@@ -75,7 +82,7 @@ func RegisterReaderNodeFirehoseApp[B firecore.Block](chain *firecore.Chain[B], r
 					PlaintextConn: viper.GetBool("reader-node-firehose-plaintext"),
 					Compression:   viper.GetString("reader-node-firehose-compression"),
 				},
-			}, appLogger, appTracer), nil
+			}, testModeComparator, appLogger, appTracer), nil
 		},
 	})
 }

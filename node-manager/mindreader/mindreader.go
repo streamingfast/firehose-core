@@ -71,6 +71,8 @@ type MindReaderPlugin struct {
 	lines               chan string
 	consoleReader       ConsolerReader // contains the 'reader' part of the pipe
 	consumeReadFlowDone chan interface{}
+
+	testModeComparator *TestModeComparator
 }
 
 // NewMindReaderPlugin initiates its own:
@@ -88,6 +90,7 @@ func NewMindReaderPlugin(
 	shutdownFunc func(error),
 	oneBlockSuffix string,
 	blockStreamServer *blockstream.Server,
+	testModeComparator *TestModeComparator,
 	zlogger *zap.Logger,
 	tracer logging.Tracer,
 ) (*MindReaderPlugin, error) {
@@ -95,6 +98,8 @@ func NewMindReaderPlugin(
 	if err != nil {
 		return nil, err
 	}
+
+	testModeEnabled := testModeComparator != nil
 
 	zlogger.Info("creating mindreader plugin",
 		zap.String("one_blocks_store_url", oneBlocksStoreURL),
@@ -105,34 +110,40 @@ func NewMindReaderPlugin(
 		zap.Int("channel_capacity", channelCapacity),
 		zap.Bool("with_head_block_updater", headBlockUpdater != nil),
 		zap.Bool("with_shutdown_func", shutdownFunc != nil),
+		zap.Bool("test_mode", testModeEnabled),
 	)
 
-	// Create directory and its parent(s), it's a no-op if everything already exists
-	err = os.MkdirAll(workingDirectory, os.ModePerm)
-	if err != nil {
-		return nil, fmt.Errorf("create working directory: %w", err)
-	}
+	var archiver *Archiver
+	if !testModeEnabled {
+		// Create directory and its parent(s), it's a no-op if everything already exists
+		err = os.MkdirAll(workingDirectory, os.ModePerm)
+		if err != nil {
+			return nil, fmt.Errorf("create working directory: %w", err)
+		}
 
-	// local store
-	localOnBlocksStoreURL := path.Join(workingDirectory, "uploadable-oneblock")
-	localOneBlocksStore, err := dstore.NewStore(localOnBlocksStoreURL, "dbin", "", false)
-	if err != nil {
-		return nil, fmt.Errorf("new local one block store: %w", err)
-	}
+		// local store
+		localOnBlocksStoreURL := path.Join(workingDirectory, "uploadable-oneblock")
+		localOneBlocksStore, err := dstore.NewStore(localOnBlocksStoreURL, "dbin", "", false)
+		if err != nil {
+			return nil, fmt.Errorf("new local one block store: %w", err)
+		}
 
-	remoteOneBlocksStore, err := dstore.NewStore(oneBlocksStoreURL, "dbin.zst", "zstd", false)
-	if err != nil {
-		return nil, fmt.Errorf("new remote one block store: %w", err)
-	}
+		remoteOneBlocksStore, err := dstore.NewStore(oneBlocksStoreURL, "dbin.zst", "zstd", false)
+		if err != nil {
+			return nil, fmt.Errorf("new remote one block store: %w", err)
+		}
 
-	archiver := NewArchiver(
-		startBlockNum,
-		oneBlockSuffix,
-		localOneBlocksStore,
-		remoteOneBlocksStore,
-		zlogger,
-		tracer,
-	)
+		archiver = NewArchiver(
+			startBlockNum,
+			oneBlockSuffix,
+			localOneBlocksStore,
+			remoteOneBlocksStore,
+			zlogger,
+			tracer,
+		)
+	} else {
+		zlogger.Info("test mode enabled, skipping archiver initialization")
+	}
 
 	zlogger.Info("creating new mindreader plugin")
 	return &MindReaderPlugin{
@@ -144,6 +155,7 @@ func NewMindReaderPlugin(
 		headBlockUpdater:         headBlockUpdater,
 		blockStreamServer:        blockStreamServer,
 		forceFinalityAfterBlocks: utils.GetEnvForceFinalityAfterBlocks(),
+		testModeComparator:       testModeComparator,
 		zlogger:                  zlogger,
 	}, nil
 }
@@ -186,8 +198,10 @@ func (p *MindReaderPlugin) Launch() {
 		p.OnTerminating(func(_ error) { closer.Close() })
 	}
 
-	p.zlogger.Debug("starting archiver")
-	p.archiver.Start(ctx)
+	if p.archiver != nil {
+		p.zlogger.Debug("starting archiver")
+		p.archiver.Start(ctx)
+	}
 	p.launch()
 
 }
@@ -249,42 +263,58 @@ func (p *MindReaderPlugin) consumeReadFlow(blocks <-chan *pbbstream.Block) {
 		block, ok := <-blocks
 		if !ok {
 			p.zlogger.Info("all blocks in channel were drained, exiting read flow")
-			p.archiver.Shutdown(nil)
-
-			<-p.archiver.Terminated()
-			p.zlogger.Info("archiver termination code completed")
+			if p.archiver != nil {
+				p.archiver.Shutdown(nil)
+				<-p.archiver.Terminated()
+				p.zlogger.Info("archiver termination code completed")
+			}
 
 			return
 		}
 
 		p.zlogger.Debug("got one block", zap.Uint64("block_num", block.Number))
 
-		err := p.archiver.StoreBlock(ctx, block)
-		if err != nil {
-			p.zlogger.Error("failed storing block in archiver, shutting down and trying to send next blocks individually. You will need to reprocess over this range.", zap.Error(err), zap.String("received_block", block.Id), zap.Uint64("received_block_num", block.Number))
-
-			if !p.IsTerminating() {
-				go p.Shutdown(fmt.Errorf("archiver store block failed: %w", err))
-			}
-
-			continue
-		}
-
-		if p.onBlockWritten != nil {
-			err = p.onBlockWritten(block)
+		// In test mode, compare blocks instead of storing them
+		if p.testModeComparator != nil {
+			err := p.testModeComparator.CompareBlock(ctx, block)
 			if err != nil {
-				p.zlogger.Error("onBlockWritten callback failed", zap.Error(err))
+				p.zlogger.Warn("failed to compare block in test mode",
+					zap.Uint64("block_num", block.Number),
+					zap.String("block_id", block.Id),
+					zap.Error(err),
+				)
+				// Don't shutdown on comparison errors, just log and continue
+			}
+		} else if p.archiver != nil {
+			// Normal mode: store block
+			err := p.archiver.StoreBlock(ctx, block)
+			if err != nil {
+				p.zlogger.Error("failed storing block in archiver, shutting down and trying to send next blocks individually. You will need to reprocess over this range.", zap.Error(err), zap.String("received_block", block.Id), zap.Uint64("received_block_num", block.Number))
 
 				if !p.IsTerminating() {
-					go p.Shutdown(fmt.Errorf("onBlockWritten callback failed: %w", err))
+					go p.Shutdown(fmt.Errorf("archiver store block failed: %w", err))
 				}
 
 				continue
 			}
+
+			if p.onBlockWritten != nil {
+				err = p.onBlockWritten(block)
+				if err != nil {
+					p.zlogger.Error("onBlockWritten callback failed", zap.Error(err))
+
+					if !p.IsTerminating() {
+						go p.Shutdown(fmt.Errorf("onBlockWritten callback failed: %w", err))
+					}
+
+					continue
+				}
+			}
 		}
 
-		if p.blockStreamServer != nil {
-			err = p.blockStreamServer.PushBlock(block)
+		// Only relay blocks to the block stream server in normal mode (not in test mode)
+		if p.blockStreamServer != nil && p.testModeComparator == nil {
+			err := p.blockStreamServer.PushBlock(block)
 			if err != nil {
 				p.zlogger.Error("failed passing block to block stream server (this should not happen, shutting down)", zap.Error(err))
 

@@ -53,23 +53,29 @@ type Modules struct {
 
 type App struct {
 	*shutter.Shutter
-	config  *Config
-	modules *Modules
-	zlogger *zap.Logger
+	config             *Config
+	testModeComparator *mindreader.TestModeComparator
+	modules            *Modules
+	zlogger            *zap.Logger
 }
 
-func New(config *Config, modules *Modules, zlogger *zap.Logger) *App {
+func New(config *Config, modules *Modules, testModeComparator *mindreader.TestModeComparator, zlogger *zap.Logger) *App {
 	return &App{
-		Shutter: shutter.New(),
-		config:  config,
-		modules: modules,
-		zlogger: zlogger,
+		Shutter:            shutter.New(),
+		config:             config,
+		testModeComparator: testModeComparator,
+		modules:            modules,
+		zlogger:            zlogger,
 	}
 }
 
 func (a *App) Run() error {
 	hasMindreader := a.modules.MindreaderPlugin != nil
-	a.zlogger.Info("running node manager app", zap.Reflect("config", a.config), zap.Bool("mindreader", hasMindreader))
+	a.zlogger.Info("running node manager app",
+		zap.Reflect("config", a.config),
+		zap.Bool("mindreader", hasMindreader),
+		zap.Object("test_mode", a.testModeComparator),
+	)
 
 	hostname, _ := os.Hostname()
 	a.zlogger.Info("retrieved hostname from os", zap.String("hostname", hostname))
