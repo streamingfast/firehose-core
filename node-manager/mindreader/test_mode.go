@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose-core/firehose/client"
 	fcproto "github.com/streamingfast/firehose-core/proto"
@@ -123,38 +124,57 @@ func (c *TestModeComparator) CompareBlock(ctx context.Context, testingBlock *pbb
 		},
 	}
 
-	resp, err := c.fetchClient.Block(ctx, req, c.callOpts...)
+	var response *pbfirehose.SingleBlockResponse
+	err := derr.Retry(3, func(ctx context.Context) (err error) {
+		response, err = c.fetchClient.Block(ctx, req, c.callOpts...)
+		if err != nil {
+			if strings.Contains(err.Error(), "not found") {
+				c.logger.Debug("block not found on production endpoint, retrying",
+					zap.Uint64("block_num", testingBlock.Number),
+					zap.String("block_id", testingBlock.Id),
+					zap.Error(err),
+				)
+
+				return fmt.Errorf("block not found on production endpoint, retrying")
+			}
+
+			return derr.NewFatalError(err)
+		}
+
+		return nil
+	})
 	if err != nil {
 		c.logger.Warn("failed to fetch production block for comparison",
 			zap.Uint64("block_num", testingBlock.Number),
 			zap.String("block_id", testingBlock.Id),
 			zap.Error(err),
 		)
-		return fmt.Errorf("fetch production block: %w", err)
+
+		return fmt.Errorf("failed to fetch production block: %w", err)
 	}
 
-	if resp.Metadata.Num != testingBlock.Number {
-		return fmt.Errorf("block number mismatch: testing %d vs production %d", testingBlock.Number, resp.Metadata.Num)
+	if response.Metadata.Num != testingBlock.Number {
+		return fmt.Errorf("block number mismatch: testing %d vs production %d", testingBlock.Number, response.Metadata.Num)
 	}
 
-	if resp.Metadata.Id != testingBlock.Id {
+	if response.Metadata.Id != testingBlock.Id {
 		// This could be due to a recent re-org, log and skip comparison
 		c.logger.Info("block ID mismatch, possible re-org, skipping comparison",
 			zap.Uint64("block_num", testingBlock.Number),
 			zap.String("testing_block_id", testingBlock.Id),
-			zap.String("production_block_id", resp.Metadata.Id),
+			zap.String("production_block_id", response.Metadata.Id),
 		)
 		return nil
 	}
 
 	productionBlock := &pbbstream.Block{
-		Number:    resp.Metadata.Num,
-		Id:        resp.Metadata.Id,
-		ParentId:  resp.Metadata.ParentId,
-		Timestamp: resp.Metadata.Time,
-		LibNum:    resp.Metadata.LibNum,
-		ParentNum: resp.Metadata.ParentNum,
-		Payload:   resp.Block,
+		Number:    response.Metadata.Num,
+		Id:        response.Metadata.Id,
+		ParentId:  response.Metadata.ParentId,
+		Timestamp: response.Metadata.Time,
+		LibNum:    response.Metadata.LibNum,
+		ParentNum: response.Metadata.ParentNum,
+		Payload:   response.Block,
 	}
 
 	if c.sanitizer != nil {
