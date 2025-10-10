@@ -129,7 +129,7 @@ func runTier1(ctx context.Context, t *testing.T, rootDir string) error {
 		"--log-to-file=false",
 		"--common-auth-plugin=null://",
 		fmt.Sprintf("--common-tmp-dir=%s", t.TempDir()),
-		fmt.Sprintf("--common-metering-plugin=grpc://localhost:10016?network=dummy_blockchain"),
+		"--common-metering-plugin=grpc://localhost:10016?network=dummy_blockchain",
 		"--common-system-shutdown-signal-delay=30s",
 		fmt.Sprintf("--common-merged-blocks-store-url=%s", mergedBlocksStore),
 		fmt.Sprintf("--common-one-block-store-url=%s", oneBlocksStore),

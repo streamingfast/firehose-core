@@ -25,11 +25,16 @@ func RegisterRelayerApp(rootLog *zap.Logger) {
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
 			sfDataDir := runtime.AbsDataDir
 
+			_, oneBlocksStoreURL, _, err := firecore.GetCommonStoresURLs(sfDataDir)
+			if err != nil {
+				return nil, err
+			}
+
 			sourcesAddr := viper.GetStringSlice("relayer-source")
 
 			return relayer.New(&relayer.Config{
 				SourcesAddr:      sourcesAddr,
-				OneBlocksURL:     firecore.MustReplaceDataDir(sfDataDir, viper.GetString("common-one-block-store-url")),
+				OneBlocksURL:     oneBlocksStoreURL,
 				GRPCListenAddr:   viper.GetString("relayer-grpc-listen-addr"),
 				MaxSourceLatency: viper.GetDuration("relayer-max-source-latency"),
 			}), nil

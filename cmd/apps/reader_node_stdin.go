@@ -37,7 +37,12 @@ func RegisterReaderNodeStdinApp[B firecore.Block](chain *firecore.Chain[B], root
 		RegisterFlags: func(cmd *cobra.Command) error { return nil },
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
 			sfDataDir := runtime.AbsDataDir
-			archiveStoreURL := firecore.MustReplaceDataDir(sfDataDir, viper.GetString("common-one-block-store-url"))
+
+			_, oneBlocksStoreURL, _, err := firecore.GetCommonStoresURLs(sfDataDir)
+			if err != nil {
+				return nil, err
+			}
+
 			consoleReaderFactory := func(lines chan string) (mindreader.ConsolerReader, error) {
 				return chain.ConsoleReaderFactory(lines, chain.BlockEncoder, appLogger, appTracer)
 			}
@@ -50,7 +55,7 @@ func RegisterReaderNodeStdinApp[B firecore.Block](chain *firecore.Chain[B], root
 
 			return nodeReaderStdinApp.New(&nodeReaderStdinApp.Config{
 				GRPCAddr:                   viper.GetString("reader-node-grpc-listen-addr"),
-				OneBlocksStoreURL:          archiveStoreURL,
+				OneBlocksStoreURL:          oneBlocksStoreURL,
 				MindReadBlocksChanCapacity: viper.GetInt("reader-node-blocks-chan-capacity"),
 				StartBlockNum:              viper.GetUint64("reader-node-start-block-num"),
 				StopBlockNum:               viper.GetUint64("reader-node-stop-block-num"),

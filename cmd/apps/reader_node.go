@@ -176,8 +176,12 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 				chainOperator.RegisterBackupSchedule(sched)
 			}
 
+			_, oneBlocksStoreURL, _, err := firecore.GetCommonStoresURLs(sfDataDir)
+			if err != nil {
+				return nil, err
+			}
+
 			blockStreamServer := blockstream.NewUnmanagedServer(blockstream.ServerOptionWithLogger(appLogger))
-			oneBlocksStoreURL := firecore.MustReplaceDataDir(sfDataDir, viper.GetString("common-one-block-store-url"))
 			workingDir := firecore.MustReplaceDataDir(sfDataDir, viper.GetString("reader-node-working-dir"))
 			gprcListenAddr := viper.GetString("reader-node-grpc-listen-addr")
 			oneBlockFileSuffix := viper.GetString("reader-node-one-block-suffix")
