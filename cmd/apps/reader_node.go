@@ -77,9 +77,9 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 			`))
 			flags.Bool("reader-node-test-mode", false, cli.FlagDescription(`
 				[DEV] Reader node will run in test mode which disables writing of blocks to directory, instead, they are compared as received
-				against another test instance defined by flag 'reader-node-test-mode-against'
+				against another test instance defined by flag 'reader-node-test-mode-diff-against'
 			`))
-			flags.String("reader-node-test-mode-against", "", cli.FlagDescription(`
+			flags.String("reader-node-test-mode-diff-against", "", cli.FlagDescription(`
 				[DEV] When in test mode, the reader node will compare blocks it reads against the blocks read by the instance defined by
 				this flag, should be an address like http://localhost:9090, http:// for plain text, https:// for TLS, with 'insecure=true' as
 				query param if the TLS certificate is self-signed, 'apiKey=<key>' if the server requires API key authentication, environment
@@ -315,7 +315,7 @@ func createTestModeComparator[B firecore.Block](chain *firecore.Chain[B], logger
 
 	testModeConfig := &reader.TestModeConfig{
 		Enabled:    testModeEnabled,
-		AgainstDSN: viper.GetString("reader-node-test-mode-against"),
+		AgainstDSN: viper.GetString("reader-node-test-mode-diff-against"),
 		DiffOutput: viper.GetString("reader-node-test-mode-diff-output"),
 	}
 

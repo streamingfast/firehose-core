@@ -44,7 +44,7 @@ func NewTestModeComparator(config *TestModeConfig, registry *fcproto.Registry, s
 	}
 
 	if config.AgainstDSN == "" {
-		return nil, fmt.Errorf("test mode enabled but no 'reader-node-test-mode-against' DSN provided")
+		return nil, fmt.Errorf("test mode enabled but no 'reader-node-test-mode-diff-against' DSN provided")
 	}
 
 	endpoint, apiKey, apiToken, insecure, plaintext, err := ParseTestModeDSN(config.AgainstDSN)
