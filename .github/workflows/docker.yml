@@ -7,6 +7,7 @@ on:
     branches:
       - "develop"
       - "feature/*"
+      - "fix/*"
   workflow_dispatch:
 
 env:
@@ -26,7 +27,7 @@ jobs:
             platform_suffix: arm64
             runner: ubuntu-24.04-arm
 
-    runs-on: [ "${{ matrix.runner }}" ]
+    runs-on: ["${{ matrix.runner }}"]
 
     permissions:
       contents: read
@@ -91,8 +92,8 @@ jobs:
       tags: ${{ steps.meta.outputs.tags }}
 
     permissions:
-        contents: read
-        packages: write
+      contents: read
+      packages: write
 
     steps:
       - name: Docker login
@@ -124,7 +125,7 @@ jobs:
       - name: Extract image
         id: image
         run: |
-            echo "ID=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "ID=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Create and push manifest images
         uses: Noelware/docker-manifest-action@0.4.3
