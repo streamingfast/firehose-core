@@ -34,7 +34,7 @@ require (
 	github.com/streamingfast/payment-gateway v0.0.0-20250910205031-eaa05d2fd1b7
 	github.com/streamingfast/pbgo v0.0.6-0.20250114182320-0b43084f4000
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.16.7-0.20251015182509-1c9938899a91
+	github.com/streamingfast/substreams v1.16.7-0.20251017164023-4087e550acda
 	github.com/stretchr/testify v1.11.1
 	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.10.0
@@ -61,7 +61,6 @@ require (
 	github.com/charmbracelet/lipgloss v1.0.0 // indirect
 	github.com/charmbracelet/x/ansi v0.4.2 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
-	github.com/drone/envsubst v1.0.3 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.32.4 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.4 // indirect
@@ -69,14 +68,12 @@ require (
 	github.com/google/pprof v0.0.0-20221203041831-ce31453925ec // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
-	github.com/jmoiron/sqlx v1.4.0 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.4 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/httprc/v3 v3.0.0 // indirect
 	github.com/lestrrat-go/jwx/v3 v3.0.10 // indirect
 	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/lestrrat-go/option/v2 v2.0.0 // indirect
-	github.com/lib/pq v1.10.9 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/muesli/termenv v0.15.3-0.20240618155329-98d742f6907a // indirect
@@ -86,7 +83,7 @@ require (
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
-	github.com/streamingfast/substreams-foundational-store v0.1.1-0.20251015185224-4a000e6ca4f1 // indirect
+	github.com/streamingfast/substreams-foundational-store v0.1.1-0.20251017155401-352038f44dd2 // indirect
 	github.com/streamingfast/worker-pool-protocol v0.0.0-20250826200931-136a043ecece // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
 	github.com/zeebo/errs v1.4.0 // indirect
