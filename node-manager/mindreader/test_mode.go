@@ -241,12 +241,12 @@ func (c *TestModeComparator) generateDiff(
 		fmt.Printf("⚠️  Diff found for block %d (%s), writing to %s\n",
 			blockNumber, blockID, c.diffOutput)
 
-		testingPath := fmt.Sprintf("block.testing.%d.%s.json", blockNumber, blockID)
+		testingPath := fmt.Sprintf("block.%d.%s.testing.json", blockNumber, blockID)
 		if err := c.diffStore.WriteObject(ctx, testingPath, bytes.NewReader(testingJSON)); err != nil {
 			return fmt.Errorf("write testing block JSON: %w", err)
 		}
 
-		productionPath := fmt.Sprintf("block.production.%d.%s.json", blockNumber, blockID)
+		productionPath := fmt.Sprintf("block.%d.%s.production.json", blockNumber, blockID)
 		if err := c.diffStore.WriteObject(ctx, productionPath, bytes.NewReader(productionJSON)); err != nil {
 			return fmt.Errorf("write production block JSON: %w", err)
 		}
