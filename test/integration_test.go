@@ -75,8 +75,17 @@ func TestIntegration(t *testing.T) {
 		meteringServer.Run()
 	}()
 
-	clientConfig := client.NewSubstreamsClientConfig("localhost:9003", "", 0, false, true, "firecore_test")
-	substreamsClient, _, _, _, err := client.NewSubstreamsClient(clientConfig)
+	clientConfig := client.NewSubstreamsClientConfig(client.SubstreamsClientConfigOptions{
+		Endpoint:             "localhost:9003",
+		AuthToken:            "",
+		AuthType:             0,
+		Insecure:             false,
+		PlainText:            true,
+		Agent:                "firecore_test",
+		ForceProtocolVersion: 0,
+	})
+	connection, _, _, _, err := client.NewSubstreamsClientConn(clientConfig)
+	substreamsClient := pbsubstreamsrpc.NewStreamClient(connection)
 	require.NoError(t, err)
 
 	// WAIT SERVERS TO BE READY
