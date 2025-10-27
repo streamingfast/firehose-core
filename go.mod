@@ -34,7 +34,7 @@ require (
 	github.com/streamingfast/payment-gateway v0.0.0-20250910205031-eaa05d2fd1b7
 	github.com/streamingfast/pbgo v0.0.6-0.20250114182320-0b43084f4000
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.17.2-0.20251023182454-2c9347d054bc
+	github.com/streamingfast/substreams v1.17.2-0.20251027174116-e3748d6ea660
 	github.com/stretchr/testify v1.11.1
 	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.10.0
