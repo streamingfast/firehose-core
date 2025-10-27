@@ -10,9 +10,12 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+## v1.12.1
 ### Substreams
 
 * Fix a panic (nil pointer) when skipping blocks via indexes on stores on tier2
+* Add store size to substreams starts
+* Add store and foundational-store list to incoming request stats
 
 ## v1.12.0
 
