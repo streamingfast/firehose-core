@@ -10,7 +10,12 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Substreams
+
+* Fix egress bytes calculation when running in noop or dev mode with specified output debug modules
+
 ## v1.12.1
+
 ### Substreams
 
 * Fix a panic (nil pointer) when skipping blocks via indexes on stores on tier2
