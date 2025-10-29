@@ -10,9 +10,13 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### CLI
+
+* `firecore tools firehose-client` and `firecore tools firehose-single-block-client` now accepts Network Registry ID or aliases directly.
+
 ### Substreams
 
-* Fix egress bytes calculation when running in noop or dev mode with specified output debug modules
+* Fix egress bytes calculation when running in noop or dev mode with specified output debug modules.
 
 ## v1.12.1
 

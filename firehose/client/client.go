@@ -7,6 +7,7 @@ import (
 	"net/url"
 
 	"github.com/streamingfast/dgrpc"
+	networks "github.com/streamingfast/firehose-networks"
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
@@ -17,7 +18,11 @@ import (
 )
 
 // parseEndpointURL parses HTTP/HTTPS URLs and extracts endpoint configuration
-// Returns the processed endpoint and whether to use plaintext connection
+// then returns the processed endpoint and whether to use plaintext connection.
+//
+// It will also try to resolve endpoint via networks.GetFirehoseEndpoint
+// (Networks Registry) which check both id and aliases. If there is a corresponding
+// resolved endpoint, it is returned with plaintext set to false.
 func parseEndpointURL(endpoint string, usePlainTextConnection bool) (string, bool) {
 	// Check for http:// or https:// prefix and adjust settings accordingly
 	if len(endpoint) > 7 && endpoint[:7] == "http://" {
@@ -48,6 +53,11 @@ func parseEndpointURL(endpoint string, usePlainTextConnection bool) (string, boo
 		}
 	}
 
+	if resolvedEndpoint := networks.GetFirehoseEndpoint(endpoint); resolvedEndpoint != "" {
+		// Resolved endpoint from alias is always non-plaintext
+		return resolvedEndpoint, false
+	}
+
 	return endpoint, usePlainTextConnection
 }
 
@@ -72,7 +82,7 @@ func NewFirehoseClient(endpoint, jwt, apiKey string, useInsecureTSLConnection, u
 		dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true}))}
 	}
 
-	conn, err := dgrpc.NewExternalClient(endpoint, dialOptions...)
+	conn, err := dgrpc.NewExternalClientConn(endpoint, dialOptions...)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("unable to create external gRPC client: %w", err)
 	}
@@ -81,7 +91,7 @@ func NewFirehoseClient(endpoint, jwt, apiKey string, useInsecureTSLConnection, u
 
 	if !usePlainTextConnection {
 		if jwt != "" {
-			credentials := oauth.NewOauthAccess(&oauth2.Token{AccessToken: jwt, TokenType: "Bearer"})
+			credentials := oauth.TokenSource{TokenSource: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: jwt})}
 			callOpts = append(callOpts, grpc.PerRPCCredentials(credentials))
 		} else if apiKey != "" {
 			callOpts = append(callOpts, grpc.PerRPCCredentials(&ApiKeyAuth{ApiKey: apiKey}))
