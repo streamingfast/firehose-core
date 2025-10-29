@@ -87,12 +87,12 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 
 	if s.sessionPool != nil {
 		auth := dauth.FromContext(ctx)
-		userID := auth.UserID()
+		organizationID := auth.OrganizationID()
 		apiKeyID := auth.APIKeyID()
 		traceID := tracing.GetTraceID(ctx).String()
 		service := "t1r"
 
-		sessionID, err := s.sessionPool.Get(ctx, service, userID, apiKeyID, traceID, func(err error) {
+		sessionID, err := s.sessionPool.Get(ctx, service, organizationID, apiKeyID, traceID, func(err error) {
 			if cancelRunning != nil { // in tests, this might be nil
 				err, _ = dsession.ToConnectError(err)
 				cancelRunning(err)
@@ -104,9 +104,10 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 			case errors.Is(err, dsession.ErrConcurrentStreamLimitExceeded),
 				errors.Is(err, dsession.ErrPermissionDenied),
 				errors.Is(err, dsession.ErrQuotaExceeded):
-				s.logger.Info("session denied to user", zap.String("user_id", userID), zap.String("api_key_id", apiKeyID), zap.String("trace_id", traceID), zap.Error(err))
+				incrementFirehoseSessionDeniedCounter(err)
+				s.logger.Debug("session denied to user", zap.String("user_id", organizationID), zap.String("api_key_id", apiKeyID), zap.String("trace_id", traceID), zap.Error(err))
 			default:
-				s.logger.Error("failed to acquire session", zap.Error(err), zap.String("service", service), zap.String("user_id", userID), zap.String("api_key_id", apiKeyID), zap.String("trace_id", traceID))
+				s.logger.Error("failed to acquire session", zap.Error(err), zap.String("service", service), zap.String("user_id", organizationID), zap.String("api_key_id", apiKeyID), zap.String("trace_id", traceID))
 			}
 			return err
 		}
@@ -370,4 +371,21 @@ func matchHeader(header http.Header) bool {
 		}
 	}
 	return false
+}
+
+func incrementFirehoseSessionDeniedCounter(err error) {
+	errorToReason := func() string {
+		switch {
+		case errors.Is(err, dsession.ErrPermissionDenied):
+			return "permission_denied"
+		case errors.Is(err, dsession.ErrQuotaExceeded):
+			return "quota_exceeded"
+		case errors.Is(err, dsession.ErrConcurrentStreamLimitExceeded):
+			return "concurrent_stream_limit_exceeded"
+		default:
+			return "unknown"
+		}
+	}()
+
+	metrics.FirehoseSessionDeniedCounter.Inc(errorToReason)
 }

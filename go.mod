@@ -20,21 +20,21 @@ require (
 	github.com/spf13/viper v1.15.0
 	github.com/streamingfast/bstream v0.0.2-0.20250903174843-9c884c3356fd
 	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b
-	github.com/streamingfast/dauth v0.0.0-20250821195214-8e2a3c300f97
+	github.com/streamingfast/dauth v0.0.0-20251029141649-15559a9f457b
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20250321151415-6b4fbbcb1bb5
 	github.com/streamingfast/dgrpc v0.0.0-20250423172640-223250ed2391
 	github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4
-	github.com/streamingfast/dmetering v0.0.0-20250606124734-944cf3e4959e
+	github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97
 	github.com/streamingfast/dmetrics v0.0.0-20250711072030-f023e918a175
-	github.com/streamingfast/dsession v0.0.0-20250904235523-ffe9952a12d3
+	github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142
 	github.com/streamingfast/dstore v0.1.1-0.20250929131642-07e4d13f2fda
 	github.com/streamingfast/firehose-networks v0.2.2
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
-	github.com/streamingfast/payment-gateway v0.0.0-20250910205031-eaa05d2fd1b7
+	github.com/streamingfast/payment-gateway v0.0.0-20251029145129-e04bdcdb54c5
 	github.com/streamingfast/pbgo v0.0.6-0.20250114182320-0b43084f4000
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.17.2-0.20251028150546-5f79914abbc7
+	github.com/streamingfast/substreams v1.17.2-0.20251029160841-965e3a42fde6
 	github.com/stretchr/testify v1.11.1
 	github.com/test-go/testify v1.1.4
 	go.uber.org/multierr v1.10.0
@@ -84,7 +84,7 @@ require (
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
 	github.com/streamingfast/substreams-foundational-store v0.1.1-0.20251017155401-352038f44dd2 // indirect
-	github.com/streamingfast/worker-pool-protocol v0.0.0-20250826200931-136a043ecece // indirect
+	github.com/streamingfast/worker-pool-protocol v0.0.0-20251029142144-b539534f3eb1 // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
 	github.com/zeebo/errs v1.4.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect

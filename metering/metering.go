@@ -42,7 +42,7 @@ func GetTotalBytesRead(meter dmetering.Meter) uint64 {
 	return total
 }
 
-func Send(ctx context.Context, meter dmetering.Meter, userID, apiKeyID, ip, userMeta, endpoint string, resp proto.Message) {
+func Send(ctx context.Context, meter dmetering.Meter, organizationID, apiKeyID, ip, userMeta, endpoint string, resp proto.Message) {
 	bytesRead := meter.BytesReadDelta()
 	bytesWritten := meter.BytesWrittenDelta()
 	egressBytes := proto.Size(resp)
@@ -60,10 +60,10 @@ func Send(ctx context.Context, meter dmetering.Meter, userID, apiKeyID, ip, user
 	meter.CountInc(TotalReadBytes, int(totalReadBytes))
 
 	event := dmetering.Event{
-		UserID:    userID,
-		ApiKeyID:  apiKeyID,
-		IpAddress: ip,
-		Meta:      userMeta,
+		OrganizationID: organizationID,
+		ApiKeyID:       apiKeyID,
+		IpAddress:      ip,
+		Meta:           userMeta,
 
 		Endpoint: endpoint,
 		Metrics: map[string]float64{
