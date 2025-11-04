@@ -18,7 +18,7 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
-	github.com/streamingfast/bstream v0.0.2-0.20250903174843-9c884c3356fd
+	github.com/streamingfast/bstream v0.0.2-0.20251104194327-84070393c253
 	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b
 	github.com/streamingfast/dauth v0.0.0-20251029141649-15559a9f457b
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
@@ -83,7 +83,6 @@ require (
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
-	github.com/streamingfast/substreams-foundational-store v0.1.1-0.20251017155401-352038f44dd2 // indirect
 	github.com/streamingfast/worker-pool-protocol v0.0.0-20251029142144-b539534f3eb1 // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
 	github.com/zeebo/errs v1.4.0 // indirect
