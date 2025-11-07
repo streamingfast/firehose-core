@@ -13,6 +13,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### CLI
 
 * `firecore tools firehose-client` and `firecore tools firehose-single-block-client` now accepts Network Registry ID or aliases directly.
+* fixed `firecore tools download-from-firehose` cursor handling to avoid erroneous "this endpoint is serving blocks out of order" issues.
 
 ### Substreams
 

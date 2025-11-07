@@ -72,6 +72,7 @@ func createToolsDownloadFromFirehoseE[B firecore.Block](chain *firecore.Chain[B]
 
 		approximateLIBWarningIssued := false
 		fallbackBlockTypeChecked := false
+		cursor := requestInfo.Cursor
 
 		var lastBlockID string
 		var lastBlockNum uint64
@@ -81,7 +82,7 @@ func createToolsDownloadFromFirehoseE[B firecore.Block](chain *firecore.Chain[B]
 				StartBlockNum:   blockRange.Start,
 				StopBlockNum:    blockRange.GetStopBlockOr(0),
 				FinalBlocksOnly: true,
-				Cursor:          requestInfo.Cursor,
+				Cursor:          cursor,
 			}
 
 			stream, err := firehoseClient.Blocks(ctx, request, requestInfo.GRPCCallOpts...)
@@ -150,6 +151,7 @@ func createToolsDownloadFromFirehoseE[B firecore.Block](chain *firecore.Chain[B]
 					if err != nil {
 						return fmt.Errorf("error decoding response cursor: %w", err)
 					}
+					cursor = response.Cursor
 
 					blk = &pbbstream.Block{
 						Id:        decodedCursor.Block.ID(),
