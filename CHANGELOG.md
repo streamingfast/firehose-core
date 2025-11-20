@@ -8,7 +8,7 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.12.2
 
 ### CLI
 
@@ -19,6 +19,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 * Fix egress bytes calculation when running in noop or dev mode with specified output debug modules.
 * Add support to foundation store v2 protocol.
+* Reduced memory usage when loading large stores
 * Added opt-in memory limits related to loading FullKV stores, gated by environment variables:
   - "SUBSTREAMS_STORE_SIZE_LIMIT_PER_REQUEST" (default allows 5GiB: `5368709120`): limit size of all loaded stores for a single request, in bytes. Set to a numeric value in bytes.
   - "SUBSTREAMS_ENFORCE_STORE_SIZE_LIMIT_PER_REQUEST" (default false): if set to `true`, enforce the limit above instead of just logging a warning
