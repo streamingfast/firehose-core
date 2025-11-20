@@ -84,6 +84,10 @@ func (a *Archiver) StoreBlock(ctx context.Context, block *pbbstream.Block) error
 		a.logger.Debug("skipping block below start_block", zap.Uint64("block_num", block.Number), zap.Uint64("start_block", a.startBlock))
 		return nil
 	}
+	if block.PartialIndex != 0 {
+		// never write partialIndex to oneblocks
+		return nil
+	}
 
 	pipeRead, pipeWrite := io.Pipe()
 

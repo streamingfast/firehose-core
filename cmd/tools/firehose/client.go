@@ -39,6 +39,7 @@ When using http:// or https:// prefixes, the --plaintext flag is automatically d
 	cmd.Flags().Bool("final-blocks-only", false, "Only ask for final blocks")
 	cmd.Flags().Bool("print-cursor-only", false, "Skip block decoding, only print the step cursor (useful for performance testing)")
 	cmd.Flags().Bool("print-clock-only", false, "Skip block decoding, only print the block timestamp and latency")
+	cmd.Flags().Bool("include-partial-blocks", false, "Request the partial blocks from the server (ex: flash blocks from base mainnet) if supported")
 
 	return cmd
 }
@@ -64,13 +65,18 @@ func getFirehoseClientE[B firecore.Block](chain *firecore.Chain[B], rootLog *zap
 
 		printCursorOnly := sflags.MustGetBool(cmd, "print-cursor-only")
 		printClockOnly := sflags.MustGetBool(cmd, "print-clock-only")
+		if printClockOnly && printCursorOnly {
+			return fmt.Errorf("cannot print clock and cursor at the same time")
+		}
+		includePartialBlocks := sflags.MustGetBool(cmd, "include-partial-blocks")
 
 		request := &pbfirehose.Request{
-			StartBlockNum:   blockRange.Start,
-			StopBlockNum:    blockRange.GetStopBlockOr(0),
-			Transforms:      requestInfo.Transforms,
-			FinalBlocksOnly: requestInfo.FinalBlocksOnly,
-			Cursor:          requestInfo.Cursor,
+			StartBlockNum:        blockRange.Start,
+			StopBlockNum:         blockRange.GetStopBlockOr(0),
+			Transforms:           requestInfo.Transforms,
+			FinalBlocksOnly:      requestInfo.FinalBlocksOnly,
+			Cursor:               requestInfo.Cursor,
+			IncludePartialBlocks: includePartialBlocks,
 		}
 
 		stream, err := firehoseClient.Blocks(ctx, request, requestInfo.GRPCCallOpts...)

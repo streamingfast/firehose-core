@@ -67,8 +67,7 @@ func NewRelayer(
 	pbhealth.RegisterHealthServer(gs.ServiceRegistrar(), r)
 
 	options := []forkable.Option{
-		forkable.EnsureAllBlocksTriggerLongestChain(), // send every forked block too
-		forkable.WithFilters(bstream.StepNew),
+		forkable.WithFilters(bstream.StepNew | bstream.StepPartial),
 	}
 
 	forkableHub := hub.NewForkableHub(

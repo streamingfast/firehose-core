@@ -154,6 +154,7 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 		streamSrv.ResponseHeader().Add("hostname", hostname)
 	}
 
+	lastSentCursor := ""
 	var blockCount uint64
 	handlerFunc := bstream.HandlerFunc(func(block *pbbstream.Block, obj interface{}) error {
 		blockCount++
@@ -174,9 +175,18 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 			return nil
 		}
 
+		cur := cursor.ToOpaque()
+		if step == bstream.StepPartial {
+			cur = lastSentCursor // never send the cursor from a 'partial' step because we can't re-connect to it
+		} else {
+			lastSentCursor = cur
+		}
+		if cur == "" {
+			return nil // don't send partial blocks until we've had at least one cursor
+		}
 		resp := &pbfirehose.Response{
 			Step:   protoStep,
-			Cursor: cursor.ToOpaque(),
+			Cursor: cur,
 			Metadata: &pbfirehose.BlockMetadata{
 				Id:        block.Id,
 				Num:       block.Number,
@@ -228,7 +238,7 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 	liveSourceMiddlewareHandler := func(next bstream.Handler) bstream.Handler {
 		return bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
 			if stepable, ok := obj.(bstream.Stepable); ok {
-				if stepable.Step().Matches(bstream.StepNew) {
+				if stepable.Step().Matches(bstream.StepNew | bstream.StepPartial) {
 					dmetering.GetBytesMeter(ctx).CountInc(metering.MeterLiveUncompressedReadBytes, len(blk.GetPayload().GetValue()))
 
 					// legacy metering
@@ -256,6 +266,10 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 	}
 
 	ctx = s.initFunc(ctx, request.Msg)
+	stepFilter := bstream.StepNew | bstream.StepUndo
+	if request.Msg.IncludePartialBlocks {
+		stepFilter |= bstream.StepPartial
+	}
 	str, err := s.streamFactory.New(
 		ctx,
 		handlerFunc,
@@ -263,6 +277,7 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 		logger,
 		stream.WithLiveSourceHandlerMiddleware(liveSourceMiddlewareHandler),
 		stream.WithFileSourceHandlerMiddleware(fileSourceMiddlewareHandler),
+		stream.WithCustomStepTypeFilter(stepFilter),
 	)
 	if err != nil {
 		fmt.Println("returning new stream factory")
@@ -344,6 +359,9 @@ func stepToProto(step bstream.StepType, finalBlocksOnly bool) (outStep pbfirehos
 
 	if step.Matches(bstream.StepNew) {
 		return pbfirehose.ForkStep_STEP_NEW, false
+	}
+	if step.Matches(bstream.StepPartial) {
+		return pbfirehose.ForkStep_STEP_PARTIAL, false
 	}
 	if step.Matches(bstream.StepUndo) {
 		return pbfirehose.ForkStep_STEP_UNDO, false

@@ -42,6 +42,7 @@ type ConsoleReader struct {
 	lastBlock             bstream.BlockRef
 	lastParentBlock       bstream.BlockRef
 	lastBlockTimestamp    time.Time
+	readPartialBlockIndex bool
 
 	lib uint64
 
@@ -187,7 +188,10 @@ func (r *ConsoleReader) readInit(line string) error {
 	switch r.readerProtocolVersion {
 	// Implementation of RPC poller were set to use 1.0 so we keep support for it for now
 	case "1.0", "3.0":
-		// Supported
+	// Supported
+	//
+	case "3.1":
+		r.readPartialBlockIndex = true
 	default:
 		return fmt.Errorf("major version of Firehose exchange protocol is unsupported (expected: one of [1.0, 3.0], found %s), you are most probably running an incompatible version of the Firehose aware node client/node poller", r.readerProtocolVersion)
 	}
@@ -208,46 +212,67 @@ func (r *ConsoleReader) readInit(line string) error {
 }
 
 // Formats
-// [block_num:342342342] [block_hash] [parent_num] [parent_hash] [lib:123123123] [timestamp:unix_nano] B64ENCODED_any
+// [block_num:342342342] [block_hash] [parent_num] [parent_hash] [lib:123123123] [timestamp:unix_nano] B64ENCODED_any // 1.0 or 3.0
+// [block_num:342342342] [partial_block_idx] [block_hash] [parent_num] [parent_hash] [lib:123123123] [timestamp:unix_nano] B64ENCODED_any // 3.1
 func (r *ConsoleReader) readBlock(line string) (out *pbbstream.Block, err error) {
 	if r.readerProtocolVersion == "" {
 		return nil, fmt.Errorf("reader protocol version not set, did you forget to send the 'FIRE INIT <reader_protocol_version> <protobuf_fully_qualified_type>' line?")
 	}
 
-	chunks, err := splitInBoundedChunks(line, 7)
+	chunksCount := 7
+	if r.readPartialBlockIndex {
+		chunksCount++
+	}
+	chunks, err := splitInBoundedChunks(line, chunksCount)
 	if err != nil {
 		return nil, fmt.Errorf("splitting block log line: %w", err)
 	}
 
-	blockNum, err := strconv.ParseUint(chunks[0], 10, 64)
+	i := 0
+	blockNum, err := strconv.ParseUint(chunks[i], 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("parsing block num %q: %w", chunks[0], err)
 	}
+	i++
 
-	blockHash := chunks[1]
-
-	parentNum, err := strconv.ParseUint(chunks[2], 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("parsing parent num %q: %w", chunks[2], err)
+	var partialBlockIndex int64
+	if r.readPartialBlockIndex {
+		partialBlockIndex, err = strconv.ParseInt(chunks[i], 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("parsing partial block index %q: %w", chunks[i], err)
+		}
+		i++
 	}
 
-	parentHash := chunks[3]
+	blockHash := chunks[i]
+	i++
 
-	libNum, err := strconv.ParseUint(chunks[4], 10, 64)
+	parentNum, err := strconv.ParseUint(chunks[i], 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("parsing lib num %q: %w", chunks[4], err)
+		return nil, fmt.Errorf("parsing parent num %q: %w", chunks[i], err)
 	}
+	i++
 
-	timestampUnixNano, err := strconv.ParseUint(chunks[5], 10, 64)
+	parentHash := chunks[i]
+	i++
+
+	libNum, err := strconv.ParseUint(chunks[i], 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("parsing timestamp %q: %w", chunks[5], err)
+		return nil, fmt.Errorf("parsing lib num %q: %w", chunks[i], err)
 	}
+	i++
+
+	timestampUnixNano, err := strconv.ParseUint(chunks[i], 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("parsing timestamp %q: %w", chunks[i], err)
+	}
+	i++
 
 	timestamp := time.Unix(0, int64(timestampUnixNano))
 
-	payload, err := base64.StdEncoding.DecodeString(chunks[6])
+	payload, err := base64.StdEncoding.DecodeString(chunks[i])
 	if err != nil {
-		return nil, fmt.Errorf("decoding payload %q: %w", chunks[6], err)
+		return nil, fmt.Errorf("decoding payload %q: %w", chunks[i], err)
 	}
 
 	blockPayload := &anypb.Any{
@@ -256,13 +281,14 @@ func (r *ConsoleReader) readBlock(line string) (out *pbbstream.Block, err error)
 	}
 
 	block := &pbbstream.Block{
-		Id:        blockHash,
-		Number:    blockNum,
-		ParentId:  parentHash,
-		ParentNum: parentNum,
-		Timestamp: timestamppb.New(timestamp),
-		LibNum:    libNum,
-		Payload:   blockPayload,
+		Id:           blockHash,
+		Number:       blockNum,
+		ParentId:     parentHash,
+		ParentNum:    parentNum,
+		Timestamp:    timestamppb.New(timestamp),
+		LibNum:       libNum,
+		Payload:      blockPayload,
+		PartialIndex: int32(partialBlockIndex),
 	}
 
 	ConsoleReaderBlockReadCount.Inc()
