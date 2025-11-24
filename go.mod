@@ -22,8 +22,8 @@ require (
 	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b
 	github.com/streamingfast/dauth v0.0.0-20251029141649-15559a9f457b
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
-	github.com/streamingfast/derr v0.0.0-20250321151415-6b4fbbcb1bb5
-	github.com/streamingfast/dgrpc v0.0.0-20250423172640-223250ed2391
+	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7
+	github.com/streamingfast/dgrpc v0.0.0-20251103214659-aab4b9f09bfd
 	github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4
 	github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97
 	github.com/streamingfast/dmetrics v0.0.0-20250711072030-f023e918a175
@@ -31,7 +31,7 @@ require (
 	github.com/streamingfast/dstore v0.1.1-0.20251105221635-c60b9e8af972
 	github.com/streamingfast/firehose-networks v0.2.2
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
-	github.com/streamingfast/payment-gateway v0.0.0-20251029145129-e04bdcdb54c5
+	github.com/streamingfast/payment-gateway v0.0.0-20251124143836-60d98e3546f5
 	github.com/streamingfast/pbgo v0.0.6-0.20250114182320-0b43084f4000
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
 	github.com/streamingfast/substreams v1.17.3-0.20251120114638-04088d9dc00b
