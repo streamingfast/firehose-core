@@ -8,7 +8,15 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## v1.12.3
+
+* Fixed substreams regression in v1.12.2 where some jobs would not get scheduled correctly, resulting in failure with the mssage  `get size of store "...": opening file: not found`.
+
 ## v1.12.2
+
+> [!IMPORTANT]
+> This version contains a bug in scheduling of substreams stages which can cause some requests to fail with the message `get size of store "...": opening file: not found`.
+> Operators are advised to upgrade to v1.12.3 as soon as possible.
 
 ### CLI
 
