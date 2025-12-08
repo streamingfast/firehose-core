@@ -20,10 +20,13 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	. "github.com/streamingfast/cli"
+	"github.com/streamingfast/cli/sflags"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
@@ -42,6 +45,9 @@ func NewToolsRelayerGroup[B firecore.Block](chain *firecore.Chain[B], logger *za
 			toolsRelayerStreamRunner(chain, logger),
 			"stream <source> [:<stop>]",
 			"Stream blocks from a live relayer source to the console",
+			Flags(func(flags *pflag.FlagSet) {
+				flags.Bool("clock", false, "For each block, only print the current timestamp, block timestamp, drift")
+			}),
 
 			RangeArgs(1, 2),
 			Description(`
@@ -68,6 +74,8 @@ func toolsRelayerStreamRunner[B firecore.Block](chain *firecore.Chain[B], logger
 		stop := int64(-1)
 		stopIsRelative := false
 
+		onlyClock := sflags.MustGetBool(cmd, "clock")
+
 		if len(args) == 2 {
 			input := strings.TrimPrefix(args[1], ":")
 
@@ -89,8 +97,12 @@ func toolsRelayerStreamRunner[B firecore.Block](chain *firecore.Chain[B], logger
 			endpoint,
 			1,
 			bstream.HandlerFunc(func(blk *pbbstream.Block, obj any) error {
-				if err := printer.PrintTo(blk, os.Stderr); err != nil {
-					return fmt.Errorf("unable to print block: %w", err)
+				if onlyClock {
+					fmt.Printf("%d -- %s %s latency(ms): %5d\n", blk.Number, blk.Timestamp.AsTime().UTC().Format("15:04:05"), time.Now().UTC().Format("15:04:05.000"), time.Since(blk.Timestamp.AsTime()).Milliseconds())
+				} else {
+					if err := printer.PrintTo(blk, os.Stderr); err != nil {
+						return fmt.Errorf("unable to print block: %w", err)
+					}
 				}
 
 				blockCount++
