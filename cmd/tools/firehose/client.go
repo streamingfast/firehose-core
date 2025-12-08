@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli/sflags"
@@ -29,14 +30,15 @@ The endpoint can be specified in the following formats:
   - https://host[:port] (automatically uses SSL connection, defaults to port 443)
 
 When using http:// or https:// prefixes, the --plaintext flag is automatically determined from the URL scheme.`,
-		Args:  cobra.ExactArgs(2),
-		RunE:  getFirehoseClientE(chain, logger),
+		Args: cobra.ExactArgs(2),
+		RunE: getFirehoseClientE(chain, logger),
 	}
 
 	addFirehoseStreamClientFlagsToSet(cmd.Flags(), chain)
 
 	cmd.Flags().Bool("final-blocks-only", false, "Only ask for final blocks")
 	cmd.Flags().Bool("print-cursor-only", false, "Skip block decoding, only print the step cursor (useful for performance testing)")
+	cmd.Flags().Bool("print-clock-only", false, "Skip block decoding, only print the block timestamp and latency")
 
 	return cmd
 }
@@ -61,6 +63,7 @@ func getFirehoseClientE[B firecore.Block](chain *firecore.Chain[B], rootLog *zap
 		}
 
 		printCursorOnly := sflags.MustGetBool(cmd, "print-cursor-only")
+		printClockOnly := sflags.MustGetBool(cmd, "print-clock-only")
 
 		request := &pbfirehose.Request{
 			StartBlockNum:   blockRange.Start,
@@ -88,7 +91,7 @@ func getFirehoseClientE[B firecore.Block](chain *firecore.Chain[B], rootLog *zap
 		resps := make(chan *respChan, 10)
 		allDone := make(chan bool)
 
-		if !printCursorOnly {
+		if !printCursorOnly && !printClockOnly {
 			// print the responses linearly
 			go func() {
 				for resp := range resps {
@@ -118,6 +121,10 @@ func getFirehoseClientE[B firecore.Block](chain *firecore.Chain[B], rootLog *zap
 
 			if printCursorOnly {
 				fmt.Printf("%s - %s\n", response.Step.String(), response.Cursor)
+				continue
+			}
+			if printClockOnly {
+				fmt.Printf("%d -- %s %s latency(ms): %5d\n", response.Metadata.Num, response.Metadata.Time.AsTime().UTC().Format("15:04:05"), time.Now().UTC().Format("15:04:05.000"), time.Since(response.Metadata.Time.AsTime()).Milliseconds())
 				continue
 			}
 
