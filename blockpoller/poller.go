@@ -224,7 +224,7 @@ func (p *BlockPoller[C]) loadNextBlocks(requestedBlock uint64, numberOfBlockToFe
 	p.optimisticallyPolledBlocks = map[uint64]*BlockItem{}
 	p.fetching = true
 
-	nailer := dhammer.NewNailer(10, func(ctx context.Context, blockToFetch uint64) (*BlockItem, error) {
+	nailer := dhammer.NewNailer(numberOfBlockToFetch, func(ctx context.Context, blockToFetch uint64) (*BlockItem, error) {
 		var blockItem *BlockItem
 		err := derr.Retry(p.fetchBlockRetryCount, func(ctx context.Context) error {
 
