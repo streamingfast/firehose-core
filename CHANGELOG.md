@@ -8,14 +8,20 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.12.4
+
+### Partial blocks
 
 Added experimental support for partial blocks (e.g. Flashblocks on Base)
 
 See https://docs.substreams.dev/reference-material/chains-and-endpoints/flashblocks for details about how they work in Substreams.
 
-* `SUBSTREAMS_BIGGEST_PARTIAL_BLOCK_INDEX` environment variable to specify the index to use when bundling the "last partial block" from the full block. (default: 10, for Base)
+* `SUBSTREAMS_BIGGEST_PARTIAL_BLOCK_INDEX` environment variable now specifies the index to use when bundling the "last partial block" from the full block. (default: 10, for Base)
 * Added flag `--include-partial-blocks` on `tools firehose-client`
+
+### Bugfixes
+
+* Substreams: fixed issue where "live backfiller" would not create segments after reconnecting with a cursor starting from a previous quicksave, causing delays in future reconnection
 
 ## v1.12.3
 
