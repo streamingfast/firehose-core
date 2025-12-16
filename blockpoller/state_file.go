@@ -109,6 +109,7 @@ func (p *BlockPoller[C]) saveState(blocks []*forkable.Block) error {
 		zap.Stringer("last_fired_block", sf.LastFiredBlock),
 		zap.Stringer("lib", sf.Lib),
 		zap.Int("block_count", len(sf.Blocks)),
+		zap.Bool("keep", false),
 	)
 	return nil
 }

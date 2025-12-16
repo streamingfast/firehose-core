@@ -126,7 +126,7 @@ func (p *BlockPoller[C]) run(resolvedStartBlock bstream.BlockRef, stopBlock uint
 			}
 		}
 
-		p.logger.Info("about to fetch block", zap.Uint64("block_to_fetch", blockToFetch), zap.Duration("delay", delay))
+		p.logger.Info("about to fetch block", zap.Uint64("block_to_fetch", blockToFetch), zap.Duration("delay", delay), zap.Bool("keep", false))
 		if delay != 0 {
 			time.Sleep(delay)
 		}
@@ -164,7 +164,7 @@ func (p *BlockPoller[C]) run(resolvedStartBlock bstream.BlockRef, stopBlock uint
 }
 
 func (p *BlockPoller[C]) processBlock(currentState *cursor, block *pbbstream.Block) (uint64, *string, error) {
-	p.logger.Info("processing block", zap.Stringer("block", block.AsRef()), zap.Uint64("lib_num", block.LibNum))
+	p.logger.Info("processing block", zap.Stringer("block", block.AsRef()), zap.Uint64("lib_num", block.LibNum), zap.Bool("keep", false))
 	if block.Number < p.forkDB.LIBNum() {
 		panic(fmt.Errorf("unexpected error block %d is below the current LIB num %d. There should be no re-org above the current LIB num", block.Number, p.forkDB.LIBNum()))
 	}
@@ -313,7 +313,7 @@ func (p *BlockPoller[C]) loadNextBlocks(requestedBlock uint64, numberOfBlockToFe
 }
 
 func (p *BlockPoller[C]) requestBlock(blockNumber uint64, numberOfBlockToFetch int) (*BlockItem, error) {
-	p.logger.Info("requesting block", zap.Uint64("block_num", blockNumber))
+	p.logger.Info("requesting block", zap.Uint64("block_num", blockNumber), zap.Bool("keep", false))
 
 	lastLog := time.Time{}
 	for {
@@ -343,7 +343,7 @@ func (p *BlockPoller[C]) requestBlock(blockNumber uint64, numberOfBlockToFetch i
 			continue
 		}
 
-		p.logger.Info("block was optimistically polled", zap.Uint64("block_num", blockNumber))
+		p.logger.Info("block was optimistically polled", zap.Uint64("block_num", blockNumber), zap.Bool("keep", false))
 		return blockItem, nil
 	}
 
