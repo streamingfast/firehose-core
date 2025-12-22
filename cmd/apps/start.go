@@ -151,8 +151,16 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 	if len(apps) == 1 {
 		serviceName = serviceName + "/" + apps[0]
 	}
-	if err := tracing.SetupOpenTelemetry(context.Background(), serviceName); err != nil {
+	tracerProvider, err := tracing.SetupOpenTelemetry(context.Background(), serviceName)
+	if err != nil {
 		return err
+	}
+	if tracerProvider != nil {
+		defer func() {
+			if shutdownErr := tracerProvider.Shutdown(context.Background()); shutdownErr != nil {
+				rootLog.Error("failed to shutdown tracer provider", zap.Error(shutdownErr))
+			}
+		}()
 	}
 
 	rootLog.Info(fmt.Sprintf("launching applications: %s", strings.Join(apps, ",")))

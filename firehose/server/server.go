@@ -119,8 +119,7 @@ func New(
 		options := []dgrpcserver.Option{
 			dgrpcserver.WithLogger(logger),
 			dgrpcserver.WithHealthCheck(dgrpcserver.HealthCheckOverGRPC|dgrpcserver.HealthCheckOverHTTP, createHealthCheck(isReady)),
-			dgrpcserver.WithPostUnaryInterceptor(otelgrpc.UnaryServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider))),
-			dgrpcserver.WithPostStreamInterceptor(otelgrpc.StreamServerInterceptor(otelgrpc.WithTracerProvider(tracerProvider))),
+			dgrpcserver.WithGRPCServerOptions(grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(tracerProvider)))),
 			dgrpcserver.WithGRPCServerOptions(grpc.MaxRecvMsgSize(25 * 1024 * 1024)),
 			dgrpcserver.WithConnectInterceptor(dauthconnect.NewAuthInterceptor(authenticator, logger)),
 			dgrpcserver.WithConnectStrictContentType(false),
