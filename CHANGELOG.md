@@ -8,6 +8,13 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Substreams partial blocks with cursor
+
+* Partial blocks sent by substreams now include a cursor. Handling of "partial blocks cursors" will now start with an "UNDO" up to the parent block, before sending you the full blocks as partial until it catches up to head.
+  This allows using "partial_blocks_only" as a source of truth without needing to double your egress.
+
 ## v1.12.4
 
 ### Partial blocks
