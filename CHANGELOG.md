@@ -15,6 +15,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 * Partial blocks sent by substreams now include a cursor. Handling of "partial blocks cursors" will now start with an "UNDO" up to the parent block, before sending you the full blocks as partial until it catches up to head.
   This allows using "partial_blocks_only" as a source of truth without needing to double your egress.
 
+### AWS Store
+
+* Migrated from AWS SDK for Go v1 to v2 (`github.com/aws/aws-sdk-go` → `github.com/aws/aws-sdk-go-v2`)
+
 ### Azure store
 
 * Added support for "workload identity credentials" in Azure. Order of preference is:
