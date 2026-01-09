@@ -28,6 +28,10 @@ func NewHeadBlockNumber(serviceName string) *dmetrics.HeadBlockNum {
 	return Metricset.NewHeadBlockNumber(serviceName)
 }
 
+func NewHeadBlockRelativeTime(serviceName string) *dmetrics.HeadBlockRelativeTime {
+	return Metricset.NewHeadBlockRelativeTime(serviceName)
+}
+
 func NewAppReadiness(serviceName string) *dmetrics.AppReadiness {
 	return Metricset.NewAppReadiness(serviceName)
 }

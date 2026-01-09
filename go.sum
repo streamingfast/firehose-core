@@ -2210,8 +2210,8 @@ github.com/spiffe/go-spiffe/v2 v2.6.0 h1:l+DolpxNWYgruGQVV0xsfeya3CsC7m8iBzDnMps
 github.com/spiffe/go-spiffe/v2 v2.6.0/go.mod h1:gm2SeUoMZEtpnzPNs2Csc0D/gX33k1xIx7lEzqblHEs=
 github.com/stoewer/go-strcase v1.2.0/go.mod h1:IBiWB2sKIp3wVVQ3Y035++gc+knqhUQag1KpM8ahLw8=
 github.com/stoewer/go-strcase v1.3.0/go.mod h1:fAH5hQ5pehh+j3nZfvwdk2RgEgQjAoM8wodgtPmh1xo=
-github.com/streamingfast/bstream v0.0.2-0.20251222143922-f74bcc447878 h1:FJQF65/TJYLP6Dp2pstboPiP0BZXf10+Wu7I+0F6a3M=
-github.com/streamingfast/bstream v0.0.2-0.20251222143922-f74bcc447878/go.mod h1:desuTzXOKd0zUbOLKnvhLc1ucQhl454KIdl1KmRw7WY=
+github.com/streamingfast/bstream v0.0.2-0.20260109211946-9060367f03aa h1:p/vwK7nNhdAo3OwgBGrKyY5K74Ohm23Omzenu6//ruo=
+github.com/streamingfast/bstream v0.0.2-0.20260109211946-9060367f03aa/go.mod h1:V3AeOgbfnXoFP1ATU3V2IwGFnBt6WSQ/zsbwdh7RrSg=
 github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b h1:ztYeX3/5rg2tV2EU7edcrcHzMz6wUbdJB+LqCrP5W8s=
 github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b/go.mod h1:o9R/tjNON01X2mgWL5qirl2MV6xQ4EZI5D504ST3K/M=
 github.com/streamingfast/dauth v0.0.0-20251218134044-fb716c7172b4 h1:qJmiXzqs3T7124+FXEnhPgK/3fbSjqjQuBTdIrUk4Oc=
@@ -2226,8 +2226,8 @@ github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4 h1:HKi8AIkLB
 github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4/go.mod h1:ehPytv7E4rI65iLcrwTes4rNGGqPPiugnH+20nDQyp4=
 github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97 h1:rXZYa87AFt+kluwe4McC9jZgx/eRNSlOkWQaIj9Yv4w=
 github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97/go.mod h1:UqWuX3REU/IInBUaymFN2eLjuvz+/0SsoUFjeQlLNyI=
-github.com/streamingfast/dmetrics v0.0.0-20250711072030-f023e918a175 h1:pqgbZm2Agu9uoU4MIzTHpLunUB3IppREGL8itDrnEeo=
-github.com/streamingfast/dmetrics v0.0.0-20250711072030-f023e918a175/go.mod h1:JbxEDbzWRG1dHdNIPrYfuPllEkktZMgm40AwVIBENcw=
+github.com/streamingfast/dmetrics v0.0.0-20260109211849-9824eaaef34e h1:IkJpYJVd4nq4oiOFS3pFDH6C0OIaEYhEJ1pv02L1tA8=
+github.com/streamingfast/dmetrics v0.0.0-20260109211849-9824eaaef34e/go.mod h1:JbxEDbzWRG1dHdNIPrYfuPllEkktZMgm40AwVIBENcw=
 github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142 h1:mgPawX0VOgrG2LHSc6EfY15r0x3AO/GK6LY58io3/+4=
 github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142/go.mod h1:ldDwFqr20xXyaLhwDm7XlMaf2vvoZNOrjgsMcFJGtrw=
 github.com/streamingfast/dstore v0.1.2 h1:8Ve7D83QszlNRrqy8x7R7XSBN08e/9MQbK/sZow0iY0=

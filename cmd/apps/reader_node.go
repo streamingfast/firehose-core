@@ -150,11 +150,13 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 
 			headBlockTimeDrift := metrics.NewHeadBlockTimeDrift("reader-node")
 			headBlockNumber := metrics.NewHeadBlockNumber("reader-node")
+			headBlockRelativeTime := metrics.NewHeadBlockRelativeTime("reader-node")
 			appReadiness := metrics.NewAppReadiness("reader-node")
 
 			metricsAndReadinessManager := nodeManager.NewMetricsAndReadinessManager(
 				headBlockTimeDrift,
 				headBlockNumber,
+				headBlockRelativeTime,
 				appReadiness,
 				readinessMaxLatency,
 			)
