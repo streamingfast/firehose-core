@@ -22,4 +22,5 @@ var MetricSet = dmetrics.NewSet()
 
 var HeadBlockTimeDrift = MetricSet.NewHeadTimeDrift("relayer")
 var HeadBlockNumber = MetricSet.NewHeadBlockNumber("relayer")
+var HeadBlockRelativeDrift = MetricSet.NewHeadBlockRelativeTime("relayer")
 var AppReadiness = MetricSet.NewAppReadiness("relayer")

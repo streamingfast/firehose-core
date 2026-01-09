@@ -15,11 +15,12 @@ type Readiness interface {
 }
 
 type MetricsAndReadinessManager struct {
-	headBlockChan      chan *pbbstream.Block
-	headBlockTimeDrift *dmetrics.HeadTimeDrift
-	headBlockNumber    *dmetrics.HeadBlockNum
-	appReadiness       *dmetrics.AppReadiness
-	readinessProbe     *atomic.Bool
+	headBlockChan          chan *pbbstream.Block
+	headBlockTimeDrift     *dmetrics.HeadTimeDrift
+	headBlockNumber        *dmetrics.HeadBlockNum
+	headBlockRelativeDrift *dmetrics.HeadBlockRelativeTime
+	appReadiness           *dmetrics.AppReadiness
+	readinessProbe         *atomic.Bool
 
 	// ReadinessMaxLatency is the max delta between head block time and
 	// now before /healthz starts returning success
@@ -28,14 +29,15 @@ type MetricsAndReadinessManager struct {
 	lastSeenBlock *atomic.Pointer[pbbstream.Block]
 }
 
-func NewMetricsAndReadinessManager(headBlockTimeDrift *dmetrics.HeadTimeDrift, headBlockNumber *dmetrics.HeadBlockNum, appReadiness *dmetrics.AppReadiness, readinessMaxLatency time.Duration) *MetricsAndReadinessManager {
+func NewMetricsAndReadinessManager(headBlockTimeDrift *dmetrics.HeadTimeDrift, headBlockNumber *dmetrics.HeadBlockNum, headBlockRelativeDrift *dmetrics.HeadBlockRelativeTime, appReadiness *dmetrics.AppReadiness, readinessMaxLatency time.Duration) *MetricsAndReadinessManager {
 	return &MetricsAndReadinessManager{
-		headBlockChan:       make(chan *pbbstream.Block, 1), // just for non-blocking, saving a few nanoseconds here
-		readinessProbe:      atomic.NewBool(false),
-		appReadiness:        appReadiness,
-		headBlockTimeDrift:  headBlockTimeDrift,
-		headBlockNumber:     headBlockNumber,
-		readinessMaxLatency: readinessMaxLatency,
+		headBlockChan:          make(chan *pbbstream.Block, 1), // just for non-blocking, saving a few nanoseconds here
+		readinessProbe:         atomic.NewBool(false),
+		appReadiness:           appReadiness,
+		headBlockTimeDrift:     headBlockTimeDrift,
+		headBlockNumber:        headBlockNumber,
+		headBlockRelativeDrift: headBlockRelativeDrift,
+		readinessMaxLatency:    readinessMaxLatency,
 
 		lastSeenBlock: atomic.NewPointer[pbbstream.Block](nil),
 	}
@@ -60,24 +62,30 @@ func (m *MetricsAndReadinessManager) Launch() {
 		select {
 		case block := <-m.headBlockChan:
 			m.lastSeenBlock.Store(block)
+
+			// metrics
+			if m.headBlockNumber != nil {
+				m.headBlockNumber.SetUint64(block.Number)
+			}
+
+			bt := block.Time()
+			if bt.IsZero() { // never act upon zero timestamps
+				continue
+			}
+			if m.headBlockTimeDrift != nil {
+				m.headBlockTimeDrift.SetBlockTime(bt)
+			}
+
+			if m.headBlockRelativeDrift != nil {
+				m.headBlockRelativeDrift.SetLastBlock(bt)
+			}
+
 		case <-time.After(time.Second):
 		}
 
 		block := m.lastSeenBlock.Load()
 		if block == nil {
 			continue
-		}
-
-		// metrics
-		if m.headBlockNumber != nil {
-			m.headBlockNumber.SetUint64(block.Number)
-		}
-
-		if block.Time().IsZero() { // never act upon zero timestamps
-			continue
-		}
-		if m.headBlockTimeDrift != nil {
-			m.headBlockTimeDrift.SetBlockTime(block.Time())
 		}
 
 		// readiness

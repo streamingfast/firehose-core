@@ -31,9 +31,9 @@ func RegisterReaderNodeStdinApp[B firecore.Block](chain *firecore.Chain[B], root
 	appLogger, appTracer := logging.PackageLogger("reader-node-stdin", chain.LoggerPackageID("reader-node-stdin"))
 
 	launcher.RegisterApp(rootLog, &launcher.AppDef{
-		ID:            "reader-node-stdin",
-		Title:         "Reader Node (stdin)",
-		Description:   "Blocks reading node, unmanaged, reads Firehose logs from standard input and transform them into Firehose chain specific blocks",
+		ID:          "reader-node-stdin",
+		Title:       "Reader Node (stdin)",
+		Description: "Blocks reading node, unmanaged, reads Firehose logs from standard input and transform them into Firehose chain specific blocks",
 		RegisterFlags: func(cmd *cobra.Command) error {
 			// Test mode flags are registered at the global level in reader_node.go
 			return nil
@@ -59,8 +59,9 @@ func RegisterReaderNodeStdinApp[B firecore.Block](chain *firecore.Chain[B], root
 			metricID := "reader-node-stdin"
 			headBlockTimeDrift := metrics.NewHeadBlockTimeDrift(metricID)
 			headBlockNumber := metrics.NewHeadBlockNumber(metricID)
+			headBlockRelativeTime := metrics.NewHeadBlockRelativeTime(metricID)
 			appReadiness := metrics.NewAppReadiness(metricID)
-			metricsAndReadinessManager := nodeManager.NewMetricsAndReadinessManager(headBlockTimeDrift, headBlockNumber, appReadiness, viper.GetDuration("reader-node-readiness-max-latency"))
+			metricsAndReadinessManager := nodeManager.NewMetricsAndReadinessManager(headBlockTimeDrift, headBlockNumber, headBlockRelativeTime, appReadiness, viper.GetDuration("reader-node-readiness-max-latency"))
 
 			return nodeReaderStdinApp.New(&nodeReaderStdinApp.Config{
 				GRPCAddr:                   viper.GetString("reader-node-grpc-listen-addr"),

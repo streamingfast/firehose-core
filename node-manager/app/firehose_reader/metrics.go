@@ -12,5 +12,6 @@ const HeadDriftServiceName = "reader_node_firehose"
 
 var BlockWriteCount = metrics.NewCounter("block_write_count", "The number of blocks written by the Firehose reader to one-block store")
 var HeadBlockTimeDrift = metrics.NewHeadTimeDrift(HeadDriftServiceName)
+var HeadBlockRelativeTime = metrics.NewHeadBlockRelativeTime(HeadDriftServiceName)
 var HeadBlockNumber = metrics.NewHeadBlockNumber(HeadDriftServiceName)
 var AppReadiness = metrics.NewAppReadiness(HeadDriftServiceName)
