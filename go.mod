@@ -26,7 +26,7 @@ require (
 	github.com/streamingfast/dgrpc v0.0.0-20251218142640-027692a12722
 	github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4
 	github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97
-	github.com/streamingfast/dmetrics v0.0.0-20260109211849-9824eaaef34e
+	github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62
 	github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142
 	github.com/streamingfast/dstore v0.1.2
 	github.com/streamingfast/firehose-networks v0.2.2
