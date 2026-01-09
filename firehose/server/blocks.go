@@ -248,7 +248,13 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 					dmetering.GetBytesMeter(ctx).CountInc(metering.MeterLiveUncompressedReadForkedBytes, len(blk.GetPayload().GetValue()))
 				}
 			}
-			return next.ProcessBlock(blk, obj)
+			err := next.ProcessBlock(blk, obj)
+			if err != nil {
+				return err
+			}
+			// TODO: find a way to identify if the block was LIVE or part of the initial burst
+			metrics.FirehoseOutputHeadBlockRelativeTime.SetLastBlock(blk.Time())
+			return nil
 		})
 	}
 
