@@ -237,8 +237,10 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 
 	liveSourceMiddlewareHandler := func(next bstream.Handler) bstream.Handler {
 		return bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+			var isNew bool
 			if stepable, ok := obj.(bstream.Stepable); ok {
 				if stepable.Step().Matches(bstream.StepNew | bstream.StepPartial) {
+					isNew = true
 					dmetering.GetBytesMeter(ctx).CountInc(metering.MeterLiveUncompressedReadBytes, len(blk.GetPayload().GetValue()))
 
 					// legacy metering
@@ -252,8 +254,14 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 			if err != nil {
 				return err
 			}
-			// TODO: find a way to identify if the block was LIVE or part of the initial burst
-			metrics.FirehoseOutputHeadBlockRelativeTime.SetLastBlock(blk.Time())
+
+			// metrics for sent live block
+			if liveable, ok := obj.(bstream.Liveable); ok && isNew {
+				if liveable.IsLiveBlock() {
+					metrics.FirehoseOutputHeadBlockRelativeTime.SetLastBlock(blk.Time())
+				}
+			}
+
 			return nil
 		})
 	}
