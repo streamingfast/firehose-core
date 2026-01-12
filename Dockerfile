@@ -7,7 +7,7 @@ RUN go mod download
 COPY . ./
 
 ARG VERSION="dev"
-RUN apt-get update && apt-get install git
+RUN apt-get update && apt-get -y install git
 RUN go build -v -ldflags "-X main.version=${VERSION}" ./cmd/firecore
 
 FROM ubuntu:24.04
