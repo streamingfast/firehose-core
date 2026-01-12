@@ -27,6 +27,7 @@ import (
 	"github.com/streamingfast/firehose-core/cmd/tools/mergeblock"
 	print2 "github.com/streamingfast/firehose-core/cmd/tools/print"
 	"github.com/streamingfast/firehose-core/cmd/tools/relayer"
+	"github.com/streamingfast/firehose-core/cmd/tools/substreams"
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 )
@@ -81,6 +82,7 @@ func ConfigureToolsCmd[B firecore.Block](
 	ToolsCmd.AddCommand(mergeblock.NewToolsMergeBlocksCmd(chain, logger))
 	ToolsCmd.AddCommand(fix.NewToolsFixBloatedMergedBlocks(chain, logger))
 	ToolsCmd.AddCommand(relayer.NewToolsRelayerGroup(chain, logger))
+	ToolsCmd.AddCommand(substreams.NewToolsSubstreamsCmd(chain, logger))
 
 	if chain.Tools.MergedBlockUpgrader != nil {
 		ToolsCmd.AddCommand(mergeblock.NewToolsUpgradeMergedBlocksCmd(chain, logger))
