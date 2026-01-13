@@ -64,6 +64,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=tag
+            type=ref,event=tag,suffix=-${{ matrix.platform_suffix }}
             type=sha,prefix=
             type=sha,prefix=,suffix=-${{ matrix.platform_suffix }}
             type=raw,value=${{ steps.extract-version.outputs.GO_PSEUDOHASH }}
