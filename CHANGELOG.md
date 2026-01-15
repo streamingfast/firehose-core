@@ -13,11 +13,11 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 * Added bucketed prometheus metrics `head_block_relative_time_sum` to help investigate latency and pipeline performance:
   - "app=firehose_output" and "app=substreams_output" that shows latency between outputing live blocks and their blocktime.
   - "app=relayer" for latency at relayer's input
+  - "app=reader-node" for latency at reader's input
 
 ### Substreams
 
 * Fixed underflow in 'FailedPrecondition desc = request needs to process a total of x blocks' error when running from 'substreams run' with a start-block in the future.
-
 
 ## v1.12.5
 

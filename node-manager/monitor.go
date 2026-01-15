@@ -1,6 +1,8 @@
 package node_manager
 
 import (
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -9,6 +11,19 @@ import (
 	"github.com/streamingfast/dmetrics"
 	"go.uber.org/atomic"
 )
+
+// metricsInitialLivenessMaxLatency is used to determine the initial max latency for liveness checks
+// Can be overridden with METRICS_INITIAL_LIVENESS_MAX_LATENCY environment variable (in seconds)
+var metricsInitialLivenessMaxLatency = getMetricsInitialLivenessMaxLatency()
+
+func getMetricsInitialLivenessMaxLatency() time.Duration {
+	if envVal := os.Getenv("METRICS_INITIAL_LIVENESS_MAX_LATENCY"); envVal != "" {
+		if seconds, err := strconv.Atoi(envVal); err == nil && seconds > 0 {
+			return time.Duration(seconds) * time.Second
+		}
+	}
+	return time.Second * 5 // default value
+}
 
 type Readiness interface {
 	IsReady() bool
@@ -58,6 +73,7 @@ func (m *MetricsAndReadinessManager) IsReady() bool {
 }
 
 func (m *MetricsAndReadinessManager) Launch() {
+	var reachedChainHead bool
 	for {
 		select {
 		case block := <-m.headBlockChan:
@@ -77,7 +93,11 @@ func (m *MetricsAndReadinessManager) Launch() {
 			}
 
 			if m.headBlockRelativeDrift != nil {
-				m.headBlockRelativeDrift.SetLastBlock(bt)
+				if reachedChainHead {
+					m.headBlockRelativeDrift.SetLastBlock(bt)
+				} else {
+					reachedChainHead = time.Since(bt) < metricsInitialLivenessMaxLatency
+				}
 			}
 
 		case <-time.After(time.Second):
