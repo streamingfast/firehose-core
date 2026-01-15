@@ -1,6 +1,6 @@
 module github.com/streamingfast/firehose-core
 
-go 1.24.2
+go 1.25.6
 
 require (
 	buf.build/gen/go/bufbuild/reflect/connectrpc/go v1.16.1-20240117202343-bf8f65e8876c.1
@@ -9,6 +9,7 @@ require (
 	github.com/ShinyTrinkets/overseer v0.3.0
 	github.com/charmbracelet/lipgloss v1.0.0
 	github.com/dustin/go-humanize v1.0.1
+	github.com/emmansun/base64 v0.8.0
 	github.com/go-json-experiment/json v0.0.0-20231013223334-54c864be5b8d
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/iancoleman/strcase v0.3.0

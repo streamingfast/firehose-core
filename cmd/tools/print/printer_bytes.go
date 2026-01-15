@@ -15,10 +15,11 @@
 package print
 
 import (
-	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"io"
+
+	"github.com/emmansun/base64"
 
 	"github.com/mr-tron/base58"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
