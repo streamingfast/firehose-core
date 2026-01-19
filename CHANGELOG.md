@@ -8,12 +8,14 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.12.6
 
 * Added bucketed prometheus metrics `head_block_relative_time_sum` to help investigate latency and pipeline performance:
   - "app=firehose_output" and "app=substreams_output" that shows latency between outputing live blocks and their blocktime.
   - "app=relayer" for latency at relayer's input
   - "app=reader-node" for latency at reader's input
+* Bump base64 library to use a much faster one in reader
+* dstore: bumped google storage lib to v1.59.1 to fix a bug in their multi-range downloader, in case it affects us
 
 ### Substreams
 
