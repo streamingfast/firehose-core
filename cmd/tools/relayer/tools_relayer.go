@@ -98,7 +98,11 @@ func toolsRelayerStreamRunner[B firecore.Block](chain *firecore.Chain[B], logger
 			1,
 			bstream.HandlerFunc(func(blk *pbbstream.Block, obj any) error {
 				if onlyClock {
-					fmt.Printf("%d -- %s %s latency(ms): %5d\n", blk.Number, blk.Timestamp.AsTime().UTC().Format("15:04:05"), time.Now().UTC().Format("15:04:05.000"), time.Since(blk.Timestamp.AsTime()).Milliseconds())
+					partialStr := ""
+					if blk.PartialIndex != 0 {
+						partialStr = fmt.Sprintf(" P%d)", blk.PartialIndex)
+					}
+					fmt.Printf("%d%s (%s) -- %s %s latency(ms): %5d\n", blk.Number, partialStr, blk.Id, blk.Timestamp.AsTime().UTC().Format("15:04:05"), time.Now().UTC().Format("15:04:05.000"), time.Since(blk.Timestamp.AsTime()).Milliseconds())
 				} else {
 					if err := printer.PrintTo(blk, os.Stderr); err != nil {
 						return fmt.Errorf("unable to print block: %w", err)
