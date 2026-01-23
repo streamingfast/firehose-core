@@ -236,10 +236,15 @@ func (r *ConsoleReader) readBlock(line string) (out *pbbstream.Block, err error)
 	i++
 
 	var partialBlockIndex int64
+	var lastPartial bool
 	if r.readPartialBlockIndex {
 		partialBlockIndex, err = strconv.ParseInt(chunks[i], 10, 32)
 		if err != nil {
 			return nil, fmt.Errorf("parsing partial block index %q: %w", chunks[i], err)
+		}
+		if partialBlockIndex >= 1000 {
+			partialBlockIndex -= 1000
+			lastPartial = true
 		}
 		i++
 	}
@@ -289,6 +294,7 @@ func (r *ConsoleReader) readBlock(line string) (out *pbbstream.Block, err error)
 		LibNum:       libNum,
 		Payload:      blockPayload,
 		PartialIndex: int32(partialBlockIndex),
+		LastPartial:  lastPartial,
 	}
 
 	ConsoleReaderBlockReadCount.Inc()
