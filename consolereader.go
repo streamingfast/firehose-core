@@ -214,6 +214,9 @@ func (r *ConsoleReader) readInit(line string) error {
 // Formats
 // [block_num:342342342] [block_hash] [parent_num] [parent_hash] [lib:123123123] [timestamp:unix_nano] B64ENCODED_any // 1.0 or 3.0
 // [block_num:342342342] [partial_block_idx] [block_hash] [parent_num] [parent_hash] [lib:123123123] [timestamp:unix_nano] B64ENCODED_any // 3.1
+//
+//	if [partial_block_idx] is greater than 1000, it means that it is the final partial
+//	of a particular block and you must substract 1000 from it to get the actual index
 func (r *ConsoleReader) readBlock(line string) (out *pbbstream.Block, err error) {
 	if r.readerProtocolVersion == "" {
 		return nil, fmt.Errorf("reader protocol version not set, did you forget to send the 'FIRE INIT <reader_protocol_version> <protobuf_fully_qualified_type>' line?")
