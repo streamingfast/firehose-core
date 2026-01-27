@@ -283,6 +283,7 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 	stepFilter := bstream.StepNew | bstream.StepUndo
 	if request.Msg.IncludePartialBlocks {
 		stepFilter |= bstream.StepPartial
+		stepFilter |= bstream.StepUndoPartial
 	}
 	str, err := s.streamFactory.New(
 		ctx,
@@ -377,7 +378,7 @@ func stepToProto(step bstream.StepType, finalBlocksOnly bool) (outStep pbfirehos
 	if step.Matches(bstream.StepPartial) {
 		return pbfirehose.ForkStep_STEP_PARTIAL, false
 	}
-	if step.Matches(bstream.StepUndo) {
+	if step.Matches(bstream.StepUndo) || step.Matches(bstream.StepUndoPartial) {
 		return pbfirehose.ForkStep_STEP_UNDO, false
 	}
 	return 0, true // simply skip irreversible or stalled here
