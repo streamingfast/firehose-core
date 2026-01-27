@@ -100,7 +100,10 @@ func toolsRelayerStreamRunner[B firecore.Block](chain *firecore.Chain[B], logger
 				if onlyClock {
 					partialStr := ""
 					if blk.PartialIndex != 0 {
-						partialStr = fmt.Sprintf(" P%d)", blk.PartialIndex)
+						partialStr = fmt.Sprintf(" P%d", blk.PartialIndex)
+					}
+					if blk.LastPartial {
+						partialStr += "*"
 					}
 					fmt.Printf("%d%s (%s) -- %s %s latency(ms): %5d\n", blk.Number, partialStr, blk.Id, blk.Timestamp.AsTime().UTC().Format("15:04:05"), time.Now().UTC().Format("15:04:05.000"), time.Since(blk.Timestamp.AsTime()).Milliseconds())
 				} else {
