@@ -20,7 +20,7 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
-	github.com/streamingfast/bstream v0.0.2-0.20260129145732-573f7c50a243
+	github.com/streamingfast/bstream v0.0.2-0.20260204202442-c5bd9b2dffea
 	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b
 	github.com/streamingfast/dauth v0.0.0-20251218134044-fb716c7172b4
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
@@ -36,7 +36,7 @@ require (
 	github.com/streamingfast/payment-gateway v0.0.0-20251124143836-60d98e3546f5
 	github.com/streamingfast/pbgo v0.0.6-0.20251125204657-0a9c67563b19
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.17.12-0.20260204185158-e9661c335402
+	github.com/streamingfast/substreams v1.17.12-0.20260204205716-ffb2bab15d3a
 	github.com/stretchr/testify v1.11.1
 	github.com/test-go/testify v1.1.4
 	go.opentelemetry.io/otel v1.39.0
@@ -96,6 +96,7 @@ require (
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
+	github.com/klauspost/connect-compress/v2 v2.1.1 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.4 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
@@ -104,9 +105,9 @@ require (
 	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/lestrrat-go/option/v2 v2.0.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
+	github.com/minio/minlz v1.0.1 // indirect
 	github.com/muesli/termenv v0.15.3-0.20240618155329-98d742f6907a // indirect
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
-	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/protocolbuffers/protoscope v0.0.0-20221109213918-8e7a6aafa2c9 // indirect
