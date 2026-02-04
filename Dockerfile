@@ -1,10 +1,11 @@
 FROM golang:1.25-bookworm AS build
 WORKDIR /app
 
+COPY . ./
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY . ./
+
 
 ARG VERSION="dev"
 RUN apt-get update && apt-get -y install git
