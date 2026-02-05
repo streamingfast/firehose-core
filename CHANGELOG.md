@@ -8,9 +8,12 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.12.8
 
 * Substreams: Improved 'partial blocks': support new pbbstream's "LastPartial" field, fix 'undo' scenarios for stores
+* Substreams: Improved 'partial blocks': support new pbbstream's "LastPartial" field, fix 'undo' scenarios for stores
+* Reduce RAM usage with partial blocks (relayer, substreams, firehose)
+* Prevent panic if transactionTrace.receipt is nil in LogFilter (even if it is not a normal scenario)
 
 ## v1.12.7
 
