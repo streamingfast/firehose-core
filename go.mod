@@ -3,7 +3,6 @@ module github.com/streamingfast/firehose-core
 go 1.25.0
 
 //replace github.com/streamingfast/dgrpc => ../dgrpc
-//
 //replace github.com/streamingfast/substreams => ../substreams
 
 require (
@@ -40,7 +39,7 @@ require (
 	github.com/streamingfast/payment-gateway v0.0.0-20251124143836-60d98e3546f5
 	github.com/streamingfast/pbgo v0.0.6-0.20251125204657-0a9c67563b19
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.17.12-0.20260210181814-9e93fbfc1b6a
+	github.com/streamingfast/substreams v1.17.12-0.20260210185132-6196f150ebd0
 	github.com/stretchr/testify v1.11.1
 	github.com/test-go/testify v1.1.4
 	go.opentelemetry.io/otel v1.39.0
