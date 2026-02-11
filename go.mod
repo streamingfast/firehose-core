@@ -2,9 +2,6 @@ module github.com/streamingfast/firehose-core
 
 go 1.25.0
 
-//replace github.com/streamingfast/dgrpc => ../dgrpc
-//replace github.com/streamingfast/substreams => ../substreams
-
 require (
 	buf.build/gen/go/bufbuild/reflect/connectrpc/go v1.16.1-20240117202343-bf8f65e8876c.1
 	buf.build/gen/go/bufbuild/reflect/protocolbuffers/go v1.33.0-20240117202343-bf8f65e8876c.1
@@ -28,7 +25,7 @@ require (
 	github.com/streamingfast/dauth v0.0.0-20251218134044-fb716c7172b4
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7
-	github.com/streamingfast/dgrpc v0.0.0-20260211152336-d4e7023003dd
+	github.com/streamingfast/dgrpc v0.0.0-20260211171202-db61f19b4ebd
 	github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4
 	github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97
 	github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62
@@ -39,7 +36,7 @@ require (
 	github.com/streamingfast/payment-gateway v0.0.0-20251124143836-60d98e3546f5
 	github.com/streamingfast/pbgo v0.0.6-0.20251125204657-0a9c67563b19
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.17.12-0.20260211155544-4a95c2af34fe
+	github.com/streamingfast/substreams v1.17.12-0.20260211171306-78155e67a29d
 	github.com/stretchr/testify v1.11.1
 	github.com/test-go/testify v1.1.4
 	go.opentelemetry.io/otel v1.39.0
