@@ -78,6 +78,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().Uint64("substreams-tier1-default-max-request-per-user", 3, "default max request per user, this will be use of the global worker pool is not reachable. Default is 5")
 			cmd.Flags().Uint64("substreams-tier1-default-minimal-request-life-time-second", 180, "default minimal request request life time, this will be use of the global worker pool is not reachable.")
 			cmd.Flags().String("substreams-tier1-foundational-stores-config-path", "", "default path for foundational stores endpoint configuration file")
+			cmd.Flags().Uint64("substreams-tier1-execout-message-buffer-size", 100, "default size of the message buffer for the exec out channel")
 			// all substreams
 			registerCommonSubstreamsFlags(cmd)
 			return nil
@@ -158,6 +159,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			config.ServiceDiscoveryURL = serviceDiscoveryURL
 			config.QuickSaveStoreURL = viper.GetString("substreams-tier1-quicksave-store")
 			config.FoundationalStoresConfigPath = viper.GetString("substreams-tier1-foundational-stores-config-path")
+			config.ExecOutMessageBufferSize = viper.GetUint64("substreams-tier1-execout-message-buffer-size")
 
 			sessionPlugin := viper.GetString("common-session-plugin")
 			sessionPool, err := dsession.New(sessionPlugin, appLogger)
