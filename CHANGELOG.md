@@ -10,7 +10,14 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+* Remove alpha partial blocks support in firehose service (only exposed via substreams)
+
+## v1.12.8
+
 * Substreams: Improved 'partial blocks': support new pbbstream's "LastPartial" field, fix 'undo' scenarios for stores
+* Substreams: Improved 'partial blocks': support new pbbstream's "LastPartial" field, fix 'undo' scenarios for stores
+* Reduce RAM usage with partial blocks (relayer, substreams, firehose)
+* Prevent panic if transactionTrace.receipt is nil in LogFilter (even if it is not a normal scenario)
 
 ## v1.12.7
 

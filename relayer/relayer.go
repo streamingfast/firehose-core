@@ -108,7 +108,7 @@ func NewMultiplexedSource(handler bstream.Handler, sourceAddresses []string, max
 				})
 			})
 
-			src := blockstream.NewSource(ctx, url, int64(sourceRequestBurst), upstreamHandler, blockstream.WithLogger(logger), blockstream.WithRequester("relayer"))
+			src := blockstream.NewSource(ctx, url, int64(sourceRequestBurst), upstreamHandler, blockstream.WithLogger(logger), blockstream.WithRequester("relayer"), blockstream.WithPartialBlocks())
 			return src
 		}
 		sourceFactories = append(sourceFactories, sf)

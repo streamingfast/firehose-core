@@ -281,10 +281,6 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 
 	ctx = s.initFunc(ctx, request.Msg)
 	stepFilter := bstream.StepNew | bstream.StepUndo
-	if request.Msg.IncludePartialBlocks {
-		stepFilter |= bstream.StepPartial
-		stepFilter |= bstream.StepUndoPartial
-	}
 	str, err := s.streamFactory.New(
 		ctx,
 		handlerFunc,
@@ -374,9 +370,6 @@ func stepToProto(step bstream.StepType, finalBlocksOnly bool) (outStep pbfirehos
 
 	if step.Matches(bstream.StepNew) {
 		return pbfirehose.ForkStep_STEP_NEW, false
-	}
-	if step.Matches(bstream.StepPartial) {
-		return pbfirehose.ForkStep_STEP_PARTIAL, false
 	}
 	if step.Matches(bstream.StepUndo) || step.Matches(bstream.StepUndoPartial) {
 		return pbfirehose.ForkStep_STEP_UNDO, false

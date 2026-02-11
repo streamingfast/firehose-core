@@ -47,6 +47,7 @@ func NewToolsRelayerGroup[B firecore.Block](chain *firecore.Chain[B], logger *za
 			"Stream blocks from a live relayer source to the console",
 			Flags(func(flags *pflag.FlagSet) {
 				flags.Bool("clock", false, "For each block, only print the current timestamp, block timestamp, drift")
+				flags.Bool("with-partials", false, "Ask for partial blocks in the blockstream request")
 			}),
 
 			RangeArgs(1, 2),
@@ -75,6 +76,7 @@ func toolsRelayerStreamRunner[B firecore.Block](chain *firecore.Chain[B], logger
 		stopIsRelative := false
 
 		onlyClock := sflags.MustGetBool(cmd, "clock")
+		withPartials := sflags.MustGetBool(cmd, "with-partials")
 
 		if len(args) == 2 {
 			input := strings.TrimPrefix(args[1], ":")
@@ -89,6 +91,14 @@ func toolsRelayerStreamRunner[B firecore.Block](chain *firecore.Chain[B], logger
 		printer, err := print.GetOutputPrinter(cmd, chain.BlockFileDescriptor())
 		if err != nil {
 			return fmt.Errorf("unable to create output printer: %w", err)
+		}
+
+		opts := []blockstream.SourceOption{
+			blockstream.WithRequester("firecore tools"),
+		}
+
+		if withPartials {
+			opts = append(opts, blockstream.WithPartialBlocks())
 		}
 
 		blockCount := 0
@@ -129,7 +139,7 @@ func toolsRelayerStreamRunner[B firecore.Block](chain *firecore.Chain[B], logger
 
 				return nil
 			}),
-			blockstream.WithRequester("firecore tools"),
+			opts...,
 		)
 
 		// Blocking
