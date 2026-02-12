@@ -3,6 +3,7 @@ package substreams
 import (
 	"github.com/spf13/cobra"
 	firecore "github.com/streamingfast/firehose-core"
+	"github.com/streamingfast/firehose-core/cmd/tools/substreams/logs"
 	"go.uber.org/zap"
 )
 
@@ -13,6 +14,7 @@ func NewToolsSubstreamsCmd[B firecore.Block](chain *firecore.Chain[B], logger *z
 	}
 
 	cmd.AddCommand(NewToolsStoreSizeCmd(logger))
+	cmd.AddCommand(logs.NewToolsLogsCmd(logger))
 
 	return cmd
 }

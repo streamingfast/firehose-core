@@ -10,6 +10,12 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Added
+
+* Add `firecore tools substreams logs connections <user_id>` command to query Cloud Logging and show Substreams connections for an organization. Correlates incoming requests with stats by trace ID and presents a summary table showing active, closed, and error connections with details like network, source IP, module, duration, and blocks processed.
+
+### Removed
+
 * Remove alpha partial blocks support in firehose service (only exposed via substreams)
 
 ## v1.12.8

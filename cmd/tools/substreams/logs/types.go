@@ -1,0 +1,87 @@
+package logs
+
+import (
+	"time"
+)
+
+// Connection status constants
+type ConnectionStatus string
+
+const (
+	StatusActive ConnectionStatus = "active"
+	StatusClosed ConnectionStatus = "closed"
+	StatusError  ConnectionStatus = "error"
+)
+
+// QueryOptions contains parameters for querying connection logs
+type QueryOptions struct {
+	UserID    string
+	Namespace string
+	StartTime time.Time
+	EndTime   time.Time
+}
+
+// ConnectionLog represents a single connection (may be partial if stats not yet received)
+type ConnectionLog struct {
+	// From incoming request
+	TraceID          string
+	UserID           string
+	IPAddress        string
+	OutputModule     string
+	OutputModuleHash string
+	StartBlock       int64
+	StopBlock        uint64
+	ProductionMode   bool
+	Timestamp        time.Time
+
+	// From resource labels (backend-specific, extracted by backend)
+	Namespace   string
+	ClusterName string
+	PodName     string
+
+	// From stats (nil if not yet received)
+	Stats *ConnectionStats
+}
+
+// Status returns the connection status based on whether stats are present and if there's an error
+func (c *ConnectionLog) Status() ConnectionStatus {
+	if c.Stats == nil {
+		return StatusActive
+	}
+	if c.Stats.Error != "" && !isNormalDisconnect(c.Stats.Error) {
+		return StatusError
+	}
+	return StatusClosed
+}
+
+// isNormalDisconnect returns true if the error indicates a normal client disconnect
+// rather than an actual error condition
+func isNormalDisconnect(err string) bool {
+	return err == "context canceled"
+}
+
+// Duration returns the duration of the connection
+// For active connections, returns time since start
+// For closed connections, returns the actual duration
+func (c *ConnectionLog) Duration() time.Duration {
+	if c.Stats == nil {
+		return time.Since(c.Timestamp)
+	}
+	return c.Stats.EndTimestamp.Sub(c.Timestamp)
+}
+
+// ConnectionStats contains statistics from the request stats log
+type ConnectionStats struct {
+	TotalBlocksProcessed uint64
+	BlockRatePerSec      string
+	TimeToFirstData      float64
+	ResolvedStartBlock   uint64
+	Error                string
+	EndTimestamp         time.Time
+}
+
+// CorrelationResult holds the result of correlating incoming requests with stats
+type CorrelationResult struct {
+	Connections   []*ConnectionLog
+	OrphanedCount int
+}
