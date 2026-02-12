@@ -34,7 +34,7 @@ Note: Currently only GCP Cloud Logging backend is supported.`,
   firecore tools substreams logs connections sfinfra --gcp-project my-project --since 30m
 
   # Show connections for a specific date range
-  firecore tools substreams logs connections sfinfra --gcp-project my-project --date-range 2024-01-15T10:00:00Z-2024-01-15T12:00:00Z
+  firecore tools substreams logs connections sfinfra --gcp-project my-project --date-range 2024-01-15T10:00:00Z/2024-01-15T12:00:00Z
 
   # Filter by Kubernetes namespace
   firecore tools substreams logs connections sfinfra --gcp-project my-project -n eth-mainnet`,
@@ -46,7 +46,7 @@ Note: Currently only GCP Cloud Logging backend is supported.`,
 
 	cmd.Flags().String("backend", "gcp", "Log backend to use (currently only 'gcp' supported)")
 	cmd.Flags().String("since", "", "Look back duration (e.g., '1h', '30m', '2d'). Mutually exclusive with --date-range")
-	cmd.Flags().String("date-range", "", "Date range in format '<start>-[<end>]'. End defaults to now. Mutually exclusive with --since")
+	cmd.Flags().String("date-range", "", "Date range in format '<start>[/<end>]'. End defaults to now. Mutually exclusive with --since")
 	cmd.Flags().StringP("k8s-namespace", "n", "", "Kubernetes namespace to filter logs")
 	cmd.Flags().String("gcp-project", "", "GCP project ID (required for GCP backend)")
 
@@ -167,18 +167,11 @@ func parseDuration(s string) (time.Duration, error) {
 	return 0, fmt.Errorf("invalid duration format: %s (use e.g., '1h', '30m', '2d')", s)
 }
 
-// parseDateRange parses a date range in format "<start>-[<end>]"
+// parseDateRange parses a date range in format "<start>[/<end>]"
 // If end is omitted, uses current time
 func parseDateRange(dateRange string) (time.Time, time.Time, error) {
-	// Find the separator - handle the case where dates contain '-' characters
-	// Format is either:
-	//   2024-01-15T10:00:00Z-2024-01-15T12:00:00Z (full range)
-	//   2024-01-15T10:00:00Z- (start only, end is now)
-	//   2024-01-15T10:00:00Z (start only, no trailing dash)
-
-	// Look for pattern where we have a '-' that's followed by a digit (start of another date)
-	// or is at the end of the string
-	parts := splitDateRange(dateRange)
+	// Split by '/' separator
+	parts := strings.SplitN(dateRange, "/", 2)
 
 	if len(parts) == 0 || parts[0] == "" {
 		return time.Time{}, time.Time{}, fmt.Errorf("invalid date range format")
@@ -204,35 +197,6 @@ func parseDateRange(dateRange string) (time.Time, time.Time, error) {
 	}
 
 	return startTime, endTime, nil
-}
-
-// splitDateRange splits a date range string into start and end parts
-func splitDateRange(s string) []string {
-	// RFC3339 dates contain 'T' and may contain 'Z' or '+/-' timezone
-	// Look for a '-' that is NOT part of a date (i.e., not after a digit and before a digit as part of date)
-
-	// Simple heuristic: find '-' characters and check if they're followed by a year (4 digits) or empty/end
-	for i := len(s) - 1; i >= 0; i-- {
-		if s[i] == '-' {
-			// Check if this could be a separator (followed by digit starting a year, or end of string/empty)
-			if i == len(s)-1 {
-				// Trailing dash - start only
-				return []string{s[:i], ""}
-			}
-			remaining := s[i+1:]
-			// If remaining starts with 4 digits (year), this is likely the separator
-			if len(remaining) >= 4 && isDigit(remaining[0]) && isDigit(remaining[1]) && isDigit(remaining[2]) && isDigit(remaining[3]) {
-				return []string{s[:i], remaining}
-			}
-		}
-	}
-
-	// No separator found - just start time
-	return []string{s}
-}
-
-func isDigit(b byte) bool {
-	return b >= '0' && b <= '9'
 }
 
 // Supported date/time formats in order of precedence

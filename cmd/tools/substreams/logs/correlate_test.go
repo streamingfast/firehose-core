@@ -343,3 +343,92 @@ func TestConnectionDuration(t *testing.T) {
 		assert.Equal(t, 5*time.Minute, duration)
 	})
 }
+
+func TestCalculateMaxConcurrent(t *testing.T) {
+	now := time.Now()
+
+	t.Run("empty connections", func(t *testing.T) {
+		result := calculateMaxConcurrent(nil)
+		assert.Equal(t, 0, result)
+	})
+
+	t.Run("single connection", func(t *testing.T) {
+		conns := []*ConnectionLog{
+			{
+				Timestamp: now.Add(-10 * time.Minute),
+				Stats:     &ConnectionStats{EndTimestamp: now.Add(-5 * time.Minute)},
+			},
+		}
+		result := calculateMaxConcurrent(conns)
+		assert.Equal(t, 1, result)
+	})
+
+	t.Run("non-overlapping connections", func(t *testing.T) {
+		conns := []*ConnectionLog{
+			{
+				Timestamp: now.Add(-10 * time.Minute),
+				Stats:     &ConnectionStats{EndTimestamp: now.Add(-8 * time.Minute)},
+			},
+			{
+				Timestamp: now.Add(-6 * time.Minute),
+				Stats:     &ConnectionStats{EndTimestamp: now.Add(-4 * time.Minute)},
+			},
+		}
+		result := calculateMaxConcurrent(conns)
+		assert.Equal(t, 1, result)
+	})
+
+	t.Run("fully overlapping connections", func(t *testing.T) {
+		// All 3 connections active at the same time
+		conns := []*ConnectionLog{
+			{
+				Timestamp: now.Add(-10 * time.Minute),
+				Stats:     &ConnectionStats{EndTimestamp: now.Add(-2 * time.Minute)},
+			},
+			{
+				Timestamp: now.Add(-9 * time.Minute),
+				Stats:     &ConnectionStats{EndTimestamp: now.Add(-3 * time.Minute)},
+			},
+			{
+				Timestamp: now.Add(-8 * time.Minute),
+				Stats:     &ConnectionStats{EndTimestamp: now.Add(-4 * time.Minute)},
+			},
+		}
+		result := calculateMaxConcurrent(conns)
+		assert.Equal(t, 3, result)
+	})
+
+	t.Run("partial overlap", func(t *testing.T) {
+		// Timeline:
+		// conn1: |--------|
+		// conn2:     |--------|
+		// conn3:         |--------|
+		// Max concurrent = 2 (when conn1+conn2 or conn2+conn3 overlap)
+		conns := []*ConnectionLog{
+			{
+				Timestamp: now.Add(-10 * time.Minute),
+				Stats:     &ConnectionStats{EndTimestamp: now.Add(-6 * time.Minute)},
+			},
+			{
+				Timestamp: now.Add(-8 * time.Minute),
+				Stats:     &ConnectionStats{EndTimestamp: now.Add(-4 * time.Minute)},
+			},
+			{
+				Timestamp: now.Add(-5 * time.Minute),
+				Stats:     &ConnectionStats{EndTimestamp: now.Add(-1 * time.Minute)},
+			},
+		}
+		result := calculateMaxConcurrent(conns)
+		assert.Equal(t, 2, result)
+	})
+
+	t.Run("active connections count as ongoing", func(t *testing.T) {
+		// Two active connections (no stats/end time) should both count
+		conns := []*ConnectionLog{
+			{Timestamp: now.Add(-10 * time.Minute)},
+			{Timestamp: now.Add(-5 * time.Minute)},
+		}
+		result := calculateMaxConcurrent(conns)
+		assert.Equal(t, 2, result)
+	})
+}

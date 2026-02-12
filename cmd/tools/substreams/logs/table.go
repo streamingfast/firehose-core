@@ -29,7 +29,8 @@ var (
 
 	// Column indices for styling
 	colStatus = 0
-	colError  = 7
+	colEnd    = 6
+	colError  = 9
 )
 
 func init() {
@@ -61,10 +62,11 @@ func printConnectionsTable(result *CorrelationResult, userID, namespace string, 
 	duration := endTime.Sub(startTime)
 	fmt.Printf("%s %s - %s (%s)\n",
 		labelStyle.Render("Time range:"),
-		valueStyle.Render(startTime.Format("2006-01-02 15:04:05")),
-		valueStyle.Render(endTime.Format("2006-01-02 15:04:05")),
+		valueStyle.Render(startTime.Local().Format("2006-01-02 15:04:05")),
+		valueStyle.Render(endTime.Local().Format("2006-01-02 15:04:05")),
 		valueStyle.Render(formatDuration(duration)),
 	)
+	fmt.Println(dimStyle.Render("Times shown in local timezone"))
 	fmt.Println()
 
 	if len(result.Connections) == 0 {
@@ -104,6 +106,11 @@ func printConnectionsTable(result *CorrelationResult, userID, namespace string, 
 
 		network := extractNetwork(conn.Namespace)
 		moduleDisplay := formatModuleWithHash(conn.OutputModule, conn.OutputModuleHash)
+		startTimeStr := conn.Timestamp.Local().Format("15:04:05")
+		endTimeStr := "-"
+		if conn.Stats != nil {
+			endTimeStr = conn.Stats.EndTimestamp.Local().Format("15:04:05")
+		}
 
 		rows = append(rows, []string{
 			string(status),
@@ -111,6 +118,8 @@ func printConnectionsTable(result *CorrelationResult, userID, namespace string, 
 			network,
 			conn.IPAddress,
 			moduleDisplay,
+			startTimeStr,
+			endTimeStr,
 			durationStr,
 			blocks,
 			errMsg,
@@ -143,6 +152,11 @@ func printConnectionsTable(result *CorrelationResult, userID, namespace string, 
 				}
 			}
 
+			// End column - dim the "-" placeholder for active connections
+			if col == colEnd && rows[row][colEnd] == "-" {
+				return dimStyle.PaddingRight(2)
+			}
+
 			// Error column styling
 			if col == colError {
 				errVal := rows[row][colError]
@@ -164,7 +178,7 @@ func printConnectionsTable(result *CorrelationResult, userID, namespace string, 
 
 	// Build and render the table
 	t := table.New().
-		Headers("STATUS", "TRACE_ID", "NETWORK", "SOURCE_IP", "MODULE", "DURATION", "BLOCKS", "ERROR").
+		Headers("STATUS", "TRACE_ID", "NETWORK", "SOURCE_IP", "MODULE", "START", "END", "DURATION", "BLOCKS", "ERROR").
 		Rows(rows...).
 		StyleFunc(styleFunc).
 		BorderTop(false).
@@ -181,11 +195,12 @@ func printConnectionsTable(result *CorrelationResult, userID, namespace string, 
 	// Print summary
 	fmt.Println()
 	fmt.Println(dimStyle.Render(strings.Repeat(separatorStr, 80)))
-	fmt.Printf("Total: %s connections (%s active, %s closed, %s error)\n",
+	fmt.Printf("Total: %s connections (%s active, %s closed, %s error), max concurrent: %s\n",
 		valueStyle.Render(fmt.Sprintf("%d", len(result.Connections))),
 		activeStyle.Render(fmt.Sprintf("%d", activeCount)),
 		closedStyle.Render(fmt.Sprintf("%d", closedCount)),
 		errorStyle.Render(fmt.Sprintf("%d", errorCount)),
+		valueStyle.Render(fmt.Sprintf("%d", result.MaxConcurrent)),
 	)
 
 	// Print orphaned warning if any

@@ -84,4 +84,5 @@ type ConnectionStats struct {
 type CorrelationResult struct {
 	Connections   []*ConnectionLog
 	OrphanedCount int
+	MaxConcurrent int // Maximum number of connections active at the same time
 }

@@ -74,20 +74,20 @@ func TestParseDateRange(t *testing.T) {
 	}{
 		{
 			name:      "full range RFC3339",
-			input:     "2024-01-15T10:00:00Z-2024-01-15T12:00:00Z",
+			input:     "2024-01-15T10:00:00Z/2024-01-15T12:00:00Z",
 			wantStart: "2024-01-15T10:00:00Z",
 			wantEnd:   "2024-01-15T12:00:00Z",
 			wantErr:   false,
 		},
 		{
-			name:      "start only with trailing dash",
-			input:     "2024-01-15T10:00:00Z-",
+			name:      "start only with trailing slash",
+			input:     "2024-01-15T10:00:00Z/",
 			wantStart: "2024-01-15T10:00:00Z",
 			wantEnd:   "", // Will be "now"
 			wantErr:   false,
 		},
 		{
-			name:      "start only no trailing dash",
+			name:      "start only no trailing slash",
 			input:     "2024-01-15T10:00:00Z",
 			wantStart: "2024-01-15T10:00:00Z",
 			wantEnd:   "", // Will be "now"
@@ -100,7 +100,7 @@ func TestParseDateRange(t *testing.T) {
 		},
 		{
 			name:    "end before start",
-			input:   "2024-01-15T12:00:00Z-2024-01-15T10:00:00Z",
+			input:   "2024-01-15T12:00:00Z/2024-01-15T10:00:00Z",
 			wantErr: true,
 		},
 	}
@@ -125,42 +125,6 @@ func TestParseDateRange(t *testing.T) {
 				// End should be close to now
 				assert.WithinDuration(t, time.Now(), end, time.Second)
 			}
-		})
-	}
-}
-
-func TestSplitDateRange(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-		want  []string
-	}{
-		{
-			name:  "full range",
-			input: "2024-01-15T10:00:00Z-2024-01-15T12:00:00Z",
-			want:  []string{"2024-01-15T10:00:00Z", "2024-01-15T12:00:00Z"},
-		},
-		{
-			name:  "start only with trailing dash",
-			input: "2024-01-15T10:00:00Z-",
-			want:  []string{"2024-01-15T10:00:00Z", ""},
-		},
-		{
-			name:  "start only no trailing dash",
-			input: "2024-01-15T10:00:00Z",
-			want:  []string{"2024-01-15T10:00:00Z"},
-		},
-		{
-			name:  "simple date format",
-			input: "2024-01-15-2024-01-16",
-			want:  []string{"2024-01-15", "2024-01-16"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := splitDateRange(tt.input)
-			assert.Equal(t, tt.want, got)
 		})
 	}
 }
