@@ -141,6 +141,7 @@ func (b *GCPBackend) parseEntry(entry *logging.Entry) LogEntry {
 	le.TimeToFirstData = getFloat64(payload, "time_to_first_data")
 	le.ResolvedStartBlock = getUint64(payload, "resolved_start_block")
 	le.Error = getString(payload, "error")
+	le.Duration = getFloat64(payload, "parallel_duration")
 
 	b.logger.Debug("parsed log entry",
 		zap.String("message", le.Message),

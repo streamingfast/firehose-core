@@ -11,6 +11,7 @@ const (
 	StatusActive ConnectionStatus = "active"
 	StatusClosed ConnectionStatus = "closed"
 	StatusError  ConnectionStatus = "error"
+	StatusOrphan ConnectionStatus = "orphan"
 )
 
 // QueryOptions contains parameters for querying connection logs
@@ -41,10 +42,16 @@ type ConnectionLog struct {
 
 	// From stats (nil if not yet received)
 	Stats *ConnectionStats
+
+	// IsOrphan indicates this is a stats-only record with no matching incoming request
+	IsOrphan bool
 }
 
 // Status returns the connection status based on whether stats are present and if there's an error
 func (c *ConnectionLog) Status() ConnectionStatus {
+	if c.IsOrphan {
+		return StatusOrphan
+	}
 	if c.Stats == nil {
 		return StatusActive
 	}
@@ -78,11 +85,11 @@ type ConnectionStats struct {
 	ResolvedStartBlock   uint64
 	Error                string
 	EndTimestamp         time.Time
+	Duration             time.Duration // Request duration (from parallel_duration)
 }
 
 // CorrelationResult holds the result of correlating incoming requests with stats
 type CorrelationResult struct {
 	Connections   []*ConnectionLog
-	OrphanedCount int
-	MaxConcurrent int // Maximum number of connections active at the same time
+	MaxConcurrent int // Maximum number of connections active at the same time (orphans use range start as start time)
 }

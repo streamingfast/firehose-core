@@ -10,24 +10,24 @@ import (
 
 func TestCorrelateConnections(t *testing.T) {
 	now := time.Now()
+	queryStartTime := now.Add(-1 * time.Hour)
 	ts1 := now.Add(-10 * time.Minute).Format(time.RFC3339Nano)
 	ts2 := now.Add(-5 * time.Minute).Format(time.RFC3339Nano)
 	ts3 := now.Add(-2 * time.Minute).Format(time.RFC3339Nano)
 
 	tests := []struct {
-		name           string
-		entries        []LogEntry
-		wantConnCount  int
-		wantOrphaned   int
-		wantActive     int
-		wantClosed     int
-		wantError      int
+		name          string
+		entries       []LogEntry
+		wantConnCount int
+		wantActive    int
+		wantClosed    int
+		wantError     int
+		wantOrphan    int
 	}{
 		{
 			name:          "empty entries",
 			entries:       []LogEntry{},
 			wantConnCount: 0,
-			wantOrphaned:  0,
 		},
 		{
 			name: "single active connection",
@@ -43,10 +43,7 @@ func TestCorrelateConnections(t *testing.T) {
 				},
 			},
 			wantConnCount: 1,
-			wantOrphaned:  0,
 			wantActive:    1,
-			wantClosed:    0,
-			wantError:     0,
 		},
 		{
 			name: "single closed connection",
@@ -70,10 +67,7 @@ func TestCorrelateConnections(t *testing.T) {
 				},
 			},
 			wantConnCount: 1,
-			wantOrphaned:  0,
-			wantActive:    0,
 			wantClosed:    1,
-			wantError:     0,
 		},
 		{
 			name: "connection with context canceled is closed not error",
@@ -97,10 +91,7 @@ func TestCorrelateConnections(t *testing.T) {
 				},
 			},
 			wantConnCount: 1,
-			wantOrphaned:  0,
-			wantActive:    0,
 			wantClosed:    1, // context canceled = normal disconnect
-			wantError:     0,
 		},
 		{
 			name: "connection with real error",
@@ -124,9 +115,6 @@ func TestCorrelateConnections(t *testing.T) {
 				},
 			},
 			wantConnCount: 1,
-			wantOrphaned:  0,
-			wantActive:    0,
-			wantClosed:    0,
 			wantError:     1,
 		},
 		{
@@ -140,8 +128,8 @@ func TestCorrelateConnections(t *testing.T) {
 					Timestamp:            ts1,
 				},
 			},
-			wantConnCount: 0,
-			wantOrphaned:  1,
+			wantConnCount: 1, // Orphans are now included in connections
+			wantOrphan:    1,
 		},
 		{
 			name: "mixed connections and orphans",
@@ -173,11 +161,10 @@ func TestCorrelateConnections(t *testing.T) {
 					Timestamp:            ts2,
 				},
 			},
-			wantConnCount: 2,
-			wantOrphaned:  1,
+			wantConnCount: 3, // 2 normal + 1 orphan
 			wantActive:    1,
 			wantClosed:    1,
-			wantError:     0,
+			wantOrphan:    1,
 		},
 		{
 			name: "tier2 stats should be ignored",
@@ -197,22 +184,18 @@ func TestCorrelateConnections(t *testing.T) {
 				},
 			},
 			wantConnCount: 1,
-			wantOrphaned:  0,
 			wantActive:    1,
-			wantClosed:    0,
-			wantError:     0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := CorrelateConnections(tt.entries)
+			result := CorrelateConnections(tt.entries, queryStartTime)
 
 			assert.Equal(t, tt.wantConnCount, len(result.Connections), "connection count mismatch")
-			assert.Equal(t, tt.wantOrphaned, result.OrphanedCount, "orphaned count mismatch")
 
 			// Count statuses
-			active, closed, errored := 0, 0, 0
+			active, closed, errored, orphan := 0, 0, 0, 0
 			for _, conn := range result.Connections {
 				switch conn.Status() {
 				case StatusActive:
@@ -221,12 +204,15 @@ func TestCorrelateConnections(t *testing.T) {
 					closed++
 				case StatusError:
 					errored++
+				case StatusOrphan:
+					orphan++
 				}
 			}
 
 			assert.Equal(t, tt.wantActive, active, "active count mismatch")
 			assert.Equal(t, tt.wantClosed, closed, "closed count mismatch")
 			assert.Equal(t, tt.wantError, errored, "error count mismatch")
+			assert.Equal(t, tt.wantOrphan, orphan, "orphan count mismatch")
 		})
 	}
 }
@@ -268,6 +254,16 @@ func TestConnectionLogStatus(t *testing.T) {
 				},
 			},
 			want: StatusError,
+		},
+		{
+			name: "orphan connection returns orphan status",
+			conn: &ConnectionLog{
+				IsOrphan: true,
+				Stats: &ConnectionStats{
+					TotalBlocksProcessed: 100,
+				},
+			},
+			want: StatusOrphan,
 		},
 	}
 
@@ -430,5 +426,44 @@ func TestCalculateMaxConcurrent(t *testing.T) {
 		}
 		result := calculateMaxConcurrent(conns)
 		assert.Equal(t, 2, result)
+	})
+
+	t.Run("orphan connections use their timestamp as start time", func(t *testing.T) {
+		// Orphan connection with Timestamp set to range start (by CorrelateConnections)
+		// This orphan overlaps with the regular connection
+		rangeStart := now.Add(-1 * time.Hour)
+		conns := []*ConnectionLog{
+			{
+				Timestamp: now.Add(-10 * time.Minute),
+				Stats:     &ConnectionStats{EndTimestamp: now.Add(-5 * time.Minute)},
+			},
+			{
+				Timestamp: rangeStart, // Orphan uses range start as timestamp
+				IsOrphan:  true,
+				Stats:     &ConnectionStats{EndTimestamp: now.Add(-8 * time.Minute)},
+			},
+		}
+		result := calculateMaxConcurrent(conns)
+		// Both connections overlap: orphan runs from rangeStart to -8min, regular from -10min to -5min
+		assert.Equal(t, 2, result)
+	})
+
+	t.Run("orphan connections non-overlapping", func(t *testing.T) {
+		// Orphan that ends before the regular connection starts
+		rangeStart := now.Add(-1 * time.Hour)
+		conns := []*ConnectionLog{
+			{
+				Timestamp: now.Add(-10 * time.Minute),
+				Stats:     &ConnectionStats{EndTimestamp: now.Add(-5 * time.Minute)},
+			},
+			{
+				Timestamp: rangeStart, // Orphan uses range start as timestamp
+				IsOrphan:  true,
+				Stats:     &ConnectionStats{EndTimestamp: now.Add(-15 * time.Minute)},
+			},
+		}
+		result := calculateMaxConcurrent(conns)
+		// Orphan ends at -15min, regular starts at -10min - no overlap
+		assert.Equal(t, 1, result)
 	})
 }

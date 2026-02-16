@@ -115,7 +115,7 @@ func runConnections(ctx context.Context, userID string, cmd *cobra.Command, logg
 	}
 
 	// Correlate connections
-	result := CorrelateConnections(entries)
+	result := CorrelateConnections(entries, startTime)
 
 	// Print results
 	printConnectionsTable(result, userID, namespace, startTime, endTime)

@@ -2,6 +2,7 @@ package logs
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -82,13 +83,20 @@ func TestCorrelateConnectionsRealData(t *testing.T) {
 		},
 	}
 
-	result := CorrelateConnections(entries)
+	queryStartTime := time.Now().Add(-1 * time.Hour)
+	result := CorrelateConnections(entries, queryStartTime)
 
 	// Should have exactly 2 connections
 	require.Equal(t, 2, len(result.Connections), "expected 2 connections from 4 entries")
 
-	// No orphaned stats
-	assert.Equal(t, 0, result.OrphanedCount, "expected no orphaned stats")
+	// No orphaned stats (count orphans in connections)
+	orphanCount := 0
+	for _, conn := range result.Connections {
+		if conn.Status() == StatusOrphan {
+			orphanCount++
+		}
+	}
+	assert.Equal(t, 0, orphanCount, "expected no orphaned stats")
 
 	// Both connections have "context canceled" which is a normal disconnect, not an error
 	for _, conn := range result.Connections {

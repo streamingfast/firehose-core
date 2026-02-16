@@ -20,15 +20,17 @@ var (
 	headerStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("14"))
 	labelStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	valueStyle   = lipgloss.NewStyle().Bold(true)
-	activeStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("11")) // Yellow
-	closedStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("10")) // Green
-	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))  // Red
+	activeStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))  // Yellow
+	closedStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))  // Green
+	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))   // Red
+	orphanStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("13"))  // Magenta
 	dimStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	warnStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("208")) // Orange
 	separatorStr = "─"
 
 	// Column indices for styling
 	colStatus = 0
+	colStart  = 5
 	colEnd    = 6
 	colError  = 9
 )
@@ -43,6 +45,7 @@ func init() {
 		activeStyle = lipgloss.NewStyle()
 		closedStyle = lipgloss.NewStyle()
 		errorStyle = lipgloss.NewStyle()
+		orphanStyle = lipgloss.NewStyle()
 		dimStyle = lipgloss.NewStyle()
 		warnStyle = lipgloss.NewStyle()
 	}
@@ -79,7 +82,7 @@ func printConnectionsTable(result *CorrelationResult, userID, namespace string, 
 	rows := make([][]string, 0, len(result.Connections))
 	rowStatuses := make([]ConnectionStatus, 0, len(result.Connections))
 
-	activeCount, closedCount, errorCount := 0, 0, 0
+	activeCount, closedCount, errorCount, orphanCount := 0, 0, 0, 0
 	for _, conn := range result.Connections {
 		status := conn.Status()
 		rowStatuses = append(rowStatuses, status)
@@ -91,22 +94,40 @@ func printConnectionsTable(result *CorrelationResult, userID, namespace string, 
 			closedCount++
 		case StatusError:
 			errorCount++
+		case StatusOrphan:
+			orphanCount++
 		}
 
 		blocks := "-"
 		errMsg := "-"
-		durationStr := formatDuration(conn.Duration())
+		durationStr := "-"
 
 		if conn.Stats != nil {
 			blocks = fmt.Sprintf("%d", conn.Stats.TotalBlocksProcessed)
 			if conn.Stats.Error != "" {
 				errMsg = truncateString(conn.Stats.Error, 30)
 			}
+			// For orphans, use the duration from stats (parallel_duration)
+			// For normal connections, calculate from start/end timestamps
+			if conn.IsOrphan && conn.Stats.Duration > 0 {
+				durationStr = formatDuration(conn.Stats.Duration)
+			} else if !conn.IsOrphan {
+				durationStr = formatDuration(conn.Duration())
+			}
+		} else if !conn.IsOrphan {
+			// Active connection - show duration since start
+			durationStr = formatDuration(conn.Duration())
 		}
 
 		network := extractNetwork(conn.Namespace)
 		moduleDisplay := formatModuleWithHash(conn.OutputModule, conn.OutputModuleHash)
+
+		// Show "?" for orphan start time since we don't know it
 		startTimeStr := conn.Timestamp.Local().Format("15:04:05")
+		if conn.IsOrphan {
+			startTimeStr = "?"
+		}
+
 		endTimeStr := "-"
 		if conn.Stats != nil {
 			endTimeStr = conn.Stats.EndTimestamp.Local().Format("15:04:05")
@@ -149,7 +170,14 @@ func printConnectionsTable(result *CorrelationResult, userID, namespace string, 
 					return closedStyle.PaddingRight(2)
 				case StatusError:
 					return errorStyle.PaddingRight(2)
+				case StatusOrphan:
+					return orphanStyle.PaddingRight(2)
 				}
+			}
+
+			// Start column - dim the "?" for orphan connections
+			if col == colStart && rows[row][colStart] == "?" {
+				return dimStyle.PaddingRight(2)
 			}
 
 			// End column - dim the "-" placeholder for active connections
@@ -195,22 +223,14 @@ func printConnectionsTable(result *CorrelationResult, userID, namespace string, 
 	// Print summary
 	fmt.Println()
 	fmt.Println(dimStyle.Render(strings.Repeat(separatorStr, 80)))
-	fmt.Printf("Total: %s connections (%s active, %s closed, %s error), max concurrent: %s\n",
+	fmt.Printf("Total: %s connections (%s active, %s closed, %s error, %s orphan), max concurrent: %s\n",
 		valueStyle.Render(fmt.Sprintf("%d", len(result.Connections))),
 		activeStyle.Render(fmt.Sprintf("%d", activeCount)),
 		closedStyle.Render(fmt.Sprintf("%d", closedCount)),
 		errorStyle.Render(fmt.Sprintf("%d", errorCount)),
+		orphanStyle.Render(fmt.Sprintf("%d", orphanCount)),
 		valueStyle.Render(fmt.Sprintf("%d", result.MaxConcurrent)),
 	)
-
-	// Print orphaned warning if any
-	if result.OrphanedCount > 0 {
-		fmt.Println()
-		fmt.Printf("%s %s\n",
-			warnStyle.Render("Warning:"),
-			warnStyle.Render(fmt.Sprintf("%d orphaned stats logs found (stats without matching incoming request)", result.OrphanedCount)),
-		)
-	}
 
 	fmt.Println()
 }

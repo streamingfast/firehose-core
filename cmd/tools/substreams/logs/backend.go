@@ -26,6 +26,7 @@ type LogEntry struct {
 	TimeToFirstData      float64
 	ResolvedStartBlock   uint64
 	Error                string
+	Duration             float64 // Request duration in seconds
 
 	// Resource labels (backend extracts these from envelope)
 	Namespace   string

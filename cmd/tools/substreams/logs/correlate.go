@@ -6,8 +6,9 @@ import (
 )
 
 // CorrelateConnections matches incoming request logs with their corresponding stats logs
-// by trace_id. Returns correlated connections and count of orphaned stats logs.
-func CorrelateConnections(entries []LogEntry) *CorrelationResult {
+// by trace_id. Returns correlated connections including orphaned stats records.
+// queryStartTime is used as the timestamp for orphaned records (for sorting purposes).
+func CorrelateConnections(entries []LogEntry, queryStartTime time.Time) *CorrelationResult {
 	// Build map of trace_id -> ConnectionLog for incoming requests
 	connectionsByTraceID := make(map[string]*ConnectionLog)
 	var statsEntries []LogEntry
@@ -35,49 +36,65 @@ func CorrelateConnections(entries []LogEntry) *CorrelationResult {
 		}
 	}
 
-	// Second pass: match stats to incoming requests
-	orphanedCount := 0
+	// Second pass: match stats to incoming requests, create orphan records for unmatched
+	var orphanedConnections []*ConnectionLog
 	for _, stats := range statsEntries {
-		conn, found := connectionsByTraceID[stats.TraceID]
-		if !found {
-			// Orphaned stats log - no matching incoming request
-			orphanedCount++
-			continue
-		}
-
 		ts, _ := time.Parse(time.RFC3339Nano, stats.Timestamp)
-		conn.Stats = &ConnectionStats{
+		statsData := &ConnectionStats{
 			TotalBlocksProcessed: stats.TotalBlocksProcessed,
 			BlockRatePerSec:      stats.BlockRatePerSec,
 			TimeToFirstData:      stats.TimeToFirstData,
 			ResolvedStartBlock:   stats.ResolvedStartBlock,
 			Error:                stats.Error,
 			EndTimestamp:         ts,
+			Duration:             time.Duration(stats.Duration * float64(time.Second)),
 		}
+
+		conn, found := connectionsByTraceID[stats.TraceID]
+		if !found {
+			// Orphaned stats log - create a connection record with IsOrphan=true
+			orphanedConnections = append(orphanedConnections, &ConnectionLog{
+				TraceID:          stats.TraceID,
+				UserID:           stats.UserID,
+				OutputModule:     stats.OutputModule,
+				OutputModuleHash: stats.OutputModuleHash,
+				Timestamp:        queryStartTime, // Use query start time for sorting
+				Namespace:        stats.Namespace,
+				ClusterName:      stats.ClusterName,
+				PodName:          stats.PodName,
+				Stats:            statsData,
+				IsOrphan:         true,
+			})
+			continue
+		}
+
+		conn.Stats = statsData
 	}
 
 	// Collect all connections into a slice
-	connections := make([]*ConnectionLog, 0, len(connectionsByTraceID))
+	connections := make([]*ConnectionLog, 0, len(connectionsByTraceID)+len(orphanedConnections))
 	for _, conn := range connectionsByTraceID {
 		connections = append(connections, conn)
 	}
+	connections = append(connections, orphanedConnections...)
 
 	// Sort by timestamp (oldest first, most recent at bottom)
 	slices.SortFunc(connections, func(a, b *ConnectionLog) int {
 		return a.Timestamp.Compare(b.Timestamp)
 	})
 
-	// Calculate max concurrent connections
+	// Calculate max concurrent connections (orphans use queryStartTime as their start time)
 	maxConcurrent := calculateMaxConcurrent(connections)
 
 	return &CorrelationResult{
 		Connections:   connections,
-		OrphanedCount: orphanedCount,
 		MaxConcurrent: maxConcurrent,
 	}
 }
 
 // calculateMaxConcurrent finds the maximum number of connections active at the same time
+// For orphan connections, their start time is assumed to be the query range start time
+// (which is already set as their Timestamp by CorrelateConnections)
 func calculateMaxConcurrent(connections []*ConnectionLog) int {
 	if len(connections) == 0 {
 		return 0
