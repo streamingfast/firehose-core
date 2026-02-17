@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/streamingfast/eth-go/rpc"
 	"go.uber.org/zap"
 )
 
@@ -75,6 +76,15 @@ func WithClientsContext[C any, V any](clients *Clients[C], ctx context.Context, 
 		cancel()
 
 		if err != nil {
+			clientDetails := ""
+
+			rpc, ok := any(client).(*rpc.Client)
+			if (ok) {
+				clientDetails = rpc.String()
+			}
+
+			clients.logger.Error("failed client request", zap.Error(err), zap.String("client", clientDetails))
+
 			errs = multierror.Append(errs, err)
 			client, err = clients.rollingStrategy.next(clients)
 			if err != nil {
