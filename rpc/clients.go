@@ -57,6 +57,22 @@ func (c *Clients[C]) Add(client C) {
 	defer c.lock.Unlock()
 	c.clients = append(c.clients, client)
 }
+
+func (c *Clients[C]) DuplicateAndStartAt(start int) *Clients[C]{
+	size := len(c.clients)
+	clients := Clients[C]{
+		clients: make([]C, size),
+		maxBlockFetchDuration: c.maxBlockFetchDuration,
+		rollingStrategy: c.rollingStrategy,
+		lock: sync.Mutex{},
+		logger: c.logger,
+	}
+	for i, v := range c.clients {
+		clients.clients[(start + i) % size] = v
+	}
+	return &clients
+}
+
 func WithClientsContext[C any, V any](clients *Clients[C], ctx context.Context, f func(context.Context, C) (v V, err error)) (v V, err error) {
 	clients.lock.Lock()
 	defer clients.lock.Unlock()
