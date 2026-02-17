@@ -78,7 +78,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().Uint64("substreams-tier1-default-max-request-per-user", 3, "default max request per user, this will be use of the global worker pool is not reachable. Default is 5")
 			cmd.Flags().Uint64("substreams-tier1-default-minimal-request-life-time-second", 180, "default minimal request request life time, this will be use of the global worker pool is not reachable.")
 			cmd.Flags().String("substreams-tier1-foundational-stores-config-path", "", "default path for foundational stores endpoint configuration file")
-			cmd.Flags().Uint64("substreams-tier1-output-bundle-size", 1, "[EXPERIMENTAL] size of 'bundles' of BlockScopedData (requires client-side specific handling)")
+			cmd.Flags().Uint64("substreams-tier1-output-buffer-size", 100, "max number of messages bundled into BlockScopedDatas (for clients using v4)")
 			// all substreams
 			registerCommonSubstreamsFlags(cmd)
 			return nil
