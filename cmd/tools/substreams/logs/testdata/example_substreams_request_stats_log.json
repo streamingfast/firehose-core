@@ -1,0 +1,57 @@
+{
+  "insertId": "lmwfs152qiyhkof7",
+  "jsonPayload": {
+    "module_wasm_ext_duration": 0,
+    "parallel_duration": 12.310119026,
+    "output_module_hash": "2295b83f96d95066bef2c1d8aaef58784a45273b",
+    "remote_jobs_incomplete": 0,
+    "timestamp": "2026-02-12T05:00:14.63409045Z",
+    "total_uncompressed_read_bytes": 66109326,
+    "total_blocks_processed": 2727,
+    "resolved_start_block": 441564911,
+    "client_read_average_time_last_5_minutes": 0.000188058,
+    "remote_blocks_processed": 1998,
+    "output_module_name": "prediction_events",
+    "remote_jobs_completed": 2,
+    "remote_jobs_failed": 0,
+    "uncompressed_egress_bytes": 952375,
+    "production_mode": true,
+    "error": "context canceled",
+    "api_key_id": "59290696f40f95fbb3ae73425c2733aebf58cccd551cabfb10b359393a62138e",
+    "message": "substreams request stats",
+    "module_exec_duration": 1.629834008,
+    "time_to_first_data": 0.313414946,
+    "user_id": "0dyay1d6a294917efc101",
+    "local_blocks_processed": 735,
+    "remote_jobs_delayed": 0,
+    "logger": "substreams-tier1.tier1",
+    "tier": "tier1",
+    "block_rate_per_sec": "2.533",
+    "store_sizes": [],
+    "trace_id": "256ab179dd47d1e4db33fac967126f77",
+    "remote_jobs_retried": 0
+  },
+  "resource": {
+    "type": "k8s_container",
+    "labels": {
+      "namespace_name": "sol-devnet",
+      "pod_name": "substreams-v1-tier1-857c8bc494-mkg4c",
+      "container_name": "substreams",
+      "cluster_name": "acme-central1",
+      "project_id": "acme-global",
+      "location": "us-central1"
+    }
+  },
+  "timestamp": "2026-02-12T05:00:14.634294750Z",
+  "severity": "INFO",
+  "labels": {
+    "k8s-pod/name": "substreams-v1-tier1",
+    "k8s-pod/pod-template-hash": "857c8bc494",
+    "k8s-pod/version": "v2",
+    "compute.googleapis.com/resource_name": "gke-acme-n2d-8-16b-481e6e9e-fbj7",
+    "logging.gke.io/top_level_controller_type": "Deployment",
+    "logging.gke.io/top_level_controller_name": "substreams-v1-tier1"
+  },
+  "logName": "projects/acme-global/logs/stderr",
+  "receiveTimestamp": "2026-02-12T05:00:16.285514268Z"
+}

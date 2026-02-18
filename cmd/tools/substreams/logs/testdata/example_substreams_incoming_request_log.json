@@ -1,0 +1,55 @@
+{
+  "insertId": "njcdmrup5v19efh2",
+  "jsonPayload": {
+    "partial_blocks": false,
+    "message": "incoming Substreams Blocks request",
+    "ip_address": "34.57.244.33",
+    "dev_output_modules": [],
+    "final_blocks_only": false,
+    "user_id": "0dyay1d6a294917efc101",
+    "modules": [
+      "map_blocks"
+    ],
+    "trace_id": "70a8129d8173a41619585edf90264473",
+    "stores": [],
+    "noop_mode": false,
+    "protocol": "/sf.substreams.rpc.v2.Stream/Blocks",
+    "foundational_stores": [],
+    "stop_block": 0,
+    "logger": "substreams-tier1.tier1",
+    "module_count": 1,
+    "with_stores": false,
+    "production_mode": false,
+    "start_block": -1,
+    "compressed": true,
+    "output_module_hash": "d3b1920483180cbcd2fd10abcabbee431146f4c8",
+    "key_id": "u340ynpirg104ou3riabj9jcfvqah65ypxj72371kfitow0mtt51v96fp8g6a8ag",
+    "cursor": "",
+    "timestamp": "2026-02-18T05:20:04.46216987Z",
+    "with_blockfilter": false,
+    "output_module": "map_blocks"
+  },
+  "resource": {
+    "type": "k8s_container",
+    "labels": {
+      "container_name": "substreams",
+      "cluster_name": "acme-central1",
+      "namespace_name": "sol-devnet",
+      "location": "us-central1",
+      "project_id": "acme-global",
+      "pod_name": "substreams-v1-tier1-7584bb78d-7b97w"
+    }
+  },
+  "timestamp": "2026-02-18T05:20:04.462307680Z",
+  "severity": "INFO",
+  "labels": {
+    "logging.gke.io/top_level_controller_name": "substreams-v1-tier1",
+    "compute.googleapis.com/resource_name": "gke-acme-n2d-8-16b-481e6e9e-fbj7",
+    "k8s-pod/version": "v2",
+    "logging.gke.io/top_level_controller_type": "Deployment",
+    "k8s-pod/name": "substreams-v1-tier1",
+    "k8s-pod/pod-template-hash": "7584bb78d"
+  },
+  "logName": "projects/acme-global/logs/stderr",
+  "receiveTimestamp": "2026-02-18T05:20:05.780963206Z"
+}
