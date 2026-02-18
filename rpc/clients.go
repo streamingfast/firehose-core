@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/streamingfast/eth-go/rpc"
 	"go.uber.org/zap"
 )
 
@@ -56,6 +57,22 @@ func (c *Clients[C]) Add(client C) {
 	defer c.lock.Unlock()
 	c.clients = append(c.clients, client)
 }
+
+func (c *Clients[C]) DuplicateAndStartAt(start int) *Clients[C]{
+	size := len(c.clients)
+	clients := Clients[C]{
+		clients: make([]C, size),
+		maxBlockFetchDuration: c.maxBlockFetchDuration,
+		rollingStrategy: c.rollingStrategy,
+		lock: sync.Mutex{},
+		logger: c.logger,
+	}
+	for i, v := range c.clients {
+		clients.clients[(start + i) % size] = v
+	}
+	return &clients
+}
+
 func WithClientsContext[C any, V any](clients *Clients[C], ctx context.Context, f func(context.Context, C) (v V, err error)) (v V, err error) {
 	clients.lock.Lock()
 	defer clients.lock.Unlock()
@@ -75,6 +92,15 @@ func WithClientsContext[C any, V any](clients *Clients[C], ctx context.Context, 
 		cancel()
 
 		if err != nil {
+			clientDetails := ""
+
+			rpc, ok := any(client).(*rpc.Client)
+			if (ok) {
+				clientDetails = rpc.String()
+			}
+
+			clients.logger.Error("failed client request", zap.Error(err), zap.String("client", clientDetails))
+
 			errs = multierror.Append(errs, err)
 			client, err = clients.rollingStrategy.next(clients)
 			if err != nil {

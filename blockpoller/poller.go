@@ -76,6 +76,8 @@ func New[C any](
 
 func (p *BlockPoller[C]) Run(firstStreamableBlockNum uint64, stopBlock *uint64, blockFetchBatchSize int) error {
 	p.startBlockNumGate = firstStreamableBlockNum
+	p.optimisticallyPolledBlocks = map[uint64]*BlockItem{}
+
 	p.logger.Info("starting poller",
 		zap.Uint64("first_streamable_block", firstStreamableBlockNum),
 		zap.Uint64("block_fetch_batch_size", uint64(blockFetchBatchSize)),
@@ -221,14 +223,13 @@ type BlockItem struct {
 }
 
 func (p *BlockPoller[C]) loadNextBlocks(requestedBlock uint64, numberOfBlockToFetch int) error {
-	p.optimisticallyPolledBlocks = map[uint64]*BlockItem{}
 	p.fetching = true
 
 	nailer := dhammer.NewNailer(numberOfBlockToFetch, func(ctx context.Context, blockToFetch uint64) (*BlockItem, error) {
 		var blockItem *BlockItem
 		err := derr.Retry(p.fetchBlockRetryCount, func(ctx context.Context) error {
-
-			bi, err := rpc.WithClients(p.clients, func(ctx context.Context, client C) (*BlockItem, error) {
+			clients := p.clients.DuplicateAndStartAt(int(blockToFetch % uint64(numberOfBlockToFetch)))
+			bi, err := rpc.WithClients(clients, func(ctx context.Context, client C) (*BlockItem, error) {
 				b, skipped, err := p.blockFetcher.Fetch(ctx, client, blockToFetch)
 				if err != nil {
 					return nil, fmt.Errorf("fetching block %d: %w", blockToFetch, err)
@@ -341,12 +342,37 @@ func (p *BlockPoller[C]) requestBlock(blockNumber uint64, numberOfBlockToFetch i
 
 			time.Sleep(20 * time.Millisecond)
 			continue
+		} else if !p.fetching {
+			// Optimistically anticipate next iterations
+			max := blockNumber
+
+			p.optimisticallyPolledBlocksLock.Lock()
+			for key := range p.optimisticallyPolledBlocks {
+				if key > max {
+					max = key
+				}
+				// Cleanup old blocks
+				if key < blockNumber {
+					delete(p.optimisticallyPolledBlocks, key)
+				}
+			}
+			p.optimisticallyPolledBlocksLock.Unlock()
+
+			if (max < blockNumber + uint64(numberOfBlockToFetch)) {
+				go func() {
+					p.logger.Info("anticipating future block polls", zap.Uint64("block_num", blockNumber), zap.Uint64("max", max))
+					err := p.loadNextBlocks(max + 1, numberOfBlockToFetch)
+					if err != nil {
+						p.Shutdown(err)
+						return
+					}
+				}()
+			}
 		}
 
 		p.logger.Info("block was optimistically polled", zap.Uint64("block_num", blockNumber), zap.Bool("keep", false))
 		return blockItem, nil
 	}
-
 }
 
 type FetchResponse struct {
