@@ -3,9 +3,9 @@ start:
   - reader-node
   - merger
   - relayer
-  - firehose
+  #- firehose
   - substreams-tier1
-  - substreams-tier2
+  #- substreams-tier2
   flags:
     advertise-block-id-encoding: "hex"
     advertise-chain-name: "acme-dummy-blockchain"
@@ -20,6 +20,11 @@ start:
       start
       --tracer=firehose
       --store-dir="{node-data-dir}"
+      --genesis-block-burst=300
       --block-rate=120
+      --block-size=1500
       --genesis-height=0
-      --genesis-block-burst=100
+      --with-reorgs=false
+      --with-skipped-blocks=false
+      --with-flash-blocks
+      --with-reorgs
