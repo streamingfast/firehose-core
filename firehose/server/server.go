@@ -183,7 +183,7 @@ func (s *Server) OnTerminated(f func(error)) {
 func (s *Server) Shutdown(timeout time.Duration) {
 	// FIXME we need to implement the timeout here
 	for _, server := range s.servers {
-		server.Shutdown(nil)
+		server.Shutdown(0)
 	}
 }
 
@@ -194,7 +194,7 @@ func (s *Server) Launch() {
 		go func() {
 			server.Launch(server.listenAddr)
 			for _, srv := range s.servers {
-				srv.Shutdown(nil) // immediately shutdown all other servers when one terminates, in case a single one failed
+				srv.Shutdown(0) // immediately shutdown all other servers when one terminates, in case a single one failed
 			}
 			wg.Done()
 		}()
