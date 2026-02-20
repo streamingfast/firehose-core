@@ -8,7 +8,16 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.13.0
+
+### Substreams Performance (RPC V4, New blocks from last partial)
+
+* **RPC V4 protocol with `BlockScopedDatas` batching**: Multiple `BlockScopedData` messages are now batched into a single `BlockScopedDatas` response, reducing gRPC round-trips and message framing overhead during backfill. Clients automatically fall back V4 → V3 → V2 when connecting to older servers, so no flag changes are required.
+* **S2 compression is now the default**: Replaces gzip as the default compression algorithm, providing ~3-5x faster compression/decompression with comparable ratios. The client automatically negotiates compression with the server.
+* **VTProtobuf fast serialization**: Both client and server now use [vtprotobuf](https://github.com/planetscale/vtprotobuf) for protobuf marshaling/unmarshaling, providing ~2-3x faster serialization with reduced memory allocations.
+* **Server-side message buffering**: Configurable via `--substreams-tier1-output-buffer-size` flag (default: 100 blocks) or `MESSAGE_BUFFER_MAX_DATA_SIZE` environment variable (default: 10MB).
+* **Improved Connect/gRPC protocol selection**: Server now efficiently routes requests to the appropriate handler based on content-type, improving performance by ~15% for pure gRPC clients.
+* **New blocks from last partial**: "Last partial blocks" are now accepted interchangeably with `new` blocks, allowing faster full blocks for requests that do not ask for partial blocks.
 
 ### Added
 
