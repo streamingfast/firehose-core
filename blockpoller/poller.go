@@ -44,6 +44,9 @@ type BlockPoller[C any] struct {
 
 	logger *zap.Logger
 
+	lastSuccessfulClientCall     time.Time
+	lastSuccessfulClientCallLock sync.Mutex
+
 	optimisticallyPolledBlocks map[uint64]*BlockItem
 
 	fetching                       bool
@@ -100,7 +103,35 @@ func (p *BlockPoller[C]) Run(firstStreamableBlockNum uint64, stopBlock *uint64, 
 	return p.run(resolvedStartBlock, resolveStopBlock, blockFetchBatchSize)
 }
 
+func (p *BlockPoller[C]) markClientSuccess() {
+	p.lastSuccessfulClientCallLock.Lock()
+	p.lastSuccessfulClientCall = time.Now()
+	p.lastSuccessfulClientCallLock.Unlock()
+}
+
 func (p *BlockPoller[C]) run(resolvedStartBlock bstream.BlockRef, stopBlock uint64, blockFetchBatchSize int) (err error) {
+	p.lastSuccessfulClientCallLock.Lock()
+	p.lastSuccessfulClientCall = time.Now()
+	p.lastSuccessfulClientCallLock.Unlock()
+
+	go func() {
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				p.lastSuccessfulClientCallLock.Lock()
+				since := time.Since(p.lastSuccessfulClientCall)
+				p.lastSuccessfulClientCallLock.Unlock()
+				if since > time.Minute {
+					p.logger.Warn("no clients have been working for over 1 minute, still retrying", zap.Duration("elapsed_since_last_success", since))
+				}
+			case <-p.Terminating():
+				return
+			}
+		}
+	}()
+
 	currentCursor := &cursor{state: ContinuousSegState, logger: p.logger}
 	blockToFetch := resolvedStartBlock.Num()
 	var hashToFetch *string
@@ -221,8 +252,6 @@ type BlockItem struct {
 }
 
 func (p *BlockPoller[C]) loadNextBlocks(requestedBlock uint64, numberOfBlockToFetch int) error {
-	p.optimisticallyPolledBlocks = map[uint64]*BlockItem{}
-	p.fetching = true
 
 	nailer := dhammer.NewNailer(numberOfBlockToFetch, func(ctx context.Context, blockToFetch uint64) (*BlockItem, error) {
 		var blockItem *BlockItem
@@ -253,6 +282,7 @@ func (p *BlockPoller[C]) loadNextBlocks(requestedBlock uint64, numberOfBlockToFe
 				return fmt.Errorf("fetching block %d with retry : %w", blockToFetch, err)
 			}
 			blockItem = bi
+			p.markClientSuccess()
 
 			return nil
 
@@ -327,6 +357,10 @@ func (p *BlockPoller[C]) requestBlock(blockNumber uint64, numberOfBlockToFetch i
 		if !found {
 			if !p.fetching {
 				go func() {
+					p.optimisticallyPolledBlocksLock.Lock()
+					p.optimisticallyPolledBlocks = map[uint64]*BlockItem{}
+					p.optimisticallyPolledBlocksLock.Unlock()
+					p.fetching = true
 					err := p.loadNextBlocks(blockNumber, numberOfBlockToFetch)
 					if err != nil {
 						p.Shutdown(err)
@@ -381,6 +415,7 @@ func (p *BlockPoller[C]) fetchBlockWithHash(blkNum uint64, hash string) (*pbbstr
 
 		out = br.Block
 		skipped = br.Skipped
+		p.markClientSuccess()
 		return nil
 	})
 
