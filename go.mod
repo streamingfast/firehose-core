@@ -11,6 +11,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.0.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/go-json-experiment/json v0.0.0-20231013223334-54c864be5b8d
+	github.com/graphprotocol/substreams-data-service v0.0.0-20260224031909-c6ca40569c63
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/iancoleman/strcase v0.3.0
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
@@ -63,6 +64,7 @@ require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.6.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.54.0 // indirect
 	github.com/alecthomas/participle v0.7.1 // indirect
+	github.com/alphadose/haxmap v1.4.1 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.32.6 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.7 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.28.6 // indirect
@@ -84,6 +86,7 @@ require (
 	github.com/aws/smithy-go v1.22.1 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bobg/go-generics/v3 v3.5.0 // indirect
+	github.com/btcsuite/btcd/btcec/v2 v2.3.6 // indirect
 	github.com/bufbuild/protocompile v0.4.0 // indirect
 	github.com/bytecodealliance/wasmtime-go/v41 v41.0.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
@@ -98,6 +101,7 @@ require (
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
+	github.com/holiman/uint256 v1.3.2 // indirect
 	github.com/klauspost/connect-compress/v2 v2.1.1 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.4 // indirect
@@ -119,6 +123,7 @@ require (
 	github.com/sercand/kuberesolver/v5 v5.1.1 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
 	github.com/streamingfast/dummy-blockchain v1.7.3 // indirect
+	github.com/streamingfast/eth-go v0.0.0-20260216202159-4e2b7501894a // indirect
 	github.com/streamingfast/firehose-ethereum/types v0.0.0-20251113151010-c9c94d64348a // indirect
 	github.com/streamingfast/worker-pool-protocol v0.0.0-20251029142144-b539534f3eb1 // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
@@ -193,7 +198,7 @@ require (
 	github.com/klauspost/compress v1.18.3 // indirect
 	github.com/lithammer/dedent v1.1.0 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
-	github.com/magiconair/properties v1.8.7 // indirect
+	github.com/magiconair/properties v1.8.10 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/manifoldco/promptui v0.9.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
@@ -231,14 +236,14 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.64.0
 	go.uber.org/atomic v1.11.0
 	go.uber.org/automaxprocs v1.5.1
-	golang.org/x/crypto v0.46.0 // indirect
-	golang.org/x/mod v0.30.0 // indirect
+	golang.org/x/crypto v0.47.0 // indirect
+	golang.org/x/mod v0.31.0 // indirect
 	golang.org/x/net v0.48.0
 	golang.org/x/oauth2 v0.34.0
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.39.0 // indirect
-	golang.org/x/term v0.38.0 // indirect
-	golang.org/x/text v0.32.0 // indirect
+	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/term v0.39.0 // indirect
+	golang.org/x/text v0.33.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/api v0.259.0
 	google.golang.org/genproto v0.0.0-20251202230838-ff82c1b0f217 // indirect

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	sdsplugin "github.com/graphprotocol/substreams-data-service/provider/plugin"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -50,6 +51,10 @@ func Main[B firecore.Block](chain *firecore.Chain[B]) {
 	dmeteringfile.Register()
 	paymentGatewayMetering.Register()
 	paymentGatewaySession.Register()
+
+	sdsplugin.RegisterAuth()
+	sdsplugin.RegisterSession()
+	sdsplugin.RegisterMetering()
 
 	chain.Validate()
 	chain.Init()
