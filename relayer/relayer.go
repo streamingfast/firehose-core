@@ -71,10 +71,11 @@ func NewRelayer(
 		forkable.WithMetrics(metrics.HeadBlockNumber, metrics.HeadBlockTimeDrift, metrics.HeadBlockRelativeDrift),
 	}
 
-	forkableHub := hub.NewForkableHub(
+	forkableHub := hub.NewForkableHubWithOptions(
 		r.liveSourceFactory,
 		10,
 		oneBlocksStore,
+		[]hub.Option{hub.WithMaxConsecutiveUnlinkableBlocks(5)},
 		options...,
 	)
 

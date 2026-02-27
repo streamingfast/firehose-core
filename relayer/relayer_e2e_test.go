@@ -225,49 +225,20 @@ func TestRelayerReconnectsAfterSourceRestart(t *testing.T) {
 	require.NoError(t, readerContainer.Start(ctx))
 	t.Log("reader-node container restarted")
 
-	// ── 9. Wait up to 15 s for blocks to resume and head block to advance ────
-	// The MultiplexedSource retries every ~5 s, so 15 s is a comfortable margin.
-	deadline := time.Now().Add(15 * time.Second)
-	var blocksAfterRestart int64
-	for time.Now().Before(deadline) {
-		time.Sleep(500 * time.Millisecond)
-		blocksAfterRestart = blocksReceived.Load()
-		if blocksAfterRestart > blocksBeforeStop {
-			break
-		}
-	}
-
-	t.Logf("blocks received after restart: %d", blocksAfterRestart)
-
-	// Drain any stream error that may have been produced (reconnect is expected
-	// to be transparent to this subscriber, but log it for visibility).
+	// ── 9. Assert the relayer shuts itself down ───────────────────────────────
+	// With the one-block files gone the hub cannot bridge the gap between its
+	// last known head and the blocks arriving from the restarted reader-node.
+	// After 10 consecutive unlinkable blocks it must trigger errRestartRequired,
+	// which causes the hub (and therefore the relayer) to shut down.
+	t.Log("waiting for relayer to shut down due to consecutive unlinkable blocks…")
 	select {
-	case streamErr := <-streamErrCh:
-		t.Logf("note: stream returned an error during the test: %v", streamErr)
-	default:
+	case <-r.Terminated():
+		t.Log("relayer shut down as expected")
+	case <-time.After(30 * time.Second):
+		t.Fatal("timed out waiting for relayer to shut down after gap-fill failure")
 	}
-
-	require.Greater(t, blocksAfterRestart, blocksBeforeStop,
-		"relayer must forward new blocks after the reader-node restarted")
-
-	// ── 10. Assert the hub's head block number advanced after the restart ─────
-	// Poll GetHeadInfo until the head number moves past the pre-stop value, or
-	// until the deadline. This confirms the hub's internal state (not just the
-	// subscriber stream) reflects the new chain head.
-	headDeadline := time.Now().Add(10 * time.Second)
-	var headInfoAfterRestart *pbheadinfo.HeadInfoResponse
-	for time.Now().Before(headDeadline) {
-		headInfoAfterRestart, err = headInfoClient.GetHeadInfo(ctx, &pbheadinfo.HeadInfoRequest{})
-		if err == nil && headInfoAfterRestart.HeadNum > headInfoBeforeStop.HeadNum {
-			break
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
-	require.NoError(t, err, "GetHeadInfo should succeed after reader-node restarted")
-	t.Logf("hub head block after restart: num=%d id=%s (was %d before stop)",
-		headInfoAfterRestart.HeadNum, headInfoAfterRestart.HeadID, headInfoBeforeStop.HeadNum)
-	require.Greater(t, headInfoAfterRestart.HeadNum, headInfoBeforeStop.HeadNum,
-		"hub head block must have advanced past its pre-stop value after the reader-node restarted")
+	require.Error(t, r.Err(), "relayer must have shut down with an error")
+	t.Logf("relayer shutdown error: %v", r.Err())
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -303,13 +274,6 @@ func startReaderNodeContainer(t *testing.T, ctx context.Context, tmpDir string, 
 	const containerGRPCPort = 10010
 	containerPort := nat.Port(fmt.Sprintf("%d/tcp", containerGRPCPort))
 
-	// When discarding one-blocks, redirect writes to a throwaway path that is
-	// not shared with the host, keeping the real one-block store pristine.
-	oneBlockStoreURL := "file:///app/firehose-data/storage/one-blocks"
-	if discardOneBlocks {
-		oneBlockStoreURL = "file:///tmp/discard-one-blocks"
-	}
-
 	cmd := []string{
 		"start",
 		"reader-node",
@@ -321,7 +285,11 @@ func startReaderNodeContainer(t *testing.T, ctx context.Context, tmpDir string, 
 		"--advertise-block-id-encoding=hex",
 		// Explicitly pin the reader-node gRPC port inside the container.
 		"--reader-node-grpc-listen-addr=:10010",
-		"--common-one-block-store-url=" + oneBlockStoreURL,
+	}
+	// Only override the one-block store for the discard variant; the normal
+	// container uses the default path derived from --data-dir (file:///data/reader/storage/one-blocks).
+	if discardOneBlocks {
+		cmd = append(cmd, "--common-one-block-store-url=file:///tmp/discard-one-blocks")
 	}
 
 	req := testcontainers.ContainerRequest{
