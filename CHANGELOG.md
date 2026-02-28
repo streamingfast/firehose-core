@@ -10,6 +10,12 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Added
+
+* Add `firecore tools networks list` command to display registered networks from The Graph Networks Registry with their Firehose and Substreams endpoints. Supports `--name-only` flag for listing only network IDs and `--only` flag for filtering networks using a regular expression.
+
+### Fixed
+
 * Fix substreams/firehose endpoints detection of supported compression: do not fail on 'algo;q=x.y' syntax
 * Fix relayer failing to get back to live if reader blocks are unlinkable after a long period, and merger has removed one-blocks: it will now shutdown in that case, so it can be restarted.
 

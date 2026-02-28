@@ -83,6 +83,7 @@ func ConfigureToolsCmd[B firecore.Block](
 	ToolsCmd.AddCommand(fix.NewToolsFixBloatedMergedBlocks(chain, logger))
 	ToolsCmd.AddCommand(relayer.NewToolsRelayerGroup(chain, logger))
 	ToolsCmd.AddCommand(substreams.NewToolsSubstreamsCmd(chain, logger))
+	ToolsCmd.AddCommand(NewToolsNetworksCmd(chain, logger))
 
 	if chain.Tools.MergedBlockUpgrader != nil {
 		ToolsCmd.AddCommand(mergeblock.NewToolsUpgradeMergedBlocksCmd(chain, logger))
