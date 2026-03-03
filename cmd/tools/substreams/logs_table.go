@@ -1,33 +1,17 @@
-package logs
+package substreams
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
-	"github.com/mattn/go-isatty"
+	"github.com/streamingfast/firehose-core/cmd/tools/stylex"
+	"github.com/streamingfast/firehose-core/cmd/tools/substreams/logs"
 )
 
 var (
-	// Styling for output - colors only enabled if terminal is TTY
-	isTTY = isatty.IsTerminal(os.Stdout.Fd())
-
-	// Styles
-	titleStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12"))
-	headerStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("14"))
-	labelStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	valueStyle   = lipgloss.NewStyle().Bold(true)
-	activeStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))  // Yellow
-	closedStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))  // Green
-	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))   // Red
-	orphanStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("13"))  // Magenta
-	dimStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-	warnStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("208")) // Orange
-	separatorStr = "─"
-
 	// Column indices for styling
 	colStatus = 0
 	colStart  = 5
@@ -35,52 +19,17 @@ var (
 	colError  = 9
 )
 
-func init() {
-	// Disable styling if not a TTY
-	if !isTTY {
-		titleStyle = lipgloss.NewStyle()
-		headerStyle = lipgloss.NewStyle()
-		labelStyle = lipgloss.NewStyle()
-		valueStyle = lipgloss.NewStyle()
-		activeStyle = lipgloss.NewStyle()
-		closedStyle = lipgloss.NewStyle()
-		errorStyle = lipgloss.NewStyle()
-		orphanStyle = lipgloss.NewStyle()
-		dimStyle = lipgloss.NewStyle()
-		warnStyle = lipgloss.NewStyle()
-	}
-}
-
 // printConnectionsTable prints the connections table to stdout
-func printConnectionsTable(result *CorrelationResult, userID, namespace string, startTime, endTime time.Time) {
-	// Print header
-	fmt.Println(titleStyle.Render("Substreams Connections"))
-	fmt.Println(dimStyle.Render(strings.Repeat(separatorStr, 120)))
-	fmt.Println()
-
-	fmt.Printf("%s %s\n", labelStyle.Render("Organization:"), valueStyle.Render(userID))
-	if namespace != "" {
-		fmt.Printf("%s %s\n", labelStyle.Render("Namespace:"), valueStyle.Render(namespace))
-	}
-	duration := endTime.Sub(startTime)
-	fmt.Printf("%s %s - %s (%s)\n",
-		labelStyle.Render("Time range:"),
-		valueStyle.Render(startTime.Local().Format("2006-01-02 15:04:05")),
-		valueStyle.Render(endTime.Local().Format("2006-01-02 15:04:05")),
-		valueStyle.Render(formatDuration(duration)),
-	)
-	fmt.Println(dimStyle.Render("Times shown in local timezone"))
-	fmt.Println()
-
+func printConnectionsTable(result *logs.CorrelationResult, userID, namespace string, startTime, endTime time.Time) {
 	if len(result.Connections) == 0 {
-		fmt.Println(labelStyle.Render("No connections found"))
+		fmt.Println(stylex.Label("No connections found"))
 		fmt.Println()
 		return
 	}
 
 	// Build rows and track status for each row
 	rows := make([][]string, 0, len(result.Connections))
-	rowStatuses := make([]ConnectionStatus, 0, len(result.Connections))
+	rowStatuses := make([]logs.ConnectionStatus, 0, len(result.Connections))
 
 	activeCount, closedCount, errorCount, orphanCount := 0, 0, 0, 0
 	for _, conn := range result.Connections {
@@ -88,13 +37,13 @@ func printConnectionsTable(result *CorrelationResult, userID, namespace string, 
 		rowStatuses = append(rowStatuses, status)
 
 		switch status {
-		case StatusActive:
+		case logs.StatusActive:
 			activeCount++
-		case StatusClosed:
+		case logs.StatusClosed:
 			closedCount++
-		case StatusError:
+		case logs.StatusError:
 			errorCount++
-		case StatusOrphan:
+		case logs.StatusOrphan:
 			orphanCount++
 		}
 
@@ -154,7 +103,7 @@ func printConnectionsTable(result *CorrelationResult, userID, namespace string, 
 
 		// Header row
 		if row == table.HeaderRow {
-			return headerStyle.PaddingRight(2)
+			return stylex.HeaderStyle.PaddingRight(2)
 		}
 
 		// Get the status for this row
@@ -164,25 +113,25 @@ func printConnectionsTable(result *CorrelationResult, userID, namespace string, 
 			// Status column gets the status color
 			if col == colStatus {
 				switch status {
-				case StatusActive:
-					return activeStyle.PaddingRight(2)
-				case StatusClosed:
-					return closedStyle.PaddingRight(2)
-				case StatusError:
-					return errorStyle.PaddingRight(2)
-				case StatusOrphan:
-					return orphanStyle.PaddingRight(2)
+				case logs.StatusActive:
+					return stylex.ConnectionActiveStyle.PaddingRight(2)
+				case logs.StatusClosed:
+					return stylex.ConnectionClosedStyle.PaddingRight(2)
+				case logs.StatusError:
+					return stylex.ErrorStyle.PaddingRight(2)
+				case logs.StatusOrphan:
+					return stylex.ConnectionOrphanStyle.PaddingRight(2)
 				}
 			}
 
 			// Start column - dim the "?" for orphan connections
 			if col == colStart && rows[row][colStart] == "?" {
-				return dimStyle.PaddingRight(2)
+				return stylex.DimStyle.PaddingRight(2)
 			}
 
 			// End column - dim the "-" placeholder for active connections
 			if col == colEnd && rows[row][colEnd] == "-" {
-				return dimStyle.PaddingRight(2)
+				return stylex.DimStyle.PaddingRight(2)
 			}
 
 			// Error column styling
@@ -190,14 +139,14 @@ func printConnectionsTable(result *CorrelationResult, userID, namespace string, 
 				errVal := rows[row][colError]
 				if errVal == "-" {
 					// Dim the "-" placeholder
-					return dimStyle.PaddingRight(2)
+					return stylex.DimStyle.PaddingRight(2)
 				}
-				if isNormalDisconnect(errVal) {
+				if logs.IsNormalDisconnect(errVal) {
 					// Normal disconnects (context canceled) use regular style
 					return baseStyle
 				}
 				// Real errors get red
-				return errorStyle.PaddingRight(2)
+				return stylex.ErrorStyle.PaddingRight(2)
 			}
 		}
 
@@ -216,23 +165,21 @@ func printConnectionsTable(result *CorrelationResult, userID, namespace string, 
 		BorderColumn(false).
 		BorderRow(false).
 		BorderHeader(true).
-		BorderStyle(dimStyle)
+		BorderStyle(stylex.DimStyle)
 
 	fmt.Println(t.Render())
 
 	// Print summary
 	fmt.Println()
-	fmt.Println(dimStyle.Render(strings.Repeat(separatorStr, 80)))
+	fmt.Println(stylex.Dim(stylex.Separator(80)))
 	fmt.Printf("Total: %s connections (%s active, %s closed, %s error, %s orphan), max concurrent: %s\n",
-		valueStyle.Render(fmt.Sprintf("%d", len(result.Connections))),
-		activeStyle.Render(fmt.Sprintf("%d", activeCount)),
-		closedStyle.Render(fmt.Sprintf("%d", closedCount)),
-		errorStyle.Render(fmt.Sprintf("%d", errorCount)),
-		orphanStyle.Render(fmt.Sprintf("%d", orphanCount)),
-		valueStyle.Render(fmt.Sprintf("%d", result.MaxConcurrent)),
+		stylex.Valuef("%d", len(result.Connections)),
+		stylex.ConnectionActivef("%d", activeCount),
+		stylex.ConnectionClosedf("%d", closedCount),
+		stylex.ConnectionErrorf("%d", errorCount),
+		stylex.ConnectionOrphanf("%d", orphanCount),
+		stylex.Valuef("%d", result.MaxConcurrent),
 	)
-
-	fmt.Println()
 }
 
 // formatModuleWithHash formats module name with inline hash: "module_name (hash...)"
@@ -291,4 +238,20 @@ func truncateString(s string, maxLen int) string {
 		return s[:maxLen]
 	}
 	return s[:maxLen-3] + "..."
+}
+
+func localTimezoneDisplay() string {
+	name, offset := time.Now().Local().Zone()
+
+	hours := offset / 3600
+	if hours == 0 {
+		return name
+	}
+
+	minutes := (offset % 3600) / 60
+	if minutes == 0 {
+		return fmt.Sprintf("%s | UTC%+d", name, hours)
+	}
+
+	return fmt.Sprintf("%s | UTC%+d:%02d", name, hours, minutes)
 }

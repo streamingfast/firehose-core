@@ -44,8 +44,8 @@ func (e *LogEntry) IsRequestStats() bool {
 	return e.Message == "substreams request stats" && e.Tier == "tier1"
 }
 
-// LogBackend abstracts the log querying mechanism
-type LogBackend interface {
+// Backend abstracts the log querying mechanism
+type Backend interface {
 	// QueryLogs returns all log entries matching the criteria
 	// Returns both incoming requests and stats logs for correlation
 	QueryLogs(ctx context.Context, opts QueryOptions) ([]LogEntry, error)

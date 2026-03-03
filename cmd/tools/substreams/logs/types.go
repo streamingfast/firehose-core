@@ -55,7 +55,7 @@ func (c *ConnectionLog) Status() ConnectionStatus {
 	if c.Stats == nil {
 		return StatusActive
 	}
-	if c.Stats.Error != "" && !isNormalDisconnect(c.Stats.Error) {
+	if c.Stats.Error != "" && !IsNormalDisconnect(c.Stats.Error) {
 		return StatusError
 	}
 	return StatusClosed
@@ -63,7 +63,7 @@ func (c *ConnectionLog) Status() ConnectionStatus {
 
 // isNormalDisconnect returns true if the error indicates a normal client disconnect
 // rather than an actual error condition
-func isNormalDisconnect(err string) bool {
+func IsNormalDisconnect(err string) bool {
 	return err == "context canceled"
 }
 

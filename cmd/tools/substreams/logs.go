@@ -1,17 +1,32 @@
-package logs
+package substreams
 
 import (
 	"context"
 	"fmt"
-	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli/sflags"
+	"github.com/streamingfast/firehose-core/cmd/tools/stylex"
+	"github.com/streamingfast/firehose-core/cmd/tools/substreams/logs"
 	"go.uber.org/zap"
 )
+
+// NewToolsLogsCmd returns the parent "logs" command for Substreams logs analysis tools
+func NewToolsLogsCmd(logger *zap.Logger) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "logs",
+		Short: "Substreams logs analysis tools",
+		Long: `Tools for analyzing Substreams logs from various backends.
+
+Note: Currently only GCP Cloud Logging backend is supported.`,
+	}
+
+	cmd.AddCommand(NewToolsLogsConnectionsCmd(logger))
+
+	return cmd
+}
 
 // NewToolsLogsConnectionsCmd returns the "connections" subcommand
 func NewToolsLogsConnectionsCmd(logger *zap.Logger) *cobra.Command {
@@ -45,7 +60,7 @@ Note: Currently only GCP Cloud Logging backend is supported.`,
 	}
 
 	cmd.Flags().String("backend", "gcp", "Log backend to use (currently only 'gcp' supported)")
-	cmd.Flags().String("since", "", "Look back duration (e.g., '1h', '30m', '2d'). Mutually exclusive with --date-range")
+	cmd.Flags().Duration("since", time.Duration(0), "Look back duration (e.g., '1h', '30m', '2d'). Mutually exclusive with --date-range")
 	cmd.Flags().String("date-range", "", "Date range in format '<start>[/<end>]'. End defaults to now. Mutually exclusive with --since")
 	cmd.Flags().StringP("k8s-namespace", "n", "", "Kubernetes namespace to filter logs")
 	cmd.Flags().String("gcp-project", "", "GCP project ID (required for GCP backend)")
@@ -55,7 +70,7 @@ Note: Currently only GCP Cloud Logging backend is supported.`,
 
 func runConnections(ctx context.Context, userID string, cmd *cobra.Command, logger *zap.Logger) error {
 	backend := sflags.MustGetString(cmd, "backend")
-	since := sflags.MustGetString(cmd, "since")
+	since := sflags.MustGetDuration(cmd, "since")
 	dateRange := sflags.MustGetString(cmd, "date-range")
 	namespace := sflags.MustGetString(cmd, "k8s-namespace")
 	gcpProject := sflags.MustGetString(cmd, "gcp-project")
@@ -63,14 +78,14 @@ func runConnections(ctx context.Context, userID string, cmd *cobra.Command, logg
 	logger.Debug("connections command invoked",
 		zap.String("user_id", userID),
 		zap.String("backend", backend),
-		zap.String("since", since),
+		zap.Duration("since", since),
 		zap.String("date_range", dateRange),
 		zap.String("namespace", namespace),
 		zap.String("gcp_project", gcpProject),
 	)
 
 	// Validate flags
-	if since != "" && dateRange != "" {
+	if since != 0 && dateRange != "" {
 		return fmt.Errorf("--since and --date-range are mutually exclusive")
 	}
 
@@ -85,14 +100,31 @@ func runConnections(ctx context.Context, userID string, cmd *cobra.Command, logg
 		zap.Time("end_time", endTime),
 	)
 
+	fmt.Println(stylex.Title("Substreams Connections"))
+	fmt.Println(stylex.Dim(stylex.Separator(120)))
+
+	fmt.Printf("%s %s\n", stylex.Label("Organization:"), stylex.Value(userID))
+	if namespace != "" {
+		fmt.Printf("%s %s\n", stylex.Label("Namespace:"), stylex.Value(namespace))
+	}
+	duration := endTime.Sub(startTime)
+	fmt.Printf("%s %s - %s (%s)\n",
+		stylex.Label("Time range:"),
+		stylex.Value(startTime.Local().Format("2006-01-02 15:04:05")),
+		stylex.Value(endTime.Local().Format("2006-01-02 15:04:05")),
+		stylex.Value(formatDuration(duration)),
+	)
+	fmt.Println(stylex.Dimf("Times shown in local timezone (%s)", localTimezoneDisplay()))
+	fmt.Println()
+
 	// Create backend
-	var logBackend LogBackend
+	var logBackend logs.Backend
 	switch backend {
 	case "gcp":
 		if gcpProject == "" {
 			return fmt.Errorf("--gcp-project is required when using GCP backend")
 		}
-		logBackend, err = NewGCPBackend(ctx, gcpProject, logger)
+		logBackend, err = logs.NewGCPBackend(ctx, gcpProject, logger)
 		if err != nil {
 			return fmt.Errorf("creating GCP backend: %w", err)
 		}
@@ -102,7 +134,7 @@ func runConnections(ctx context.Context, userID string, cmd *cobra.Command, logg
 	}
 
 	// Query logs
-	opts := QueryOptions{
+	opts := logs.QueryOptions{
 		UserID:    userID,
 		Namespace: namespace,
 		StartTime: startTime,
@@ -115,7 +147,7 @@ func runConnections(ctx context.Context, userID string, cmd *cobra.Command, logg
 	}
 
 	// Correlate connections
-	result := CorrelateConnections(entries, startTime)
+	result := logs.CorrelateConnections(entries, startTime)
 
 	// Print results
 	printConnectionsTable(result, userID, namespace, startTime, endTime)
@@ -125,46 +157,24 @@ func runConnections(ctx context.Context, userID string, cmd *cobra.Command, logg
 
 // parseTimeRange parses the --since or --date-range flags into start/end times
 // If neither is provided, defaults to 1 hour ago
-func parseTimeRange(since, dateRange string) (time.Time, time.Time, error) {
+func parseTimeRange(since time.Duration, dateRange string) (time.Time, time.Time, error) {
 	now := time.Now()
 
 	// Default: 1 hour ago
-	if since == "" && dateRange == "" {
+	if since == 0 && dateRange == "" {
 		return now.Add(-1 * time.Hour), now, nil
 	}
 
-	// Parse --since
-	if since != "" {
-		duration, err := parseDuration(since)
-		if err != nil {
-			return time.Time{}, time.Time{}, fmt.Errorf("invalid --since value: %w", err)
-		}
-		return now.Add(-duration), now, nil
+	if (since != 0) && dateRange != "" {
+		return time.Time{}, time.Time{}, fmt.Errorf("--since and --date-range are mutually exclusive")
+	}
+
+	if since != 0 {
+		return now.Add(-since), now, nil
 	}
 
 	// Parse --date-range
 	return parseDateRange(dateRange)
-}
-
-// parseDuration parses a human-friendly duration string
-// Supports: s, m, h, d (seconds, minutes, hours, days)
-func parseDuration(s string) (time.Duration, error) {
-	// Try standard Go duration first
-	if d, err := time.ParseDuration(s); err == nil {
-		return d, nil
-	}
-
-	// Handle days suffix
-	re := regexp.MustCompile(`^(\d+)d$`)
-	if matches := re.FindStringSubmatch(s); len(matches) == 2 {
-		days, err := strconv.Atoi(matches[1])
-		if err != nil {
-			return 0, err
-		}
-		return time.Duration(days) * 24 * time.Hour, nil
-	}
-
-	return 0, fmt.Errorf("invalid duration format: %s (use e.g., '1h', '30m', '2d')", s)
 }
 
 // parseDateRange parses a date range in format "<start>[/<end>]"
@@ -205,6 +215,7 @@ var dateTimeFormats = []string{
 	time.RFC3339Nano,
 	"2006-01-02",
 	"2006-01-02T15:04:05",
+	"2006-01-02T15:04:05Z",
 }
 
 // parseDateTime parses a datetime string in various formats

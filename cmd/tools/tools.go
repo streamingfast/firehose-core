@@ -106,3 +106,7 @@ func ConfigureToolsCmd[B firecore.Block](
 
 	return nil
 }
+
+func Styles() {
+
+}

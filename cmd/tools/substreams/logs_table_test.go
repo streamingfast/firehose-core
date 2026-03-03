@@ -1,4 +1,4 @@
-package logs
+package substreams
 
 import (
 	"testing"

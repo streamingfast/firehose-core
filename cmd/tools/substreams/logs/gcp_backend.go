@@ -119,6 +119,20 @@ func (b *GCPBackend) parseEntry(entry *logging.Entry) LogEntry {
 		return le
 	}
 
+	// Trace log the raw entry for debugging
+	if b.logger.Core().Enabled(zap.DebugLevel) {
+		var resourceLabels map[string]string
+		if entry.Resource != nil {
+			resourceLabels = entry.Resource.Labels
+		}
+		b.logger.Debug("raw log entry retrieved",
+			zap.Any("payload", payload),
+			zap.String("log_name", entry.LogName),
+			zap.Time("timestamp", entry.Timestamp),
+			zap.Any("resource_labels", resourceLabels),
+		)
+	}
+
 	le.Message = getString(payload, "message")
 	le.TraceID = getString(payload, "trace_id")
 	le.UserID = getString(payload, "user_id")
