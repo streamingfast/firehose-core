@@ -138,7 +138,7 @@ func (p *BlockPoller[C]) initState(firstStreamableBlockNum uint64, stateStorePat
 				continue
 			}
 			if br.Skipped {
-				return nil, nil, fmt.Errorf("expecting first streamable block %q not to be skiped", firstStreamableBlockNum)
+				return nil, nil, fmt.Errorf("expecting first streamable block %d not to be skiped", firstStreamableBlockNum)
 			}
 
 			firstStreamableBlockRef := br.Block.AsRef()
