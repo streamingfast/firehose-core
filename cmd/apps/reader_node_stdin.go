@@ -15,6 +15,8 @@
 package apps
 
 import (
+	"os"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	firecore "github.com/streamingfast/firehose-core"
@@ -72,6 +74,7 @@ func RegisterReaderNodeStdinApp[B firecore.Block](chain *firecore.Chain[B], root
 				WorkingDir:                 firecore.MustReplaceDataDir(sfDataDir, viper.GetString("reader-node-working-dir")),
 				OneBlockSuffix:             viper.GetString("reader-node-one-block-suffix"),
 				MaxLineLengthInBytes:       int64(viper.GetUint64("reader-node-line-buffer-size")),
+				GRPCSecretKey:              os.Expand(viper.GetString("reader-node-grpc-secret-key"), os.Getenv),
 			}, &nodeReaderStdinApp.Modules{
 				ConsoleReaderFactory:       consoleReaderFactory,
 				MetricsAndReadinessManager: metricsAndReadinessManager,

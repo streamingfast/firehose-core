@@ -32,7 +32,7 @@ import (
 var RelayerStartAborted = fmt.Errorf("getting start block aborted by relayer application terminating signal")
 
 type Config struct {
-	SourcesAddr        []string
+	Sources            []relayer.SourceAddr
 	GRPCListenAddr     string
 	SourceRequestBurst int
 	MaxSourceLatency   time.Duration
@@ -40,8 +40,12 @@ type Config struct {
 }
 
 func (c *Config) ZapFields() []zap.Field {
+	addrs := make([]string, len(c.Sources))
+	for i, s := range c.Sources {
+		addrs[i] = s.URL
+	}
 	return []zap.Field{
-		zap.Strings("sources_addr", c.SourcesAddr),
+		zap.Strings("sources_addr", addrs),
 		zap.String("grpc_listen_addr", c.GRPCListenAddr),
 		zap.Int("source_request_burst", c.SourceRequestBurst),
 		zap.Duration("max_source_latency", c.MaxSourceLatency),
@@ -74,7 +78,7 @@ func (a *App) Run() error {
 	liveSourceFactory := bstream.SourceFactory(func(h bstream.Handler) bstream.Source {
 		return relayer.NewMultiplexedSource(
 			h,
-			a.config.SourcesAddr,
+			a.config.Sources,
 			a.config.MaxSourceLatency,
 			a.config.SourceRequestBurst,
 		)

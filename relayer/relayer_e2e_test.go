@@ -110,7 +110,7 @@ func TestRelayerReconnectsAfterSourceRestart(t *testing.T) {
 	// newMultiplexedSourceWithDelay is a test-local variant of NewMultiplexedSource
 	// that includes a time.Sleep to simulate slow source initialisation.
 	liveSourceFactory := bstream.SourceFactory(func(h bstream.Handler) bstream.Source {
-		return NewMultiplexedSource(h, []string{readerAddr}, 30*time.Second, 10)
+		return NewMultiplexedSource(h, []SourceAddr{{URL: readerAddr}}, 30*time.Second, 10)
 	})
 
 	r := NewRelayer(liveSourceFactory, relayerListenAddr, oneBlocksStore)

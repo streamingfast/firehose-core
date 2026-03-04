@@ -44,7 +44,7 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 		Description: "Provides a substreams grpc endpoint",
 		RegisterFlags: func(cmd *cobra.Command) error {
 			cmd.Flags().String("substreams-tier2-grpc-listen-addr", firecore.SubstreamsTier2GRPCServingAddr, "Address on which the substreams tier2 will listen. Default is plain-text, appending a '*' to the end to make it listen in snake-oil (insecure) TLS")
-			cmd.Flags().String("substreams-tier2-authenticator", "trust://", "Authenticator to use for tier2 requests. Can be 'trust://' or 'secret://<key>'")
+			cmd.Flags().String("substreams-tier2-authenticator", "trust://", "Authenticator to use for tier2 requests. Can be 'trust://' or 'secret://<key>'. Supports environment variable interpolation with ${ENV_VAR_NAME} syntax, e.g. 'secret://${TIER2_SECRET}'.")
 			cmd.Flags().String("substreams-tier2-discovery-service-url", "", "URL to advertise presence to the grpc discovery service") //traffic-director://xds?vpc_network=vpc-global&use_xds_reds=true
 			cmd.Flags().Uint64("substreams-tier2-max-concurrent-requests", 0, "Maximum number of concurrent requests allowed on the server. When the tier2 service hits this limit, it will set itself as 'Not Ready' until requests are processed. Default 0 (no limit)")
 			cmd.Flags().Duration("substreams-tier2-segment-execution-timeout", time.Hour, "Maximum duration a segment can take to execute before being forcefully stopped with DeadlineExceeded error")
@@ -91,7 +91,7 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 				return nil, fmt.Errorf("getting temporary directory: %w", err)
 			}
 
-			authString := viper.GetString("substreams-tier2-authenticator")
+			authString := os.Expand(viper.GetString("substreams-tier2-authenticator"), os.Getenv)
 			auth, err := dauth.New(authString, appLogger)
 			if err != nil {
 				return nil, fmt.Errorf("creating authenticator: %w", err)

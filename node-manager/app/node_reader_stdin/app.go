@@ -21,6 +21,8 @@ import (
 
 	"github.com/streamingfast/bstream/blockstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/dauth"
+	dauthgrpc "github.com/streamingfast/dauth/middleware/grpc"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	dgrpcfactory "github.com/streamingfast/dgrpc/server/factory"
 	nodeManager "github.com/streamingfast/firehose-core/node-manager"
@@ -47,6 +49,12 @@ type Config struct {
 	// MaxLineLengthInBytes configures the maximum bytes a single line consumed can be
 	// without any error. If left unspecified or 0, the default is 50 MiB (50 * 1024 * 1024).
 	MaxLineLengthInBytes int64
+
+	// GRPCSecretKey, when non-empty, requires every incoming gRPC call to present
+	// the key as a Bearer token in the "authorization" metadata header.
+	// The value supports ${ENV_VAR} interpolation (resolved before this struct is
+	// populated by the caller).
+	GRPCSecretKey string
 }
 
 type Modules struct {
@@ -84,7 +92,23 @@ func (a *App) Run() error {
 		zap.Object("test_mode", a.testModeComparator),
 	)
 
-	gs := dgrpcfactory.ServerFromOptions(dgrpcserver.WithLogger(a.zlogger))
+	serverOpts := []dgrpcserver.Option{dgrpcserver.WithLogger(a.zlogger)}
+
+	if a.Config.GRPCSecretKey != "" {
+		a.zlogger.Info("blockstream gRPC server secret key authentication enabled")
+
+		auth, err := dauth.New("secret://"+a.Config.GRPCSecretKey, a.zlogger)
+		if err != nil {
+			return fmt.Errorf("creating blockstream authenticator: %w", err)
+		}
+
+		serverOpts = append(serverOpts,
+			dgrpcserver.WithPostUnaryInterceptor(dauthgrpc.UnaryAuthChecker(auth, a.zlogger)),
+			dgrpcserver.WithPostStreamInterceptor(dauthgrpc.StreamAuthChecker(auth, a.zlogger)),
+		)
+	}
+
+	gs := dgrpcfactory.ServerFromOptions(serverOpts...)
 
 	blockStreamServer := blockstream.NewUnmanagedServer(
 		blockstream.ServerOptionWithLogger(a.zlogger),
