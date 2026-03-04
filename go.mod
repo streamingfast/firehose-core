@@ -2,14 +2,7 @@ module github.com/streamingfast/firehose-core
 
 go 1.26.0
 
-replace (
-	block-streamer => ../block-streamer
-	github.com/streamingfast/dgrpc => ../dgrpc
-	github.com/streamingfast/substreams => ../substreams
-)
-
 require (
-	block-streamer v0.0.0-00010101000000-000000000000
 	buf.build/gen/go/bufbuild/reflect/connectrpc/go v1.16.1-20240117202343-bf8f65e8876c.1
 	buf.build/gen/go/bufbuild/reflect/protocolbuffers/go v1.33.0-20240117202343-bf8f65e8876c.1
 	cloud.google.com/go/logging v1.13.2
@@ -46,8 +39,9 @@ require (
 	github.com/streamingfast/logging v0.0.0-20260108192805-38f96de0a641
 	github.com/streamingfast/payment-gateway v0.0.0-20251124143836-60d98e3546f5
 	github.com/streamingfast/pbgo v0.0.6-0.20260206150405-2b95acf70437
+	github.com/streamingfast/quic-block-transport v0.0.0-20260304133304-0333059fb5ce
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.18.2-0.20260225165135-3f4f15a0e533
+	github.com/streamingfast/substreams v1.18.2-0.20260304133624-4fbf2d3a6aee
 	github.com/stretchr/testify v1.11.1
 	github.com/test-go/testify v1.1.4
 	github.com/testcontainers/testcontainers-go v0.40.0

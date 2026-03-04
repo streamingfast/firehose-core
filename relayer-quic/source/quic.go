@@ -15,11 +15,11 @@
 package source
 
 import (
-	"block-streamer/blockinfo"
-	"block-streamer/quic"
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/streamingfast/quic-block-transport/blockinfo"
+	"github.com/streamingfast/quic-block-transport/quic"
 	"io"
 
 	"github.com/streamingfast/bstream"

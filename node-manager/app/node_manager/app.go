@@ -22,7 +22,7 @@ import (
 	"os"
 	"time"
 
-	quicblockserver "block-streamer/quic"
+	quicblockserver "github.com/streamingfast/quic-block-transport/quic"
 
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	dgrpcfactory "github.com/streamingfast/dgrpc/server/factory"

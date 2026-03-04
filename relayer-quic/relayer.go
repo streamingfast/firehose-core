@@ -27,8 +27,8 @@ import (
 	"strings"
 	"time"
 
-	"block-streamer/blockinfo"
-	"block-streamer/quic"
+	"github.com/streamingfast/quic-block-transport/blockinfo"
+	"github.com/streamingfast/quic-block-transport/quic"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"

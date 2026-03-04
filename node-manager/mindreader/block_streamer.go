@@ -6,8 +6,8 @@ import (
 	"io"
 	"sync"
 
-	"block-streamer/blockinfo"
-	quicblockserver "block-streamer/quic"
+	"github.com/streamingfast/quic-block-transport/blockinfo"
+	quicblockserver "github.com/streamingfast/quic-block-transport/quic"
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"go.uber.org/zap"
