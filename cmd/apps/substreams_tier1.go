@@ -48,7 +48,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 		RegisterFlags: func(cmd *cobra.Command) error {
 			cmd.Flags().String("substreams-tier1-grpc-listen-addr", firecore.SubstreamsTier1GRPCServingAddr, "Address on which the Substreams tier1 will listen, listen by default in plain text, appending a '*' to the end of the address make it listen in snake-oil (inscure) TLS")
 			cmd.Flags().String("substreams-tier1-subrequests-endpoint", firecore.SubstreamsTier2GRPCServingAddr, "Address on which the Substreans tier1 can reach the tier2")
-			// communication with tier2
+			cmd.Flags().String("substreams-tier1-subrequests-secret-key", "", "Secret key to use for backend authentication with the tier2")
 			cmd.Flags().String("substreams-tier1-discovery-service-url", "", "URL to configure the grpc discovery service, used for communication with tier2") //traffic-director://xds?vpc_network=vpc-global&use_xds_reds=true
 			cmd.Flags().Bool("substreams-tier1-subrequests-insecure", false, "Connect to tier2 without checking certificate validity")
 			cmd.Flags().Bool("substreams-tier1-subrequests-plaintext", true, "Connect to tier2 without client in plaintext mode")
@@ -150,6 +150,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			config.ActiveRequestsHardLimit = viper.GetInt("substreams-tier1-active-requests-hard-limit")
 			config.SubrequestsInsecure = viper.GetBool("substreams-tier1-subrequests-insecure")
 			config.SubrequestsPlaintext = viper.GetBool("substreams-tier1-subrequests-plaintext")
+			config.SubrequestsSecret = viper.GetString("substreams-tier1-subrequests-secret-key")
 			config.BlockType = blockType
 			config.WASMExtensions = wasmExtensions
 			config.BlockExecutionTimeout = viper.GetDuration("substreams-block-execution-timeout")
