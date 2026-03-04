@@ -115,6 +115,7 @@ func Main[B firecore.Block](chain *firecore.Chain[B]) {
 	apps.RegisterReaderNodeFirehoseApp(chain, rootLog)
 	apps.RegisterMergerApp(rootLog)
 	apps.RegisterRelayerApp(rootLog)
+	apps.RegisterRelayerQuicApp(rootLog)
 	apps.RegisterFirehoseApp(chain, rootLog)
 	apps.RegisterSubstreamsTier1App(chain, rootLog)
 	apps.RegisterSubstreamsTier2App(chain, rootLog)

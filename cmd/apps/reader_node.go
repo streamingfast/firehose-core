@@ -2,7 +2,14 @@ package apps
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
+	"math/big"
 	"os"
 	"regexp"
 	"time"
@@ -64,6 +71,7 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 			`)))
 			flags.StringSlice("reader-node-backups", []string{}, "Repeatable, space-separated key=values definitions for backups. Example: 'type=gke-pvc-snapshot prefix= tag=v1 freq-blocks=1000 freq-time= project=myproj'")
 			flags.String("reader-node-grpc-listen-addr", firecore.ReaderNodeGRPCAddr, "The gRPC listening address to use for serving real-time blocks")
+			flags.String("reader-node-quic-addr", firecore.ReaderNodeQuicCAddr, "QUIC listen address for the block server (empty to disable)")
 			flags.Bool("reader-node-discard-after-stop-num", false, "Ignore remaining blocks being processed after stop num (only useful if we discard the reader data after reprocessing a chunk of blocks)")
 			flags.String("reader-node-working-dir", "{data-dir}/reader/work", "Path where reader will stores its files")
 			flags.Uint("reader-node-start-block-num", 0, "Blocks that were produced with smaller block number then the given block num are skipped")
@@ -209,8 +217,14 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 			blockStreamServer := blockstream.NewUnmanagedServer(blockstream.ServerOptionWithLogger(appLogger))
 			workingDir := firecore.MustReplaceDataDir(sfDataDir, viper.GetString("reader-node-working-dir"))
 			gprcListenAddr := viper.GetString("reader-node-grpc-listen-addr")
+			quicAddr := viper.GetString("reader-node-quic-addr")
 			oneBlockFileSuffix := viper.GetString("reader-node-one-block-suffix")
 			blocksChanCapacity := viper.GetInt("reader-node-blocks-chan-capacity")
+
+			var blockSourceAdapter *reader.BlockSourceAdapter
+			if quicAddr != "" {
+				blockSourceAdapter = reader.NewBlockSourceAdapter(blocksChanCapacity, appLogger)
+			}
 
 			readerPlugin, err := reader.NewMindReaderPlugin(
 				oneBlocksStoreURL,
@@ -227,6 +241,7 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 				},
 				oneBlockFileSuffix,
 				blockStreamServer,
+				blockSourceAdapter,
 				testModeComparator,
 				appLogger,
 				appTracer,
@@ -237,12 +252,20 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 
 			superviser.RegisterLogPlugin(readerPlugin)
 
+			var quicTLS *tls.Config
+			if quicAddr != "" {
+				quicTLS = generateSelfSignedTLSConfig()
+			}
+
 			return nodeManagerApp.New(&nodeManagerApp.Config{
-				HTTPAddr: httpAddr,
-				GRPCAddr: gprcListenAddr,
+				HTTPAddr:            httpAddr,
+				GRPCAddr:            gprcListenAddr,
+				QuicBlockServerAddr: quicAddr,
+				QuicBlockServerTLS:  quicTLS,
 			}, &nodeManagerApp.Modules{
 				Operator:                   chainOperator,
 				MindreaderPlugin:           readerPlugin,
+				BlockSourceAdapter:         blockSourceAdapter,
 				MetricsAndReadinessManager: metricsAndReadinessManager,
 				RegisterGRPCService: func(server grpc.ServiceRegistrar) error {
 					pbheadinfo.RegisterHeadInfoServer(server, blockStreamServer)
@@ -305,6 +328,36 @@ func createNodeArgumentsResolver(dataDir, nodeDataDir, hostname string, firstStr
 
 func gkeSnapshotterFactory(conf operator.BackupModuleConfig) (operator.BackupModule, error) {
 	return snapshotter.NewGKEPVCSnapshotter(conf)
+}
+
+func generateSelfSignedTLSConfig() *tls.Config {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		panic(fmt.Sprintf("generating ECDSA key: %v", err))
+	}
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(365 * 24 * time.Hour),
+	}
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
+	if err != nil {
+		panic(fmt.Sprintf("creating certificate: %v", err))
+	}
+	keyBytes, err := x509.MarshalECPrivateKey(key)
+	if err != nil {
+		panic(fmt.Sprintf("marshaling EC private key: %v", err))
+	}
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyBytes})
+	tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		panic(fmt.Sprintf("loading X509 key pair: %v", err))
+	}
+	return &tls.Config{
+		Certificates: []tls.Certificate{tlsCert},
+		NextProtos:   []string{"block-streamer"},
+	}
 }
 
 // createTestModeComparator creates a test mode comparator if test mode is enabled.

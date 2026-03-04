@@ -63,10 +63,11 @@ type MindReaderPlugin struct {
 	lastSeenBlock     bstream.BlockRef
 	lastSeenBlockLock sync.RWMutex
 
-	headBlockUpdater  nodeManager.HeadBlockUpdater
-	onBlockWritten    nodeManager.OnBlockWritten
-	blockStreamServer *blockstream.Server
-	zlogger           *zap.Logger
+	headBlockUpdater   nodeManager.HeadBlockUpdater
+	onBlockWritten     nodeManager.OnBlockWritten
+	blockStreamServer  *blockstream.Server
+	blockSourceAdapter *BlockSourceAdapter
+	zlogger            *zap.Logger
 
 	lines               chan string
 	consoleReader       ConsolerReader // contains the 'reader' part of the pipe
@@ -90,6 +91,7 @@ func NewMindReaderPlugin(
 	shutdownFunc func(error),
 	oneBlockSuffix string,
 	blockStreamServer *blockstream.Server,
+	blockSourceAdapter *BlockSourceAdapter,
 	testModeComparator *TestModeComparator,
 	zlogger *zap.Logger,
 	tracer logging.Tracer,
@@ -154,6 +156,7 @@ func NewMindReaderPlugin(
 		channelCapacity:          channelCapacity,
 		headBlockUpdater:         headBlockUpdater,
 		blockStreamServer:        blockStreamServer,
+		blockSourceAdapter:       blockSourceAdapter,
 		forceFinalityAfterBlocks: utils.GetEnvForceFinalityAfterBlocks(),
 		testModeComparator:       testModeComparator,
 		zlogger:                  zlogger,
@@ -324,6 +327,11 @@ func (p *MindReaderPlugin) consumeReadFlow(blocks <-chan *pbbstream.Block) {
 
 				continue
 			}
+		}
+
+		// Also relay blocks to the block-streamer adapter if configured
+		if p.blockSourceAdapter != nil && p.testModeComparator == nil {
+			p.blockSourceAdapter.Push(block)
 		}
 	}
 }

@@ -103,6 +103,7 @@ func (a *App) Run() error {
 		func(_ error) {},
 		a.Config.OneBlockSuffix,
 		blockStreamServer,
+		nil, // blockSourceAdapter
 		a.testModeComparator,
 		a.zlogger,
 		a.tracer,

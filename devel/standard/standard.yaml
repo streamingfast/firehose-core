@@ -2,10 +2,10 @@ start:
   args:
   - reader-node
   - merger
-  - relayer
-  - firehose
-  - substreams-tier1
-  - substreams-tier2
+  - relayer-quic
+#  - firehose
+#  - substreams-tier1
+#  - substreams-tier2
   flags:
     advertise-block-id-encoding: "hex"
     advertise-chain-name: "acme-dummy-blockchain"
@@ -14,6 +14,8 @@ start:
     # of `go env GOPATH` in your environment).
     reader-node-path: "dummy-blockchain"
     reader-node-data-dir: "{data-dir}/reader-node"
+    common-live-blocks-addr: ""
+    substreams-tier1-block-stream-quic-addr: "localhost:10120"
 
     # Flags that will be added to the dummy chain process command
     reader-node-arguments:
@@ -23,3 +25,4 @@ start:
       --block-rate=120
       --genesis-height=0
       --genesis-block-burst=100
+      --block-size=10kb

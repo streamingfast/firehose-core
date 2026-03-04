@@ -16,10 +16,13 @@ package nodemanager
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"os"
 	"time"
+
+	quicblockserver "block-streamer/quic"
 
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	dgrpcfactory "github.com/streamingfast/dgrpc/server/factory"
@@ -40,6 +43,9 @@ type Config struct {
 	ConnectionWatchdog bool
 
 	GRPCAddr string
+
+	QuicBlockServerAddr string      // QUIC listen address for quic block server (empty to disable)
+	QuicBlockServerTLS  *tls.Config // TLS config for quic block server
 }
 
 type Modules struct {
@@ -47,6 +53,7 @@ type Modules struct {
 	MetricsAndReadinessManager   *nodeManager.MetricsAndReadinessManager
 	LaunchConnectionWatchdogFunc func(terminating <-chan struct{})
 	MindreaderPlugin             *mindreader.MindReaderPlugin
+	BlockSourceAdapter           *mindreader.BlockSourceAdapter
 	RegisterGRPCService          func(server grpc.ServiceRegistrar) error
 	StartFailureHandlerFunc      func()
 }
@@ -101,7 +108,12 @@ func (a *App) Run() error {
 		if err := a.startMindreader(); err != nil {
 			return fmt.Errorf("unable to start mindreader: %w", err)
 		}
+	}
 
+	if a.config.QuicBlockServerAddr != "" && a.modules.BlockSourceAdapter != nil {
+		if err := a.startQuicBlockServer(); err != nil {
+			return fmt.Errorf("unable to start quic block server: %w", err)
+		}
 	}
 
 	a.zlogger.Info("launching operator")
@@ -134,6 +146,30 @@ func (a *App) IsReady() bool {
 	}
 
 	return res.StatusCode == 200
+}
+
+func (a *App) startQuicBlockServer() error {
+	a.zlogger.Info("starting quic block server", zap.String("addr", a.config.QuicBlockServerAddr))
+
+	srv := quicblockserver.NewBlockServer(a.config.QuicBlockServerAddr, a.config.QuicBlockServerTLS, a.modules.BlockSourceAdapter, a.zlogger)
+
+	// Accept proxy connections in the background.
+	go func() {
+		if err := srv.ListenAndServe(context.Background()); err != nil {
+			a.zlogger.Error("quic block server listen error", zap.Error(err))
+			a.Shutdown(err)
+		}
+	}()
+
+	// Stream blocks to connected proxies in the background.
+	go func() {
+		if err := srv.StreamBlocks(context.Background()); err != nil {
+			a.zlogger.Error("quic block server stream error", zap.Error(err))
+			a.Shutdown(err)
+		}
+	}()
+
+	return nil
 }
 
 func (a *App) startMindreader() error {

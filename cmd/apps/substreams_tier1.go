@@ -70,6 +70,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				This is useful to prevent the tier1 from being overwhelmed by too many requests, most client auto-reconnects on 'Unavailable' code
 				so they should end up on another tier1 instance, assuming you have proper auto-scaling of the number of instances available.
 			`))
+			cmd.Flags().String("substreams-tier1-block-stream-quic-addr", "", "Address on which the Substreams tier1 will connect to a QUIC block stream, can be \"\" to disable")
 			cmd.Flags().String("substreams-tier1-quicksave-store", "", "If enabled, substreams will use this store to put 'quicksave' data when shutting down while running requests with 'stores'. Use this flag with a non-zero --common-system-shutdown-signal-delay")
 			cmd.Flags().String("substreams-tier1-global-worker-pool-address", "", "Address of the global worker pool to use for the substreams tier1. (disabled if empty)")
 			cmd.Flags().String("substreams-tier1-global-request-pool-address", "", "Address of the global worker pool to use for the substreams tier1. (disabled if empty)")
@@ -140,6 +141,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			config.OneBlocksStoreURL = oneBlocksStoreURL
 			config.ForkedBlocksStoreURL = forkedBlocksStoreURL
 			config.BlockStreamAddr = viper.GetString("common-live-blocks-addr")
+			config.BlockStreamQUICAddr = viper.GetString("substreams-tier1-block-stream-quic-addr")
 			config.TmpDir = tmpDir
 			config.StateStoreURL = firecore.MustReplaceDataDir(sfDataDir, viper.GetString("substreams-state-store-url"))
 			config.StateStoreDefaultTag = viper.GetString("substreams-state-store-default-tag")

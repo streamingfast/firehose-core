@@ -10,9 +10,11 @@ var (
 	// Firehose chain specific port
 	IndexBuilderServiceAddr        string = ":10009"
 	ReaderNodeGRPCAddr             string = ":10010"
+	ReaderNodeQuicCAddr            string = ":10020"
 	ReaderNodeManagerAPIAddr       string = ":10011"
 	MergerServingAddr              string = ":10012"
 	RelayerServingAddr             string = ":10014"
+	RelayerQuicServingAddr         string = ":10021"
 	FirehoseGRPCServingAddr        string = ":10015"
 	SubstreamsTier1GRPCServingAddr string = ":10016"
 	SubstreamsTier2GRPCServingAddr string = ":10017"
