@@ -15,6 +15,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 * Add `firecore tools networks list` command to display registered networks from The Graph Networks Registry with their Firehose and Substreams endpoints. Supports `--name-only` flag for listing only network IDs and `--only` flag for filtering networks using a regular expression.
 * Add `substreams-tier2-authenticator` flag to specify the authenticator to use for tier2 requests. Can be 'trust://' (default, same as previous behavior) or 'secret://<key>'
 * Add `substreams-tier1-subrequests-secret-key` flag to specify the secret key to use for tier1 subrequests authentication when using 'secret://' authenticator on tier2
+* Add `reader-node-grpc-secret-key` flag to specify the secret key to use for reader node gRPC authentication
+* Add `?secret=...` parsing to `relayer-source`s
 
 ### Fixed
 
