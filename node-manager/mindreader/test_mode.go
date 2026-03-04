@@ -114,6 +114,10 @@ func (c *TestModeComparator) Close() error {
 }
 
 func (c *TestModeComparator) CompareBlock(ctx context.Context, testingBlock *pbbstream.Block) error {
+	// Track metrics - increment total blocks compared
+	TestModeBlocksCompared.Inc()
+	defer c.updatePercentageMetrics()
+
 	// Fetch the production block from the remote endpoint
 	req := &pbfirehose.SingleBlockRequest{
 		Reference: &pbfirehose.SingleBlockRequest_BlockHashAndNumber_{
@@ -194,12 +198,14 @@ func (c *TestModeComparator) CompareBlock(ctx context.Context, testingBlock *pbb
 
 	// Compare the chain-specific payload
 	if proto.Equal(testingChainBlock, productionChainBlock) {
+		TestModeBlocksMatched.Inc()
 		fmt.Printf("✅ Block %d (%s) matches production\n", testingBlock.Number, testingBlock.Id)
 		c.logger.Debug("blocks are identical", zap.Uint64("block_num", testingBlock.Number))
 		return nil
 	}
 
 	// Payloads differ, generate diff (it's fine to use same block number and ID as this has been checked already here)
+	TestModeBlocksMismatched.Inc()
 	return c.generateDiff(testingBlock.Number, testingBlock.Id, testingChainBlock, productionChainBlock)
 }
 
@@ -313,6 +319,33 @@ func sanitizeBlockID(blockID string) string {
 	}
 
 	return blockID
+}
+
+// updatePercentageMetrics recalculates and updates success/failure percentage gauges
+func (c *TestModeComparator) updatePercentageMetrics() {
+	total := TestModeBlocksCompared.Get()
+	if total == 0 {
+		TestModeSuccessPercentage.SetFloat64(0)
+		TestModeFailurePercentage.SetFloat64(0)
+		return
+	}
+
+	matched := TestModeBlocksMatched.Get()
+	mismatched := TestModeBlocksMismatched.Get()
+
+	successPercentage := (matched / total) * 100
+	failurePercentage := (mismatched / total) * 100
+
+	TestModeSuccessPercentage.SetFloat64(successPercentage)
+	TestModeFailurePercentage.SetFloat64(failurePercentage)
+
+	c.logger.Debug("updated test mode percentage metrics",
+		zap.Float64("total", total),
+		zap.Float64("matched", matched),
+		zap.Float64("mismatched", mismatched),
+		zap.Float64("success_pct", successPercentage),
+		zap.Float64("failure_pct", failurePercentage),
+	)
 }
 
 // ParseTestModeDSN parses the DSN format: http(s)://host:port[?insecure=true][&apiKey=key]

@@ -17,6 +17,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 * Add `substreams-tier1-subrequests-secret-key` flag to specify the secret key to use for tier1 subrequests authentication when using 'secret://' authenticator on tier2
 * Add `reader-node-grpc-secret-key` flag to specify the secret key to use for reader node gRPC authentication
 * Add `?secret=...` parsing to `relayer-source`s
+* Add Prometheus metrics for reader test mode: track blocks compared, success/failure counts, and success/failure percentages for easy monitoring at interval stats.
 
 ### Fixed
 
