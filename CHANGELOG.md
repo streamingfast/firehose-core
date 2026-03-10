@@ -8,7 +8,7 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.13.1
 
 ### Added
 
@@ -22,6 +22,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### Fixed
 
 * Fix substreams/firehose endpoints detection of supported compression: do not fail on 'algo;q=x.y' syntax
+* Fix substreams tier2 jobs behind load balancer: will now retry forever on 'Unavailable: no healthy upstream' errors
 * Fix relayer failing to get back to live if reader blocks are unlinkable after a long period, and merger has removed one-blocks: it will now shutdown in that case, so it can be restarted.
 
 ## v1.13.0
