@@ -22,6 +22,7 @@ import (
 	"path"
 	"regexp"
 	"sync"
+	"time"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/blockstream"
@@ -37,6 +38,11 @@ import (
 var (
 	oneblockSuffixRegexp = regexp.MustCompile(`^[\w\-]+$`)
 )
+
+type readBlockSample struct {
+	at       time.Time
+	duration time.Duration
+}
 
 type ConsolerReader interface {
 	ReadBlock() (obj *pbbstream.Block, err error)
@@ -71,6 +77,13 @@ type MindReaderPlugin struct {
 	lines               chan string
 	consoleReader       ConsolerReader // contains the 'reader' part of the pipe
 	consumeReadFlowDone chan interface{}
+
+	samplesMu             sync.Mutex
+	readBlockSamples      []readBlockSample
+	headUpdaterSamples    []readBlockSample
+	storeBlockSamples     []readBlockSample
+	onBlockWrittenSamples []readBlockSample
+	pushBlockSamples      []readBlockSample
 
 	testModeComparator *TestModeComparator
 }
@@ -205,10 +218,81 @@ func (p *MindReaderPlugin) Launch() {
 	p.launch()
 
 }
+func (p *MindReaderPlugin) recordSample(samples *[]readBlockSample, at time.Time) {
+	p.samplesMu.Lock()
+	*samples = append(*samples, readBlockSample{at: at, duration: time.Since(at)})
+	p.samplesMu.Unlock()
+}
+
+func pruneSamples(samples *[]readBlockSample, cutoff time.Time) {
+	s := *samples
+	i := 0
+	for i < len(s) && s[i].at.Before(cutoff) {
+		i++
+	}
+	*samples = s[i:]
+}
+
+func sampleStats(samples []readBlockSample) (avg, last time.Duration, count int) {
+	count = len(samples)
+	if count == 0 {
+		return
+	}
+	var total time.Duration
+	for _, s := range samples {
+		total += s.duration
+	}
+	avg = total / time.Duration(count)
+	last = samples[count-1].duration
+	return
+}
+
 func (p *MindReaderPlugin) launch() {
 	blocks := make(chan *pbbstream.Block, p.channelCapacity)
 	p.zlogger.Info("launching blocks reading loop", zap.Int("capacity", p.channelCapacity))
 	go p.consumeReadFlow(blocks)
+
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				channelLen := len(blocks)
+				channelCap := cap(blocks)
+
+				p.samplesMu.Lock()
+				cutoff := time.Now().Add(-5 * time.Minute)
+				pruneSamples(&p.readBlockSamples, cutoff)
+				pruneSamples(&p.headUpdaterSamples, cutoff)
+				pruneSamples(&p.storeBlockSamples, cutoff)
+				pruneSamples(&p.onBlockWrittenSamples, cutoff)
+				pruneSamples(&p.pushBlockSamples, cutoff)
+
+				readBlockAvg, readBlockLast, readBlockCount := sampleStats(p.readBlockSamples)
+				headUpdaterAvg, _, _ := sampleStats(p.headUpdaterSamples)
+				storeBlockAvg, _, _ := sampleStats(p.storeBlockSamples)
+				onBlockWrittenAvg, _, _ := sampleStats(p.onBlockWrittenSamples)
+				pushBlockAvg, _, _ := sampleStats(p.pushBlockSamples)
+				p.samplesMu.Unlock()
+
+				p.zlogger.Info("mindreader stats",
+					zap.Int("channel_len", channelLen),
+					zap.Int("channel_cap", channelCap),
+					zap.Bool("channel_full", channelLen == channelCap),
+					zap.Int("blocks_5m", readBlockCount),
+					zap.Duration("read_block_last", readBlockLast),
+					zap.Duration("read_block_avg_5m", readBlockAvg),
+					zap.Duration("head_updater_avg_5m", headUpdaterAvg),
+					zap.Duration("store_block_avg_5m", storeBlockAvg),
+					zap.Duration("on_block_written_avg_5m", onBlockWrittenAvg),
+					zap.Duration("push_block_avg_5m", pushBlockAvg),
+				)
+			case <-p.Terminating():
+				return
+			}
+		}
+	}()
 
 	go func() {
 		for {
@@ -287,7 +371,9 @@ func (p *MindReaderPlugin) consumeReadFlow(blocks <-chan *pbbstream.Block) {
 			}
 		} else if p.archiver != nil {
 			// Normal mode: store block
+			storeBlockStart := time.Now()
 			err := p.archiver.StoreBlock(ctx, block)
+			p.recordSample(&p.storeBlockSamples, storeBlockStart)
 			if err != nil {
 				p.zlogger.Error("failed storing block in archiver, shutting down and trying to send next blocks individually. You will need to reprocess over this range.", zap.Error(err), zap.String("received_block", block.Id), zap.Uint64("received_block_num", block.Number))
 
@@ -299,7 +385,9 @@ func (p *MindReaderPlugin) consumeReadFlow(blocks <-chan *pbbstream.Block) {
 			}
 
 			if p.onBlockWritten != nil {
+				onBlockWrittenStart := time.Now()
 				err = p.onBlockWritten(block)
+				p.recordSample(&p.onBlockWrittenSamples, onBlockWrittenStart)
 				if err != nil {
 					p.zlogger.Error("onBlockWritten callback failed", zap.Error(err))
 
@@ -314,7 +402,9 @@ func (p *MindReaderPlugin) consumeReadFlow(blocks <-chan *pbbstream.Block) {
 
 		// Only relay blocks to the block stream server in normal mode (not in test mode)
 		if p.blockStreamServer != nil && p.testModeComparator == nil {
+			pushBlockStart := time.Now()
 			err := p.blockStreamServer.PushBlock(block)
+			p.recordSample(&p.pushBlockSamples, pushBlockStart)
 			if err != nil {
 				p.zlogger.Error("failed passing block to block stream server (this should not happen, shutting down)", zap.Error(err))
 
@@ -335,10 +425,12 @@ func (p *MindReaderPlugin) drainMessages() {
 }
 
 func (p *MindReaderPlugin) readOneMessage(blocks chan<- *pbbstream.Block) error {
+	start := time.Now()
 	block, err := p.consoleReader.ReadBlock()
 	if err != nil {
 		return err
 	}
+	p.recordSample(&p.readBlockSamples, start)
 
 	if p.forceFinalityAfterBlocks != nil {
 		utils.TweakBlockFinality(block, *p.forceFinalityAfterBlocks)
@@ -353,6 +445,7 @@ func (p *MindReaderPlugin) readOneMessage(blocks chan<- *pbbstream.Block) error 
 	p.lastSeenBlockLock.Unlock()
 
 	if p.headBlockUpdater != nil {
+		headUpdaterStart := time.Now()
 		if err := p.headBlockUpdater(block); err != nil {
 			p.zlogger.Info("shutting down because head block updater generated an error", zap.Error(err))
 
@@ -363,6 +456,7 @@ func (p *MindReaderPlugin) readOneMessage(blocks chan<- *pbbstream.Block) error 
 			// 0a33f6b578cc4d0b
 			go p.Shutdown(err)
 		}
+		p.recordSample(&p.headUpdaterSamples, headUpdaterStart)
 	}
 
 	blocks <- block

@@ -1,11 +1,11 @@
 start:
   args:
-  - reader-node
-  - merger
-  - relayer
-  - firehose
-  - substreams-tier1
-  - substreams-tier2
+    - reader-node
+    - merger
+    - relayer
+    - firehose
+    - substreams-tier1
+    - substreams-tier2
   flags:
     advertise-block-id-encoding: "hex"
     advertise-chain-name: "acme-dummy-blockchain"
@@ -16,10 +16,10 @@ start:
     reader-node-data-dir: "{data-dir}/reader-node"
 
     # Flags that will be added to the dummy chain process command
-    reader-node-arguments:
-      start
+    reader-node-arguments: start
       --tracer=firehose
       --store-dir="{node-data-dir}"
       --block-rate=120
       --genesis-height=0
       --genesis-block-burst=100
+#      --block-size="80 MiB"
