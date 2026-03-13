@@ -8,6 +8,13 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+* Removed parallel preloading of one-block-files to reduce RAM usage when merging big blocks.
+
+> [!NOTE]
+> With this change, HEAD block timestamp is now updated maximum every 5 seconds instead of at every block, by reading the first 500 bytes of the last one-block-file
+
 ## v1.13.3
 
 * Fix substreams support for requests with 'application/grpc-web*' content-type (old connectweb library)

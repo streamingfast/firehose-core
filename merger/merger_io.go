@@ -1,7 +1,6 @@
 package merger
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -17,7 +16,6 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose-core/merger/metrics"
-	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 )
 
@@ -36,11 +34,11 @@ type IOInterface interface {
 	// MergeAndStore writes a merged file from a list of oneBlockFiles
 	MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64, oneBlockFiles []*bstream.OneBlockFile) (err error)
 
-	// DownloadOneBlockFile will get you the data from the file
-	DownloadOneBlockFile(ctx context.Context, oneBlockFile *bstream.OneBlockFile) (data []byte, err error)
-
 	// DeleteAsync should be able to delete large quantities of oneBlockFiles from storage without ever blocking
 	DeleteAsync(oneBlockFiles []*bstream.OneBlockFile) error
+
+	// OpenOneBlockFile opens a one-block-file for reading
+	OpenOneBlockFile(ctx context.Context, obf *bstream.OneBlockFile) (io.ReadCloser, error)
 }
 
 type ForkAwareIOInterface interface {
@@ -67,14 +65,12 @@ type DStoreIO struct {
 	bundleSize uint64
 
 	logger *zap.Logger
-	tracer logging.Tracer
 	od     *oneBlockFilesDeleter
 	forkOd *oneBlockFilesDeleter
 }
 
 func NewDStoreIO(
 	logger *zap.Logger,
-	tracer logging.Tracer,
 	oneBlocksStore dstore.Store,
 	mergedBlocksStore dstore.Store,
 	forkedBlocksStore dstore.Store,
@@ -93,7 +89,6 @@ func NewDStoreIO(
 		retryCooldown:     retryCooldown,
 		bundleSize:        bundleSize,
 		logger:            logger,
-		tracer:            tracer,
 		od:                od,
 	}
 
@@ -144,11 +139,11 @@ func (s *DStoreIO) MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64
 	err = Retry(s.logger, s.retryAttempts, s.retryCooldown, func() error {
 		inCtx, cancel := context.WithTimeout(ctx, WriteObjectTimeout)
 		defer cancel()
-		bundleReader, err := NewBundleReader(ctx, s.logger, s.tracer, filteredOBF, anyOneBlockFile, s.DownloadOneBlockFile)
+		streamReader, err := NewStreamingBundleReader(ctx, s.logger, filteredOBF, anyOneBlockFile, s.OpenOneBlockFile)
 		if err != nil {
 			return err
 		}
-		return s.mergedBlocksStore.WriteObject(inCtx, bundleFilename, bundleReader)
+		return s.mergedBlocksStore.WriteObject(inCtx, bundleFilename, streamReader)
 	})
 	if err != nil {
 		return fmt.Errorf("write object error: %s", err)
@@ -174,68 +169,15 @@ func (s *DStoreIO) WalkOneBlockFiles(ctx context.Context, lowestBlock uint64, ca
 
 }
 
-// fixLegacyBlock reads the header and looks for "Version 0", rewriting to Version 1 on the fly if needed
-func fixLegacyBlock(in []byte) ([]byte, error) {
-	dbinReader, err := bstream.NewDBinBlockReader(bytes.NewReader(in))
-	if err != nil {
-		return nil, fmt.Errorf("creating block reader in fixLegacyBlock: %w", err)
-	}
-
-	if dbinReader.Header.Version != 0 {
-		return in, nil
-	}
-
-	reader, err := bstream.NewDBinBlockReader(bytes.NewReader(in))
-	if err != nil {
-		return nil, fmt.Errorf("creating block reader in fixLegacyBlock: %w", err)
-	}
-
-	blk, err := reader.Read()
-	if err != nil {
-		return nil, fmt.Errorf("reading block in fixLegacyBlock: %w", err)
-	}
-
-	out := new(bytes.Buffer)
-	writer, err := bstream.NewDBinBlockWriter(out)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := writer.Write(blk); err != nil {
-		return nil, fmt.Errorf("writing block in fixLegacyBlock: %w", err)
-	}
-	return out.Bytes(), nil
-
-}
-
-func (s *DStoreIO) DownloadOneBlockFile(ctx context.Context, oneBlockFile *bstream.OneBlockFile) (data []byte, err error) {
-	for filename := range oneBlockFile.Filenames { // will try to get MemoizeData from any of those files
-		var out io.ReadCloser
-		out, err = s.oneBlocksStore.OpenObject(ctx, filename)
-		s.logger.Debug("downloading one block", zap.String("file_name", filename))
+func (s *DStoreIO) OpenOneBlockFile(ctx context.Context, oneBlockFile *bstream.OneBlockFile) (io.ReadCloser, error) {
+	for filename := range oneBlockFile.Filenames {
+		r, err := s.oneBlocksStore.OpenObject(ctx, filename)
 		if err != nil {
 			continue
 		}
-		defer out.Close()
-
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-		}
-
-		data, err = io.ReadAll(out)
-		if err != nil {
-			continue
-		}
-
-		data, err = fixLegacyBlock(data)
-		if err == nil {
-			break
-		}
+		return r, nil
 	}
-
-	return
+	return nil, fmt.Errorf("could not open any file for block %d", oneBlockFile.Num)
 }
 
 func (s *DStoreIO) NextBundle(ctx context.Context, lowestBaseBlock uint64) (outBaseBlock uint64, lib bstream.BlockRef, err error) {

@@ -1,16 +1,9 @@
 package merger
 
 import (
-	//	"context"
-	//"fmt"
-
 	"context"
 	"testing"
 
-	//	"time"
-
-	//	"github.com/streamingfast/bstream"
-	//"github.com/streamingfast/firehose-core/merger/bundle"
 	"github.com/streamingfast/bstream"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -224,3 +217,4 @@ func TestBundlerMergeKeepOne(t *testing.T) {
 		})
 	}
 }
+

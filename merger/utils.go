@@ -17,6 +17,7 @@ package merger
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -52,11 +53,11 @@ func Retry(logger *zap.Logger, attempts int, sleep time.Duration, function func(
 }
 
 type TestMergerIO struct {
-	NextBundleFunc           func(ctx context.Context, lowestBaseBlock uint64) (baseBlock uint64, lastIrreversibleBlock bstream.BlockRef, err error)
-	WalkOneBlockFilesFunc    func(ctx context.Context, inclusiveLowerBlock uint64, callback func(*bstream.OneBlockFile) error) error
-	MergeAndStoreFunc        func(ctx context.Context, inclusiveLowerBlock uint64, oneBlockFiles []*bstream.OneBlockFile) (err error)
-	DownloadOneBlockFileFunc func(ctx context.Context, oneBlockFile *bstream.OneBlockFile) (data []byte, err error)
-	DeleteAsyncFunc          func(oneBlockFiles []*bstream.OneBlockFile) error
+	NextBundleFunc        func(ctx context.Context, lowestBaseBlock uint64) (baseBlock uint64, lastIrreversibleBlock bstream.BlockRef, err error)
+	WalkOneBlockFilesFunc func(ctx context.Context, inclusiveLowerBlock uint64, callback func(*bstream.OneBlockFile) error) error
+	MergeAndStoreFunc     func(ctx context.Context, inclusiveLowerBlock uint64, oneBlockFiles []*bstream.OneBlockFile) (err error)
+	DeleteAsyncFunc       func(oneBlockFiles []*bstream.OneBlockFile) error
+	OpenOneBlockFileFunc  func(ctx context.Context, obf *bstream.OneBlockFile) (io.ReadCloser, error)
 }
 
 func (io *TestMergerIO) NextBundle(ctx context.Context, lowestBaseBlock uint64) (baseBlock uint64, lastIrreversibleBlock bstream.BlockRef, err error) {
@@ -73,14 +74,6 @@ func (io *TestMergerIO) MergeAndStore(ctx context.Context, inclusiveLowerBlock u
 	return nil
 }
 
-func (io *TestMergerIO) DownloadOneBlockFile(ctx context.Context, oneBlockFile *bstream.OneBlockFile) (data []byte, err error) {
-	if io.DownloadOneBlockFileFunc != nil {
-		return io.DownloadOneBlockFileFunc(ctx, oneBlockFile)
-	}
-
-	return nil, nil
-}
-
 func (io *TestMergerIO) WalkOneBlockFiles(ctx context.Context, inclusiveLowerBlock uint64, callback func(*bstream.OneBlockFile) error) error {
 	if io.WalkOneBlockFilesFunc != nil {
 		return io.WalkOneBlockFilesFunc(ctx, inclusiveLowerBlock, callback)
@@ -92,4 +85,11 @@ func (io *TestMergerIO) DeleteAsync(oneBlockFiles []*bstream.OneBlockFile) error
 		return io.DeleteAsyncFunc(oneBlockFiles)
 	}
 	return nil
+}
+
+func (io *TestMergerIO) OpenOneBlockFile(ctx context.Context, obf *bstream.OneBlockFile) (io.ReadCloser, error) {
+	if io.OpenOneBlockFileFunc != nil {
+		return io.OpenOneBlockFileFunc(ctx, obf)
+	}
+	return nil, nil
 }

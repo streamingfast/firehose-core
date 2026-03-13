@@ -87,7 +87,6 @@ func (a *App) Run() error {
 	// we are setting the backoff here for dstoreIO
 	io := merger.NewDStoreIO(
 		zlog,
-		tracer,
 		oneBlockStoreStore,
 		mergedBlocksStore,
 		forkedBlocksStore,

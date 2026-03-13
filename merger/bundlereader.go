@@ -15,112 +15,71 @@
 package merger
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
 
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/dbin"
-	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 )
 
-type BundleReader struct {
-	ctx              context.Context
-	readBuffer       []byte
-	readBufferOffset int
-	oneBlockDataChan chan []byte
-	errChan          chan error
-
-	logger       *zap.Logger
-	header       *dbin.Header
-	headerLength int
-}
-
-func NewBundleReader(ctx context.Context, logger *zap.Logger, tracer logging.Tracer, oneBlockFiles []*bstream.OneBlockFile, anyOneBlockFile *bstream.OneBlockFile, oneBlockDownloader bstream.OneBlockDownloaderFunc) (*BundleReader, error) {
-	r := &BundleReader{
-		ctx:              ctx,
-		logger:           logger,
-		oneBlockDataChan: make(chan []byte, 1),
-		errChan:          make(chan error, 1),
-	}
-
-	data, err := anyOneBlockFile.Data(ctx, oneBlockDownloader)
+// NewStreamingBundleReader creates an io.Reader that streams one-block-files directly from storage
+// without loading them into memory. It opens each file via opener one at a time, strips DBIN headers
+// from all files except the first, and pipes the concatenated output to the returned reader.
+func NewStreamingBundleReader(ctx context.Context, logger *zap.Logger, oneBlockFiles []*bstream.OneBlockFile, anyOneBlockFile *bstream.OneBlockFile, opener func(context.Context, *bstream.OneBlockFile) (io.ReadCloser, error)) (io.Reader, error) {
+	// Open anyOneBlockFile just to determine the DBIN header length
+	headerReader, err := opener(ctx, anyOneBlockFile)
 	if err != nil {
-		return nil, fmt.Errorf("cannot read one_block_file to get header: %w", err)
+		return nil, fmt.Errorf("cannot open one_block_file to get header: %w", err)
 	}
-
-	dbinReader, err := bstream.NewDBinBlockReader(bytes.NewReader(data))
+	dbinReader, err := bstream.NewDBinBlockReader(headerReader)
 	if err != nil {
-		return nil, fmt.Errorf("creating block reader: %w", err)
+		headerReader.Close()
+		return nil, fmt.Errorf("creating block reader for header: %w", err)
 	}
+	headerBytes := dbinReader.Header.RawBytes
+	headerLen := len(headerBytes)
+	headerReader.Close()
 
-	r.header = dbinReader.Header
-	r.headerLength = len(r.header.RawBytes)
+	pr, pw := io.Pipe()
 
-	if len(data) < r.headerLength {
-		return nil, fmt.Errorf("one-block-file corrupt: expected header size of %d, but file size is only %d bytes", r.headerLength, len(data))
-	}
-	r.readBuffer = data[:r.headerLength]
-
-	go r.downloadAll(oneBlockFiles, oneBlockDownloader)
-	return r, nil
-}
-
-// downloadAll does not work in parallel: for performance, the oneBlockFiles' data should already have been memoized by calling Data() on them.
-func (r *BundleReader) downloadAll(oneBlockFiles []*bstream.OneBlockFile, oneBlockDownloader bstream.OneBlockDownloaderFunc) {
-	defer close(r.oneBlockDataChan)
-	for _, oneBlockFile := range oneBlockFiles {
-		data, err := oneBlockFile.Data(r.ctx, oneBlockDownloader)
-		if err != nil {
-			r.errChan <- err
+	go func() {
+		// Write the DBIN header once at the start
+		if _, err := pw.Write(headerBytes); err != nil {
+			pw.CloseWithError(err)
 			return
 		}
-		r.oneBlockDataChan <- data
-	}
-}
 
-func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
-	if r.readBuffer == nil {
-		if err := r.fillBuffer(); err != nil {
-			return 0, err
+		for _, obf := range oneBlockFiles {
+			select {
+			case <-ctx.Done():
+				pw.CloseWithError(ctx.Err())
+				return
+			default:
+			}
+
+			r, err := opener(ctx, obf)
+			if err != nil {
+				pw.CloseWithError(fmt.Errorf("opening one_block_file %s: %w", obf.CanonicalName, err))
+				return
+			}
+
+			// Skip the DBIN header on each individual file
+			if _, err := io.CopyN(io.Discard, r, int64(headerLen)); err != nil {
+				r.Close()
+				pw.CloseWithError(fmt.Errorf("skipping header in one_block_file %s: %w", obf.CanonicalName, err))
+				return
+			}
+
+			if _, err := io.Copy(pw, r); err != nil {
+				r.Close()
+				pw.CloseWithError(fmt.Errorf("streaming one_block_file %s: %w", obf.CanonicalName, err))
+				return
+			}
+			r.Close()
 		}
-	}
+		pw.Close()
+	}()
 
-	bytesRead = copy(p, r.readBuffer[r.readBufferOffset:])
-	r.readBufferOffset += bytesRead
-	if r.readBufferOffset >= len(r.readBuffer) {
-		r.readBuffer = nil
-	}
-
-	return bytesRead, nil
-}
-
-func (r *BundleReader) fillBuffer() error {
-	var data []byte
-	select {
-	case d, ok := <-r.oneBlockDataChan:
-		if !ok {
-			return io.EOF
-		}
-		data = d
-	case err := <-r.errChan:
-		return err
-	case <-r.ctx.Done():
-		return nil
-	}
-
-	if len(data) == 0 {
-		r.readBuffer = nil
-		return fmt.Errorf("one-block-file corrupt: empty data")
-	}
-
-	if len(data) < r.headerLength {
-		return fmt.Errorf("one-block-file corrupt: expected header size of %d, but file size is only %d bytes", r.headerLength, len(data))
-	}
-	data = data[r.headerLength:]
-	r.readBuffer = data
-	r.readBufferOffset = 0
-	return nil
+	return pr, nil
 }
