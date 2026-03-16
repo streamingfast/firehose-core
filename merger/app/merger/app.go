@@ -36,6 +36,7 @@ type Config struct {
 	StorageForkedBlocksFilesPath string
 
 	FilesDeleteThreads int
+	MaxMergingThreads  int
 
 	GRPCListenAddr string
 
@@ -105,6 +106,7 @@ func (a *App) Run() error {
 		a.config.TimeBetweenPruning,
 		a.config.TimeBetweenPolling,
 		a.config.StopBlock,
+		a.config.MaxMergingThreads,
 	)
 	zlog.Info("merger initiated")
 

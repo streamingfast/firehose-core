@@ -52,10 +52,11 @@ func NewMerger(
 	timeBetweenPruning time.Duration,
 	timeBetweenPolling time.Duration,
 	stopBlock uint64,
+	maxMergingThreads int,
 ) *Merger {
 	m := &Merger{
 		Shutter:              shutter.New(),
-		bundler:              NewBundler(firstStreamableBlock, stopBlock, firstStreamableBlock, bundleSize, io),
+		bundler:              NewBundler(firstStreamableBlock, stopBlock, firstStreamableBlock, bundleSize, io, maxMergingThreads),
 		grpcListenAddr:       grpcListenAddr,
 		io:                   io,
 		firstStreamableBlock: firstStreamableBlock,
@@ -64,7 +65,7 @@ func NewMerger(
 		timeBetweenPruning:   timeBetweenPruning,
 		logger:               logger,
 	}
-	m.OnTerminating(func(_ error) { m.bundler.inProcess.Lock(); m.bundler.inProcess.Unlock() }) // finish bundle that may be merging async
+	m.OnTerminating(func(_ error) { m.bundler.WaitForMerges() }) // wait for all in-flight async merges to complete
 
 	return m
 }
@@ -157,7 +158,7 @@ func (m *Merger) startOldFilesPruner() {
 }
 
 func (m *Merger) pruningTarget(distance uint64) uint64 {
-	bundlerBase := m.bundler.BaseBlockNum()
+	bundlerBase := m.bundler.LowestUnmergedBlockNum()
 	if distance > bundlerBase {
 		return 0
 	}

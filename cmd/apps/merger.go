@@ -24,6 +24,7 @@ func RegisterMergerApp(rootLog *zap.Logger) {
 			cmd.Flags().Duration("merger-time-between-store-lookups", 1*time.Second, "Delay between source store polling (should be higher for remote storage)")
 			cmd.Flags().Duration("merger-time-between-store-pruning", time.Minute, "Delay between source store pruning loops")
 			cmd.Flags().Int("merger-delete-threads", 8, "Number of threads for deleting files in parallel (increase this in case the merger isn't able to keep up with deleting one-block files).")
+			cmd.Flags().Int("merger-max-merging-threads", 4, "Maximum number of bundles that can be merged in parallel. Increasing this allows the merger to catch up faster when behind, at the cost of more memory usage.")
 			return nil
 		},
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
@@ -42,6 +43,7 @@ func RegisterMergerApp(rootLog *zap.Logger) {
 				TimeBetweenPruning:           viper.GetDuration("merger-time-between-store-pruning"),
 				TimeBetweenPolling:           viper.GetDuration("merger-time-between-store-lookups"),
 				FilesDeleteThreads:           viper.GetInt("merger-delete-threads"),
+				MaxMergingThreads:            viper.GetInt("merger-max-merging-threads"),
 			}), nil
 		},
 	})

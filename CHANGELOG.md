@@ -11,9 +11,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ## Unreleased
 
 * Removed parallel preloading of one-block-files to reduce RAM usage when merging big blocks.
+* Added '--merger-max-merging-threads' so that the merger can merge blocks in parallel (still using way less RAM than previous one-block-preloading method)
 
 > [!NOTE]
-> With this change, HEAD block timestamp is now updated maximum every 5 seconds instead of at every block, by reading the first 500 bytes of the last one-block-file
+> With this change, HEAD block timestamp is now updated maximum every 5 seconds instead of at every block, by reading the first 500 bytes of the last one-block-file.
 
 ## v1.13.3
 
