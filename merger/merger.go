@@ -212,6 +212,9 @@ func (m *Merger) run() error {
 		var walkErr error
 		retryErr := Retry(m.logger, 12, 5*time.Second, func() error {
 			err = m.io.WalkOneBlockFiles(ctx, m.bundler.baseBlockNum, func(obf *bstream.OneBlockFile) error {
+				if m.IsTerminating() {
+					return errTerminating
+				}
 				return m.bundler.HandleBlockFile(obf)
 			})
 
@@ -231,6 +234,9 @@ func (m *Merger) run() error {
 		}
 
 		if walkErr != nil {
+			if walkErr == errTerminating {
+				return nil
+			}
 			if walkErr == ErrStopBlockReached {
 				m.logger.Info("stop block reached")
 				return nil

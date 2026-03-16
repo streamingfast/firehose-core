@@ -116,7 +116,11 @@ func (a *App) Run() error {
 	}
 	a.readinessProbe = pbhealth.NewHealthClient(gs)
 
-	a.OnTerminating(m.Shutdown)
+	a.OnTerminating(func(err error) {
+		m.Shutdown(err)
+		<-m.Terminated()
+		zlog.Info("merger terminated")
+	})
 	m.OnTerminated(a.Shutdown)
 
 	go m.Run()

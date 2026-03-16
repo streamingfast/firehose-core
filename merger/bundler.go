@@ -34,6 +34,7 @@ import (
 
 var ErrStopBlockReached = errors.New("stop block reached")
 var ErrFirstBlockAfterInitialStreamableBlock = errors.New("received first block after inital streamable block")
+var errTerminating = errors.New("terminating")
 
 type Bundler struct {
 	sync.Mutex
