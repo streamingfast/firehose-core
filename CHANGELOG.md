@@ -35,6 +35,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 * Add `?secret=...` parsing to `relayer-source`s
 * Add Prometheus metrics for reader test mode: track blocks compared, success/failure counts, and success/failure percentages for easy monitoring at interval stats.
 
+### Changed
+
+* Refactor reader test mode Prometheus metrics to fix incorrect success/failure percentage calculation caused by unaccounted blocks. Renamed `blocks_matched_total` -> `blocks_compared_matched_total` and `blocks_mismatched_total` -> `blocks_compared_mismatched_total`. The `blocks_compared_total` metric now counts only blocks that were fully compared (matched + mismatched). Added three new metrics: `blocks_seen_total` (all attempted blocks), `blocks_reorg_total` (skipped due to re-org/ID mismatch), and `blocks_fetch_failure_total` (failed to fetch from production). Invariants: `blocks_seen == blocks_reorg + blocks_fetch_failure + blocks_compared` and `blocks_compared == blocks_compared_matched + blocks_compared_mismatched`.
+
 ### Fixed
 
 * Fix substreams/firehose endpoints detection of supported compression: do not fail on 'algo;q=x.y' syntax
