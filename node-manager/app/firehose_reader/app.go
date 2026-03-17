@@ -16,11 +16,14 @@ package firehose_reader
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/streamingfast/bstream/blockstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/dauth"
+	dauthgrpc "github.com/streamingfast/dauth/middleware/grpc"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	dgrpcfactory "github.com/streamingfast/dgrpc/server/factory"
 	"github.com/streamingfast/dstore"
@@ -40,6 +43,9 @@ type Config struct {
 	ReadinessMaxLatency time.Duration
 	StateFile           string
 	FirehoseConfig      FirehoseConfig
+	// GRPCSecretKey, when non-empty, requires every incoming gRPC call to present
+	// the key as a Bearer token in the "authorization" metadata header.
+	GRPCSecretKey string
 }
 
 type FirehoseConfig struct {
@@ -104,6 +110,7 @@ func (a *App) Run() error {
 		Shutter:           shutter.New(),
 		listenAddr:        a.config.GRPCAddr,
 		blockStreamServer: blockStreamServer,
+		secretKey:         a.config.GRPCSecretKey,
 		healthCheck: func(ctx context.Context) (isReady bool, out interface{}, err error) {
 			return AppReadiness.IsReady(), nil, nil
 		},
@@ -134,15 +141,35 @@ type server struct {
 	*shutter.Shutter
 	listenAddr        string
 	blockStreamServer *blockstream.Server
+	secretKey         string
 	healthCheck       dgrpcserver.HealthCheck
 	logger            *zap.Logger
 }
 
 func (s *server) Run() {
-	gs := dgrpcfactory.ServerFromOptions(
+	serverOpts := []dgrpcserver.Option{
 		dgrpcserver.WithLogger(s.logger),
 		dgrpcserver.WithHealthCheck(dgrpcserver.HealthCheckOverGRPC|dgrpcserver.HealthCheckOverHTTP, s.healthCheck),
-	)
+	}
+
+	if s.secretKey != "" {
+		s.logger.Info("blockstream gRPC server secret key authentication enabled")
+
+		auth, err := dauth.New("secret://"+s.secretKey, s.logger)
+		if err != nil {
+			// Run() has no error return; log fatally so the shutter catches it cleanly.
+			s.logger.Error("failed to create blockstream authenticator, shutting down", zap.Error(err))
+			s.Shutdown(fmt.Errorf("creating blockstream authenticator: %w", err))
+			return
+		}
+
+		serverOpts = append(serverOpts,
+			dgrpcserver.WithPostUnaryInterceptor(dauthgrpc.UnaryAuthChecker(auth, s.logger)),
+			dgrpcserver.WithPostStreamInterceptor(dauthgrpc.StreamAuthChecker(auth, s.logger)),
+		)
+	}
+
+	gs := dgrpcfactory.ServerFromOptions(serverOpts...)
 
 	serviceRegistrar := gs.ServiceRegistrar()
 	pbheadinfo.RegisterHeadInfoServer(serviceRegistrar, s.blockStreamServer)

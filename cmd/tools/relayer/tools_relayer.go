@@ -48,6 +48,7 @@ func NewToolsRelayerGroup[B firecore.Block](chain *firecore.Chain[B], logger *za
 			Flags(func(flags *pflag.FlagSet) {
 				flags.Bool("clock", false, "For each block, only print the current timestamp, block timestamp, drift")
 				flags.Bool("with-partials", false, "Ask for partial blocks in the blockstream request")
+				flags.String("secret-key", "", "Secret key sent as a Bearer token in the 'authorization' metadata header. Supports ${ENV_VAR} interpolation.")
 			}),
 
 			RangeArgs(1, 2),
@@ -77,6 +78,7 @@ func toolsRelayerStreamRunner[B firecore.Block](chain *firecore.Chain[B], logger
 
 		onlyClock := sflags.MustGetBool(cmd, "clock")
 		withPartials := sflags.MustGetBool(cmd, "with-partials")
+		secretKey := os.Expand(sflags.MustGetString(cmd, "secret-key"), os.Getenv)
 
 		if len(args) == 2 {
 			input := strings.TrimPrefix(args[1], ":")
@@ -99,6 +101,9 @@ func toolsRelayerStreamRunner[B firecore.Block](chain *firecore.Chain[B], logger
 
 		if withPartials {
 			opts = append(opts, blockstream.WithPartialBlocks())
+		}
+		if secretKey != "" {
+			opts = append(opts, blockstream.WithSecretKey(secretKey))
 		}
 
 		blockCount := 0

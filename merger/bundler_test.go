@@ -1,16 +1,11 @@
 package merger
 
 import (
-	//	"context"
-	//"fmt"
-
 	"context"
+	"sync"
 	"testing"
+	"time"
 
-	//	"time"
-
-	//	"github.com/streamingfast/bstream"
-	//"github.com/streamingfast/firehose-core/merger/bundle"
 	"github.com/streamingfast/bstream"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -91,7 +86,7 @@ var block609Final608 = func() *bstream.OneBlockFile {
 }
 
 func TestNewBundler(t *testing.T) {
-	b := NewBundler(100, 200, 2, 100, nil)
+	b := NewBundler(100, 200, 2, 100, nil, 1)
 	require.NotNil(t, b)
 	assert.EqualValues(t, 100, b.bundleSize)
 	assert.EqualValues(t, 200, b.stopBlock)
@@ -99,8 +94,135 @@ func TestNewBundler(t *testing.T) {
 	assert.NotNil(t, b.seenBlockFiles)
 }
 
+// twoMergesBlocks is the canonical input that triggers exactly 2 async bundle merges
+// (at bases 100 and 102) when fed to a Bundler with mergeSize=2 seeded with block100+block101.
+var twoMergesBlocks = []*bstream.OneBlockFile{
+	block100(), block101(), block102Final100(), block103Final101(),
+	block104Final102(), block105Final103(), block106Final104(),
+}
+
+func TestBundlerParallelMergesRunConcurrently(t *testing.T) {
+	// With maxMergingThreads=2 and 2 bundle triggers, both goroutines should enter
+	// MergeAndStore before either is allowed to return, proving true parallelism.
+	started := make(chan struct{}, 2)
+	release := make(chan struct{})
+
+	b := NewBundler(100, 700, 2, 2, &TestMergerIO{
+		MergeAndStoreFunc: func(_ context.Context, _ uint64, _ []*bstream.OneBlockFile) error {
+			started <- struct{}{}
+			<-release
+			return nil
+		},
+	}, 2)
+	b.irreversibleBlocks = []*bstream.OneBlockFile{block100(), block101()}
+
+	feedDone := make(chan error, 1)
+	go func() {
+		for _, blk := range twoMergesBlocks {
+			if err := b.HandleBlockFile(blk); err != nil {
+				feedDone <- err
+				return
+			}
+		}
+		feedDone <- nil
+	}()
+
+	// Both merges must start before either finishes (they're blocked on release).
+	for i := 0; i < 2; i++ {
+		select {
+		case <-started:
+		case <-time.After(2 * time.Second):
+			t.Fatal("timed out waiting for concurrent merges to start")
+		}
+	}
+
+	close(release)
+	require.NoError(t, <-feedDone)
+	b.WaitForMerges()
+}
+
+func TestBundlerLowestUnmergedBlockNumSafeWhileMerging(t *testing.T) {
+	// Verify that LowestUnmergedBlockNum() returns the lowest in-flight merge base so the
+	// pruner never deletes one-block-files from a bundle still being merged.
+	started := make(chan struct{}, 2)
+	release := make(chan struct{})
+
+	b := NewBundler(100, 700, 2, 2, &TestMergerIO{
+		MergeAndStoreFunc: func(_ context.Context, _ uint64, _ []*bstream.OneBlockFile) error {
+			started <- struct{}{}
+			<-release
+			return nil
+		},
+	}, 2)
+	b.irreversibleBlocks = []*bstream.OneBlockFile{block100(), block101()}
+
+	feedDone := make(chan error, 1)
+	go func() {
+		for _, blk := range twoMergesBlocks {
+			if err := b.HandleBlockFile(blk); err != nil {
+				feedDone <- err
+				return
+			}
+		}
+		feedDone <- nil
+	}()
+
+	// Wait for both bundles (100 and 102) to be in-flight.
+	for i := 0; i < 2; i++ {
+		select {
+		case <-started:
+		case <-time.After(2 * time.Second):
+			t.Fatal("timed out waiting for concurrent merges to start")
+		}
+	}
+
+	// Both bundles in-flight: BaseBlockNum must return 100 (the lower one),
+	// not 104 (the current advancing base), to prevent premature file deletion.
+	assert.EqualValues(t, 100, b.LowestUnmergedBlockNum())
+
+	close(release)
+	require.NoError(t, <-feedDone)
+	b.WaitForMerges()
+
+	// All merges done: BaseBlockNum returns the current base.
+	assert.EqualValues(t, 104, b.LowestUnmergedBlockNum())
+}
+
+func TestBundlerSemaphoreLimitsParallelism(t *testing.T) {
+	// With maxMergingThreads=1, the second bundle must wait for the first to finish
+	// before its goroutine can start. Verify that at most 1 merge runs at a time.
+	var mu sync.Mutex
+	inFlight, maxObserved := 0, 0
+
+	b := NewBundler(100, 700, 2, 2, &TestMergerIO{
+		MergeAndStoreFunc: func(_ context.Context, _ uint64, _ []*bstream.OneBlockFile) error {
+			mu.Lock()
+			inFlight++
+			if inFlight > maxObserved {
+				maxObserved = inFlight
+			}
+			mu.Unlock()
+
+			time.Sleep(5 * time.Millisecond) // hold the slot briefly so overlap is detectable
+
+			mu.Lock()
+			inFlight--
+			mu.Unlock()
+			return nil
+		},
+	}, 1)
+	b.irreversibleBlocks = []*bstream.OneBlockFile{block100(), block101()}
+
+	for _, blk := range twoMergesBlocks {
+		require.NoError(t, b.HandleBlockFile(blk))
+	}
+	b.WaitForMerges()
+
+	assert.Equal(t, 1, maxObserved, "with maxMergingThreads=1 at most 1 merge should run at a time")
+}
+
 func TestBundlerReset(t *testing.T) {
-	b := NewBundler(100, 200, 2, 2, nil) // merge every 2 blocks
+	b := NewBundler(100, 200, 2, 2, nil, 1) // merge every 2 blocks
 
 	b.irreversibleBlocks = []*bstream.OneBlockFile{block100(), block101()}
 	b.Reset(102, block100().ToBstreamBlock().AsRef())
@@ -207,16 +329,15 @@ func TestBundlerMergeKeepOne(t *testing.T) {
 					merged = append(merged, inclusiveLowerBlock)
 					return nil
 				},
-			}) // merge every 2 blocks
+			}, 1) // merge every 2 blocks
 			b.irreversibleBlocks = []*bstream.OneBlockFile{block100(), block101()}
 
 			for _, blk := range c.inBlocks {
 				require.NoError(t, b.HandleBlockFile(blk))
 			}
 
-			// wait for MergeAndStore
-			b.inProcess.Lock()
-			b.inProcess.Unlock()
+			// wait for all in-flight merges to complete
+			b.WaitForMerges()
 
 			assert.Equal(t, c.expectMerged, merged)
 			assert.Equal(t, c.expectRemaining, b.irreversibleBlocks)

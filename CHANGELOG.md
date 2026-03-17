@@ -10,13 +10,39 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+* Removed parallel preloading of one-block-files to reduce RAM usage when merging big blocks.
+* Added '--merger-max-merging-threads' (defaults: 4) so that the merger can merge blocks in parallel (still using way less RAM than previous one-block-preloading method)
+
+> [!NOTE]
+> With this change, HEAD block timestamp is now updated maximum every 5 seconds instead of at every block, by reading the first 500 bytes of the last one-block-file.
+
+## v1.13.3
+
+* Fix substreams support for requests with 'application/grpc-web*' content-type (old connectweb library)
+
+## v1.13.2
+
+* Add 'mindreader stats' info log every 30secs with performance metrics
+
+## v1.13.1
+
 ### Added
 
 * Add `firecore tools networks list` command to display registered networks from The Graph Networks Registry with their Firehose and Substreams endpoints. Supports `--name-only` flag for listing only network IDs and `--only` flag for filtering networks using a regular expression.
+* Add `substreams-tier2-authenticator` flag to specify the authenticator to use for tier2 requests. Can be 'trust://' (default, same as previous behavior) or 'secret://<key>'
+* Add `substreams-tier1-subrequests-secret-key` flag to specify the secret key to use for tier1 subrequests authentication when using 'secret://' authenticator on tier2
+* Add `reader-node-grpc-secret-key` flag to specify the secret key to use for reader node gRPC authentication
+* Add `?secret=...` parsing to `relayer-source`s
+* Add Prometheus metrics for reader test mode: track blocks compared, success/failure counts, and success/failure percentages for easy monitoring at interval stats.
+
+### Changed
+
+* Refactor reader test mode Prometheus metrics to fix incorrect success/failure percentage calculation caused by unaccounted blocks. Renamed `blocks_matched_total` -> `blocks_compared_matched_total` and `blocks_mismatched_total` -> `blocks_compared_mismatched_total`. The `blocks_compared_total` metric now counts only blocks that were fully compared (matched + mismatched). Added three new metrics: `blocks_seen_total` (all attempted blocks), `blocks_reorg_total` (skipped due to re-org/ID mismatch), and `blocks_fetch_failure_total` (failed to fetch from production). Invariants: `blocks_seen == blocks_reorg + blocks_fetch_failure + blocks_compared` and `blocks_compared == blocks_compared_matched + blocks_compared_mismatched`.
 
 ### Fixed
 
 * Fix substreams/firehose endpoints detection of supported compression: do not fail on 'algo;q=x.y' syntax
+* Fix substreams tier2 jobs behind load balancer: will now retry forever on 'Unavailable: no healthy upstream' errors
 * Fix relayer failing to get back to live if reader blocks are unlinkable after a long period, and merger has removed one-blocks: it will now shutdown in that case, so it can be restarted.
 
 ## v1.13.0

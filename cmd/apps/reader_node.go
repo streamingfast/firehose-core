@@ -97,6 +97,15 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 				[DEV] When in test mode, the reader will write diff output to the given file path, if empty, diffs are written to
 				the standard output.
 			`))
+			flags.String("reader-node-grpc-secret-key", "", cli.FlagDescription(`
+				Secret key that the blockstream gRPC server will require from every incoming connection.
+				Connections must present the key as a Bearer token in the "authorization" metadata header
+				(i.e. "authorization: Bearer <key>" or "authorization: <key>). When empty, no authentication is performed.
+
+				Supports environment variable interpolation using the syntax ${ENV_VAR_NAME}, e.g. "${READER_SECRET_KEY}".
+
+				Example: "mysecretkey" or "${READER_NODE_SECRET}"
+			`))
 			return nil
 		},
 		InitFunc: func(runtime *launcher.Runtime) error {
@@ -214,6 +223,8 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 				return nil, err
 			}
 
+			grpcSecretKey := os.Expand(viper.GetString("reader-node-grpc-secret-key"), os.Getenv)
+
 			blockStreamServer := blockstream.NewUnmanagedServer(blockstream.ServerOptionWithLogger(appLogger))
 			workingDir := firecore.MustReplaceDataDir(sfDataDir, viper.GetString("reader-node-working-dir"))
 			gprcListenAddr := viper.GetString("reader-node-grpc-listen-addr")
@@ -260,6 +271,7 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 			return nodeManagerApp.New(&nodeManagerApp.Config{
 				HTTPAddr:            httpAddr,
 				GRPCAddr:            gprcListenAddr,
+				GRPCSecretKey: grpcSecretKey,
 				QuicBlockServerAddr: quicAddr,
 				QuicBlockServerTLS:  quicTLS,
 			}, &nodeManagerApp.Modules{

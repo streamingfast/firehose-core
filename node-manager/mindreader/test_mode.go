@@ -114,6 +114,10 @@ func (c *TestModeComparator) Close() error {
 }
 
 func (c *TestModeComparator) CompareBlock(ctx context.Context, testingBlock *pbbstream.Block) error {
+	// Track metrics - increment total blocks seen
+	TestModeBlocksSeen.Inc()
+	defer c.updatePercentageMetrics()
+
 	// Fetch the production block from the remote endpoint
 	req := &pbfirehose.SingleBlockRequest{
 		Reference: &pbfirehose.SingleBlockRequest_BlockHashAndNumber_{
@@ -144,6 +148,7 @@ func (c *TestModeComparator) CompareBlock(ctx context.Context, testingBlock *pbb
 		return nil
 	})
 	if err != nil {
+		TestModeBlocksFetchFailure.Inc()
 		c.logger.Warn("failed to fetch production block for comparison",
 			zap.Uint64("block_num", testingBlock.Number),
 			zap.String("block_id", testingBlock.Id),
@@ -159,6 +164,7 @@ func (c *TestModeComparator) CompareBlock(ctx context.Context, testingBlock *pbb
 
 	if response.Metadata.Id != testingBlock.Id {
 		// This could be due to a recent re-org, log and skip comparison
+		TestModeBlocksReorg.Inc()
 		c.logger.Info("block ID mismatch, possible re-org, skipping comparison",
 			zap.Uint64("block_num", testingBlock.Number),
 			zap.String("testing_block_id", testingBlock.Id),
@@ -194,12 +200,16 @@ func (c *TestModeComparator) CompareBlock(ctx context.Context, testingBlock *pbb
 
 	// Compare the chain-specific payload
 	if proto.Equal(testingChainBlock, productionChainBlock) {
+		TestModeBlocksCompared.Inc()
+		TestModeBlocksComparedMatched.Inc()
 		fmt.Printf("✅ Block %d (%s) matches production\n", testingBlock.Number, testingBlock.Id)
 		c.logger.Debug("blocks are identical", zap.Uint64("block_num", testingBlock.Number))
 		return nil
 	}
 
 	// Payloads differ, generate diff (it's fine to use same block number and ID as this has been checked already here)
+	TestModeBlocksCompared.Inc()
+	TestModeBlocksComparedMismatched.Inc()
 	return c.generateDiff(testingBlock.Number, testingBlock.Id, testingChainBlock, productionChainBlock)
 }
 
@@ -313,6 +323,33 @@ func sanitizeBlockID(blockID string) string {
 	}
 
 	return blockID
+}
+
+// updatePercentageMetrics recalculates and updates success/failure percentage gauges
+func (c *TestModeComparator) updatePercentageMetrics() {
+	total := TestModeBlocksCompared.Get()
+	if total == 0 {
+		TestModeSuccessPercentage.SetFloat64(0)
+		TestModeFailurePercentage.SetFloat64(0)
+		return
+	}
+
+	matched := TestModeBlocksComparedMatched.Get()
+	mismatched := TestModeBlocksComparedMismatched.Get()
+
+	successPercentage := (matched / total) * 100
+	failurePercentage := (mismatched / total) * 100
+
+	TestModeSuccessPercentage.SetFloat64(successPercentage)
+	TestModeFailurePercentage.SetFloat64(failurePercentage)
+
+	c.logger.Debug("updated test mode percentage metrics",
+		zap.Float64("total", total),
+		zap.Float64("matched", matched),
+		zap.Float64("mismatched", mismatched),
+		zap.Float64("success_pct", successPercentage),
+		zap.Float64("failure_pct", failurePercentage),
+	)
 }
 
 // ParseTestModeDSN parses the DSN format: http(s)://host:port[?insecure=true][&apiKey=key]

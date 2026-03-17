@@ -15,25 +15,26 @@
 package merger
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"sync"
 	"time"
 
+	"github.com/abourget/llerrgroup"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
 	"github.com/streamingfast/firehose-core/merger/metrics"
 	"github.com/streamingfast/logging"
+	"go.uber.org/atomic"
 	"go.uber.org/zap"
 )
 
 var ErrStopBlockReached = errors.New("stop block reached")
 var ErrFirstBlockAfterInitialStreamableBlock = errors.New("received first block after inital streamable block")
+var errTerminating = errors.New("terminating")
 
 type Bundler struct {
 	sync.Mutex
@@ -44,7 +45,9 @@ type Bundler struct {
 
 	bundleSize                 uint64
 	bundleError                chan error
-	inProcess                  sync.Mutex
+	eg                         *llerrgroup.Group
+	inFlightMu                 sync.Mutex
+	inFlightBundles            map[uint64]bool
 	stopBlock                  uint64
 	enforceNextBlockOnBoundary bool
 	firstStreamableBlock       uint64
@@ -53,31 +56,57 @@ type Bundler struct {
 	irreversibleBlocks []*bstream.OneBlockFile
 	forkable           *forkable.Forkable
 
+	blockTimestampInFlight *atomic.Bool
+	blockTimestampLastRun  *atomic.Int64 // unix nanos
+
 	logger *zap.Logger
 }
 
 var logger, _ = logging.PackageLogger("merger", "github.com/streamingfast/firehose-core/merger/bundler")
 
-func NewBundler(startBlock, stopBlock, firstStreamableBlock, bundleSize uint64, io IOInterface) *Bundler {
+func NewBundler(startBlock, stopBlock, firstStreamableBlock, bundleSize uint64, io IOInterface, maxMergingThreads int) *Bundler {
+	if maxMergingThreads < 1 {
+		maxMergingThreads = 1
+	}
 	b := &Bundler{
-		bundleSize:           bundleSize,
-		io:                   io,
-		bundleError:          make(chan error, 1),
-		firstStreamableBlock: firstStreamableBlock,
-		stopBlock:            stopBlock,
-		seenBlockFiles:       make(map[string]*bstream.OneBlockFile),
-		logger:               logger,
+		bundleSize:             bundleSize,
+		io:                     io,
+		bundleError:            make(chan error, 1),
+		firstStreamableBlock:   firstStreamableBlock,
+		stopBlock:              stopBlock,
+		eg:                     llerrgroup.New(maxMergingThreads),
+		inFlightBundles:        make(map[uint64]bool),
+		seenBlockFiles:         make(map[string]*bstream.OneBlockFile),
+		blockTimestampInFlight: atomic.NewBool(false),
+		blockTimestampLastRun:  atomic.NewInt64(0),
+		logger:                 logger,
 	}
 	b.Reset(toBaseNum(startBlock, bundleSize), nil)
 	return b
 }
 
-// BaseBlockNum can be called from a different thread
-func (b *Bundler) BaseBlockNum() uint64 {
-	b.inProcess.Lock()
-	defer b.inProcess.Unlock()
-	// while inProcess is locked, all blocks below b.baseBlockNum are actually merged
-	return b.baseBlockNum
+// LowestUnmergedBlockNum can be called from a different thread.
+// It returns the lowest block number that has not yet been confirmed merged,
+// which is the minimum in-flight merge base (or current baseBlockNum if none in flight).
+// This is used as a safe pruning boundary: one-block-files below this value are safe to delete.
+func (b *Bundler) LowestUnmergedBlockNum() uint64 {
+	b.Lock()
+	cur := b.baseBlockNum
+	b.Unlock()
+
+	b.inFlightMu.Lock()
+	defer b.inFlightMu.Unlock()
+	for base := range b.inFlightBundles {
+		if base < cur {
+			cur = base
+		}
+	}
+	return cur
+}
+
+// WaitForMerges blocks until all in-flight async merges have completed.
+func (b *Bundler) WaitForMerges() {
+	_ = b.eg.Wait()
 }
 
 func (b *Bundler) HandleBlockFile(obf *bstream.OneBlockFile) error {
@@ -126,19 +155,6 @@ func (b *Bundler) Reset(nextBase uint64, lib bstream.BlockRef) {
 	b.Unlock()
 }
 
-func readBlockTime(data []byte) (time.Time, error) {
-	reader := bytes.NewReader(data)
-	blockReader, err := bstream.NewDBinBlockReader(reader)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("unable to create block reader: %w", err)
-	}
-	blk, err := blockReader.Read()
-	if err != nil && err != io.EOF {
-		return time.Time{}, fmt.Errorf("block reader failed: %w", err)
-	}
-	return blk.Time(), nil
-}
-
 func (b *Bundler) ProcessBlock(_ *pbbstream.Block, obj interface{}) error {
 	obf := obj.(bstream.ObjectWrapper).WrappedObject().(*bstream.OneBlockFile)
 	if obf.Num < b.baseBlockNum {
@@ -169,18 +185,19 @@ func (b *Bundler) ProcessBlock(_ *pbbstream.Block, obj interface{}) error {
 		metrics.AppReadiness.SetReady()
 		b.irreversibleBlocks = append(b.irreversibleBlocks, obf)
 		metrics.HeadBlockNumber.SetUint64(obf.Num)
-		go func() {
-			// this pre-downloads the data
-			data, err := obf.Data(context.Background(), b.io.DownloadOneBlockFile)
-			if err != nil {
-				return
-			}
-			// now that we have the data, might as well read the block time for metrics
-			if time, err := readBlockTime(data); err == nil {
-				metrics.HeadBlockTimeDrift.SetBlockTime(time)
-			}
-		}()
 		b.Unlock()
+		if time.Since(time.Unix(0, b.blockTimestampLastRun.Load())) >= time.Second*5 && b.blockTimestampInFlight.CompareAndSwap(false, true) {
+			b.blockTimestampLastRun.Store(time.Now().UnixNano())
+			go func() {
+				defer b.blockTimestampInFlight.Store(false)
+				t, err := readBlockTimestamp(context.Background(), obf, b.io.OpenOneBlockFile)
+				if err != nil {
+					b.logger.Debug("cannot read block timestamp for head drift metric", zap.Error(err))
+					return
+				}
+				metrics.HeadBlockTimeDrift.SetBlockTime(t)
+			}()
+		}
 		return nil
 	}
 
@@ -193,18 +210,31 @@ func (b *Bundler) ProcessBlock(_ *pbbstream.Block, obj interface{}) error {
 	forkedBlocks := b.forkedBlocksInCurrentBundle()
 	blocksToBundle := b.irreversibleBlocks
 	baseBlockNum := b.baseBlockNum
-	b.inProcess.Lock()
-	go func() {
-		defer b.inProcess.Unlock()
+
+	// Track in-flight before Stop() so LowestUnmergedBlockNum() is conservative even while waiting for a slot.
+	b.inFlightMu.Lock()
+	b.inFlightBundles[baseBlockNum] = true
+	b.inFlightMu.Unlock()
+
+	// Stop() blocks until a slot is free; Go() launches the goroutine. Errors are never returned
+	// through eg (they go to bundleError), so Stop() will never return true.
+	b.eg.Stop()
+	b.eg.Go(func() error {
+		defer func() {
+			b.inFlightMu.Lock()
+			delete(b.inFlightBundles, baseBlockNum)
+			b.inFlightMu.Unlock()
+		}()
 		if err := b.io.MergeAndStore(context.Background(), baseBlockNum, blocksToBundle); err != nil {
 			b.bundleError <- err
-			return
+			return nil // errors are consumed via bundleError, not propagated through eg
 		}
 		if forkableIO, ok := b.io.(ForkAwareIOInterface); ok {
 			forkableIO.MoveForkedBlocks(context.Background(), forkedBlocks)
 		}
 		// we do not delete bundled blocks here, they get pruned later. keeping the blocks from the last bundle is useful for bootstrapping
-	}()
+		return nil
+	})
 
 	b.Lock()
 	// we keep the last block of the bundle, only deleting it on next merge, to facilitate joining to one-block-filled hub
@@ -212,11 +242,24 @@ func (b *Bundler) ProcessBlock(_ *pbbstream.Block, obj interface{}) error {
 	b.irreversibleBlocks = []*bstream.OneBlockFile{lastBlock, obf}
 	b.baseBlockNum += b.bundleSize
 	for obf.Num > b.baseBlockNum+b.bundleSize { // skip more merged-block-files
-		b.inProcess.Lock()
-		if err := b.io.MergeAndStore(context.Background(), b.baseBlockNum, []*bstream.OneBlockFile{lastBlock}); err != nil { // lastBlock will be excluded from bundle but is useful to bundler
-			return err
+		capturedBase := b.baseBlockNum
+		b.inFlightMu.Lock()
+		b.inFlightBundles[capturedBase] = true
+		b.inFlightMu.Unlock()
+		if b.eg.Stop() {
+			break
 		}
-		b.inProcess.Unlock()
+		b.eg.Go(func() error { // lastBlock will be excluded from bundle but is useful to bundler
+			defer func() {
+				b.inFlightMu.Lock()
+				delete(b.inFlightBundles, capturedBase)
+				b.inFlightMu.Unlock()
+			}()
+			if err := b.io.MergeAndStore(context.Background(), capturedBase, []*bstream.OneBlockFile{lastBlock}); err != nil {
+				b.bundleError <- err
+			}
+			return nil
+		})
 		b.baseBlockNum += b.bundleSize
 	}
 	b.Unlock()

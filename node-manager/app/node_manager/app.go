@@ -24,6 +24,8 @@ import (
 
 	quicblockserver "github.com/streamingfast/quic-block-transport/quic"
 
+	"github.com/streamingfast/dauth"
+	dauthgrpc "github.com/streamingfast/dauth/middleware/grpc"
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	dgrpcfactory "github.com/streamingfast/dgrpc/server/factory"
 	"github.com/streamingfast/dmetrics"
@@ -46,6 +48,11 @@ type Config struct {
 
 	QuicBlockServerAddr string      // QUIC listen address for quic block server (empty to disable)
 	QuicBlockServerTLS  *tls.Config // TLS config for quic block server
+	// GRPCSecretKey, when non-empty, requires every incoming gRPC call to present
+	// the key as a Bearer token in the "authorization" metadata header.
+	// The value supports ${ENV_VAR} interpolation (resolved before this struct is
+	// populated by the caller).
+	GRPCSecretKey string
 }
 
 type Modules struct {
@@ -174,7 +181,24 @@ func (a *App) startQuicBlockServer() error {
 
 func (a *App) startMindreader() error {
 	a.zlogger.Info("starting mindreader gRPC server")
-	gs := dgrpcfactory.ServerFromOptions(dgrpcserver.WithLogger(a.zlogger))
+
+	serverOpts := []dgrpcserver.Option{dgrpcserver.WithLogger(a.zlogger)}
+
+	if a.config.GRPCSecretKey != "" {
+		a.zlogger.Info("blockstream gRPC server secret key authentication enabled")
+
+		auth, err := dauth.New("secret://"+a.config.GRPCSecretKey, a.zlogger)
+		if err != nil {
+			return fmt.Errorf("creating blockstream authenticator: %w", err)
+		}
+
+		serverOpts = append(serverOpts,
+			dgrpcserver.WithPostUnaryInterceptor(dauthgrpc.UnaryAuthChecker(auth, a.zlogger)),
+			dgrpcserver.WithPostStreamInterceptor(dauthgrpc.StreamAuthChecker(auth, a.zlogger)),
+		)
+	}
+
+	gs := dgrpcfactory.ServerFromOptions(serverOpts...)
 
 	if a.modules.RegisterGRPCService != nil {
 		err := a.modules.RegisterGRPCService(gs.ServiceRegistrar())

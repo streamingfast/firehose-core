@@ -34,6 +34,16 @@ import (
 	pbhealth "google.golang.org/grpc/health/grpc_health_v1"
 )
 
+// SourceAddr holds a parsed relayer source address, optionally carrying a
+// secret key extracted from the "?secret=<key>" query parameter.
+type SourceAddr struct {
+	// URL is the gRPC endpoint address (everything before the '?' separator).
+	URL string
+	// SecretKey is the value of the "secret" query parameter, or empty when
+	// no authentication is required.
+	SecretKey string
+}
+
 const (
 	getHeadInfoTimeout = 10 * time.Second
 )
@@ -86,14 +96,13 @@ func NewRelayer(
 
 }
 
-func NewMultiplexedSource(handler bstream.Handler, sourceAddresses []string, maxSourceLatency time.Duration, sourceRequestBurst int) bstream.Source {
+func NewMultiplexedSource(handler bstream.Handler, sources []SourceAddr, maxSourceLatency time.Duration, sourceRequestBurst int) bstream.Source {
 	ctx := context.Background()
 
 	var sourceFactories []bstream.SourceFactory
-	for _, u := range sourceAddresses {
-
-		url := u // https://github.com/golang/go/wiki/CommonMistakes (url is given to the blockstream newSource)
-		sourceName := urlToLoggerName(url)
+	for _, src := range sources {
+		src := src // capture loop variable
+		sourceName := urlToLoggerName(src.URL)
 		logger := zlog.Named("src").Named(sourceName)
 		sf := func(subHandler bstream.Handler) bstream.Source {
 
@@ -109,8 +118,15 @@ func NewMultiplexedSource(handler bstream.Handler, sourceAddresses []string, max
 				})
 			})
 
-			src := blockstream.NewSource(ctx, url, int64(sourceRequestBurst), upstreamHandler, blockstream.WithLogger(logger), blockstream.WithRequester("relayer"), blockstream.WithPartialBlocks())
-			return src
+			opts := []blockstream.SourceOption{
+				blockstream.WithLogger(logger),
+				blockstream.WithRequester("relayer"),
+				blockstream.WithPartialBlocks(),
+			}
+			if src.SecretKey != "" {
+				opts = append(opts, blockstream.WithSecretKey(src.SecretKey))
+			}
+			return blockstream.NewSource(ctx, src.URL, int64(sourceRequestBurst), upstreamHandler, opts...)
 		}
 		sourceFactories = append(sourceFactories, sf)
 	}

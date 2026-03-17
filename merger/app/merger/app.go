@@ -36,6 +36,7 @@ type Config struct {
 	StorageForkedBlocksFilesPath string
 
 	FilesDeleteThreads int
+	MaxMergingThreads  int
 
 	GRPCListenAddr string
 
@@ -87,7 +88,6 @@ func (a *App) Run() error {
 	// we are setting the backoff here for dstoreIO
 	io := merger.NewDStoreIO(
 		zlog,
-		tracer,
 		oneBlockStoreStore,
 		mergedBlocksStore,
 		forkedBlocksStore,
@@ -106,6 +106,7 @@ func (a *App) Run() error {
 		a.config.TimeBetweenPruning,
 		a.config.TimeBetweenPolling,
 		a.config.StopBlock,
+		a.config.MaxMergingThreads,
 	)
 	zlog.Info("merger initiated")
 
@@ -115,7 +116,11 @@ func (a *App) Run() error {
 	}
 	a.readinessProbe = pbhealth.NewHealthClient(gs)
 
-	a.OnTerminating(m.Shutdown)
+	a.OnTerminating(func(err error) {
+		m.Shutdown(err)
+		<-m.Terminated()
+		zlog.Info("merger terminated")
+	})
 	m.OnTerminated(a.Shutdown)
 
 	go m.Run()

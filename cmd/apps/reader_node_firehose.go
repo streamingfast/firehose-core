@@ -73,6 +73,7 @@ func RegisterReaderNodeFirehoseApp[B firecore.Block](chain *firecore.Chain[B], r
 				StopBlockNum:        viper.GetUint64("reader-node-stop-block-num"),
 				StateFile:           stateFile,
 				ReadinessMaxLatency: viper.GetDuration("reader-node-readiness-max-latency"),
+				GRPCSecretKey:       os.Expand(viper.GetString("reader-node-grpc-secret-key"), os.Getenv),
 
 				FirehoseConfig: firehose_reader.FirehoseConfig{
 					ApiKey:        os.Getenv(viper.GetString("reader-node-firehose-api-key-env-var")),
