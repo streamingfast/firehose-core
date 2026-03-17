@@ -17,6 +17,7 @@ package merger
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -170,6 +171,7 @@ func (m *Merger) run() error {
 	ctx := context.Background()
 
 	var holeFoundLogged bool
+	var firstBlockErrCount int
 	for {
 		now := time.Now()
 		if m.IsTerminating() {
@@ -209,39 +211,31 @@ func (m *Merger) run() error {
 			m.bundler.Reset(base, lib)
 		}
 
-		var walkErr error
-		retryErr := Retry(m.logger, 12, 5*time.Second, func() error {
-			err = m.io.WalkOneBlockFiles(ctx, m.bundler.baseBlockNum, func(obf *bstream.OneBlockFile) error {
-				if m.IsTerminating() {
-					return errTerminating
-				}
-				return m.bundler.HandleBlockFile(obf)
-			})
-
-			if err == ErrFirstBlockAfterInitialStreamableBlock {
-				m.bundler.Reset(base, lib)
-				return err
+		err = m.io.WalkOneBlockFiles(ctx, m.bundler.baseBlockNum, func(obf *bstream.OneBlockFile) error {
+			if m.IsTerminating() {
+				return errTerminating
 			}
-
-			if err != nil {
-				walkErr = err
-			}
-			return nil
+			return m.bundler.HandleBlockFile(obf)
 		})
 
-		if retryErr != nil {
-			return retryErr
-		}
-
-		if walkErr != nil {
-			if walkErr == errTerminating {
-				return nil
+		switch err {
+		case nil:
+			firstBlockErrCount = 0
+		case errTerminating:
+			return nil
+		case ErrStopBlockReached:
+			m.logger.Info("stop block reached")
+			return nil
+		case ErrFirstBlockAfterInitialStreamableBlock:
+			firstBlockErrCount++
+			if firstBlockErrCount >= 12 {
+				return fmt.Errorf("too many consecutive first-block errors: %w", err)
 			}
-			if walkErr == ErrStopBlockReached {
-				m.logger.Info("stop block reached")
-				return nil
-			}
-			return walkErr
+			m.bundler.Reset(base, lib)
+			m.logger.Warn("retrying after error", zap.Error(err))
+		default:
+			firstBlockErrCount = 0
+			m.logger.Warn("error walking one block files, will retry", zap.Error(err))
 		}
 
 		if spentTime := time.Since(now); spentTime < m.timeBetweenPolling {
