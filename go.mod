@@ -41,7 +41,7 @@ require (
 	github.com/streamingfast/pbgo v0.0.6-0.20260206150405-2b95acf70437
 	github.com/streamingfast/quic-block-transport v0.0.0-20260304140622-b95e8b5202df
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.18.3-0.20260312163334-e27b44bd1c9d
+	github.com/streamingfast/substreams v1.18.3-0.20260317124645-46aa32c967f3
 	github.com/stretchr/testify v1.11.1
 	github.com/test-go/testify v1.1.4
 	github.com/testcontainers/testcontainers-go v0.40.0
