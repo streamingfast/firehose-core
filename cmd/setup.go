@@ -69,6 +69,10 @@ func setupCmd(cmd *cobra.Command, binaryName string) error {
 		}
 	}
 
+	if err := applyShiftPorts(rootLog); err != nil {
+		return fmt.Errorf("applying port shift: %w", err)
+	}
+
 	launcher.SetupLogger(rootLog, &launcher.LoggingOptions{
 		WorkingDir: viper.GetString("global-data-dir"),
 		// We add +1 so our default verbosity is to show all packages in INFO mode

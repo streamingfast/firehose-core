@@ -107,6 +107,33 @@ func Main[B firecore.Block](chain *firecore.Chain[B]) {
 			maintenance operations on a running container or pod prior it will actually start processing. Useful for example to clear
 			a persistent disks of its content before starting, cleary cached content to try to resolve bugs, etc.
 		`))
+		flags.Int("shift-ports", 0, cli.FlagDescription(`
+			[DEV] Shift all Firehose port numbers by the given offset. Useful for running multiple
+			instances on the same machine without port conflicts. Flags explicitly set by the user
+			on the command line are never shifted. The affected flags are:
+
+			  Service ports:
+			    --firehose-grpc-listen-addr          :10015
+			    --merger-grpc-listen-addr             :10012
+			    --relayer-grpc-listen-addr            :10014
+			    --reader-node-grpc-listen-addr        :10010
+			    --reader-node-manager-api-addr        :10011
+			    --substreams-tier1-grpc-listen-addr   :10016
+			    --substreams-tier2-grpc-listen-addr   :10017
+			    --index-builder-grpc-listen-addr      :10009
+
+			  Client connection addresses:
+			    --common-live-blocks-addr                  :10014
+			    --substreams-tier1-subrequests-endpoint    :10017
+			    --relayer-source                           :10010
+
+			  Infrastructure ports:
+			    --metrics-listen-addr                 :9102
+			    --pprof-listen-addr                   localhost:6060
+			    --log-level-switcher-listen-addr      localhost:1065
+
+			Example: fire{chain} start --shift-ports 100 shifts :10015 to :10115, :9102 to :9202, etc.
+		`))
 	})(rootCmd.PersistentFlags())
 
 	registerCommonFlags(chain)

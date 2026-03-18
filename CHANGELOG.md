@@ -10,6 +10,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+* Added `--shift-ports` global flag that shifts all Firehose service port numbers by a given offset, useful for running multiple instances on the same machine without port conflicts. Both server listen addresses and internal client connection addresses are shifted so wiring stays consistent. Infrastructure ports (Prometheus metrics, pprof, log-level-switcher) are also shifted. Example: `fire{chain} start --shift-ports 100` shifts all ports by +100.
+
 * Removed parallel preloading of one-block-files to reduce RAM usage when merging big blocks.
 * Added '--merger-max-merging-threads' (defaults: 4) so that the merger can merge blocks in parallel (still using way less RAM than previous one-block-preloading method)
 
