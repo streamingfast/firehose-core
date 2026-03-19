@@ -171,7 +171,7 @@ func (m *Merger) run() error {
 	ctx := context.Background()
 
 	var holeFoundLogged bool
-	var firstBlockErrCount int
+	var consecutiveErrors int
 	for {
 		now := time.Now()
 		if m.IsTerminating() {
@@ -220,21 +220,18 @@ func (m *Merger) run() error {
 
 		switch err {
 		case nil:
-			firstBlockErrCount = 0
+			consecutiveErrors = 0
 		case errTerminating:
 			return nil
 		case ErrStopBlockReached:
 			m.logger.Info("stop block reached")
 			return nil
-		case ErrFirstBlockAfterInitialStreamableBlock:
-			firstBlockErrCount++
-			if firstBlockErrCount >= 12 {
-				return fmt.Errorf("too many consecutive first-block errors: %w", err)
-			}
-			m.bundler.Reset(base, lib)
-			m.logger.Warn("retrying after error", zap.Error(err))
 		default:
-			firstBlockErrCount = 0
+			consecutiveErrors = 0
+			consecutiveErrors++
+			if consecutiveErrors >= 10 {
+				return fmt.Errorf("too many consecutive errors: %w", err)
+			}
 			m.logger.Warn("error walking one block files, will retry", zap.Error(err))
 		}
 
