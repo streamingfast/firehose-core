@@ -35,6 +35,7 @@ import (
 var ErrStopBlockReached = errors.New("stop block reached")
 var ErrFirstBlockAfterInitialStreamableBlock = errors.New("received first block after inital streamable block")
 var errTerminating = errors.New("terminating")
+var errCheckLoop = errors.New("max blocks read over bundle, continuing to next loop")
 
 type Bundler struct {
 	sync.Mutex
@@ -46,6 +47,7 @@ type Bundler struct {
 	bundleSize                 uint64
 	bundleError                chan error
 	eg                         *llerrgroup.Group
+	maxMergingThreads          int
 	inFlightMu                 sync.Mutex
 	inFlightBundles            map[uint64]bool
 	stopBlock                  uint64
@@ -75,6 +77,7 @@ func NewBundler(startBlock, stopBlock, firstStreamableBlock, bundleSize uint64, 
 		firstStreamableBlock:   firstStreamableBlock,
 		stopBlock:              stopBlock,
 		eg:                     llerrgroup.New(maxMergingThreads),
+		maxMergingThreads:      maxMergingThreads,
 		inFlightBundles:        make(map[uint64]bool),
 		seenBlockFiles:         make(map[string]*bstream.OneBlockFile),
 		blockTimestampInFlight: atomic.NewBool(false),
@@ -83,6 +86,11 @@ func NewBundler(startBlock, stopBlock, firstStreamableBlock, bundleSize uint64, 
 	}
 	b.Reset(toBaseNum(startBlock, bundleSize), nil)
 	return b
+}
+
+// TooFarAhead indicates a sane number of one-blocks to walk over current baseBlockNum before you should re-evaluate if merged-blocks exist or if maybe you skipped some blocks
+func (b *Bundler) TooFarAhead(blk uint64) bool {
+	return blk > b.baseBlockNum+b.bundleSize*uint64(b.maxMergingThreads+4) // 5x ahead is safe, no chain skips that many blocks
 }
 
 // LowestUnmergedBlockNum can be called from a different thread.

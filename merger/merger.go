@@ -215,12 +215,17 @@ func (m *Merger) run() error {
 			if m.IsTerminating() {
 				return errTerminating
 			}
+			if m.bundler.TooFarAhead(obf.LibNum) { // don't go too far ahead, in case we have unlinkable blocks, we want to continue to next loop
+				return errCheckLoop
+			}
 			return m.bundler.HandleBlockFile(obf)
 		})
 
 		switch err {
 		case nil:
 			consecutiveErrors = 0
+		case errCheckLoop:
+			continue
 		case errTerminating:
 			return nil
 		case ErrStopBlockReached:
