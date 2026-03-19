@@ -23,7 +23,6 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 type Merger struct {
@@ -178,7 +177,8 @@ func (m *Merger) run() error {
 			return nil
 		}
 
-		base, lib, err := m.io.NextBundle(ctx, m.bundler.getSafeBaseBlockNum())
+		safeBase := m.bundler.getSafeBaseBlockNum()
+		base, lib, err := m.io.NextBundle(ctx, safeBase)
 		if err != nil {
 			if errors.Is(err, ErrHoleFound) {
 				if holeFoundLogged {
@@ -199,14 +199,6 @@ func (m *Merger) run() error {
 			}
 		}
 
-		logFields := []zapcore.Field{
-			zap.Uint64("previous_base_block_num", m.bundler.baseBlockNum),
-			zap.Uint64("new_base_block_num", base),
-		}
-		if lib != nil {
-			logFields = append(logFields, zap.Stringer("lib", lib))
-		}
-		m.logger.Info("resetting bundler base block num", logFields...)
 		m.bundler.Reset(base, lib)
 
 		err = m.io.WalkOneBlockFiles(ctx, base, func(obf *bstream.OneBlockFile) error {

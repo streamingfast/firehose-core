@@ -30,6 +30,7 @@ import (
 	"github.com/streamingfast/logging"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 var ErrStopBlockReached = errors.New("stop block reached")
@@ -179,8 +180,18 @@ func (b *Bundler) Reset(nextBase uint64, lib bstream.BlockRef) {
 	b.inFlightMu.Unlock()
 
 	b.Lock()
+	if nextBase != b.safeBaseBlockNum {
+		logFields := []zapcore.Field{
+			zap.Uint64("previous_base_block_num", b.safeBaseBlockNum),
+			zap.Uint64("new_base_block_num", nextBase),
+		}
+		if lib != nil {
+			logFields = append(logFields, zap.Stringer("lib", lib))
+		}
+		b.logger.Info("resetting bundler base block num", logFields...)
+		b.safeBaseBlockNum = nextBase
+	}
 	b.baseBlockNum = nextBase
-	b.safeBaseBlockNum = nextBase
 	b.irreversibleBlocks = nil
 	b.Unlock()
 }
