@@ -141,53 +141,6 @@ func TestBundlerParallelMergesRunConcurrently(t *testing.T) {
 	b.WaitForMerges()
 }
 
-func TestBundlerLowestUnmergedBlockNumSafeWhileMerging(t *testing.T) {
-	// Verify that LowestUnmergedBlockNum() returns the lowest in-flight merge base so the
-	// pruner never deletes one-block-files from a bundle still being merged.
-	started := make(chan struct{}, 2)
-	release := make(chan struct{})
-
-	b := NewBundler(100, 700, 2, 2, &TestMergerIO{
-		MergeAndStoreFunc: func(_ context.Context, _ uint64, _ []*bstream.OneBlockFile) error {
-			started <- struct{}{}
-			<-release
-			return nil
-		},
-	}, 2)
-	b.irreversibleBlocks = []*bstream.OneBlockFile{block100(), block101()}
-
-	feedDone := make(chan error, 1)
-	go func() {
-		for _, blk := range twoMergesBlocks {
-			if err := b.HandleBlockFile(blk); err != nil {
-				feedDone <- err
-				return
-			}
-		}
-		feedDone <- nil
-	}()
-
-	// Wait for both bundles (100 and 102) to be in-flight.
-	for i := 0; i < 2; i++ {
-		select {
-		case <-started:
-		case <-time.After(2 * time.Second):
-			t.Fatal("timed out waiting for concurrent merges to start")
-		}
-	}
-
-	// Both bundles in-flight: BaseBlockNum must return 100 (the lower one),
-	// not 104 (the current advancing base), to prevent premature file deletion.
-	assert.EqualValues(t, 100, b.LowestUnmergedBlockNum())
-
-	close(release)
-	require.NoError(t, <-feedDone)
-	b.WaitForMerges()
-
-	// All merges done: BaseBlockNum returns the current base.
-	assert.EqualValues(t, 104, b.LowestUnmergedBlockNum())
-}
-
 func TestBundlerSemaphoreLimitsParallelism(t *testing.T) {
 	// With maxMergingThreads=1, the second bundle must wait for the first to finish
 	// before its goroutine can start. Verify that at most 1 merge runs at a time.

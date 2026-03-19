@@ -42,7 +42,8 @@ type Bundler struct {
 
 	io IOInterface
 
-	baseBlockNum uint64
+	baseBlockNum     uint64
+	safeBaseBlockNum uint64 // this one is updated only from m.io.NextBundle()
 
 	bundleSize                 uint64
 	bundleError                chan error
@@ -50,14 +51,16 @@ type Bundler struct {
 	maxMergingThreads          int
 	inFlightMu                 sync.Mutex
 	inFlightBundles            map[uint64]bool
+	mergedBundles              map[uint64]bool
 	stopBlock                  uint64
 	enforceNextBlockOnBoundary bool
 	firstStreamableBlock       uint64
 
-	seenBlockFiles     map[string]*bstream.OneBlockFile
+	seenBlockFiles     map[string]*bstream.OneBlockFile // this is used to identify forked blocks that should be moved to the forked store
 	irreversibleBlocks []*bstream.OneBlockFile
 	forkable           *forkable.Forkable
 
+	// these blockTimestamp values are used to force load "some" oneblocks, for metrics, without loading RAM full of them.
 	blockTimestampInFlight *atomic.Bool
 	blockTimestampLastRun  *atomic.Int64 // unix nanos
 
@@ -79,6 +82,7 @@ func NewBundler(startBlock, stopBlock, firstStreamableBlock, bundleSize uint64, 
 		eg:                     llerrgroup.New(maxMergingThreads),
 		maxMergingThreads:      maxMergingThreads,
 		inFlightBundles:        make(map[uint64]bool),
+		mergedBundles:          make(map[uint64]bool),
 		seenBlockFiles:         make(map[string]*bstream.OneBlockFile),
 		blockTimestampInFlight: atomic.NewBool(false),
 		blockTimestampLastRun:  atomic.NewInt64(0),
@@ -88,33 +92,42 @@ func NewBundler(startBlock, stopBlock, firstStreamableBlock, bundleSize uint64, 
 	return b
 }
 
-// TooFarAhead indicates a sane number of one-blocks to walk over current baseBlockNum before you should re-evaluate if merged-blocks exist or if maybe you skipped some blocks
+// TooFarAhead indicates a sane number of one-blocks to walk above baseBlockNum:
+// if we go too far and baseBlockNum does not move, you are probably walking through unlinkable blocks:
+// you should stop that walk and re-evaluate your baseBlockNum from existing merged blocks, etc.
 func (b *Bundler) TooFarAhead(blk uint64) bool {
-	return blk > b.baseBlockNum+b.bundleSize*uint64(b.maxMergingThreads+4) // 5x ahead is safe, no chain skips that many blocks
+	return blk > b.baseBlockNum+b.bundleSize*5 // 5x ahead is safe, no chain skips that many blocks
 }
 
-// LowestUnmergedBlockNum can be called from a different thread.
-// It returns the lowest block number that has not yet been confirmed merged,
-// which is the minimum in-flight merge base (or current baseBlockNum if none in flight).
-// This is used as a safe pruning boundary: one-block-files below this value are safe to delete.
-func (b *Bundler) LowestUnmergedBlockNum() uint64 {
+// this is used to determine what we can safely delete from the one-block store
+func (b *Bundler) getSafeBaseBlockNum() uint64 {
 	b.Lock()
-	cur := b.baseBlockNum
-	b.Unlock()
-
-	b.inFlightMu.Lock()
-	defer b.inFlightMu.Unlock()
-	for base := range b.inFlightBundles {
-		if base < cur {
-			cur = base
-		}
-	}
-	return cur
+	defer b.Unlock()
+	return b.safeBaseBlockNum
 }
 
 // WaitForMerges blocks until all in-flight async merges have completed.
 func (b *Bundler) WaitForMerges() {
 	_ = b.eg.Wait()
+}
+
+func (b *Bundler) markBundleInFlight(base uint64) {
+	b.inFlightMu.Lock()
+	b.inFlightBundles[base] = true
+	b.inFlightMu.Unlock()
+}
+
+func (b *Bundler) markBundleMerged(base uint64) {
+	b.inFlightMu.Lock()
+	b.mergedBundles[base] = true
+	delete(b.inFlightBundles, base)
+	b.inFlightMu.Unlock()
+}
+
+func (b *Bundler) markBundleFailed(base uint64) {
+	b.inFlightMu.Lock()
+	delete(b.inFlightBundles, base)
+	b.inFlightMu.Unlock()
 }
 
 func (b *Bundler) HandleBlockFile(obf *bstream.OneBlockFile) error {
@@ -157,8 +170,17 @@ func (b *Bundler) Reset(nextBase uint64, lib bstream.BlockRef) {
 	}
 	b.forkable = forkable.New(b, options...)
 
+	b.inFlightMu.Lock()
+	for k := range b.inFlightBundles {
+		if k < nextBase {
+			delete(b.inFlightBundles, k)
+		}
+	}
+	b.inFlightMu.Unlock()
+
 	b.Lock()
 	b.baseBlockNum = nextBase
+	b.safeBaseBlockNum = nextBase
 	b.irreversibleBlocks = nil
 	b.Unlock()
 }
@@ -221,28 +243,29 @@ func (b *Bundler) ProcessBlock(_ *pbbstream.Block, obj interface{}) error {
 
 	// Track in-flight before Stop() so LowestUnmergedBlockNum() is conservative even while waiting for a slot.
 	b.inFlightMu.Lock()
-	b.inFlightBundles[baseBlockNum] = true
+	alreadyHandled := b.inFlightBundles[baseBlockNum] || b.mergedBundles[baseBlockNum]
+	if !alreadyHandled {
+		b.inFlightBundles[baseBlockNum] = true
+	}
 	b.inFlightMu.Unlock()
 
-	// Stop() blocks until a slot is free; Go() launches the goroutine. Errors are never returned
-	// through eg (they go to bundleError), so Stop() will never return true.
-	b.eg.Stop()
-	b.eg.Go(func() error {
-		defer func() {
-			b.inFlightMu.Lock()
-			delete(b.inFlightBundles, baseBlockNum)
-			b.inFlightMu.Unlock()
-		}()
-		if err := b.io.MergeAndStore(context.Background(), baseBlockNum, blocksToBundle); err != nil {
-			b.bundleError <- err
-			return nil // errors are consumed via bundleError, not propagated through eg
-		}
-		if forkableIO, ok := b.io.(ForkAwareIOInterface); ok {
-			forkableIO.MoveForkedBlocks(context.Background(), forkedBlocks)
-		}
-		// we do not delete bundled blocks here, they get pruned later. keeping the blocks from the last bundle is useful for bootstrapping
-		return nil
-	})
+	if !alreadyHandled {
+		// Stop() blocks until a slot is free; Go() launches the goroutine. Errors are never returned
+		// through eg (they go to bundleError), so Stop() will never return true.
+		b.eg.Stop()
+		b.eg.Go(func() (err error) {
+			if err := b.io.MergeAndStore(context.Background(), baseBlockNum, blocksToBundle); err != nil {
+				b.bundleError <- err
+				b.markBundleFailed(baseBlockNum)
+				return nil // errors are consumed via bundleError, not propagated through eg
+			}
+			if forkableIO, ok := b.io.(ForkAwareIOInterface); ok {
+				forkableIO.MoveForkedBlocks(context.Background(), forkedBlocks)
+			}
+			b.markBundleMerged(baseBlockNum)
+			return nil
+		})
+	}
 
 	b.Lock()
 	// we keep the last block of the bundle, only deleting it on next merge, to facilitate joining to one-block-filled hub
@@ -251,28 +274,25 @@ func (b *Bundler) ProcessBlock(_ *pbbstream.Block, obj interface{}) error {
 	b.baseBlockNum += b.bundleSize
 	for obf.Num > b.baseBlockNum+b.bundleSize { // skip more merged-block-files
 		capturedBase := b.baseBlockNum
-		b.inFlightMu.Lock()
-		b.inFlightBundles[capturedBase] = true
-		b.inFlightMu.Unlock()
+		b.markBundleInFlight(capturedBase)
 		if b.eg.Stop() {
 			break
 		}
 		b.eg.Go(func() error { // lastBlock will be excluded from bundle but is useful to bundler
-			defer func() {
-				b.inFlightMu.Lock()
-				delete(b.inFlightBundles, capturedBase)
-				b.inFlightMu.Unlock()
-			}()
 			if err := b.io.MergeAndStore(context.Background(), capturedBase, []*bstream.OneBlockFile{lastBlock}); err != nil {
 				b.bundleError <- err
+				b.markBundleFailed(capturedBase)
+				return nil
 			}
+			b.markBundleMerged(capturedBase)
 			return nil
 		})
 		b.baseBlockNum += b.bundleSize
 	}
+	reachedStop := b.stopBlock != 0 && b.baseBlockNum >= b.stopBlock
 	b.Unlock()
 
-	if b.stopBlock != 0 && b.baseBlockNum >= b.stopBlock {
+	if reachedStop {
 		return ErrStopBlockReached
 	}
 

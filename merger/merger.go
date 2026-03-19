@@ -159,7 +159,7 @@ func (m *Merger) startOldFilesPruner() {
 }
 
 func (m *Merger) pruningTarget(distance uint64) uint64 {
-	bundlerBase := m.bundler.LowestUnmergedBlockNum()
+	bundlerBase := m.bundler.getSafeBaseBlockNum()
 	if distance > bundlerBase {
 		return 0
 	}
@@ -178,7 +178,7 @@ func (m *Merger) run() error {
 			return nil
 		}
 
-		base, lib, err := m.io.NextBundle(ctx, m.bundler.baseBlockNum)
+		base, lib, err := m.io.NextBundle(ctx, m.bundler.getSafeBaseBlockNum())
 		if err != nil {
 			if errors.Is(err, ErrHoleFound) {
 				if holeFoundLogged {
@@ -199,19 +199,17 @@ func (m *Merger) run() error {
 			}
 		}
 
-		if base > m.bundler.baseBlockNum {
-			logFields := []zapcore.Field{
-				zap.Uint64("previous_base_block_num", m.bundler.baseBlockNum),
-				zap.Uint64("new_base_block_num", base),
-			}
-			if lib != nil {
-				logFields = append(logFields, zap.Stringer("lib", lib))
-			}
-			m.logger.Info("resetting bundler base block num", logFields...)
-			m.bundler.Reset(base, lib)
+		logFields := []zapcore.Field{
+			zap.Uint64("previous_base_block_num", m.bundler.baseBlockNum),
+			zap.Uint64("new_base_block_num", base),
 		}
+		if lib != nil {
+			logFields = append(logFields, zap.Stringer("lib", lib))
+		}
+		m.logger.Info("resetting bundler base block num", logFields...)
+		m.bundler.Reset(base, lib)
 
-		err = m.io.WalkOneBlockFiles(ctx, m.bundler.baseBlockNum, func(obf *bstream.OneBlockFile) error {
+		err = m.io.WalkOneBlockFiles(ctx, base, func(obf *bstream.OneBlockFile) error {
 			if m.IsTerminating() {
 				return errTerminating
 			}

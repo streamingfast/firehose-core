@@ -111,7 +111,7 @@ func TestMergerRun_FailedBundleDoesNotDeleteUnmergedOrRemergeOtherBundles(t *tes
 			walkCalls = append(walkCalls, inclusiveLowerBlock)
 			walkCallCount++
 			callNum := walkCallCount
-			if seenLowest := merger.bundler.LowestUnmergedBlockNum(); seenLowest > highestSeenLowestUnmergedBlockNum {
+			if seenLowest := merger.bundler.getSafeBaseBlockNum(); seenLowest > highestSeenLowestUnmergedBlockNum {
 				highestSeenLowestUnmergedBlockNum = seenLowest
 			}
 			mu.Unlock()
@@ -206,7 +206,7 @@ func TestMergerRun_CheckAlreadyMergedAfterManyBlocks(t *testing.T) {
 			walkCalls = append(walkCalls, inclusiveLowerBlock)
 			walkCallCount++
 			callNum := walkCallCount
-			if seenLowest := merger.bundler.LowestUnmergedBlockNum(); seenLowest > highestSeenLowestUnmergedBlockNum {
+			if seenLowest := merger.bundler.getSafeBaseBlockNum(); seenLowest > highestSeenLowestUnmergedBlockNum {
 				highestSeenLowestUnmergedBlockNum = seenLowest
 			}
 			mu.Unlock()
