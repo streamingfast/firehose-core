@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/streamingfast/quic-block-transport/blockinfo"
 	quicblockserver "github.com/streamingfast/quic-block-transport/quic"
@@ -71,18 +72,20 @@ func (a *BlockSourceAdapter) Next(ctx context.Context) (*blockinfo.BlockInfo, *q
 			payload = block.PayloadBuffer
 		}
 
+		now := time.Now()
 		compressedData, err := quicblockserver.CompressData(&quicblockserver.UncompressedData{Bytes: payload})
 		if err != nil {
 			return nil, nil, fmt.Errorf("compressing block: %w", err)
 		}
 
 		info := &blockinfo.BlockInfo{
-			Number:      block.Number,
-			ID:          block.Id,
-			ParentID:    block.ParentId,
-			ParentNum:   block.ParentNum,
-			LibNum:      block.LibNum,
-			Timestamp:   block.Timestamp.AsTime(),
+			Number:    block.Number,
+			ID:        block.Id,
+			ParentID:  block.ParentId,
+			ParentNum: block.ParentNum,
+			LibNum:    block.LibNum,
+			//Timestamp:   block.Timestamp.AsTime(),
+			Timestamp:   now, //debug hack
 			PayloadSize: uint64(len(payload)),
 		}
 
