@@ -2346,8 +2346,8 @@ github.com/streamingfast/pbgo v0.0.6-0.20260206150405-2b95acf70437 h1:BsGEgwjlIJ
 github.com/streamingfast/pbgo v0.0.6-0.20260206150405-2b95acf70437/go.mod h1:MHb9nR5zyNyvA1Zi2wud+hWpoILpll7vpLUijvh3YV0=
 github.com/streamingfast/protoreflect v0.0.0-20231205191344-4b629d20ce8d h1:33VIARqUqBUKXJcuQoOS1rVSms54tgxhhNCmrLptpLg=
 github.com/streamingfast/protoreflect v0.0.0-20231205191344-4b629d20ce8d/go.mod h1:aBJivEdekmFWYSQ29EE/fN9IanJWJXbtjy3ky0XD/jE=
-github.com/streamingfast/quic-block-transport v0.0.0-20260304140622-b95e8b5202df h1:86EfiBsHcncxM+5CTXE76deWXkjSYVzvewn7OPXmbxY=
-github.com/streamingfast/quic-block-transport v0.0.0-20260304140622-b95e8b5202df/go.mod h1:vKg8I+XjBuv/5UvZTbYyBl01BJwV0z2EVV+Hm98xUB0=
+github.com/streamingfast/quic-block-transport v0.0.0-20260320124015-49d8e52a5339 h1:qyMQ7DlWmRMZLsPstTU7el2Tohf5Ij3M68MgxaQd4CQ=
+github.com/streamingfast/quic-block-transport v0.0.0-20260320124015-49d8e52a5339/go.mod h1:vKg8I+XjBuv/5UvZTbYyBl01BJwV0z2EVV+Hm98xUB0=
 github.com/streamingfast/sf-tracing v0.0.0-20251218140752-bafd5572499f h1:KXE5MEXwc7l6FwD9dBYH0r+0IojAS9VYZa/vuzCBnK0=
 github.com/streamingfast/sf-tracing v0.0.0-20251218140752-bafd5572499f/go.mod h1:H57LMxdkHi0MZ+n7xr7zo9PJv7kZZ38du9w0SizLcFU=
 github.com/streamingfast/shutter v1.5.0 h1:NpzDYzj0HVpSiDJVO/FFSL6QIK/YKOxY0gJAtyaTOgs=
