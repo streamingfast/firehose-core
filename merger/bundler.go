@@ -43,19 +43,18 @@ type Bundler struct {
 
 	io IOInterface
 
-	baseBlockNum     uint64
-	safeBaseBlockNum uint64 // this one is updated only from m.io.NextBundle()
+	// baseBlockNum goes forward, ahead of completion of in-flight bundles
+	// use getSafeBaseBlockNum() to get the baseBlockNum below which it is safe to delete one-block files
+	baseBlockNum uint64
 
 	bundleSize                 uint64
-	bundleError                chan error
 	eg                         *llerrgroup.Group
-	maxMergingThreads          int
 	inFlightMu                 sync.Mutex
 	inFlightBundles            map[uint64]bool
-	mergedBundles              map[uint64]bool
 	stopBlock                  uint64
 	enforceNextBlockOnBoundary bool
 	firstStreamableBlock       uint64
+	shutDownFunc               func(error)
 
 	seenBlockFiles     map[string]*bstream.OneBlockFile // this is used to identify forked blocks that should be moved to the forked store
 	irreversibleBlocks []*bstream.OneBlockFile
@@ -70,23 +69,21 @@ type Bundler struct {
 
 var logger, _ = logging.PackageLogger("merger", "github.com/streamingfast/firehose-core/merger/bundler")
 
-func NewBundler(startBlock, stopBlock, firstStreamableBlock, bundleSize uint64, io IOInterface, maxMergingThreads int) *Bundler {
+func NewBundler(startBlock, stopBlock, firstStreamableBlock, bundleSize uint64, io IOInterface, maxMergingThreads int, shutDownFunc func(error)) *Bundler {
 	if maxMergingThreads < 1 {
 		maxMergingThreads = 1
 	}
 	b := &Bundler{
 		bundleSize:             bundleSize,
 		io:                     io,
-		bundleError:            make(chan error, 1),
 		firstStreamableBlock:   firstStreamableBlock,
 		stopBlock:              stopBlock,
 		eg:                     llerrgroup.New(maxMergingThreads),
-		maxMergingThreads:      maxMergingThreads,
 		inFlightBundles:        make(map[uint64]bool),
-		mergedBundles:          make(map[uint64]bool),
 		seenBlockFiles:         make(map[string]*bstream.OneBlockFile),
 		blockTimestampInFlight: atomic.NewBool(false),
 		blockTimestampLastRun:  atomic.NewInt64(0),
+		shutDownFunc:           shutDownFunc,
 		logger:                 logger,
 	}
 	b.Reset(toBaseNum(startBlock, bundleSize), nil)
@@ -104,7 +101,13 @@ func (b *Bundler) TooFarAhead(blk uint64) bool {
 func (b *Bundler) getSafeBaseBlockNum() uint64 {
 	b.Lock()
 	defer b.Unlock()
-	return b.safeBaseBlockNum
+	out := b.baseBlockNum
+	for inflight := range b.inFlightBundles {
+		if inflight < out {
+			out = inflight
+		}
+	}
+	return out
 }
 
 // WaitForMerges blocks until all in-flight async merges have completed.
@@ -119,13 +122,6 @@ func (b *Bundler) markBundleInFlight(base uint64) {
 }
 
 func (b *Bundler) markBundleMerged(base uint64) {
-	b.inFlightMu.Lock()
-	b.mergedBundles[base] = true
-	delete(b.inFlightBundles, base)
-	b.inFlightMu.Unlock()
-}
-
-func (b *Bundler) markBundleFailed(base uint64) {
 	b.inFlightMu.Lock()
 	delete(b.inFlightBundles, base)
 	b.inFlightMu.Unlock()
@@ -180,17 +176,14 @@ func (b *Bundler) Reset(nextBase uint64, lib bstream.BlockRef) {
 	b.inFlightMu.Unlock()
 
 	b.Lock()
-	if nextBase != b.safeBaseBlockNum {
-		logFields := []zapcore.Field{
-			zap.Uint64("previous_base_block_num", b.safeBaseBlockNum),
-			zap.Uint64("new_base_block_num", nextBase),
-		}
-		if lib != nil {
-			logFields = append(logFields, zap.Stringer("lib", lib))
-		}
-		b.logger.Info("resetting bundler base block num", logFields...)
-		b.safeBaseBlockNum = nextBase
+	logFields := []zapcore.Field{
+		zap.Uint64("previous_base_block_num", b.baseBlockNum),
+		zap.Uint64("new_base_block_num", nextBase),
 	}
+	if lib != nil {
+		logFields = append(logFields, zap.Stringer("lib", lib))
+	}
+	b.logger.Info("resetting bundler base block num", logFields...)
 	b.baseBlockNum = nextBase
 	b.irreversibleBlocks = nil
 	b.Unlock()
@@ -242,41 +235,25 @@ func (b *Bundler) ProcessBlock(_ *pbbstream.Block, obj interface{}) error {
 		return nil
 	}
 
-	select {
-	case err := <-b.bundleError:
-		return err
-	default:
-	}
-
 	forkedBlocks := b.forkedBlocksInCurrentBundle()
 	blocksToBundle := b.irreversibleBlocks
 	baseBlockNum := b.baseBlockNum
 
-	// Track in-flight before Stop() so LowestUnmergedBlockNum() is conservative even while waiting for a slot.
-	b.inFlightMu.Lock()
-	alreadyHandled := b.inFlightBundles[baseBlockNum] || b.mergedBundles[baseBlockNum]
-	if !alreadyHandled {
-		b.inFlightBundles[baseBlockNum] = true
+	if b.eg.Stop() {
+		return errTerminating
 	}
-	b.inFlightMu.Unlock()
-
-	if !alreadyHandled {
-		// Stop() blocks until a slot is free; Go() launches the goroutine. Errors are never returned
-		// through eg (they go to bundleError), so Stop() will never return true.
-		b.eg.Stop()
-		b.eg.Go(func() (err error) {
-			if err := b.io.MergeAndStore(context.Background(), baseBlockNum, blocksToBundle); err != nil {
-				b.bundleError <- err
-				b.markBundleFailed(baseBlockNum)
-				return nil // errors are consumed via bundleError, not propagated through eg
-			}
-			if forkableIO, ok := b.io.(ForkAwareIOInterface); ok {
-				forkableIO.MoveForkedBlocks(context.Background(), forkedBlocks)
-			}
-			b.markBundleMerged(baseBlockNum)
-			return nil
-		})
-	}
+	b.markBundleInFlight(baseBlockNum)
+	b.eg.Go(func() (_ error) {
+		if err := b.io.MergeAndStore(context.Background(), baseBlockNum, blocksToBundle); err != nil {
+			go b.shutDownFunc(err) // in a go func so it doesn't block waiting for b.eg
+			return err
+		}
+		if forkableIO, ok := b.io.(ForkAwareIOInterface); ok {
+			forkableIO.MoveForkedBlocks(context.Background(), forkedBlocks)
+		}
+		b.markBundleMerged(baseBlockNum)
+		return nil
+	})
 
 	b.Lock()
 	// we keep the last block of the bundle, only deleting it on next merge, to facilitate joining to one-block-filled hub
@@ -287,12 +264,11 @@ func (b *Bundler) ProcessBlock(_ *pbbstream.Block, obj interface{}) error {
 		capturedBase := b.baseBlockNum
 		b.markBundleInFlight(capturedBase)
 		if b.eg.Stop() {
-			break
+			return errTerminating
 		}
 		b.eg.Go(func() error { // lastBlock will be excluded from bundle but is useful to bundler
 			if err := b.io.MergeAndStore(context.Background(), capturedBase, []*bstream.OneBlockFile{lastBlock}); err != nil {
-				b.bundleError <- err
-				b.markBundleFailed(capturedBase)
+				go b.shutDownFunc(err) // in a go func so it doesn't block waiting for b.eg
 				return nil
 			}
 			b.markBundleMerged(capturedBase)

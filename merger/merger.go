@@ -56,7 +56,6 @@ func NewMerger(
 ) *Merger {
 	m := &Merger{
 		Shutter:              shutter.New(),
-		bundler:              NewBundler(firstStreamableBlock, stopBlock, firstStreamableBlock, bundleSize, io, maxMergingThreads),
 		grpcListenAddr:       grpcListenAddr,
 		io:                   io,
 		firstStreamableBlock: firstStreamableBlock,
@@ -65,6 +64,8 @@ func NewMerger(
 		timeBetweenPruning:   timeBetweenPruning,
 		logger:               logger,
 	}
+
+	m.bundler = NewBundler(firstStreamableBlock, stopBlock, firstStreamableBlock, bundleSize, io, maxMergingThreads, m.Shutdown)
 	m.OnTerminating(func(_ error) { m.bundler.WaitForMerges() }) // wait for all in-flight async merges to complete
 
 	return m
@@ -177,8 +178,7 @@ func (m *Merger) run() error {
 			return nil
 		}
 
-		safeBase := m.bundler.getSafeBaseBlockNum()
-		base, lib, err := m.io.NextBundle(ctx, safeBase)
+		base, lib, err := m.io.NextBundle(ctx, m.bundler.baseBlockNum)
 		if err != nil {
 			if errors.Is(err, ErrHoleFound) {
 				if holeFoundLogged {
@@ -199,7 +199,9 @@ func (m *Merger) run() error {
 			}
 		}
 
-		m.bundler.Reset(base, lib)
+		if base > m.bundler.baseBlockNum { // means we jump forward because the merged-blocks have been produced by someone else
+			m.bundler.Reset(base, lib)
+		}
 
 		err = m.io.WalkOneBlockFiles(ctx, base, func(obf *bstream.OneBlockFile) error {
 			if m.IsTerminating() {

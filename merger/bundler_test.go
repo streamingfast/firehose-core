@@ -86,11 +86,10 @@ var block609Final608 = func() *bstream.OneBlockFile {
 }
 
 func TestNewBundler(t *testing.T) {
-	b := NewBundler(100, 200, 2, 100, nil, 1)
+	b := NewBundler(100, 200, 2, 100, nil, 1, nil)
 	require.NotNil(t, b)
 	assert.EqualValues(t, 100, b.bundleSize)
 	assert.EqualValues(t, 200, b.stopBlock)
-	assert.NotNil(t, b.bundleError)
 	assert.NotNil(t, b.seenBlockFiles)
 }
 
@@ -113,7 +112,7 @@ func TestBundlerParallelMergesRunConcurrently(t *testing.T) {
 			<-release
 			return nil
 		},
-	}, 2)
+	}, 2, nil)
 	b.irreversibleBlocks = []*bstream.OneBlockFile{block100(), block101()}
 
 	feedDone := make(chan error, 1)
@@ -163,7 +162,7 @@ func TestBundlerSemaphoreLimitsParallelism(t *testing.T) {
 			mu.Unlock()
 			return nil
 		},
-	}, 1)
+	}, 1, nil)
 	b.irreversibleBlocks = []*bstream.OneBlockFile{block100(), block101()}
 
 	for _, blk := range twoMergesBlocks {
@@ -175,7 +174,7 @@ func TestBundlerSemaphoreLimitsParallelism(t *testing.T) {
 }
 
 func TestBundlerReset(t *testing.T) {
-	b := NewBundler(100, 200, 2, 2, nil, 1) // merge every 2 blocks
+	b := NewBundler(100, 200, 2, 2, nil, 1, nil) // merge every 2 blocks
 
 	b.irreversibleBlocks = []*bstream.OneBlockFile{block100(), block101()}
 	b.Reset(102, block100().ToBstreamBlock().AsRef())
@@ -282,7 +281,7 @@ func TestBundlerMergeKeepOne(t *testing.T) {
 					merged = append(merged, inclusiveLowerBlock)
 					return nil
 				},
-			}, 1) // merge every 2 blocks
+			}, 1, nil) // merge every 2 blocks
 			b.irreversibleBlocks = []*bstream.OneBlockFile{block100(), block101()}
 
 			for _, blk := range c.inBlocks {

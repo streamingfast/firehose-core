@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/shutter"
@@ -26,11 +27,11 @@ func chainBlock(num, prevNum, lib uint64) *bstream.OneBlockFile {
 func newRunTestMerger(io IOInterface, firstStreamableBlock, bundleSize uint64, maxThreads int) *Merger {
 	m := &Merger{
 		Shutter:            shutter.New(),
-		bundler:            NewBundler(firstStreamableBlock, 0, firstStreamableBlock, bundleSize, io, maxThreads),
 		io:                 io,
 		timeBetweenPolling: 0,
 		logger:             testLogger,
 	}
+	m.bundler = NewBundler(firstStreamableBlock, 0, firstStreamableBlock, bundleSize, io, maxThreads, m.Shutdown)
 	m.OnTerminating(func(_ error) { m.bundler.WaitForMerges() })
 	return m
 }
@@ -73,14 +74,14 @@ var testRepeaterRan bool
 // 	}
 // }
 
-// TestMergerRun_FailedBundleDoesNotDeleteUnmergedOrRemergeOtherBundles tests the core scenario:
+// TestMergerRun_FailedBundleCausesShutdown tests the core scenario:
 //   - bundle size 10, blocks 10..35 available (0-9 already merged)
-//   - merge for bundle 10-19 fails every time
+//   - merge for bundle 10-19 fails
 //   - running with multiple threads
 //
 // We ensure that the `LowestUnmergedBlockNum()` func never returns a value above 10 so that the file deleter would not risk deleting unmerged files
-// We ensure that range "20-29" is not merged multiple times (it succeeds every time)
-func TestMergerRun_FailedBundleDoesNotDeleteUnmergedOrRemergeOtherBundles(t *testing.T) {
+// We ensure that range "20-29" is merged
+func TestMergerRun_FailedBundleCausesShutdown(t *testing.T) {
 	const (
 		bundleSize = uint64(10)
 	)
@@ -92,9 +93,6 @@ func TestMergerRun_FailedBundleDoesNotDeleteUnmergedOrRemergeOtherBundles(t *tes
 	var highestSeenLowestUnmergedBlockNum uint64
 	var mergeAttempts []uint64
 	var walkCalls []uint64
-
-	walkCallCount := 0
-	mergeFailedOnce := false
 
 	var merger *Merger
 
@@ -109,18 +107,10 @@ func TestMergerRun_FailedBundleDoesNotDeleteUnmergedOrRemergeOtherBundles(t *tes
 		WalkOneBlockFilesFunc: func(_ context.Context, inclusiveLowerBlock uint64, callback func(*bstream.OneBlockFile) error) error {
 			mu.Lock()
 			walkCalls = append(walkCalls, inclusiveLowerBlock)
-			walkCallCount++
-			callNum := walkCallCount
 			if seenLowest := merger.bundler.getSafeBaseBlockNum(); seenLowest > highestSeenLowestUnmergedBlockNum {
 				highestSeenLowestUnmergedBlockNum = seenLowest
 			}
 			mu.Unlock()
-
-			// after a few iterations we shut down
-			if callNum > 10 {
-				merger.Shutdown(nil)
-				return nil
-			}
 
 			for _, blk := range blocks {
 				if blk.Num < inclusiveLowerBlock {
@@ -135,39 +125,38 @@ func TestMergerRun_FailedBundleDoesNotDeleteUnmergedOrRemergeOtherBundles(t *tes
 		MergeAndStoreFunc: func(_ context.Context, inclusiveLowerBlock uint64, _ []*bstream.OneBlockFile) error {
 			mu.Lock()
 			mergeCountPerBase[inclusiveLowerBlock]++
-			shouldFail := inclusiveLowerBlock == 10 //&& !mergeFailedOnce
-			if shouldFail {
-				mergeFailedOnce = true
-			}
 			mergeAttempts = append(mergeAttempts, inclusiveLowerBlock)
 			mu.Unlock()
-
-			if shouldFail {
+			if inclusiveLowerBlock == 10 {
+				time.Sleep(time.Millisecond * 100)
 				return errors.New("injected merge failure for bundle 10")
 			}
+
 			return nil
 		},
 	}
 
 	merger = newRunTestMerger(testIO, 0, bundleSize, 4)
-	err := merger.run()
+
+	var err error
+	go func() {
+		err = merger.run()
+	}()
+	select {
+	case <-time.After(time.Second):
+		t.Fail()
+	case <-merger.Terminated():
+	}
 	require.NoError(t, err)
 	merger.bundler.WaitForMerges()
 
-	mu.Lock()
 	assert.Equal(t, 10, int(highestSeenLowestUnmergedBlockNum), "bundler lowestUnmergedBlockNum should never go above 10")
 
 	// Bundle 10-19 must have been attempted (and failed).
-	assert.Greaterf(t, mergeCountPerBase[10], 1, "bundle 10 should have been attempted multiple times: mergeCalls: %v, walkCalls: %v", mergeAttempts, walkCalls)
-	assert.True(t, mergeFailedOnce, "bundle 10 should have failed once")
+	assert.Equalf(t, mergeCountPerBase[10], 1, "bundle 10 should have been attempted a single time: mergeCalls: %v, walkCalls: %v", mergeAttempts, walkCalls)
 
-	for base, count := range mergeCountPerBase {
-		if base == 10 {
-			continue // already checked above
-		}
-		assert.Less(t, count, 2, "bundler must not merge the same base block twice, base %d merged %d times", base, count)
-	}
-	mu.Unlock()
+	// Bundle 20-29 must have been attempted (and succeeded).
+	assert.Equalf(t, mergeCountPerBase[20], 1, "bundle 20 should have been attempted a single time: mergeCalls: %v, walkCalls: %v", mergeAttempts, walkCalls)
 
 }
 
@@ -246,19 +235,5 @@ func TestMergerRun_CheckAlreadyMergedAfterManyBlocks(t *testing.T) {
 
 	assert.Greater(t, nextBundleCount, 10, "nextBundleCount should be greater than 10")
 	assert.Less(t, highestCheckedOneBlock, uint64(200), "highestCheckedOneBlock should be less than 200")
-
-	//mu.Lock()
-	//assert.Equal(t, 10, int(highestSeenLowestUnmergedBlockNum), "bundler lowestUnmergedBlockNum should never go above 10")
-
-	// Bundle 10-19 must have been attempted (and failed).
-	//assert.Greaterf(t, mergeCountPerBase[10], 1, "bundle 10 should have been attempted multiple times: mergeCalls: %v, walkCalls: %v", mergeAttempts, walkCalls)
-
-	//for base, count := range mergeCountPerBase {
-	//	if base == 10 {
-	//		continue // already checked above
-	//	}
-	//	assert.Less(t, count, 2, "bundler must not merge the same base block twice, base %d merged %d times", base, count)
-	//
-	//mu.Unlock()
 
 }
