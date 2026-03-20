@@ -73,6 +73,7 @@ func (a *BlockSourceAdapter) Next(ctx context.Context) (*blockinfo.BlockInfo, *q
 		}
 
 		now := time.Now()
+		a.logger.Info("block processing time", zap.Duration("duration", now.Sub(block.Timestamp.AsTime())))
 		compressedData, err := quicblockserver.CompressData(&quicblockserver.UncompressedData{Bytes: payload})
 		if err != nil {
 			return nil, nil, fmt.Errorf("compressing block: %w", err)
