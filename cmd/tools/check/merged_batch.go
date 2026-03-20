@@ -2,6 +2,7 @@ package check
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -167,7 +168,7 @@ func checkMergedBlockFileBroken(
 		block, err = readerFactory.Read()
 
 		if block == nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				err = nil
 			}
 			return

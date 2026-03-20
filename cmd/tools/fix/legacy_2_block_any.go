@@ -1,6 +1,7 @@
 package fix
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -85,7 +86,7 @@ func runLegacy2BlockAnyE(zlog *zap.Logger) firecore.CommandExecutor {
 			// iterate through the blocks in the file
 			for {
 				block, err := br.Read()
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					break
 				}
 
@@ -118,7 +119,7 @@ func runLegacy2BlockAnyE(zlog *zap.Logger) firecore.CommandExecutor {
 			return nil
 		})
 
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return nil
 		}
 

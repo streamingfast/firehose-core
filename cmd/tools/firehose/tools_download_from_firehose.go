@@ -2,6 +2,7 @@ package firehose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -93,7 +94,7 @@ func createToolsDownloadFromFirehoseE[B firecore.Block](chain *firecore.Chain[B]
 			for {
 				response, err := stream.Recv()
 				if err != nil {
-					if err == io.EOF {
+					if errors.Is(err, io.EOF) {
 						return nil
 					}
 

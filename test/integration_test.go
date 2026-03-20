@@ -1,6 +1,7 @@
 package test
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -224,7 +225,7 @@ func requestTier1(ctx context.Context, t *testing.T, testCase Case, substreamsCl
 
 	for {
 		block, err := stream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		require.NoError(t, err)

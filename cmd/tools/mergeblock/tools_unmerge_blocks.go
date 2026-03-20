@@ -1,6 +1,7 @@
 package mergeblock
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -72,7 +73,7 @@ func runUnmergeBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 			// iterate through the blocks in the file
 			for {
 				block, err := br.Read()
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					break
 				}
 
@@ -121,7 +122,7 @@ func runUnmergeBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 			return nil
 		})
 
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return nil
 		}
 

@@ -2,6 +2,7 @@ package firecore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -130,7 +131,7 @@ func isBootstrapped(dataDir string, logger *zap.Logger) bool {
 			foundFile = true
 			return io.EOF
 		})
-	if err != nil && !os.IsNotExist(err) && err != io.EOF {
+	if err != nil && !os.IsNotExist(err) && !errors.Is(err, io.EOF) {
 		logger.Warn("error while checking for bootstrapped status", zap.Error(err))
 	}
 

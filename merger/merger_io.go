@@ -264,7 +264,7 @@ func (s *ForkAwareDStoreIO) DeleteForkedBlocksAsync(inclusiveLowBoundary, inclus
 		return nil
 	})
 
-	if err != nil && err != io.EOF {
+	if err != nil && !errors.Is(err, io.EOF) {
 		s.logger.Warn("cannot walk forked block files to delete old ones",
 			zap.Uint64("inclusive_low_boundary", inclusiveLowBoundary),
 			zap.Uint64("inclusive_high_boundary", inclusiveHighBoundary),
@@ -379,7 +379,7 @@ func lastBlock(mergeFileReader io.ReadCloser) (out *pbbstream.Block, err error) 
 			out = block
 		}
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			return nil, err

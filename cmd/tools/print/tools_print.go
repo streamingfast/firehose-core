@@ -214,7 +214,7 @@ func createToolsPrintOneBlockE[B firecore.Block](chain *firecore.Chain[B]) firec
 
 			block, err := readerFactory.Read()
 			if err != nil {
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					break
 				}
 				return fmt.Errorf("reading block: %w", err)

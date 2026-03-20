@@ -16,6 +16,7 @@ package compare
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -286,7 +287,7 @@ func readBundle(
 	blockNumMap := make(map[string]uint64)
 	for {
 		curBlock, err := blockReader.Read()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

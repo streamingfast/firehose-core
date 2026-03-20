@@ -3,6 +3,7 @@ package firehose
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -115,7 +116,7 @@ func getFirehoseClientE[B firecore.Block](chain *firecore.Chain[B], rootLog *zap
 			response, err := stream.Recv()
 
 			if err != nil {
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					break
 				}
 				return fmt.Errorf("stream error while receiving: %w", err)

@@ -16,6 +16,7 @@ package mindreader
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -298,7 +299,7 @@ func (p *MindReaderPlugin) launch() {
 		for {
 			err := p.readOneMessage(blocks)
 			if err != nil {
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					p.zlogger.Info("reached end of console reader stream, nothing more to do")
 					close(blocks)
 					return

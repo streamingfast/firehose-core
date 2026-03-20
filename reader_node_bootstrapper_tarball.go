@@ -3,6 +3,7 @@ package firecore
 import (
 	"archive/tar"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -66,7 +67,7 @@ func (b *TarballNodeBootstrapper) createChainData(reader io.Reader) error {
 	for {
 		header, err := tr.Next()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return nil
 			}
 

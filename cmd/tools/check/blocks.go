@@ -2,6 +2,7 @@ package check
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -268,7 +269,7 @@ func validateBlockSegment[B firecore.Block](
 			continue
 		}
 
-		if block == nil && err == io.EOF {
+		if block == nil && errors.Is(err, io.EOF) {
 			if seenBlockCount < expectedBlockCount(segment, fileBlockSize) {
 				fmt.Printf("🔶 Segment %s contained only %d blocks (< 100), this can happen on some chains\n", segment, seenBlockCount)
 			}
