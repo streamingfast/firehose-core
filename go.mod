@@ -13,7 +13,7 @@ require (
 	github.com/docker/go-connections v0.6.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/go-json-experiment/json v0.0.0-20231013223334-54c864be5b8d
-	github.com/graphprotocol/substreams-data-service v0.0.0-20260224031909-c6ca40569c63
+	github.com/graphprotocol/substreams-data-service v0.0.0-20260323141224-141602015bcf
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/iancoleman/strcase v0.3.0
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
@@ -35,7 +35,7 @@ require (
 	github.com/streamingfast/dsession v0.0.0-20251029144057-b94d1030e142
 	github.com/streamingfast/dstore v0.1.3-0.20260119134532-ee504d6a2655
 	github.com/streamingfast/firehose-networks v0.2.2
-	github.com/streamingfast/logging v0.0.0-20260108192805-38f96de0a641
+	github.com/streamingfast/logging v1.2.2
 	github.com/streamingfast/payment-gateway v0.0.0-20251124143836-60d98e3546f5
 	github.com/streamingfast/pbgo v0.0.6-0.20260206150405-2b95acf70437
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
@@ -157,6 +157,9 @@ require (
 	github.com/streamingfast/eth-go v0.0.0-20260216202159-4e2b7501894a // indirect
 	github.com/streamingfast/firehose-ethereum/types v0.0.0-20251113151010-c9c94d64348a // indirect
 	github.com/streamingfast/worker-pool-protocol v0.0.0-20251029142144-b539534f3eb1 // indirect
+	github.com/tidwall/gjson v1.18.0 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
+	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
