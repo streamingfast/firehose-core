@@ -90,13 +90,6 @@ func NewBundler(startBlock, stopBlock, firstStreamableBlock, bundleSize uint64, 
 	return b
 }
 
-// TooFarAhead indicates a sane number of one-blocks to walk above baseBlockNum:
-// if we go too far and baseBlockNum does not move, you are probably walking through unlinkable blocks:
-// you should stop that walk and re-evaluate your baseBlockNum from existing merged blocks, etc.
-func (b *Bundler) TooFarAhead(blk uint64) bool {
-	return blk > b.baseBlockNum+b.bundleSize*5 // 5x ahead is safe, no chain skips that many blocks
-}
-
 // this is used to determine what we can safely delete from the one-block store
 func (b *Bundler) getSafeBaseBlockNum() uint64 {
 	b.Lock()

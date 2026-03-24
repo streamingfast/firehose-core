@@ -203,12 +203,24 @@ func (m *Merger) run() error {
 			m.bundler.Reset(base, lib)
 		}
 
+		unlinkableCount := 0
+		maxUnlinkableBlocks := int(m.bundler.bundleSize * 4)
+		lastBase := m.bundler.baseBlockNum
+
 		err = m.io.WalkOneBlockFiles(ctx, base, func(obf *bstream.OneBlockFile) error {
 			if m.IsTerminating() {
 				return errTerminating
 			}
-			if m.bundler.TooFarAhead(obf.LibNum) { // don't go too far ahead, in case we have unlinkable blocks, we want to continue to next loop
-				return errCheckLoop
+			if lastBase != m.bundler.baseBlockNum { // reset count every time we do a bundle
+				unlinkableCount = 0
+				lastBase = m.bundler.baseBlockNum
+			}
+			if obf.Num > m.bundler.baseBlockNum && !m.bundler.forkable.Linkable(obf.ToBstreamBlock()) {
+				unlinkableCount++
+				if unlinkableCount > maxUnlinkableBlocks {
+					m.logger.Info("too many unlinkable blocks, continuing to next loop", zap.Uint64("base", obf.Num), zap.Int("unlinkable_count", unlinkableCount), zap.Stringer("last_seen_block", obf))
+					return errCheckLoop // we have too many unlinkable blocks, continue to next loop in case
+				}
 			}
 			return m.bundler.HandleBlockFile(obf)
 		})
