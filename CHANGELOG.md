@@ -8,6 +8,15 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## v1.14.1
+
+### Updated
+
+* Library `dstore` bumped to latest version which brings these changes:
+  * GCS store: opt-in gRPC transport via `client_protocol=grpc` query parameter (e.g. `gs://bucket/path?client_protocol=grpc`). Defaults to the existing HTTP client; the gRPC client is selected only when this parameter is explicitly set.
+  * S3 store: `storageClass` query parameter is deprecated in favour of `storage_class`; a warning is logged when the old form is used. `storage_class` query parameter as the canonical snake_case name for `storageClass`.
+  * S3 store: each store clone now gets its own transport for failure isolation; adds `ResponseHeaderTimeout` to prevent hung requests and configures HTTP/2 health checks via `x/net/http2`; default connection pool sizes are reduced.
+
 ## v1.14.0
 
 ### Added
