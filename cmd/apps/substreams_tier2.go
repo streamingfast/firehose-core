@@ -97,19 +97,19 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 				return nil, fmt.Errorf("creating authenticator: %w", err)
 			}
 
+			config := app.NewDefaultTier2Config()
+			config.Tracing = tracing
+			config.GRPCListenAddr = grpcListenAddr
+			config.ServiceDiscoveryURL = serviceDiscoveryURL
+			config.TmpDir = tmpDir
+			config.WASMExtensions = wasmExtensions
+			config.BlockExecutionTimeout = executionTimeout
+			config.SegmentExecutionTimeout = segmentExecutionTimeout
+			config.MaximumConcurrentRequests = maximumConcurrentRequests
+
 			return app.NewTier2(appLogger,
-				&app.Tier2Config{
-					Tracing: tracing,
-
-					GRPCListenAddr:          grpcListenAddr,
-					ServiceDiscoveryURL:     serviceDiscoveryURL,
-					WASMExtensions:          wasmExtensions,
-					BlockExecutionTimeout:   executionTimeout,
-					SegmentExecutionTimeout: segmentExecutionTimeout,
-					TmpDir:                  tmpDir,
-
-					MaximumConcurrentRequests: maximumConcurrentRequests,
-				}, &app.Tier2Modules{
+				config,
+				&app.Tier2Modules{
 					CheckPendingShutDown: runtime.IsPendingShutdown,
 					Authenticator:        auth,
 				}), nil
