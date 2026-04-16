@@ -341,7 +341,7 @@ func (p *MindReaderPlugin) waitForReadFlowToComplete() {
 func (p *MindReaderPlugin) consumeReadFlow(blocks <-chan *pbbstream.Block) {
 	p.zlogger.Info("starting consume flow")
 	defer close(p.consumeReadFlowDone)
-
+	logger := p.zlogger.Named("consumer flow")
 	ctx := context.Background()
 	for {
 		p.zlogger.Debug("waiting to consume next block")
@@ -357,13 +357,15 @@ func (p *MindReaderPlugin) consumeReadFlow(blocks <-chan *pbbstream.Block) {
 			return
 		}
 
-		p.zlogger.Debug("got one block", zap.Uint64("block_num", block.Number))
+		logger.Debug("got one block", zap.Uint64("block_num", block.Number))
 
 		// In test mode, compare blocks instead of storing them
 		if p.testModeComparator != nil {
+			logger.Debug("test mode comparator")
+
 			err := p.testModeComparator.CompareBlock(ctx, block)
 			if err != nil {
-				p.zlogger.Warn("failed to compare block in test mode",
+				logger.Warn("failed to compare block in test mode",
 					zap.Uint64("block_num", block.Number),
 					zap.String("block_id", block.Id),
 					zap.Error(err),
@@ -371,12 +373,15 @@ func (p *MindReaderPlugin) consumeReadFlow(blocks <-chan *pbbstream.Block) {
 				// Don't shutdown on comparison errors, just log and continue
 			}
 		} else if p.archiver != nil {
+			logger.Debug("In archiver")
 			// Normal mode: store block
 			storeBlockStart := time.Now()
 			err := p.archiver.StoreBlock(ctx, block)
+			logger.Debug("Block stored")
 			p.recordSample(&p.storeBlockSamples, storeBlockStart)
+			logger.Debug("Block record samples")
 			if err != nil {
-				p.zlogger.Error("failed storing block in archiver, shutting down and trying to send next blocks individually. You will need to reprocess over this range.", zap.Error(err), zap.String("received_block", block.Id), zap.Uint64("received_block_num", block.Number))
+				logger.Error("failed storing block in archiver, shutting down and trying to send next blocks individually. You will need to reprocess over this range.", zap.Error(err), zap.String("received_block", block.Id), zap.Uint64("received_block_num", block.Number))
 
 				if !p.IsTerminating() {
 					go p.Shutdown(fmt.Errorf("archiver store block failed: %w", err))
@@ -385,12 +390,21 @@ func (p *MindReaderPlugin) consumeReadFlow(blocks <-chan *pbbstream.Block) {
 				continue
 			}
 
+			logger.Debug("Post block stored and record")
+
 			if p.onBlockWritten != nil {
+
+				logger.Debug("onBlockWritten before")
+
 				onBlockWrittenStart := time.Now()
 				err = p.onBlockWritten(block)
+
+				logger.Debug("onBlockWritten after")
+
 				p.recordSample(&p.onBlockWrittenSamples, onBlockWrittenStart)
+
 				if err != nil {
-					p.zlogger.Error("onBlockWritten callback failed", zap.Error(err))
+					logger.Error("onBlockWritten callback failed", zap.Error(err))
 
 					if !p.IsTerminating() {
 						go p.Shutdown(fmt.Errorf("onBlockWritten callback failed: %w", err))
@@ -401,13 +415,18 @@ func (p *MindReaderPlugin) consumeReadFlow(blocks <-chan *pbbstream.Block) {
 			}
 		}
 
+		logger.Debug("before stream server")
+
 		// Only relay blocks to the block stream server in normal mode (not in test mode)
 		if p.blockStreamServer != nil && p.testModeComparator == nil {
+			logger.Debug("Block stream server")
 			pushBlockStart := time.Now()
 			err := p.blockStreamServer.PushBlock(block)
 			p.recordSample(&p.pushBlockSamples, pushBlockStart)
+
+			logger.Debug("Block stream server post record sample")
 			if err != nil {
-				p.zlogger.Error("failed passing block to block stream server (this should not happen, shutting down)", zap.Error(err))
+				logger.Error("failed passing block to block stream server (this should not happen, shutting down)", zap.Error(err))
 
 				if !p.IsTerminating() {
 					go p.Shutdown(fmt.Errorf("block stream push block failed: %w", err))
