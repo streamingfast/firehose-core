@@ -18,6 +18,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/streamingfast/bstream/blockstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
@@ -41,6 +42,7 @@ type Config struct {
 	OneBlockSuffix             string
 	MindReadBlocksChanCapacity int
 	StartBlockNum              uint64
+	StartBlockTimestamp        *time.Time
 	StopBlockNum               uint64
 	WorkingDir                 string
 	LogToZap                   bool
@@ -121,6 +123,7 @@ func (a *App) Run() error {
 		a.Config.WorkingDir,
 		a.modules.ConsoleReaderFactory,
 		a.Config.StartBlockNum,
+		a.Config.StartBlockTimestamp,
 		a.Config.StopBlockNum,
 		a.Config.MindReadBlocksChanCapacity,
 		a.modules.MetricsAndReadinessManager.UpdateHeadBlock,

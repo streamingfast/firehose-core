@@ -67,6 +67,7 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 			flags.Bool("reader-node-discard-after-stop-num", false, "Ignore remaining blocks being processed after stop num (only useful if we discard the reader data after reprocessing a chunk of blocks)")
 			flags.String("reader-node-working-dir", "{data-dir}/reader/work", "Path where reader will stores its files")
 			flags.Uint("reader-node-start-block-num", 0, "Blocks that were produced with smaller block number then the given block num are skipped")
+			flags.String("reader-node-start-block-timestamp", "", "Blocks that were produced before this timestamp are skipped (inclusive gate, supports unix seconds or RFC3339)")
 			flags.Uint("reader-node-stop-block-num", 0, "Shutdown reader when we the following 'stop-block-num' has been reached, inclusively.")
 			flags.Int("reader-node-blocks-chan-capacity", 100, "Capacity of the channel holding blocks read by the reader. Process will shutdown reader-node if the channel gets over 90% of that capacity to prevent horrible consequences. Raise this number when processing tiny blocks very quickly")
 			flags.Uint64("reader-node-line-buffer-size", 209715200, "Capacity of the buffer for reading a single line out of the node, in bytes (This is a hard limit. Some future enormouse blocks may require raising this to process them).")
@@ -148,6 +149,10 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 			}
 
 			stopBlockNum := viper.GetUint64("reader-node-stop-block-num")
+			startBlockTimestamp, err := parseReaderNodeStartBlockTimestamp(viper.GetString("reader-node-start-block-timestamp"))
+			if err != nil {
+				return nil, err
+			}
 
 			hostname, _ := os.Hostname()
 			nodeArgumentResolver := createNodeArgumentsResolver(sfDataDir, nodeDataDir, hostname, firstStreamableBlock, resolveStartBlockNum, stopBlockNum)
@@ -230,6 +235,7 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 					return chain.ConsoleReaderFactory(lines, chain.BlockEncoder, appLogger, appTracer)
 				},
 				resolveStartBlockNum,
+				startBlockTimestamp,
 				stopBlockNum,
 				blocksChanCapacity,
 				metricsAndReadinessManager.UpdateHeadBlock,
