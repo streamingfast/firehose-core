@@ -121,12 +121,15 @@ func TestMindReaderPlugin_StartBlockTimestampReached(t *testing.T) {
 		startBlockTimestamp: &startBlockTimestamp,
 	}
 
-	mindReader.LogLine(`DMLOG {"id":"00000001a","timestamp":"1970-01-01T00:16:39Z"}`)
+	blockBeforeStartTime := startBlockTimestamp.Add(-time.Second)
+	blockAtStartTime := startBlockTimestamp
+
+	mindReader.LogLine(fmt.Sprintf(`DMLOG {"id":"00000001a","timestamp":"%s"}`, blockBeforeStartTime.Format(time.RFC3339Nano)))
 	err := mindReader.readOneMessage(blocks)
 	require.NoError(t, err)
 	assert.Equal(t, 0, len(blocks))
 
-	mindReader.LogLine(`DMLOG {"id":"00000002a","timestamp":"1970-01-01T00:16:40Z"}`)
+	mindReader.LogLine(fmt.Sprintf(`DMLOG {"id":"00000002a","timestamp":"%s"}`, blockAtStartTime.Format(time.RFC3339Nano)))
 	err = mindReader.readOneMessage(blocks)
 	require.NoError(t, err)
 
