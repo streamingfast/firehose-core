@@ -74,9 +74,11 @@ func (w *MergedBlocksWriter) WriteBundle() error {
 	}
 
 	pr, pw := io.Pipe()
+	done := make(chan struct{})
 
 	go func() {
 		var err error
+		defer close(done)
 		defer func() {
 			pw.CloseWithError(err)
 		}()
@@ -98,6 +100,14 @@ func (w *MergedBlocksWriter) WriteBundle() error {
 	if err != nil {
 		w.Logger.Error("writing to store", zap.Error(err))
 	}
+
+	// If the store returned without consuming the reader (e.g. an S3 store
+	// skipping an already-existing object), the goroutine above would block
+	// forever on its next write to the pipe, pinning the bundle's blocks in
+	// memory. Closing the read end unblocks it; we then wait for it to
+	// finish so the captured slice is released before we return.
+	pr.Close()
+	<-done
 
 	w.LowBlockNum += 100
 	w.blocks = nil

@@ -8,6 +8,12 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Fixed
+
+* `MergedBlocksWriter.WriteBundle`: close the read end of the internal pipe and wait for the producer goroutine to finish before returning. Previously, if the underlying `Store.WriteObject` returned without consuming the reader (e.g. an S3 destination skipping an existing object when `overwrite` is disabled), the producer goroutine would block forever on its next pipe write, leaking the goroutine and pinning the bundle's blocks in memory. This affected `tools download-from-firehose` against S3 destinations that already contained any of the requested bundles.
+
 ## v1.14.2
 
 * Library `dsession` bumped to latest version which brings:
