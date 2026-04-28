@@ -2003,8 +2003,8 @@ github.com/gorilla/context v1.1.1/go.mod h1:kBGZzfjB9CEq2AlWe17Uuf7NDRt0dE0s8S51
 github.com/gorilla/mux v1.6.2/go.mod h1:1lud6UwP+6orDFRuTfBEV8e9/aOM/c4fVVCaMa2zaAs=
 github.com/gorilla/mux v1.8.0 h1:i40aqfkR1h2SlN9hojwV5ZA91wcXFOvkdNIeFDP5koI=
 github.com/gorilla/mux v1.8.0/go.mod h1:DVbg23sWSpFRCP0SfiEN6jmj59UnW/n46BH5rLB71So=
-github.com/graphprotocol/substreams-data-service v0.0.0-20260323141224-141602015bcf h1:pZcMNqBUHBhJQJN5Pn2Vk86uwRgA0YcAT4n1GdtMoJI=
-github.com/graphprotocol/substreams-data-service v0.0.0-20260323141224-141602015bcf/go.mod h1:SUs1YMAfHQoxUA8Wx3s7IP+WKK4hX8men7SxrkxxxCs=
+github.com/graphprotocol/substreams-data-service v0.0.0-20260428173539-9a5b28a88fb5 h1:fs77oqM09o49mzCuRsvWDavy1tAppXUg4t2GAVaL514=
+github.com/graphprotocol/substreams-data-service v0.0.0-20260428173539-9a5b28a88fb5/go.mod h1:SUs1YMAfHQoxUA8Wx3s7IP+WKK4hX8men7SxrkxxxCs=
 github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 h1:UH//fgunKIs4JdUbpDl1VZCDaL56wXCB/5+wF6uHfaI=
 github.com/grpc-ecosystem/go-grpc-middleware v1.4.0/go.mod h1:g5qyo/la0ALbONm6Vbp88Yd8NsDy6rZz+RcrMPxvld8=
 github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 h1:Ovs26xHkKqVztRpIrF/92BcuyuQ/YW4NSIpoGtfXNho=
