@@ -13,7 +13,7 @@ require (
 	github.com/docker/go-connections v0.6.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/go-json-experiment/json v0.0.0-20231013223334-54c864be5b8d
-	github.com/graphprotocol/substreams-data-service v0.0.0-20260323141224-141602015bcf
+	github.com/graphprotocol/substreams-data-service v0.0.0-20260428173539-9a5b28a88fb5
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/iancoleman/strcase v0.3.0
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
