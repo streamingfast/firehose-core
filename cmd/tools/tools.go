@@ -73,7 +73,7 @@ func ConfigureToolsCmd[B firecore.Block](
 	ToolsCmd.AddCommand(check.NewCheckCommand(chain, logger))
 	ToolsCmd.AddCommand(print2.NewToolsPrintCmd(chain, logger))
 
-	ToolsCmd.AddCommand(compare.NewToolsCompareBlocksCmd(chain))
+	ToolsCmd.AddCommand(compare.NewToolsCompareBlocksCmd(chain, logger))
 	ToolsCmd.AddCommand(firehose.NewToolsDownloadFromFirehoseCmd(chain, logger))
 	ToolsCmd.AddCommand(firehose.NewToolsFirehoseClientCmd(chain, logger))
 	ToolsCmd.AddCommand(firehose.NewToolsFirehoseSingleBlockClientCmd(chain, logger, tracer))

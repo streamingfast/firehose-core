@@ -30,6 +30,7 @@ require (
 	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7
 	github.com/streamingfast/dgrpc v0.0.0-20260224192836-e5cd6cffceff
 	github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4
+	github.com/streamingfast/diffx v0.0.0-20260428032925-db795b0d8333
 	github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97
 	github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62
 	github.com/streamingfast/dsession v0.0.0-20260414190543-79b9846e7c58
@@ -90,6 +91,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.2 // indirect
 	github.com/aws/smithy-go v1.22.1 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
+	github.com/aymanbagabas/go-udiff v0.4.1 // indirect
 	github.com/bobg/go-generics/v3 v3.5.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.6 // indirect
 	github.com/bufbuild/protocompile v0.4.0 // indirect
@@ -229,7 +231,6 @@ require (
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jhump/protoreflect v1.14.0
-	github.com/josephburnett/jd v1.7.1
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.18.3 // indirect
@@ -278,8 +279,8 @@ require (
 	golang.org/x/net v0.48.0
 	golang.org/x/oauth2 v0.34.0
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
-	golang.org/x/term v0.39.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/term v0.42.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/api v0.259.0

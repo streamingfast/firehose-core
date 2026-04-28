@@ -15,19 +15,24 @@
 package compare
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"os/exec"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 
-	jd "github.com/josephburnett/jd/lib"
+	"github.com/go-json-experiment/json/jsontext"
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
+	"github.com/streamingfast/diffx"
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/cmd/tools/check"
@@ -35,6 +40,7 @@ import (
 	fcproto "github.com/streamingfast/firehose-core/proto"
 	"github.com/streamingfast/firehose-core/types"
 	"go.uber.org/multierr"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/dynamicpb"
 )
@@ -44,7 +50,7 @@ type BlockDifferences struct {
 	Differences []string
 }
 
-func NewToolsCompareBlocksCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra.Command {
+func NewToolsCompareBlocksCmd[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Logger) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "compare-blocks <reference_blocks_store> <current_blocks_store> [<block_range>]",
 		Short: "Checks for any differences between two block stores between a specified range. (To compare the likeness of two block ranges, for example)",
@@ -58,31 +64,48 @@ func NewToolsCompareBlocksCmd[B firecore.Block](chain *firecore.Chain[B]) *cobra
 			After passing through the blocks, it will output instructions on how to locate a specific difference
 			based on the blocks that were given. This is done by applying the '--diff' flag before your args.
 
-			Commands inputted with '--diff' will display the blocks that have differences, as well as the
-			difference.
+			The --diff flag controls how differences are displayed:
+			  --diff or --diff=inline  Print inline diffs using diffx (ANSI color, line numbers, character-level highlighting)
+			  --diff=editor            Open each differing block in $DIFF_EDITOR; falls back to 'diff -u' if not set
+			  --diff=<cmd>             Treat the value as an editor command (e.g. 'vimdiff', 'code --wait --diff')
 		`),
 		Args: cobra.ExactArgs(3),
-		RunE: runCompareBlocksE(chain),
+		RunE: runCompareBlocksE(chain, zlog),
 		Example: firecore.ExamplePrefixed(chain, "tools compare-blocks", `
+			# Compare a single block (auto-expands to its 100-block bundle)
+			reference_store/ current_store/ 2713
+
 			# Run over full block range
 			reference_store/ current_store/ 0:16000000
 
-			# Run over specific block range, displaying differences in blocks
+			# Run over specific block range, displaying inline differences
 			--diff reference_store/ current_store/ 100:200
+
+			# Run over specific block range, opening differences in $DIFF_EDITOR (or 'diff -u' fallback)
+			--diff=editor reference_store/ current_store/ 100:200
+
+			# Run over specific block range, opening differences in vimdiff
+			--diff=vimdiff reference_store/ current_store/ 100:200
 		`),
 	}
 
 	flags := cmd.PersistentFlags()
-	flags.Bool("diff", false, "When activated, difference is displayed for each block with a difference")
+	flags.String("diff", "", cli.FlagDescription(`
+		Show diff for each differing block. Accepts an optional value:
+		  (no value) or 'inline'  Print inline diffs using diffx
+		  'editor'                Open $DIFF_EDITOR, falling back to 'diff -u' if unset
+		  <command>               Use the given command as the diff editor (e.g. 'vimdiff', 'code --wait --diff')
+	`))
+	cmd.Flag("diff").NoOptDefVal = "inline"
 	flags.Bool("include-unknown-fields", false, "When activated, the 'unknown fields' in the protobuf message will also be compared. These would not generate any difference when unmarshalled with the current protobuf definition.")
 
 	return cmd
 }
 
-func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.CommandExecutor {
+func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Logger) firecore.CommandExecutor {
 
 	return func(cmd *cobra.Command, args []string) error {
-		displayDiff := sflags.MustGetBool(cmd, "diff")
+		diffMode := sflags.MustGetString(cmd, "diff")
 		includeUnknownFields := sflags.MustGetBool(cmd, "include-unknown-fields")
 		protoPaths := sflags.MustGetStringSlice(cmd, "proto-paths")
 		bytesEncoding := sflags.MustGetString(cmd, "bytes-encoding")
@@ -92,6 +115,13 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 		blockRange, err := types.GetBlockRangeFromArg(args[2])
 		if err != nil {
 			return fmt.Errorf("parsing range: %w", err)
+		}
+
+		const bundleSize = uint64(100)
+		if !strings.Contains(args[2], ":") && blockRange.IsOpen() && blockRange.Start >= 0 {
+			n := uint64(blockRange.Start)
+			blockRange = types.NewClosedRange(int64(n), n+1)
+			zlog.Debug("single block argument, comparing only that block", zap.Uint64("block", n))
 		}
 
 		if !blockRange.IsResolved() {
@@ -125,7 +155,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 
 		sanitizer := chain.Tools.GetSanitizeBlockForCompare()
 
-		err = storeReference.Walk(ctx, check.WalkBlockPrefix(blockRange, 100), func(filename string) (err error) {
+		err = storeReference.Walk(ctx, check.WalkBlockPrefix(blockRange, bundleSize), func(filename string) (err error) {
 			var isOneBlock bool
 			fileStartBlock, err := strconv.ParseUint(filename, 10, 64)
 			if err != nil {
@@ -141,7 +171,16 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 				return dstore.StopIteration
 			}
 
-			if blockRange.Contains(uint64(fileStartBlock), types.EndBoundaryExclusive) {
+			// For one-block files the filename IS the block number so a direct Contains is correct.
+			// For merged-block files the filename is the bundle start, so we need an overlap test:
+			// the bundle covers [fileStartBlock, fileStartBlock+bundleSize) and we want any
+			// intersection with [blockRange.Start, stopBlock).
+			inRange := isOneBlock &&
+				blockRange.Contains(uint64(fileStartBlock), types.EndBoundaryExclusive) ||
+				!isOneBlock &&
+					fileStartBlock < stopBlock && uint64(blockRange.Start) < fileStartBlock+bundleSize
+
+			if inRange {
 				var wg sync.WaitGroup
 				var bundleErrLock sync.Mutex
 				var bundleReadErr error
@@ -171,9 +210,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 					}
 				}
 
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					referenceBlockHashes, referenceBlocks, referenceBlocksNum, err = readBundle(
 						ctx,
 						filename,
@@ -189,11 +226,9 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 						bundleReadErr = multierr.Append(bundleReadErr, err)
 						bundleErrLock.Unlock()
 					}
-				}()
+				})
 
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					_, currentBlocks, _, err = readBundle(ctx,
 						rightSideFilename,
 						storeCurrent,
@@ -208,7 +243,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 						bundleReadErr = multierr.Append(bundleReadErr, err)
 						bundleErrLock.Unlock()
 					}
-				}()
+				})
 				wg.Wait()
 				if bundleReadErr != nil {
 					return fmt.Errorf("reading bundles: %w", bundleReadErr)
@@ -216,32 +251,55 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 
 				outLock := sync.Mutex{}
 				for _, referenceBlockHash := range referenceBlockHashes {
-					wg.Add(1)
-					go func(hash string) {
-						defer wg.Done()
-						referenceBlock := referenceBlocks[hash]
-						currentBlock, existsInCurrent := currentBlocks[hash]
-						referenceBlockNum := referenceBlocksNum[hash]
+					wg.Go(func() {
+						referenceBlock := referenceBlocks[referenceBlockHash]
+						currentBlock, existsInCurrent := currentBlocks[referenceBlockHash]
+						referenceBlockNum := referenceBlocksNum[referenceBlockHash]
+
+						// Skip blocks that precede the range start. This happens when a merged-block
+						// file starts before blockRange.Start (e.g. single-block input mid-bundle).
+						if referenceBlockNum < uint64(blockRange.Start) {
+							return
+						}
 
 						var isDifferent bool
 						if existsInCurrent {
-							differences := Compare(referenceBlock, currentBlock, includeUnknownFields, registry, bytesEncoding)
+							refJSON, curJSON, different, compareErr := Compare(referenceBlock, currentBlock, includeUnknownFields, registry, bytesEncoding)
 
-							isDifferent = len(differences) > 0
+							isDifferent = different
 
 							if isDifferent {
 								outLock.Lock()
-								fmt.Printf("- Block %d is different\n", referenceBlockNum)
-								if displayDiff {
-									for _, diff := range differences {
-										fmt.Println("  · ", diff)
+								shortHash := referenceBlockHash
+								if len(shortHash) > 8 {
+									shortHash = shortHash[:8] + "..."
+								}
+								fmt.Printf("- Block %d (%s) is different\n", referenceBlockNum, shortHash)
+								switch diffMode {
+								case "inline":
+									if writeErr := diffx.WriteJSONDiff(os.Stdout, refJSON, curJSON); writeErr != nil && compareErr == nil {
+										compareErr = writeErr
 									}
+								case "editor":
+									editorCmd := cmp.Or(os.Getenv("DIFF_EDITOR"), "diff -u")
+									if openErr := openDiffEditor(editorCmd, refJSON, curJSON, referenceBlockNum); openErr != nil {
+										fmt.Printf("  ! failed to open diff editor: %s\n", openErr)
+									}
+								case "":
+									// no diff displayed
+								default:
+									if openErr := openDiffEditor(diffMode, refJSON, curJSON, referenceBlockNum); openErr != nil {
+										fmt.Printf("  ! failed to open diff editor: %s\n", openErr)
+									}
+								}
+								if compareErr != nil {
+									fmt.Printf("  ! diff error: %s\n", compareErr)
 								}
 								outLock.Unlock()
 							}
 						}
 						processState.process(referenceBlockNum, isDifferent, !existsInCurrent)
-					}(referenceBlockHash)
+					})
 					wg.Wait()
 				}
 			}
@@ -254,11 +312,56 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B]) firecore.Comm
 
 		if processState.totalDifferencesFound > 0 {
 			fmt.Println()
-			fmt.Println("Re-run with --diff <specific-range> flag to see differences over a specific range of block")
+			fmt.Println("Re-run with --diff to see inline differences, or --diff=editor to open $DIFF_EDITOR")
 		}
 
 		return nil
 	}
+}
+
+// openDiffEditor writes both JSON representations to temp files and opens the
+// configured diff editor with them, waiting for it to exit before returning.
+// The temp files are removed after the editor exits.
+func openDiffEditor(editorCmd, refJSON, curJSON string, blockNum uint64) error {
+	refFile, err := os.CreateTemp("", fmt.Sprintf("block_%d_reference_*.json", blockNum))
+	if err != nil {
+		return fmt.Errorf("creating reference temp file: %w", err)
+	}
+
+	curFile, err := os.CreateTemp("", fmt.Sprintf("block_%d_current_*.json", blockNum))
+	if err != nil {
+		refFile.Close()
+		return fmt.Errorf("creating current temp file: %w", err)
+	}
+
+	if _, err := refFile.WriteString(refJSON); err != nil {
+		refFile.Close()
+		curFile.Close()
+		return fmt.Errorf("writing reference temp file: %w", err)
+	}
+	refFile.Close()
+
+	if _, err := curFile.WriteString(curJSON); err != nil {
+		curFile.Close()
+		return fmt.Errorf("writing current temp file: %w", err)
+	}
+	curFile.Close()
+
+	parts := strings.Fields(editorCmd)
+	cmdArgs := append(parts[1:], refFile.Name(), curFile.Name())
+	c := exec.Command(parts[0], cmdArgs...)
+	c.Stdin = os.Stdin
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+
+	if err := c.Run(); err != nil {
+		// Exit code 1 from diff tools (e.g. 'diff -u') means differences were found — not an error.
+		if exitErr, ok := errors.AsType[*exec.ExitError](err); ok && exitErr.ExitCode() == 1 {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 func readBundle(
@@ -355,74 +458,72 @@ func (s *state) process(blockNum uint64, isDifferent bool, isMissing bool) {
 }
 
 func (s *state) print() {
-	endBlock := fmt.Sprintf("%d", s.segments[s.currentSegmentIdx].GetStopBlockOr(firecore.MaxUint64))
+	seg := s.segments[s.currentSegmentIdx]
+	rawStop := seg.GetStopBlockOr(firecore.MaxUint64)
+	var endBlock string
+	if rawStop == firecore.MaxUint64 {
+		endBlock = "∞"
+	} else {
+		endBlock = fmt.Sprintf("%d", rawStop-1)
+	}
 
 	if s.totalBlocksCounted == 0 {
-		fmt.Printf("✖ No blocks were found at all for segment %d - %s\n", s.segments[s.currentSegmentIdx].Start, endBlock)
+		fmt.Printf("✖ No blocks were found at all for segment %d - %s\n", seg.Start, endBlock)
 		return
 	}
 
 	if s.differencesFound == 0 && s.missingBlocks == 0 {
-		fmt.Printf("✓ Segment %d - %s has no differences (%d blocks counted)\n", s.segments[s.currentSegmentIdx].Start, endBlock, s.totalBlocksCounted)
+		fmt.Printf("✓ Segment %d - %s has no differences (%d blocks counted)\n", seg.Start, endBlock, s.totalBlocksCounted)
 		return
 	}
 
-	if s.differencesFound == 0 && s.missingBlocks == 0 {
-		fmt.Printf("✓~ Segment %d - %s has no differences but does have %d missing blocks (%d blocks counted)\n", s.segments[s.currentSegmentIdx].Start, endBlock, s.missingBlocks, s.totalBlocksCounted)
+	if s.differencesFound == 0 && s.missingBlocks != 0 {
+		fmt.Printf("✓~ Segment %d - %s has no differences but does have %d missing blocks (%d blocks counted)\n", seg.Start, endBlock, s.missingBlocks, s.totalBlocksCounted)
 		return
 	}
 
-	fmt.Printf("✖ Segment %d - %s has %d different blocks!and %d missing blocks (%d blocks counted)\n", s.segments[s.currentSegmentIdx].Start, endBlock, s.differencesFound, s.missingBlocks, s.totalBlocksCounted)
+	fmt.Printf("✖ Segment %d - %s has %d different blocks and %d missing blocks (%d blocks counted)\n", seg.Start, endBlock, s.differencesFound, s.missingBlocks, s.totalBlocksCounted)
 }
 
-func Compare(reference proto.Message, current proto.Message, includeUnknownFields bool, registry *fcproto.Registry, bytesEncoding string) (differences []string) {
+// Compare marshals both proto messages to JSON and returns their representations
+// along with whether they differ. The returned JSON strings are normalized
+// (sorted keys, consistent indentation) for use with diffx.WriteJSONDiff.
+func Compare(reference proto.Message, current proto.Message, includeUnknownFields bool, registry *fcproto.Registry, bytesEncoding string) (referenceJSON string, currentJSON string, isDifferent bool, err error) {
 	if reference == nil && current == nil {
-		return nil
+		return "", "", false, nil
 	}
 	if reflect.TypeOf(reference).Kind() == reflect.Ptr && reference == current {
-		return nil
+		return "", "", false, nil
 	}
 
 	referenceMsg := reference.ProtoReflect()
 	currentMsg := current.ProtoReflect()
 	if referenceMsg.IsValid() && !currentMsg.IsValid() {
-		return []string{"reference block is valid protobuf message, but current block is invalid"}
+		return "", "", true, nil
 	}
 	if !referenceMsg.IsValid() && currentMsg.IsValid() {
-		return []string{"reference block is invalid protobuf message, but current block is valid"}
+		return "", "", true, nil
 	}
 
-	//todo: check if there is a equals that do not compare unknown fields
-	if !proto.Equal(reference, current) {
-		var opts []fcjson.MarshallerOption
-		if !includeUnknownFields {
-			opts = append(opts, fcjson.WithoutUnknownFields())
-		}
-
-		if bytesEncoding != "" {
-			opts = append(opts, fcjson.WithBytesEncoding(bytesEncoding))
-		}
-
-		encoder := fcjson.NewMarshaller(registry, opts...)
-
-		referenceAsJSON, err := encoder.MarshalToString(reference)
-		cli.NoError(err, "marshal JSON reference")
-
-		currentAsJSON, err := encoder.MarshalToString(current)
-		cli.NoError(err, "marshal JSON current")
-
-		r, err := jd.ReadJsonString(referenceAsJSON)
-		cli.NoError(err, "read JSON reference")
-
-		c, err := jd.ReadJsonString(currentAsJSON)
-		cli.NoError(err, "read JSON current")
-
-		if diff := r.Diff(c).Render(); diff != "" {
-
-			differences = append(differences, diff)
-		}
-
+	if proto.Equal(reference, current) {
+		return "", "", false, nil
 	}
 
-	return differences
+	var opts []fcjson.MarshallerOption
+	if !includeUnknownFields {
+		opts = append(opts, fcjson.WithoutUnknownFields())
+	}
+	if bytesEncoding != "" {
+		opts = append(opts, fcjson.WithBytesEncoding(bytesEncoding))
+	}
+
+	encoder := fcjson.NewMarshaller(registry, opts...)
+
+	referenceJSON, err = encoder.MarshalToString(reference, jsontext.WithIndent("  "))
+	cli.NoError(err, "marshal JSON reference")
+
+	currentJSON, err = encoder.MarshalToString(current, jsontext.WithIndent("  "))
+	cli.NoError(err, "marshal JSON current")
+
+	return referenceJSON, currentJSON, true, nil
 }

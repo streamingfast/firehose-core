@@ -43,6 +43,26 @@ func setupCmd(cmd *cobra.Command, binaryName string) error {
 
 	startFlagByName := getStartFlags()
 
+	// Process the 'global' config section first (lower priority than command-specific).
+	// This allows setting global/persistent flags (e.g. shift-ports, log-format) in a
+	// dedicated section rather than under a command's flags.
+	if globalConf := launcher.Config["global"]; globalConf != nil {
+		for k, v := range globalConf.Flags {
+			flag, found := startFlagByName[k]
+			if !found {
+				return fmt.Errorf("invalid flag %q in config file under 'global' section", k)
+			}
+			if !strings.HasPrefix(flag.viperKey, "global.") {
+				return fmt.Errorf("flag %q in config file 'global' section is not a global flag; only persistent global flags (e.g. shift-ports, log-format) belong here", k)
+			}
+			if v == nil {
+				v = ""
+			}
+			viper.SetDefault(flag.viperKey, v)
+			viper.SetDefault(strings.Replace(flag.viperKey, "global.", "global-", 1), v)
+		}
+	}
+
 	subconf := launcher.Config[subCommand]
 	if subconf != nil {
 		for k, v := range subconf.Flags {
