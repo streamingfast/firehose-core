@@ -78,6 +78,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().Uint64("substreams-tier1-default-max-request-per-user", 3, "default max request per user, this will be use of the global worker pool is not reachable. Default is 5")
 			cmd.Flags().Uint64("substreams-tier1-default-minimal-request-life-time-second", 180, "default minimal request request life time, this will be use of the global worker pool is not reachable.")
 			cmd.Flags().String("substreams-tier1-foundational-stores-config-path", "", "default path for foundational stores endpoint configuration file")
+			cmd.Flags().String("substreams-tier1-badger-backed-stores-config-path", "", "path to JSON file mapping store module name -> foundational store gRPC address, for stores backed by Badger instead of object storage")
 			cmd.Flags().Uint64("substreams-tier1-output-buffer-size", 100, "max number of messages bundled into BlockScopedDatas (for clients using v4)")
 			// all substreams
 			registerCommonSubstreamsFlags(cmd)
@@ -160,6 +161,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			config.ServiceDiscoveryURL = serviceDiscoveryURL
 			config.QuickSaveStoreURL = viper.GetString("substreams-tier1-quicksave-store")
 			config.FoundationalStoresConfigPath = viper.GetString("substreams-tier1-foundational-stores-config-path")
+			config.BadgerBackedStoresConfigPath = viper.GetString("substreams-tier1-badger-backed-stores-config-path")
 			config.OutputBufferSize = viper.GetUint64("substreams-tier1-output-buffer-size")
 
 			sessionPlugin := viper.GetString("common-session-plugin")
