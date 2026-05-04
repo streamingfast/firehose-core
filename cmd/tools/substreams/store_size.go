@@ -199,9 +199,9 @@ func displayResults(results []storeModuleInfo) {
 	fmt.Println(stylex.Headerf("Store Sizes:"))
 	fmt.Println()
 
-	var totalUncompressed int64
+	var totalSize int64
 	var errorCount int
-	var hasAnyUncompressed bool
+	var hasAnySize bool
 
 	// Find max lengths for column alignment
 	maxNameLen := 0
@@ -214,49 +214,66 @@ func displayResults(results []storeModuleInfo) {
 		maxNameLen = 12
 	}
 
-	// Print table header (simplified - only Live size)
-	fmt.Printf("  %s  %s\n",
+	const liveHeader = "Live Size"
+	const liveColWidth = 25 // wide enough for "1023.99 PiB (compressed)"
+	const hashColWidth = 16 // show first 16 chars of the 40-char hex hash
+
+	// Print table header
+	fmt.Printf("  %s  %s  %s\n",
 		stylex.Headerf("%-*s", maxNameLen, "Module Name"),
-		stylex.Header("Live (uncompressed)"),
+		stylex.Header(fmt.Sprintf("%-*s", hashColWidth, "Hash (partial)")),
+		stylex.Header(liveHeader),
 	)
-	fmt.Printf("  %s  %s\n",
+	fmt.Printf("  %s  %s  %s\n",
 		stylex.Dim(stylex.Separator(maxNameLen)),
-		stylex.Dim(stylex.Separator(19)),
+		stylex.Dim(stylex.Separator(hashColWidth)),
+		stylex.Dim(stylex.Separator(liveColWidth)),
 	)
 
 	// Display each store
 	for _, result := range results {
+		hashStr := stylex.Dimf("%-*s", hashColWidth, "error")
+		if len(result.Hash) >= hashColWidth {
+			hashStr = stylex.Dimf("%-*s", hashColWidth, result.Hash[:hashColWidth])
+		}
+
 		if result.Err != nil {
 			errorCount++
-			fmt.Printf("  %s  %s\n",
+			fmt.Printf("  %s  %s  %s\n",
 				stylex.Errorf("%-*s", maxNameLen, result.Name),
+				hashStr,
 				stylex.Errorf("Error: %v", result.Err),
 			)
 			continue
 		}
 
-		liveStr := stylex.Dimf("%19s", "N/A")
+		liveStr := stylex.Dimf("%*s", liveColWidth, "Not found")
 		if result.Sizes.LiveUncompressed != nil {
-			hasAnyUncompressed = true
-			totalUncompressed += *result.Sizes.LiveUncompressed
-			liveStr = stylex.Valuef("%19s", formatBytes(*result.Sizes.LiveUncompressed))
+			hasAnySize = true
+			totalSize += *result.Sizes.LiveUncompressed
+			liveStr = stylex.Valuef("%*s", liveColWidth, formatBytes(*result.Sizes.LiveUncompressed))
+		} else if result.Sizes.LiveCompressed > 0 {
+			hasAnySize = true
+			totalSize += result.Sizes.LiveCompressed
+			liveStr = stylex.Valuef("%*s", liveColWidth, formatBytes(result.Sizes.LiveCompressed)+" (compressed)")
 		}
 
-		fmt.Printf("  %s  %s\n",
+		fmt.Printf("  %s  %s  %s\n",
 			stylex.Valuef("%-*s", maxNameLen, result.Name),
+			hashStr,
 			liveStr,
 		)
 	}
 
 	// Display summary
 	fmt.Println()
-	fmt.Println(stylex.Dim(stylex.Separator(maxNameLen + 24)))
+	fmt.Println(stylex.Dim(stylex.Separator(maxNameLen + hashColWidth + liveColWidth + 6)))
 	fmt.Println(stylex.Header("Summary:"))
 
-	if hasAnyUncompressed {
+	if hasAnySize {
 		fmt.Printf("  %s %s\n",
-			stylex.Label("Total Live (uncompressed):"),
-			stylex.Value(formatBytes(totalUncompressed)),
+			stylex.Label("Total Live Size:          "),
+			stylex.Value(formatBytes(totalSize)),
 		)
 	}
 	fmt.Printf("  %s %s\n",
@@ -268,6 +285,11 @@ func displayResults(results []storeModuleInfo) {
 			stylex.Label("Errors:                   "),
 			stylex.Error(fmt.Sprintf("%d", errorCount)),
 		)
+	}
+	if !hasAnySize && errorCount == 0 {
+		fmt.Println()
+		fmt.Printf("  %s\n", stylex.Warn("⚠  No state data found for any module."))
+		fmt.Printf("  %s\n", stylex.Warn("   Verify that --state-store points to the correct location."))
 	}
 	fmt.Println()
 }

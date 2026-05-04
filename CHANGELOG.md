@@ -15,6 +15,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - Config file now supports a `global:` section for setting persistent (global) flags such as `shift-ports`, `log-format`, `log-to-file`, etc. These flags can also still be set under the command-specific section (e.g. `start.flags`), but `global:` is more intuitive for flags that apply regardless of command.
 - `tools compare-blocks`: A single block number (e.g. `2713`) is now accepted as the range argument, automatically expanding to the 100-block bundle that contains that block (e.g. `2700:2799`).
 
+### Fixed
+
+- `tools substreams store-size`: Fix `N/A` shown for all stores. For local state stores, the compressed file size is now displayed as a fallback when no uncompressed metadata is available. For GCS state stores, the compressed size is now returned even when files lack `datasize` metadata, and both `.kv` and `.kv.zst` file extensions are now accepted. The "Live (uncompressed)" column is renamed to "Live Size" and now shows "Not found" when no state exists for a module. The computed module hash is shown in the table for easy manual GCS path verification. A warning is shown when no state data is found for any module, hinting at a possible wrong `--state-store` URL.
+
 ### Changed
 
 - `tools compare-blocks`: `--diff` flag is now a string flag instead of a boolean. `--diff` or `--diff=inline` prints inline diffs using `diffx`; `--diff=editor` opens `$DIFF_EDITOR` (falls back to `diff -u`); `--diff=<cmd>` uses that command as the diff editor (e.g. `--diff=vimdiff`). The separate `--diff-editor` flag has been removed.

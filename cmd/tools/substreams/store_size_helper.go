@@ -176,13 +176,19 @@ func (q *gcsStoreSizeQuerier) GetStoreSizes(ctx context.Context, path string) (*
 
 	bucket := client.Bucket(bucketName)
 
-	// True binary search: Find the exact boundary where files exist
-	// Files are named like: states/0074981000-0000000000.kv.zst
-	// State files are always aligned to 1000-block boundaries
+	// True binary search: Find the exact boundary where files exist.
+	// Files are named like: states/0074981000-0000000000.kv or states/0074981000-0000000000.kv.zst
+	// (dstore may add .zst compression transparently).
+	// State files are always aligned to 1000-block boundaries.
 	statesPrefix := fullPrefix + "states/"
 	zlog.Debug("using states prefix", zap.String("states_prefix", statesPrefix))
 
-	// Helper to check if any .kv.zst files exist at or above a block number
+	// isStateFile returns true for .kv and .kv.zst files (dstore may add .zst transparently).
+	isStateFile := func(name string) bool {
+		return strings.HasSuffix(name, ".kv") || strings.HasSuffix(name, ".kv.zst")
+	}
+
+	// Helper to check if any state files exist at or above a block number
 	hasFilesAtOrAbove := func(blockNum uint64) (bool, error) {
 		blockPrefix := fmt.Sprintf("%010d", blockNum)
 		startOffset := statesPrefix + blockPrefix
@@ -202,7 +208,7 @@ func (q *gcsStoreSizeQuerier) GetStoreSizes(ctx context.Context, path string) (*
 			return false, err
 		}
 
-		return strings.HasSuffix(attrs.Name, ".kv.zst"), nil
+		return isStateFile(attrs.Name), nil
 	}
 
 	// Phase 1: Find initial range using exponential probes
@@ -318,7 +324,7 @@ func (q *gcsStoreSizeQuerier) GetStoreSizes(ctx context.Context, path string) (*
 			return nil, fmt.Errorf("listing from block %d: %w", low, err)
 		}
 
-		if strings.HasSuffix(attrs.Name, ".kv.zst") {
+		if isStateFile(attrs.Name) {
 			kvFiles = append(kvFiles, attrs.Name)
 			if len(kvFiles) > maxFilesToKeep {
 				kvFiles = kvFiles[1:]
@@ -350,7 +356,8 @@ func (q *gcsStoreSizeQuerier) GetStoreSizes(ctx context.Context, path string) (*
 	var latestFileName string
 	var latestFileSize int64
 
-	// Iterate backwards through files until we find one with metadata
+	// Iterate backwards through files until we find one with metadata.
+	// Always track the first file we can read (latest) as fallback for compressed size.
 	for i := len(kvFiles) - 1; i >= len(kvFiles)-maxTries; i-- {
 		fileName := kvFiles[i]
 		attrs, err := bucket.Object(fileName).Attrs(ctx)
@@ -364,6 +371,12 @@ func (q *gcsStoreSizeQuerier) GetStoreSizes(ctx context.Context, path string) (*
 			zap.Int64("size", attrs.Size),
 			zap.Int("metadata_count", len(attrs.Metadata)),
 		)
+
+		// Always record the latest readable file (first one we encounter iterating backwards).
+		if latestFileName == "" {
+			latestFileName = fileName
+			latestFileSize = attrs.Size
+		}
 
 		// Check for uncompressed size in custom metadata
 		if datasize, ok := attrs.Metadata["datasize"]; ok {
@@ -382,7 +395,7 @@ func (q *gcsStoreSizeQuerier) GetStoreSizes(ctx context.Context, path string) (*
 	}
 
 	if latestFileName == "" {
-		zlog.Debug("no files with metadata found")
+		zlog.Debug("no files with readable attrs found")
 		return &StoreSizes{}, nil
 	}
 
