@@ -24,6 +24,7 @@ Note: Currently only GCP Cloud Logging backend is supported.`,
 	}
 
 	cmd.AddCommand(NewToolsLogsConnectionsCmd(logger))
+	cmd.AddCommand(NewToolsLogsReexecCmd(logger))
 
 	return cmd
 }
