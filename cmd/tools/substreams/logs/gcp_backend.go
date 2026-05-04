@@ -78,17 +78,26 @@ func (b *GCPBackend) iterateEntries(ctx context.Context, filter string) iter.Seq
 }
 
 // buildFilter constructs the Cloud Logging filter string
+//
+// When TraceID is set, filters by SEARCH() across the entry payload. Otherwise
+// filters by jsonPayload.user_id.
 func (b *GCPBackend) buildFilter(opts QueryOptions) string {
-	// Base filter for k8s container logs with the specific user_id
+	var subjectFilter string
+	if opts.TraceID != "" {
+		subjectFilter = fmt.Sprintf(`SEARCH("%s")`, opts.TraceID)
+	} else {
+		subjectFilter = fmt.Sprintf(`jsonPayload.user_id="%s"`, opts.UserID)
+	}
+
 	filter := fmt.Sprintf(`resource.type="k8s_container"
-jsonPayload.user_id="%s"
+%s
 (
   jsonPayload.message="incoming Substreams Blocks request" OR
   (jsonPayload.message="substreams request stats" AND jsonPayload.tier="tier1")
 )
 timestamp >= "%s"
 timestamp <= "%s"`,
-		opts.UserID,
+		subjectFilter,
 		opts.StartTime.Format(time.RFC3339),
 		opts.EndTime.Format(time.RFC3339),
 	)
@@ -135,6 +144,7 @@ func (b *GCPBackend) parseEntry(entry *logging.Entry) LogEntry {
 
 	le.Message = getString(payload, "message")
 	le.TraceID = getString(payload, "trace_id")
+	le.SessionID = getString(payload, "session_id")
 	le.UserID = getString(payload, "user_id")
 	le.IPAddress = getString(payload, "ip_address")
 	le.OutputModule = getString(payload, "output_module")
@@ -145,7 +155,10 @@ func (b *GCPBackend) parseEntry(entry *logging.Entry) LogEntry {
 	le.OutputModuleHash = getString(payload, "output_module_hash")
 	le.StartBlock = getInt64(payload, "start_block")
 	le.StopBlock = getUint64(payload, "stop_block")
+	le.Cursor = getString(payload, "cursor")
 	le.ProductionMode = getBool(payload, "production_mode")
+	le.FinalBlocksOnly = getBool(payload, "final_blocks_only")
+	le.NoopMode = getBool(payload, "noop_mode")
 	le.Timestamp = getString(payload, "timestamp")
 
 	// Stats-specific fields

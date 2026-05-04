@@ -14,6 +14,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Config file now supports a `global:` section for setting persistent (global) flags such as `shift-ports`, `log-format`, `log-to-file`, etc. These flags can also still be set under the command-specific section (e.g. `start.flags`), but `global:` is more intuitive for flags that apply regardless of command.
 - `tools compare-blocks`: A single block number (e.g. `2713`) is now accepted as the range argument, automatically expanding to the 100-block bundle that contains that block (e.g. `2700:2799`).
+- `tools substreams logs connection <trace-id>`: New command that prints the .spkg URL and the relevant Substreams request information (output module, blocks, mode flags, namespace) and stats (when available) for a single trace ID found in GCP Cloud Logging. The endpoint is inferred from the k8s namespace via the networks registry. The `--state-store` flag is optional — when set, the package is loaded to display its name/version and full URL.
 
 ### Fixed
 
