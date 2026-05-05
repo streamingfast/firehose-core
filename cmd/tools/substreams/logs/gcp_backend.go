@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/logging"
@@ -84,9 +85,9 @@ func (b *GCPBackend) iterateEntries(ctx context.Context, filter string) iter.Seq
 func (b *GCPBackend) buildFilter(opts QueryOptions) string {
 	var subjectFilter string
 	if opts.TraceID != "" {
-		subjectFilter = fmt.Sprintf(`SEARCH("%s")`, opts.TraceID)
+		subjectFilter = fmt.Sprintf(`SEARCH("%s")`, escapeFilterValue(opts.TraceID))
 	} else {
-		subjectFilter = fmt.Sprintf(`jsonPayload.user_id="%s"`, opts.UserID)
+		subjectFilter = fmt.Sprintf(`jsonPayload.user_id="%s"`, escapeFilterValue(opts.UserID))
 	}
 
 	filter := fmt.Sprintf(`resource.type="k8s_container"
@@ -105,10 +106,28 @@ timestamp <= "%s"`,
 	// Add namespace filter if specified
 	if opts.Namespace != "" {
 		filter += fmt.Sprintf(`
-resource.labels.namespace_name="%s"`, opts.Namespace)
+resource.labels.namespace_name="%s"`, escapeFilterValue(opts.Namespace))
 	}
 
 	return filter
+}
+
+// escapeFilterValue escapes a string for use inside a double-quoted Cloud
+// Logging filter literal. Only `\` and `"` carry special meaning inside a
+// quoted string; control characters (newline, carriage return, tab) are
+// stripped because they would terminate the literal and let an attacker append
+// arbitrary filter clauses.
+//
+// See https://cloud.google.com/logging/docs/view/logging-query-language#string-comparison-operators
+func escapeFilterValue(s string) string {
+	r := strings.NewReplacer(
+		`\`, `\\`,
+		`"`, `\"`,
+		"\n", "",
+		"\r", "",
+		"\t", "",
+	)
+	return r.Replace(s)
 }
 
 // parseEntry extracts fields from a Cloud Logging entry into a LogEntry

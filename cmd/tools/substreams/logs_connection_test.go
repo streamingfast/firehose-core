@@ -135,6 +135,22 @@ func TestPickConnectionEntries(t *testing.T) {
 		assert.Equal(t, ts(20), stats.Timestamp)
 	})
 
+	t.Run("mixed RFC3339 and RFC3339Nano timestamps order correctly", func(t *testing.T) {
+		// At the same wall-clock second, the RFC3339 form ("...:04Z") sorts
+		// AFTER the RFC3339Nano form ("...:04.5Z") lexicographically because
+		// '.' (0x2E) < 'Z' (0x5A). The parsed-time comparison must treat
+		// :04Z as earlier than :04.5Z.
+		early := "2026-02-18T05:20:04Z"
+		late := "2026-02-18T05:20:04.500Z"
+		entries := []logs.LogEntry{
+			{Message: "incoming Substreams Blocks request", TraceID: "t6", Timestamp: late},
+			{Message: "incoming Substreams Blocks request", TraceID: "t6", Timestamp: early},
+		}
+		req, _, _ := pickConnectionEntries(entries)
+		require.NotNil(t, req)
+		assert.Equal(t, early, req.Timestamp)
+	})
+
 	t.Run("empty entries", func(t *testing.T) {
 		req, stats, count := pickConnectionEntries(nil)
 		assert.Nil(t, req)

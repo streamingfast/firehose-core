@@ -171,18 +171,31 @@ func runConnection(ctx context.Context, args []string, cmd *cobra.Command, logge
 // pickConnectionEntries selects the oldest incoming-request log and the most
 // recent stats log from the entries (both are optional). The total number of
 // incoming-request logs is also returned to surface ambiguous matches.
+//
+// Timestamps are parsed to time.Time before comparing so mixed RFC3339 and
+// RFC3339Nano formats (e.g. "...:00Z" vs "...:00.123Z") order correctly. If a
+// timestamp fails to parse, the entry still wins over a nil incumbent (so we
+// never return nil when matches exist) but loses any timestamp comparison.
 func pickConnectionEntries(entries []logs.LogEntry) (request, stats *logs.LogEntry, requestCount int) {
+	var requestTS, statsTS time.Time
 	for i := range entries {
 		entry := &entries[i]
+		ts, tsOK := parseLogTimestamp(entry.Timestamp)
 		switch {
 		case entry.IsIncomingRequest():
 			requestCount++
-			if request == nil || entry.Timestamp < request.Timestamp {
+			if request == nil || (tsOK && ts.Before(requestTS)) {
 				request = entry
+				if tsOK {
+					requestTS = ts
+				}
 			}
 		case entry.IsRequestStats():
-			if stats == nil || entry.Timestamp > stats.Timestamp {
+			if stats == nil || (tsOK && ts.After(statsTS)) {
 				stats = entry
+				if tsOK {
+					statsTS = ts
+				}
 			}
 		}
 	}

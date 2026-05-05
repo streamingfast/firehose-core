@@ -310,8 +310,9 @@ type reexecRequest struct {
 }
 
 // queryIncomingRequestByTraceID searches GCP logs for the incoming Substreams
-// request matching the given trace ID. Returns the first match (oldest) and
-// the total count of matches found.
+// request matching the given trace ID. Returns the oldest match (selected by
+// parsed timestamp, since the backend iterates newest-first) and the total
+// count of matches found.
 func queryIncomingRequestByTraceID(ctx context.Context, gcpProject, traceID string, startTime, endTime time.Time, logger *zap.Logger) (*reexecRequest, int, error) {
 	backend, err := logs.NewGCPBackend(ctx, gcpProject, logger)
 	if err != nil {
@@ -328,31 +329,40 @@ func queryIncomingRequestByTraceID(ctx context.Context, gcpProject, traceID stri
 		return nil, 0, fmt.Errorf("querying logs: %w", err)
 	}
 
-	var first *reexecRequest
+	var oldest *logs.LogEntry
+	var oldestTS time.Time
 	count := 0
-	for _, entry := range entries {
+	for i := range entries {
+		entry := &entries[i]
 		if !entry.IsIncomingRequest() {
 			continue
 		}
 		count++
-		if first == nil {
-			first = &reexecRequest{
-				OutputModuleHash: entry.OutputModuleHash,
-				OutputModule:     entry.OutputModule,
-				StartBlock:       entry.StartBlock,
-				StopBlock:        entry.StopBlock,
-				Cursor:           entry.Cursor,
-				ProductionMode:   entry.ProductionMode,
-				FinalBlocksOnly:  entry.FinalBlocksOnly,
-				NoopMode:         entry.NoopMode,
-				TraceID:          entry.TraceID,
-				SessionID:        entry.SessionID,
-				Namespace:        entry.Namespace,
+		ts, tsOK := parseLogTimestamp(entry.Timestamp)
+		if oldest == nil || (tsOK && ts.Before(oldestTS)) {
+			oldest = entry
+			if tsOK {
+				oldestTS = ts
 			}
 		}
 	}
 
-	return first, count, nil
+	if oldest == nil {
+		return nil, count, nil
+	}
+	return &reexecRequest{
+		OutputModuleHash: oldest.OutputModuleHash,
+		OutputModule:     oldest.OutputModule,
+		StartBlock:       oldest.StartBlock,
+		StopBlock:        oldest.StopBlock,
+		Cursor:           oldest.Cursor,
+		ProductionMode:   oldest.ProductionMode,
+		FinalBlocksOnly:  oldest.FinalBlocksOnly,
+		NoopMode:         oldest.NoopMode,
+		TraceID:          oldest.TraceID,
+		SessionID:        oldest.SessionID,
+		Namespace:        oldest.Namespace,
+	}, count, nil
 }
 
 // ─── Block output ──────────────────────────────────────────────────────────────
