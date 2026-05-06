@@ -39,7 +39,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-const dummyBlockchainImage = "ghcr.io/streamingfast/dummy-blockchain:762f40d"
+const dummyBlockchainImage = "ghcr.io/streamingfast/dummy-blockchain:latest"
 
 func init() {
 	logging.InstantiateLoggers(logging.WithDefaultLevel(zapcore.InfoLevel))
