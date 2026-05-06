@@ -7,6 +7,7 @@ on:
       - "v*"
     branches:
       - "develop"
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -147,7 +148,7 @@ jobs:
         id: sha
         run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
-      - name: Docker Scout
+      - name: Docker Scout AMD64
         uses: docker/scout-action@v1
         with:
           dockerhub-user: ${{ secrets.DOCKER_SCOUT_USER }}
@@ -155,6 +156,18 @@ jobs:
           command: cves
           only-severities: critical,high
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sha.outputs.short }}-amd64
+          github-token: ${{ secrets.PR_COMMENTER }}
+          exit-code: true
+          write-comment: true
+
+      - name: Docker Scout ARM64
+        uses: docker/scout-action@v1
+        with:
+          dockerhub-user: ${{ secrets.DOCKER_SCOUT_USER }}
+          dockerhub-password: ${{ secrets.DOCKER_SCOUT_PASSWORD }}
+          command: cves
+          only-severities: critical,high
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.sha.outputs.short }}-arm64
           github-token: ${{ secrets.PR_COMMENTER }}
           exit-code: true
           write-comment: true
