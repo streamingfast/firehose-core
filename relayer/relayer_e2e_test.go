@@ -294,6 +294,7 @@ func startReaderNodeContainer(t *testing.T, ctx context.Context, tmpDir string, 
 
 	req := testcontainers.ContainerRequest{
 		Image: dummyBlockchainImage,
+		User:  fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
 		Cmd:   cmd,
 		Env: map[string]string{
 			"DLOG": ".*=info",

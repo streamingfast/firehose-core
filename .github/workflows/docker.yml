@@ -115,7 +115,7 @@ jobs:
           dockerhub-password: ${{ secrets.DOCKER_SCOUT_PASSWORD }}
           command: cves
           only-severities: critical,high
-          image: ${{ steps.meta.outputs.tags }}
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.extract-version.outputs.VERSION }}-${{ matrix.platform_suffix }}
           github-token: ${{ secrets.PR_COMMENTER }}
           exit-code: true # This will fail the GitHub Action step if CVEs are found
           write-comment: true
