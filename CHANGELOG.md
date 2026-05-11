@@ -10,12 +10,16 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## v1.14.4
 
+### Removed from docker image
+
+* The 'grpc_health_probe' binary is no longer included in the docker image. You can use the HTTP '/healthz' endpoints instead or use your own GRPC poller.
+
 ### Added
 
+- `merger` and `relayer` now expose an HTTP `/healthz` endpoint on a dedicated port via the new `--merger-http-healthz-addr` (default `:10013`) and `--relayer-http-healthz-addr` (default `:10018`) flags. Set the flag to an empty string to disable. The endpoint returns HTTP 200 when the service is ready and 503 otherwise (including during the `common-system-shutdown-signal-delay` graceful-shutdown window).
 - Config file now supports a `global:` section for setting persistent (global) flags such as `shift-ports`, `log-format`, `log-to-file`, etc. These flags can also still be set under the command-specific section (e.g. `start.flags`), but `global:` is more intuitive for flags that apply regardless of command.
 - `tools compare-blocks`: A single block number (e.g. `2713`) is now accepted as the range argument, automatically expanding to the 100-block bundle that contains that block (e.g. `2700:2799`).
 - Substreams **Index optimisation**: Optimized `ClockDistributor` to skip blocks earlier and faster when using block filter.
-
 
 ### Fixed
 

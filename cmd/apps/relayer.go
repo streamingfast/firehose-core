@@ -23,6 +23,7 @@ func RegisterRelayerApp(rootLog *zap.Logger) {
 		Description: "Serves blocks as a stream, with a buffer",
 		RegisterFlags: func(cmd *cobra.Command) error {
 			cmd.Flags().String("relayer-grpc-listen-addr", firecore.RelayerServingAddr, "Address to listen for incoming gRPC requests")
+			cmd.Flags().String("relayer-http-healthz-addr", firecore.RelayerHTTPHealthzAddr, "Address to listen on for the HTTP /healthz endpoint. Set to an empty string to disable. Returns 200 when ready, 503 otherwise.")
 			cmd.Flags().StringSlice("relayer-source", []string{firecore.ReaderNodeGRPCAddr}, strings.TrimSpace(`
 List of live sources (reader nodes) to connect to for live block feeds (repeat flag as needed).
 
@@ -53,10 +54,12 @@ Examples:
 			}
 
 			return relayerapp.New(&relayerapp.Config{
-				Sources:          sources,
-				OneBlocksURL:     oneBlocksStoreURL,
-				GRPCListenAddr:   viper.GetString("relayer-grpc-listen-addr"),
-				MaxSourceLatency: viper.GetDuration("relayer-max-source-latency"),
+				Sources:               sources,
+				OneBlocksURL:          oneBlocksStoreURL,
+				GRPCListenAddr:        viper.GetString("relayer-grpc-listen-addr"),
+				HTTPHealthzListenAddr: viper.GetString("relayer-http-healthz-addr"),
+				MaxSourceLatency:      viper.GetDuration("relayer-max-source-latency"),
+				IsPendingShutdown:     runtime.IsPendingShutdown,
 			}), nil
 		},
 	})

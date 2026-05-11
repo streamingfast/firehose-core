@@ -81,10 +81,22 @@ func TestShiftAddressPort(t *testing.T) {
 			expected: ":10112",
 		},
 		{
+			name:     "merger http healthz default port",
+			addr:     ":10013",
+			offset:   100,
+			expected: ":10113",
+		},
+		{
 			name:     "relayer default port",
 			addr:     ":10014",
 			offset:   100,
 			expected: ":10114",
+		},
+		{
+			name:     "relayer http healthz default port",
+			addr:     ":10018",
+			offset:   100,
+			expected: ":10118",
 		},
 		{
 			name:     "firehose grpc default port",
