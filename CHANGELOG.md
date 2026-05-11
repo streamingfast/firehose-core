@@ -8,16 +8,19 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.14.4
 
 ### Added
 
 - Config file now supports a `global:` section for setting persistent (global) flags such as `shift-ports`, `log-format`, `log-to-file`, etc. These flags can also still be set under the command-specific section (e.g. `start.flags`), but `global:` is more intuitive for flags that apply regardless of command.
 - `tools compare-blocks`: A single block number (e.g. `2713`) is now accepted as the range argument, automatically expanding to the 100-block bundle that contains that block (e.g. `2700:2799`).
+- Substreams **Index optimisation**: Optimized `ClockDistributor` to skip blocks earlier and faster when using block filter.
+
 
 ### Fixed
 
 - `tools substreams store-size`: Fix `N/A` shown for all stores. For local state stores, the compressed file size is now displayed as a fallback when no uncompressed metadata is available. For GCS state stores, the compressed size is now returned even when files lack `datasize` metadata, and both `.kv` and `.kv.zst` file extensions are now accepted. The "Live (uncompressed)" column is renamed to "Live Size" and now shows "Not found" when no state exists for a module. The computed module hash is shown in the table for easy manual GCS path verification. A warning is shown when no state data is found for any module, hinting at a possible wrong `--state-store` URL.
+* Substreams: Fix server-side bug that would cause Blocks request to fail after a few retries with 'load full store (...) load store stream: opening file for streaming: not found' when depending on a store that is being merged slowly
 
 ### Changed
 
