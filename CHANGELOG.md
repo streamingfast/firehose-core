@@ -8,6 +8,12 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Fixed
+
+- Substreams: fix tier1 not forwarding the subrequest secret key to tier2 in the live backfiller, which could cause backfill jobs to fail authentication against tier2 when the tier2 secret key was configured.
+
 ## v1.14.4
 
 ### Removed from docker image
