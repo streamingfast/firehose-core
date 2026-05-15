@@ -12,6 +12,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
+- `tools check one-blocks`: New command that walks one-block files in streaming mode, checks linkability, reports holes and their lengths (in block count), and uses the finalized block number (`LibNum`) embedded in each file to prune internal state so it does not grow infinitely. Supports `--progress-each N` to print progress every N blocks.
 - Config file now supports a `global:` section for setting persistent (global) flags such as `shift-ports`, `log-format`, `log-to-file`, etc. These flags can also still be set under the command-specific section (e.g. `start.flags`), but `global:` is more intuitive for flags that apply regardless of command.
 - `tools compare-blocks`: A single block number (e.g. `2713`) is now accepted as the range argument, automatically expanding to the 100-block bundle that contains that block (e.g. `2700:2799`).
 
