@@ -87,7 +87,7 @@ func (s *syncer) Run() error {
 				return fmt.Errorf("removing stale state file %q: %w", s.config.StateFile, err)
 			}
 			lastCursor = ""
-			s.logger.Info("no state file found, starting from block num", zap.Uint64("start_block_num", s.config.StartBlockNum))
+			s.logger.Info("stalled stale file removed, restarting from start block num", zap.Uint64("start_block_num", s.config.StartBlockNum))
 		} else {
 			s.logger.Info("found state file, continuing previous run", zap.String("cursor", lastCursor), zap.String("state_file", s.config.StateFile))
 		}
