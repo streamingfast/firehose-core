@@ -72,7 +72,25 @@ func (s *syncer) Run() error {
 
 	lastCursor := string(stateFileContent)
 	if len(lastCursor) > 0 {
-		s.logger.Info("found state file, continuing previous run", zap.String("cursor", lastCursor), zap.String("state_file", s.config.StateFile))
+		cur, err := bstream.CursorFromOpaque(lastCursor)
+		if err != nil {
+			return fmt.Errorf("decoding cursor from state file %q: %w", s.config.StateFile, err)
+		}
+
+		if cur.Block.Num() < s.config.StartBlockNum {
+			s.logger.Warn("cursor in state file is older than configured start block, discarding it",
+				zap.Uint64("cursor_block_num", cur.Block.Num()),
+				zap.Uint64("start_block_num", s.config.StartBlockNum),
+				zap.String("state_file", s.config.StateFile),
+			)
+			if err := os.Remove(s.config.StateFile); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("removing stale state file %q: %w", s.config.StateFile, err)
+			}
+			lastCursor = ""
+			s.logger.Info("no state file found, starting from block num", zap.Uint64("start_block_num", s.config.StartBlockNum))
+		} else {
+			s.logger.Info("found state file, continuing previous run", zap.String("cursor", lastCursor), zap.String("state_file", s.config.StateFile))
+		}
 	} else {
 		s.logger.Info("no state file found, starting from block num", zap.Uint64("start_block_num", s.config.StartBlockNum))
 	}
