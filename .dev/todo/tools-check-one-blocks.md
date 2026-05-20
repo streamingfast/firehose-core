@@ -27,53 +27,82 @@ Inspired by the existing `toolsCheckForksE` command (which walks one/forked bloc
 
 ## Dev Feedback
 
-1. `filesSeen` is never pruned, if a one-blocks dir as 24M blocks we will most probably run out of memory, use one block file LIB to determine what to prune.
-2. `state.process(file)` is called serialily with the `Walk` process, this prevent the next file to be listed, let's use a channel to process out of bound the file names
-3. Use our stylex library to render the progress with nicer rendering and coloring + emoticons.
+*Round 3 of feedback*
+
+- `Block range found: ##23 666 500 to ##74 823 106 (5960648 distinct heights)` Double # here in print
+- We need some progress, let's use a ladder first at 10K, second at 100K, third at 500K, last as 1M (repeat each millions after) blocks so we account for large folder (rare but happens on reproc job)
+- `❌ Missing blocks in range [#23 666 815, #23 666 825]` let's use `❌ Missing blocks in range [#23 666 815 to #23 666 825]`
+- `🔀 Block ##69 815 484 has 2 candidates (fork)` double dash here too.
+- `Checking parent-chain continuity...` this is printed at the very end just before summary but it's unclear what it check, should be simply done/included while checking for other?
+- `> 🆗 Parent chain is continuous` this was printed but we reported multiple holes, chain cannot be continuous in this case.
 
 ## Spec & Implementation
 
 ### Implementation
 
-New file: `cmd/tools/check/one_blocks.go`
+File: `cmd/tools/check/one_blocks.go`
 
 - `newCheckOneBlocksCmd()` — creates the cobra subcommand `tools check one-blocks <store-url>`
-  - Flag `--progress-each uint64` (default 0 = disabled): print progress every N blocks
+  - Flag `--progress-each uint64` (default 0 = automatic ladder): override the progress cadence; when 0 the ladder 10K → 100K → 500K → 1M (then every 1M) is used.
 - `oneBlocksState` struct — tracks in-flight state during the walk:
-  - `blocksByID map[string]*OneBlockFile` — lookup by block ID suffix
-  - `blocksByNum map[uint64][]*OneBlockFile` — lookup by block number (for hole-length estimation)
-  - `highestFinalizedBlock uint64` — updated from each file's `LibNum`
-  - `holeCount int` — cumulative hole count
+  - `blocksByID map[string]*OneBlockFile` — lookup by block ID suffix (pruned by `LibNum`)
+  - `blocksByNum map[uint64][]*OneBlockFile` — lookup by block number (pruned by `LibNum`)
+  - `seenCanonical map[string]struct{}` — dedup set (pruned)
+  - `firstBlockNum`, `lastBlockNum`, `lastDistinctSeen`, `distinctHeights` — for the inline range/gap detection and the summary
+  - `missing []missingRange`, `missingBlockCount` — gap ranges detected inline
+  - `forks []forkReport`, `reportedForkAtNum` — fork heights detected inline
+  - `brokenParentCount` — parent-chain breakage detected inline
+  - `highestFinalizedBlock`, `processedCount`, `nextProgressAt`, `progressEachOverride`
 - `process(file)` — called for each file as it is streamed:
-  1. Update `highestFinalizedBlock` from `file.LibNum`
-  2. Register block in both maps
-  3. Check linkability: if `file.Num > 0` and `parentID` not in `blocksByID` **and** parent num is above the finalized boundary → hole detected, print message
-  4. Estimate hole length by walking backwards in `blocksByNum`
-  5. Print progress if `progressEach > 0`
-  6. Prune state at/below `highestFinalizedBlock`
-- `summary()` — prints totals at end
-- Registered in `check.go` alongside existing subcommands
+  1. Dedup via `seenCanonical`; bump `processedCount`.
+  2. Update `firstBlockNum`/`lastBlockNum`; when a new distinct height arrives, check for gaps and emit `❌ Missing blocks in range [#X to #Y]` for each gap.
+  3. Update `highestFinalizedBlock` from `file.LibNum`.
+  4. Detect forks: if another block with a different ID already exists at this height, append a `forkReport` and emit `🔀 Block #N has C candidates (fork)` once per height.
+  5. Inline parent-chain continuity check: when the parent height is within the active window and at least one block exists at that height but none matches `PreviousID`, increment `brokenParentCount` and emit `⚠ Block #N expects parent … at #P`.
+  6. Emit progress when `processedCount` reaches `nextProgressAt`; recompute `nextProgressAt` from the ladder (or override).
+  7. Prune state at/below `highestFinalizedBlock`.
+- `summary()` — prints the discovered block range, processed/finalized counters, missing/forked/broken counts and an accurate parent-chain continuity status (only `🆗 Parent chain is continuous` when both `missingBlockCount` and `brokenParentCount` are zero).
+- Registered in `check.go` alongside existing subcommands.
 
-### Tests (6 passing)
+### Tests (11 passing)
 
-- `TestOneBlocksState_NoHole` — consecutive chain produces no holes
-- `TestOneBlocksState_DetectsHole` — missing block 1 between 0 and 2 → 1 hole
-- `TestOneBlocksState_PrunesStateOnFinalization` — libNum-driven pruning works correctly
-- `TestOneBlocksState_NoHoleAfterFinalized` — parents pruned by finalization don't count as holes
-- `TestOneBlocksState_DetectHoleLength` — hole length estimation returns ≥ 1
-- `TestNewOneBlocksState_ProgressEach` — flag wired correctly
+- `TestOneBlocksState_NoHole`
+- `TestOneBlocksState_DetectsHole`
+- `TestOneBlocksState_DetectsHoleRange` — height jump > 1 produces a single `missingRange` covering all missing heights
+- `TestOneBlocksState_PrunesStateOnFinalization`
+- `TestOneBlocksState_NoHoleAfterFinalized`
+- `TestOneBlocksState_DetectsFork` — two distinct IDs at the same height
+- `TestOneBlocksState_DuplicateNotFork` — re-processing the same canonical name is not a fork
+- `TestOneBlocksState_BrokenParentLinkage` — contiguous heights with mismatched `PreviousID` increments `brokenParentCount`
+- `TestNewOneBlocksState_ProgressEachOverride`
+- `TestOneBlocksState_ProgressLadder` — `progressStep` returns 10K / 100K / 500K / 1M at the expected count boundaries
+- `TestOneBlocksState_ProgressNextStep` — `computeNextProgress` advances correctly across ladder bands
 
 ## State Tracker
 
-**Last Updated:** 2026-05-15
-**Current Step:** Step 3 — Dev Feedback Addressed, Ready for Re-Review
-**Status:** All three feedback items addressed; tests pass.
+**Last Updated:** 2026-05-20
+**Current Step:** Step 4 — Round 3 Dev Feedback Addressed, Ready for Re-Review
+**Status:** All six round-3 feedback items addressed; tests pass.
 
 ### Step 2 (completed)
 Implementation done; all tests pass; committed as `90cef4d`.
 
-### Step 3 (current)
-Addressed dev feedback:
+### Step 3 (completed)
+Addressed dev feedback (round 1/2):
 1. **`filesSeen` memory leak** — Replaced the unbounded `filesSeen map[string]bool` with `seenCanonical map[string]struct{}` that is pruned in lock-step with `blocksByNum` inside `pruneBelow()`. Entries below `highestFinalizedBlock` are deleted from both maps, bounding memory to the live finalization window.
 2. **Serial Walk/process** — Added a buffered channel (`fileCh`, capacity 128) between the Walk goroutine (producer) and the processing loop (consumer). The store listing now runs concurrently with processing so that fetching the next filename is not blocked by processing the current one.
-3. **stylex rendering** — Replaced all plain `fmt.Printf` calls with `stylex` helpers: errors/holes use `stylex.Error`/`stylex.Warn`, progress uses `stylex.Dim`/`stylex.Value`, summary uses `stylex.Title`/`stylex.Label`/`stylex.Success`/`stylex.Error` with ✔/✘/⚠/↻ emoticons.
+3. **stylex rendering** — Replaced all plain `fmt.Printf` calls with `stylex` helpers.
+Committed as `ce5a114`.
+
+### Step 4 (current)
+Addressed round-3 dev feedback:
+1. **Double `##` in block-range print** — All formatting paths now build `#%s` once around an already-numeric value (no value carries a leading `#`), so the block range line reads `Block range found: #X to #Y (N distinct heights)` with a single `#`. Same fix applied throughout summary, progress, hole and fork lines.
+2. **Progress ladder** — Replaced the flat `--progress-each` behavior with an automatic ladder when the flag is `0` (default): every 10K below 100K processed, every 100K below 500K, every 500K below 1M, then every 1M. Passing a non-zero `--progress-each` value still works as a manual override. Implemented in `progressStep` and `computeNextProgress`; covered by `TestOneBlocksState_ProgressLadder` and `TestOneBlocksState_ProgressNextStep`.
+3. **Missing-blocks-range separator** — Output is now `❌ Missing blocks in range [#X to #Y]` (changed from the previous `,` separator).
+4. **Double `##` in fork print** — Fork line now reads `🔀 Block #X has N candidates (fork)`.
+5. **Parent-chain continuity is inlined** — Removed the standalone post-walk continuity pass. Linkability is now verified inline as each block is processed, in two complementary ways: (a) gaps in the height sequence are reported as soon as a height jump > 1 is observed (the `❌ Missing blocks in range […]` line); (b) when consecutive heights are present but the new block's `PreviousID` does not match any known block at the parent height, a `⚠ Block #X expects parent … but no matching block was found at #Y` line is emitted and `brokenParentCount` is incremented. New test `TestOneBlocksState_BrokenParentLinkage` covers (b).
+6. **`Parent chain is continuous` accuracy** — Summary now reflects what was actually observed: if `missingBlockCount > 0` or `brokenParentCount > 0` the line becomes `✘ Parent chain is NOT continuous (M missing block(s), B broken parent link(s))`. Only when both counts are zero does the line read `🆗 Parent chain is continuous`.
+
+Other touches:
+- Updated `CHANGELOG.md` `Unreleased` entry to describe the new output style and progress ladder.
+- Rewrote tests around the new state fields (`missingBlockCount`, `missing`, `forks`, `brokenParentCount`) and removed the obsolete per-block hole count assertions.
