@@ -96,6 +96,11 @@ type oneBlocksState struct {
 	distinctHeights  uint64
 	lastDistinctSeen uint64
 
+	// currentAvailableStart is the first block number of the current contiguous
+	// run of available blocks. It is reset to the current block number each time a
+	// gap is detected.
+	currentAvailableStart uint64
+
 	// processedCount is total files processed.
 	processedCount uint64
 
@@ -184,6 +189,7 @@ func (s *oneBlocksState) process(file *bstream.OneBlockFile) {
 	// Track block range and distinct height count.
 	if !s.hasFirstBlock {
 		s.firstBlockNum = file.Num
+		s.currentAvailableStart = file.Num
 		s.hasFirstBlock = true
 	}
 
@@ -194,6 +200,16 @@ func (s *oneBlocksState) process(file *bstream.OneBlockFile) {
 		if s.hasFirstBlock && s.distinctHeights > 0 && file.Num > s.lastDistinctSeen+1 {
 			// Inline gap detection: every height between lastDistinctSeen+1 and
 			// file.Num-1 inclusive is missing.
+			//
+			// First print the available range that just ended, then the missing range.
+			availFrom := s.currentAvailableStart
+			availTo := s.lastDistinctSeen
+			fmt.Printf("%s Available blocks in range [%s to %s]\n",
+				stylex.Success("✅"),
+				stylex.Successf("#%s", humanize.Comma(int64(availFrom))),
+				stylex.Successf("#%s", humanize.Comma(int64(availTo))),
+			)
+
 			from := s.lastDistinctSeen + 1
 			to := file.Num - 1
 			s.missing = append(s.missing, missingRange{from: from, to: to})
@@ -203,6 +219,9 @@ func (s *oneBlocksState) process(file *bstream.OneBlockFile) {
 				stylex.Errorf("#%s", humanize.Comma(int64(from))),
 				stylex.Errorf("#%s", humanize.Comma(int64(to))),
 			)
+
+			// The new available segment starts at the current block.
+			s.currentAvailableStart = file.Num
 		}
 		s.distinctHeights++
 		s.lastDistinctSeen = file.Num
@@ -332,6 +351,16 @@ func (s *oneBlocksState) pruneBelow(finalizedNum uint64) {
 
 // summary prints a final summary of the check.
 func (s *oneBlocksState) summary() {
+	// Print the final available range (the trailing contiguous segment after the
+	// last gap, or the entire range when there were no gaps at all).
+	if s.hasFirstBlock {
+		fmt.Printf("%s Available blocks in range [%s to %s]\n",
+			stylex.Success("✅"),
+			stylex.Successf("#%s", humanize.Comma(int64(s.currentAvailableStart))),
+			stylex.Successf("#%s", humanize.Comma(int64(s.lastBlockNum))),
+		)
+	}
+
 	fmt.Println()
 	fmt.Println(stylex.Title("One-blocks check complete"))
 	fmt.Println(stylex.Dim(stylex.Separator(50)))
@@ -350,22 +379,12 @@ func (s *oneBlocksState) summary() {
 	fmt.Printf("  %s %s\n", stylex.Label("Forked heights          :"), forkCountStyled(len(s.forks)))
 	fmt.Printf("  %s %s\n", stylex.Label("Broken parent linkages  :"), missingCountStyled(s.brokenParentCount))
 
-	// Parent-chain continuity status, computed from inline observations made during
-	// the walk. Holes or broken parent linkages both invalidate continuity.
-	hasIssues := s.missingBlockCount > 0 || s.brokenParentCount > 0
+	// Status line: no emoji prefix, just color-coded value.
+	hasIssues := s.missingBlockCount > 0 || s.brokenParentCount > 0 || len(s.forks) > 0
 	if hasIssues {
-		fmt.Printf("  %s %s\n", stylex.Error("✘"), stylex.Errorf("Parent chain is NOT continuous (%s missing block(s), %s broken parent link(s))",
-			humanize.Comma(int64(s.missingBlockCount)),
-			humanize.Comma(int64(s.brokenParentCount)),
-		))
+		fmt.Printf("  %s %s\n", stylex.Label("Status                  :"), stylex.Error("broken"))
 	} else {
-		fmt.Printf("  %s %s\n", stylex.Success("🆗"), stylex.Success("Parent chain is continuous"))
-	}
-
-	if hasIssues || len(s.forks) > 0 {
-		fmt.Printf("  %s %s\n", stylex.Error("✘"), stylex.Errorf("Status: PROBLEMS FOUND"))
-	} else {
-		fmt.Printf("  %s %s\n", stylex.Success("✔"), stylex.Success("Status: OK"))
+		fmt.Printf("  %s %s\n", stylex.Label("Status                  :"), stylex.Success("ok"))
 	}
 }
 
