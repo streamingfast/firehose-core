@@ -27,14 +27,43 @@ Inspired by the existing `toolsCheckForksE` command (which walks one/forked bloc
 
 ## Dev Feedback
 
-*Round 3 of feedback*
+*Round 4 of feedback*
 
-- `Block range found: ##23 666 500 to ##74 823 106 (5960648 distinct heights)` Double # here in print
-- We need some progress, let's use a ladder first at 10K, second at 100K, third at 500K, last as 1M (repeat each millions after) blocks so we account for large folder (rare but happens on reproc job)
-- `❌ Missing blocks in range [#23 666 815, #23 666 825]` let's use `❌ Missing blocks in range [#23 666 815 to #23 666 825]`
-- `🔀 Block ##69 815 484 has 2 candidates (fork)` double dash here too.
-- `Checking parent-chain continuity...` this is printed at the very end just before summary but it's unclear what it check, should be simply done/included while checking for other?
-- `> 🆗 Parent chain is continuous` this was printed but we reported multiple holes, chain cannot be continuous in this case.
+```
+❌ Missing blocks in range [#69,815,500 to #74,677,299]
+❌ Missing blocks in range [#74,677,489 to #74,772,819]
+❌ Missing blocks in range [#74,772,900 to #74,776,699]
+❌ Missing blocks in range [#74,776,826 to #74,776,828]
+❌ Missing blocks in range [#74,776,900 to #74,822,999]
+
+One-blocks check complete
+──────────────────────────────────────────────────
+Block range found: #69,815,484 to #74,823,106 (589 distinct heights)
+  Total files processed   : 591
+  Highest finalized block : #74,823,104
+  Missing blocks          : 5,007,034
+  Missing ranges          : 5
+  Forked heights          : 0
+  Broken parent linkages  : 0
+  ✘ Parent chain is NOT continuous (5,007,034 missing block(s), 0 broken parent link(s))
+  ✘ Status: PROBLEMS FOUND
+```
+
+1. In addition to missing range, also shows before the available range, that will help get a better, for example here above we would have got:
+
+```
+<checkmark> Available blocks in range [#69,815,484 to #69,815,499]
+❌ Missing blocks in range [#69,815,500 to #74,677,299]
+<same here for range #74,677,300 - #74,677,488>
+❌ Missing blocks in range [#74,677,489 to #74,772,819]
+```
+
+1. Let's remove `Parent chain is NOT continuous ...` line, I file it's useless all information is already there
+
+1. For `✘ Status: PROBLEMS FOUND`, lets use:
+
+- `Status<proper alignement>: ok` (in green when all good)
+- `Status<proper alignement>: broken` (in red when any problem detected)
 
 ## Spec & Implementation
 
@@ -80,9 +109,9 @@ File: `cmd/tools/check/one_blocks.go`
 
 ## State Tracker
 
-**Last Updated:** 2026-05-20
-**Current Step:** Step 4 — Round 3 Dev Feedback Addressed, Ready for Re-Review
-**Status:** All six round-3 feedback items addressed; tests pass.
+**Last Updated:** 2026-05-22
+**Current Step:** Step 5 — Round 4 Dev Feedback Addressed, Ready for Re-Review
+**Status:** All three round-4 feedback items addressed; all 11 tests pass; committed as `2cb2fce`.
 
 ### Step 2 (completed)
 Implementation done; all tests pass; committed as `90cef4d`.
@@ -94,15 +123,18 @@ Addressed dev feedback (round 1/2):
 3. **stylex rendering** — Replaced all plain `fmt.Printf` calls with `stylex` helpers.
 Committed as `ce5a114`.
 
-### Step 4 (current)
+### Step 4 (completed)
 Addressed round-3 dev feedback:
 1. **Double `##` in block-range print** — All formatting paths now build `#%s` once around an already-numeric value (no value carries a leading `#`), so the block range line reads `Block range found: #X to #Y (N distinct heights)` with a single `#`. Same fix applied throughout summary, progress, hole and fork lines.
 2. **Progress ladder** — Replaced the flat `--progress-each` behavior with an automatic ladder when the flag is `0` (default): every 10K below 100K processed, every 100K below 500K, every 500K below 1M, then every 1M. Passing a non-zero `--progress-each` value still works as a manual override. Implemented in `progressStep` and `computeNextProgress`; covered by `TestOneBlocksState_ProgressLadder` and `TestOneBlocksState_ProgressNextStep`.
 3. **Missing-blocks-range separator** — Output is now `❌ Missing blocks in range [#X to #Y]` (changed from the previous `,` separator).
 4. **Double `##` in fork print** — Fork line now reads `🔀 Block #X has N candidates (fork)`.
-5. **Parent-chain continuity is inlined** — Removed the standalone post-walk continuity pass. Linkability is now verified inline as each block is processed, in two complementary ways: (a) gaps in the height sequence are reported as soon as a height jump > 1 is observed (the `❌ Missing blocks in range […]` line); (b) when consecutive heights are present but the new block's `PreviousID` does not match any known block at the parent height, a `⚠ Block #X expects parent … but no matching block was found at #Y` line is emitted and `brokenParentCount` is incremented. New test `TestOneBlocksState_BrokenParentLinkage` covers (b).
-6. **`Parent chain is continuous` accuracy** — Summary now reflects what was actually observed: if `missingBlockCount > 0` or `brokenParentCount > 0` the line becomes `✘ Parent chain is NOT continuous (M missing block(s), B broken parent link(s))`. Only when both counts are zero does the line read `🆗 Parent chain is continuous`.
+5. **Parent-chain continuity is inlined** — Removed the standalone post-walk continuity pass. Linkability is now verified inline as each block is processed.
+6. **`Parent chain is continuous` accuracy** — Summary reflects what was actually observed.
 
-Other touches:
-- Updated `CHANGELOG.md` `Unreleased` entry to describe the new output style and progress ladder.
-- Rewrote tests around the new state fields (`missingBlockCount`, `missing`, `forks`, `brokenParentCount`) and removed the obsolete per-block hole count assertions.
+### Step 5 (current)
+Addressed round-4 dev feedback:
+1. **Interleaved available/missing ranges** — When a gap is detected, the code now first prints `✅ Available blocks in range [#from to #to]` for the contiguous segment that just ended, then `❌ Missing blocks in range [#from to #to]` for the gap. The trailing available segment (after the last gap, or the entire range if no gaps exist) is printed at the start of `summary()` just before the separator. Implemented by adding a `currentAvailableStart` field to `oneBlocksState`, initialised to the first block seen and reset to the current block number each time a gap is detected.
+2. **Removed redundant continuity line** — The `✘ Parent chain is NOT continuous` / `🆗 Parent chain is continuous` lines have been removed from the summary. The individual counts already carry that information.
+3. **Simplified Status line** — No emoji prefix; reads `Status                  : ok` (green) or `Status                  : broken` (red), aligned with the other summary labels.
+Committed as `2cb2fce`.
