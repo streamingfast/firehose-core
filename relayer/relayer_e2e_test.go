@@ -39,7 +39,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-const dummyBlockchainImage = "ghcr.io/streamingfast/dummy-blockchain:762f40d"
+const dummyBlockchainImage = "ghcr.io/streamingfast/dummy-blockchain:latest"
 
 func init() {
 	logging.InstantiateLoggers(logging.WithDefaultLevel(zapcore.InfoLevel))
@@ -294,6 +294,7 @@ func startReaderNodeContainer(t *testing.T, ctx context.Context, tmpDir string, 
 
 	req := testcontainers.ContainerRequest{
 		Image: dummyBlockchainImage,
+		User:  fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()),
 		Cmd:   cmd,
 		Env: map[string]string{
 			"DLOG": ".*=info",

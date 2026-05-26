@@ -17,6 +17,7 @@ package relayer
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -32,11 +33,14 @@ import (
 var RelayerStartAborted = fmt.Errorf("getting start block aborted by relayer application terminating signal")
 
 type Config struct {
-	Sources            []relayer.SourceAddr
-	GRPCListenAddr     string
-	SourceRequestBurst int
-	MaxSourceLatency   time.Duration
-	OneBlocksURL       string
+	Sources               []relayer.SourceAddr
+	GRPCListenAddr        string
+	HTTPHealthzListenAddr string
+	SourceRequestBurst    int
+	MaxSourceLatency      time.Duration
+	OneBlocksURL          string
+
+	IsPendingShutdown func() bool `json:"-"`
 }
 
 func (c *Config) ZapFields() []zap.Field {
@@ -47,6 +51,7 @@ func (c *Config) ZapFields() []zap.Field {
 	return []zap.Field{
 		zap.Strings("sources_addr", addrs),
 		zap.String("grpc_listen_addr", c.GRPCListenAddr),
+		zap.String("http_healthz_listen_addr", c.HTTPHealthzListenAddr),
 		zap.Int("source_request_burst", c.SourceRequestBurst),
 		zap.Duration("max_source_latency", c.MaxSourceLatency),
 		zap.String("one_blocks_url", c.OneBlocksURL),
@@ -94,8 +99,43 @@ func (a *App) Run() error {
 	a.OnTerminating(a.relayer.Shutdown)
 	a.relayer.OnTerminated(a.Shutdown)
 
+	if a.config.HTTPHealthzListenAddr != "" {
+		a.startHTTPHealthzServer()
+	}
+
 	a.relayer.Run()
 	return nil
+}
+
+func (a *App) startHTTPHealthzServer() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		if a.config.IsPendingShutdown != nil && a.config.IsPendingShutdown() {
+			http.Error(w, "not ready: shutting down", http.StatusServiceUnavailable)
+			return
+		}
+		resp, err := a.relayer.Check(context.Background(), emptyHealthCheckRequest)
+		if err != nil || resp.Status != pbhealth.HealthCheckResponse_SERVING {
+			http.Error(w, "not ready", http.StatusServiceUnavailable)
+			return
+		}
+		w.Write([]byte("ready\n"))
+	})
+
+	srv := &http.Server{Addr: a.config.HTTPHealthzListenAddr, Handler: mux}
+	a.OnTerminating(func(_ error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(ctx)
+	})
+
+	zlog.Info("starting relayer http healthz server", zap.String("addr", a.config.HTTPHealthzListenAddr))
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			zlog.Error("relayer http healthz server failed", zap.Error(err))
+			a.Shutdown(err)
+		}
+	}()
 }
 
 var emptyHealthCheckRequest = &pbhealth.HealthCheckRequest{}
