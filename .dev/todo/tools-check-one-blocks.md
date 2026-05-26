@@ -47,6 +47,31 @@ Let's align the block range otherwise it's hard to see.
 
 Last change after which we are ready.
 
+*Round 6 of feedback*
+
+*SUPERSEDE Round 5*
+
+There was a misunderstanding on the desired output and streaming behavior.
+1. We didn't wanted to change the streaming behavior
+1. We wanted this output:
+
+```
+✅ Available blocks in range [#69,815,484 to #69,815,499]
+❌ Missing blocks in range   [#69,815,500 to #74,677,299]
+✅ Available blocks in range [#74,677,300 to #74,677,488]
+❌ Missing blocks in range   [#74,677,489 to #74,772,819]
+✅ Available blocks in range [#74,772,820 to #74,772,899]
+❌ Missing blocks in range   [#74,772,900 to #74,776,699]
+✅ Available blocks in range [#74,776,700 to #74,776,825]
+❌ Missing blocks in range   [#74,776,826 to #74,776,828]
+✅ Available blocks in range [#74,776,829 to #74,776,899]
+❌ Missing blocks in range   [#74,776,900 to #74,822,999]
+✅ Available blocks in range [#74,823,000 to #74,823,106]
+```
+
+We accept that within `[...]` length may vary, important thing is alignment after `Available blocks in range/Missing blocks in range` which is known in advance.
+
+Put back the streaming approach essentially reverting the previous 2 commits and implementing it the right way as described in round 6.
 
 ## Spec & Implementation
 
@@ -93,8 +118,8 @@ File: `cmd/tools/check/one_blocks.go`
 ## State Tracker
 
 **Last Updated:** 2026-05-26
-**Current Step:** Step 6 — Round 5 Dev Feedback Addressed, Ready for Re-Review
-**Status:** Round-5 alignment feedback addressed; all 11 tests pass; committed as `df9e014`.
+**Current Step:** Step 7 — Round 6 Dev Feedback Addressed, Ready for Re-Review
+**Status:** Round-6 feedback addressed; inline streaming restored, label padding fixed; all 11 tests pass; committed as `4445469`.
 
 ### Step 2 (completed)
 Implementation done; all tests pass; committed as `90cef4d`.
@@ -122,7 +147,17 @@ Addressed round-4 dev feedback:
 3. **Simplified Status line** — No emoji prefix; reads `Status                  : ok` (green) or `Status                  : broken` (red), aligned with the other summary labels.
 Committed as `2cb2fce`.
 
-### Step 6 (current)
+### Step 6 (completed)
 Addressed round-5 dev feedback:
 1. **Right-aligned block numbers in range output** — Range events (available and missing) are now buffered in a `rangeEvents []rangeEvent` slice during the walk instead of being printed inline. In `summary()`, the max formatted number width is computed across all events and `fmt.Sprintf("%*s", ...)` right-pads each number to that width so the `#`, `to`, and `]` columns all line up. The label "Missing blocks in range" is padded with one extra space to match "Available blocks in range" so the opening bracket is also column-aligned.
 Committed as `df9e014`.
+
+### Step 7 (current)
+Addressed round-6 dev feedback (supersedes round-5):
+1. **Reverted buffering approach** — Removed the `rangeEvent` type and `rangeEvents []rangeEvent` field introduced in round-5. Restored the inline/streaming approach where `✅` and `❌` lines are printed during the walk as they are discovered, not deferred to `summary()`.
+2. **Label padding for `[` alignment** — "Missing blocks in range" padded with 2 extra spaces to match the width of "Available blocks in range" (both 25 chars), so the opening `[` aligns:
+   ```
+   ✅ Available blocks in range [#69,815,484 to #69,815,499]
+   ❌ Missing blocks in range   [#69,815,500 to #74,677,299]
+   ```
+Committed as `4445469`.
