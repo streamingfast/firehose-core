@@ -55,6 +55,23 @@ type missingRange struct {
 	to   uint64
 }
 
+// rangeEventKind distinguishes an available segment from a missing gap.
+type rangeEventKind int
+
+const (
+	rangeAvailable rangeEventKind = iota
+	rangeMissing
+)
+
+// rangeEvent is an entry in the ordered log of available/missing block ranges
+// collected during the walk. They are buffered and printed at the end so that
+// all block numbers can be right-aligned to the same width.
+type rangeEvent struct {
+	kind rangeEventKind
+	from uint64
+	to   uint64
+}
+
 // forkReport tracks a height for which multiple distinct block IDs were seen.
 type forkReport struct {
 	num        uint64
@@ -106,6 +123,10 @@ type oneBlocksState struct {
 
 	// nextProgressAt is the next processedCount value at which to emit a progress line.
 	nextProgressAt uint64
+
+	// rangeEvents is the ordered log of available and missing block ranges collected
+	// during the walk. They are printed at the end so block numbers can be aligned.
+	rangeEvents []rangeEvent
 
 	// missing is the list of missing block ranges detected inline during the walk.
 	missing []missingRange
@@ -201,24 +222,18 @@ func (s *oneBlocksState) process(file *bstream.OneBlockFile) {
 			// Inline gap detection: every height between lastDistinctSeen+1 and
 			// file.Num-1 inclusive is missing.
 			//
-			// First print the available range that just ended, then the missing range.
+			// Record the available range that just ended, then the missing range.
+			// Both are buffered in rangeEvents so they can be printed with aligned
+			// column widths once the full block range is known.
 			availFrom := s.currentAvailableStart
 			availTo := s.lastDistinctSeen
-			fmt.Printf("%s Available blocks in range [%s to %s]\n",
-				stylex.Success("✅"),
-				stylex.Successf("#%s", humanize.Comma(int64(availFrom))),
-				stylex.Successf("#%s", humanize.Comma(int64(availTo))),
-			)
+			s.rangeEvents = append(s.rangeEvents, rangeEvent{kind: rangeAvailable, from: availFrom, to: availTo})
 
 			from := s.lastDistinctSeen + 1
 			to := file.Num - 1
 			s.missing = append(s.missing, missingRange{from: from, to: to})
 			s.missingBlockCount += to - from + 1
-			fmt.Printf("%s Missing blocks in range [%s to %s]\n",
-				stylex.Errorf("❌"),
-				stylex.Errorf("#%s", humanize.Comma(int64(from))),
-				stylex.Errorf("#%s", humanize.Comma(int64(to))),
-			)
+			s.rangeEvents = append(s.rangeEvents, rangeEvent{kind: rangeMissing, from: from, to: to})
 
 			// The new available segment starts at the current block.
 			s.currentAvailableStart = file.Num
@@ -351,14 +366,48 @@ func (s *oneBlocksState) pruneBelow(finalizedNum uint64) {
 
 // summary prints a final summary of the check.
 func (s *oneBlocksState) summary() {
-	// Print the final available range (the trailing contiguous segment after the
-	// last gap, or the entire range when there were no gaps at all).
+	// Append the trailing available segment (after the last gap, or the entire
+	// range if no gaps were detected) before printing the aligned range table.
 	if s.hasFirstBlock {
-		fmt.Printf("%s Available blocks in range [%s to %s]\n",
-			stylex.Success("✅"),
-			stylex.Successf("#%s", humanize.Comma(int64(s.currentAvailableStart))),
-			stylex.Successf("#%s", humanize.Comma(int64(s.lastBlockNum))),
-		)
+		s.rangeEvents = append(s.rangeEvents, rangeEvent{
+			kind: rangeAvailable,
+			from: s.currentAvailableStart,
+			to:   s.lastBlockNum,
+		})
+	}
+
+	// Compute the maximum width of any formatted block number across all range
+	// events so that every number can be right-aligned to the same width.
+	maxNumWidth := 0
+	for _, ev := range s.rangeEvents {
+		if w := len(humanize.Comma(int64(ev.from))); w > maxNumWidth {
+			maxNumWidth = w
+		}
+		if w := len(humanize.Comma(int64(ev.to))); w > maxNumWidth {
+			maxNumWidth = w
+		}
+	}
+
+	// Print the range table with aligned block numbers.
+	for _, ev := range s.rangeEvents {
+		fromStr := humanize.Comma(int64(ev.from))
+		toStr := humanize.Comma(int64(ev.to))
+		// Right-align each number within maxNumWidth.
+		fromPadded := fmt.Sprintf("%*s", maxNumWidth, fromStr)
+		toPadded := fmt.Sprintf("%*s", maxNumWidth, toStr)
+		if ev.kind == rangeAvailable {
+			fmt.Printf("%s Available blocks in range [%s to %s]\n",
+				stylex.Success("✅"),
+				stylex.Successf("#%s", fromPadded),
+				stylex.Successf("#%s", toPadded),
+			)
+		} else {
+			fmt.Printf("%s Missing blocks in range  [%s to %s]\n",
+				stylex.Errorf("❌"),
+				stylex.Errorf("#%s", fromPadded),
+				stylex.Errorf("#%s", toPadded),
+			)
+		}
 	}
 
 	fmt.Println()
