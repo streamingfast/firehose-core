@@ -27,43 +27,26 @@ Inspired by the existing `toolsCheckForksE` command (which walks one/forked bloc
 
 ## Dev Feedback
 
-*Round 4 of feedback*
+*Round 5 of feedback*
 
 ```
+✅ Available blocks in range [#69,815,484 to #69,815,499]
 ❌ Missing blocks in range [#69,815,500 to #74,677,299]
+✅ Available blocks in range [#74,677,300 to #74,677,488]
 ❌ Missing blocks in range [#74,677,489 to #74,772,819]
+✅ Available blocks in range [#74,772,820 to #74,772,899]
 ❌ Missing blocks in range [#74,772,900 to #74,776,699]
+✅ Available blocks in range [#74,776,700 to #74,776,825]
 ❌ Missing blocks in range [#74,776,826 to #74,776,828]
+✅ Available blocks in range [#74,776,829 to #74,776,899]
 ❌ Missing blocks in range [#74,776,900 to #74,822,999]
-
-One-blocks check complete
-──────────────────────────────────────────────────
-Block range found: #69,815,484 to #74,823,106 (589 distinct heights)
-  Total files processed   : 591
-  Highest finalized block : #74,823,104
-  Missing blocks          : 5,007,034
-  Missing ranges          : 5
-  Forked heights          : 0
-  Broken parent linkages  : 0
-  ✘ Parent chain is NOT continuous (5,007,034 missing block(s), 0 broken parent link(s))
-  ✘ Status: PROBLEMS FOUND
+✅ Available blocks in range [#74,823,000 to #74,823,106]
 ```
 
-1. In addition to missing range, also shows before the available range, that will help get a better, for example here above we would have got:
+Let's align the block range otherwise it's hard to see.
 
-```
-<checkmark> Available blocks in range [#69,815,484 to #69,815,499]
-❌ Missing blocks in range [#69,815,500 to #74,677,299]
-<same here for range #74,677,300 - #74,677,488>
-❌ Missing blocks in range [#74,677,489 to #74,772,819]
-```
+Last change after which we are ready.
 
-1. Let's remove `Parent chain is NOT continuous ...` line, I file it's useless all information is already there
-
-1. For `✘ Status: PROBLEMS FOUND`, lets use:
-
-- `Status<proper alignement>: ok` (in green when all good)
-- `Status<proper alignement>: broken` (in red when any problem detected)
 
 ## Spec & Implementation
 
@@ -109,9 +92,9 @@ File: `cmd/tools/check/one_blocks.go`
 
 ## State Tracker
 
-**Last Updated:** 2026-05-22
-**Current Step:** Step 5 — Round 4 Dev Feedback Addressed, Ready for Re-Review
-**Status:** All three round-4 feedback items addressed; all 11 tests pass; committed as `2cb2fce`.
+**Last Updated:** 2026-05-26
+**Current Step:** Step 6 — Round 5 Dev Feedback Addressed, Ready for Re-Review
+**Status:** Round-5 alignment feedback addressed; all 11 tests pass; committed as `df9e014`.
 
 ### Step 2 (completed)
 Implementation done; all tests pass; committed as `90cef4d`.
@@ -132,9 +115,14 @@ Addressed round-3 dev feedback:
 5. **Parent-chain continuity is inlined** — Removed the standalone post-walk continuity pass. Linkability is now verified inline as each block is processed.
 6. **`Parent chain is continuous` accuracy** — Summary reflects what was actually observed.
 
-### Step 5 (current)
+### Step 5 (completed)
 Addressed round-4 dev feedback:
 1. **Interleaved available/missing ranges** — When a gap is detected, the code now first prints `✅ Available blocks in range [#from to #to]` for the contiguous segment that just ended, then `❌ Missing blocks in range [#from to #to]` for the gap. The trailing available segment (after the last gap, or the entire range if no gaps exist) is printed at the start of `summary()` just before the separator. Implemented by adding a `currentAvailableStart` field to `oneBlocksState`, initialised to the first block seen and reset to the current block number each time a gap is detected.
 2. **Removed redundant continuity line** — The `✘ Parent chain is NOT continuous` / `🆗 Parent chain is continuous` lines have been removed from the summary. The individual counts already carry that information.
 3. **Simplified Status line** — No emoji prefix; reads `Status                  : ok` (green) or `Status                  : broken` (red), aligned with the other summary labels.
 Committed as `2cb2fce`.
+
+### Step 6 (current)
+Addressed round-5 dev feedback:
+1. **Right-aligned block numbers in range output** — Range events (available and missing) are now buffered in a `rangeEvents []rangeEvent` slice during the walk instead of being printed inline. In `summary()`, the max formatted number width is computed across all events and `fmt.Sprintf("%*s", ...)` right-pads each number to that width so the `#`, `to`, and `]` columns all line up. The label "Missing blocks in range" is padded with one extra space to match "Available blocks in range" so the opening bracket is also column-aligned.
+Committed as `df9e014`.
