@@ -12,10 +12,12 @@ var (
 	ReaderNodeGRPCAddr             string = ":10010"
 	ReaderNodeManagerAPIAddr       string = ":10011"
 	MergerServingAddr              string = ":10012"
+	MergerHTTPHealthzAddr          string = ":10013"
 	RelayerServingAddr             string = ":10014"
 	FirehoseGRPCServingAddr        string = ":10015"
 	SubstreamsTier1GRPCServingAddr string = ":10016"
 	SubstreamsTier2GRPCServingAddr string = ":10017"
+	RelayerHTTPHealthzAddr         string = ":10018"
 
 	// Data storage default locations
 	BlocksCacheDirectory string = "file://{data-dir}/storage/blocks-cache"

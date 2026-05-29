@@ -10,15 +10,33 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Changed
+
+- `reader-node-firehose`: if the persisted cursor in the state file points to a block older than `--reader-node-start-block-num`, the cursor is now discarded (with a warning log) and the syncer restarts from the configured start block. Previously the stale cursor was always honored.
+
+### Fixed
+
+- Substreams: fix tier1 not forwarding the subrequest secret key to tier2 in the live backfiller, which could cause backfill jobs to fail authentication against tier2 when the tier2 secret key was configured.
+
+## v1.14.4
+
+### Removed from docker image
+
+- The 'grpc_health_probe' binary is no longer included in the docker image. You can use the HTTP '/healthz' endpoints instead or use your own GRPC poller.
+
 ### Added
 
 - `tools check one-blocks`: New command that walks one-block files in streaming mode and reports issues inline as they are detected: available block ranges (printed as `✅ Available blocks in range [#X to #Y]`), missing block ranges (printed as `❌ Missing blocks in range [#X to #Y]`), forks (multiple distinct IDs at the same height), and parent-chain continuity breaks. Available and missing ranges are printed interleaved so the full picture of which blocks exist and which are absent is immediately visible. Uses the finalized block number (`LibNum`) embedded in each file to prune internal state so it does not grow infinitely. Progress is reported with an automatic ladder (every 10K below 100K processed, every 100K below 500K, every 500K below 1M, then every 1M); pass `--progress-each N` to override with a fixed cadence. The final summary ends with a colour-coded `Status : ok` (green) or `Status : broken` (red) line.
+- `merger` and `relayer` now expose an HTTP `/healthz` endpoint on a dedicated port via the new `--merger-http-healthz-addr` (default `:10013`) and `--relayer-http-healthz-addr` (default `:10018`) flags. Set the flag to an empty string to disable. The endpoint returns HTTP 200 when the service is ready and 503 otherwise (including during the `common-system-shutdown-signal-delay` graceful-shutdown window).
 - Config file now supports a `global:` section for setting persistent (global) flags such as `shift-ports`, `log-format`, `log-to-file`, etc. These flags can also still be set under the command-specific section (e.g. `start.flags`), but `global:` is more intuitive for flags that apply regardless of command.
 - `tools compare-blocks`: A single block number (e.g. `2713`) is now accepted as the range argument, automatically expanding to the 100-block bundle that contains that block (e.g. `2700:2799`).
+- Substreams **Index optimisation**: Optimized `ClockDistributor` to skip blocks earlier and faster when using block filter.
+- Substreams: add substreams_tier2_max_concurrent_requests and substreams_tier1_active_requests_hard_limit metrics to prometheus
 
 ### Fixed
 
 - `tools substreams store-size`: Fix `N/A` shown for all stores. For local state stores, the compressed file size is now displayed as a fallback when no uncompressed metadata is available. For GCS state stores, the compressed size is now returned even when files lack `datasize` metadata, and both `.kv` and `.kv.zst` file extensions are now accepted. The "Live (uncompressed)" column is renamed to "Live Size" and now shows "Not found" when no state exists for a module. The computed module hash is shown in the table for easy manual GCS path verification. A warning is shown when no state data is found for any module, hinting at a possible wrong `--state-store` URL.
+- Substreams: Fix server-side bug that would cause Blocks request to fail after a few retries with 'load full store (...) load store stream: opening file for streaming: not found' when depending on a store that is being merged slowly
 
 ### Changed
 

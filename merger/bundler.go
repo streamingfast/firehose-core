@@ -93,8 +93,11 @@ func NewBundler(startBlock, stopBlock, firstStreamableBlock, bundleSize uint64, 
 // this is used to determine what we can safely delete from the one-block store
 func (b *Bundler) getSafeBaseBlockNum() uint64 {
 	b.Lock()
-	defer b.Unlock()
 	out := b.baseBlockNum
+	b.Unlock()
+
+	b.inFlightMu.Lock()
+	defer b.inFlightMu.Unlock()
 	for inflight := range b.inFlightBundles {
 		if inflight < out {
 			out = inflight
