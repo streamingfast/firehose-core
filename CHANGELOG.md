@@ -18,6 +18,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Substreams: fix tier1 not forwarding the subrequest secret key to tier2 in the live backfiller, which could cause backfill jobs to fail authentication against tier2 when the tier2 secret key was configured.
 
+### Added
+
+- Tools: 'relayer write-one-blocks' subcommand, to write one-block-files directly from the relayer. Can write partial blocks too, for comparing.
+
 ## v1.14.4
 
 ### Removed from docker image
