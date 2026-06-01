@@ -66,6 +66,40 @@ func NewToolsRelayerGroup[B firecore.Block](chain *firecore.Chain[B], logger *za
 				to stream forever.
 			`),
 		),
+
+		Command(
+			toolsRelayerWriteOneBlocksRunner(logger),
+			"write-one-blocks <source> <destination> [:<stop>]",
+			"Write one-block files from a live relayer source to a destination store",
+			Flags(func(flags *pflag.FlagSet) {
+				flags.Bool("partial-only", false, "Only write blocks whose PartialIndex != 0 (implies --with-partials)")
+				flags.Bool("with-partials", false, "Ask for partial blocks in the blockstream request and write them too")
+				flags.String("one-block-suffix", "default", "Suffix used to name the one-block files written to the destination store")
+				flags.String("secret-key", "", "Secret key sent as a Bearer token in the 'authorization' metadata header. Supports ${ENV_VAR} interpolation.")
+			}),
+
+			RangeArgs(2, 3),
+			Description(`
+				Connects to a 'relayer' source and writes each received block as a
+				one-block file in the destination store.
+
+				The destination can be any URL supported by 'dstore' (e.g. './my-dir',
+				'gs://bucket/path', 's3://...'). Files are written in 'dbin.zst' format,
+				following the conventional one-block filename layout.
+
+				By default, only full blocks (PartialIndex == 0) are written. Use
+				--with-partials to also request and write partial blocks, or
+				--partial-only to write only partial blocks (PartialIndex != 0).
+
+				When writing partial blocks, the partial index is appended to the
+				filename suffix (e.g. 'default-p2') so partial blocks do not collide
+				with their full counterparts.
+
+				You can pass a stop block to the command, can be absolute or relative. If relative,
+				only +N is supported, where N is the number of blocks seen so far. Default is
+				to stream forever.
+			`),
+		),
 	))
 }
 
