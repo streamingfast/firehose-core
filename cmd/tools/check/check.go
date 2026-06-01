@@ -58,6 +58,7 @@ func NewCheckCommand[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Lo
 	)
 
 	toolsCheckCmd.AddCommand(newCheckMergedBlockBatchCmd())
+	toolsCheckCmd.AddCommand(newCheckOneBlocksCmd())
 	toolsCheckCmd.AddCommand(toolsCheckForksCmd)
 	toolsCheckCmd.AddCommand(toolsCheckMergedBlocksCmd)
 
