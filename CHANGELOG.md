@@ -8,15 +8,19 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.14.5
 
 ### Changed
 
 - `reader-node-firehose`: if the persisted cursor in the state file points to a block older than `--reader-node-start-block-num`, the cursor is now discarded (with a warning log) and the syncer restarts from the configured start block. Previously the stale cursor was always honored.
+- Bumped `golang.org/x/net` to `v0.55.0` and `golang.org/x/crypto` to `v0.52.0` (along with `x/sys`, `x/term` and `x/text`) to pick up the latest security fixes.
 
 ### Fixed
 
 - Substreams: fix tier1 not forwarding the subrequest secret key to tier2 in the live backfiller, which could cause backfill jobs to fail authentication against tier2 when the tier2 secret key was configured.
+- Substreams: per-block execution timeouts are now surfaced as a `DeadlineExceeded` gRPC error instead of being silently swallowed (and the affected block dropped). Previously a deadline-exceeded panic during block execution could be caught by the generic context-cancelled handler, so the timeout was hidden and the block silently skipped.
+- Substreams: stop the `progressBlockRate` janitor goroutine when closing the sink stats, fixing a goroutine leak.
+- `payment-gateway`: fix a nil-pointer panic in session `Release` when `sessionInfo` is `nil`.
 
 ### Added
 
