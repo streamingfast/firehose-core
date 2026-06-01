@@ -20,11 +20,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
-<<<<<<< feature/relayer-writeoneblock
-- Tools: 'relayer write-one-blocks' subcommand, to write one-block-files directly from the relayer. Can write partial blocks too, for comparing.
-=======
+- `tools relayer write-one-blocks` New command to write one-block-files directly from the relayer. Can write partial blocks too, for comparing.
 - `tools check one-blocks`: New command that walks one-block files in streaming mode and reports issues inline as they are detected: available block ranges (printed as `✅ Available blocks in range [#X to #Y]`), missing block ranges (printed as `❌ Missing blocks in range [#X to #Y]`), forks (multiple distinct IDs at the same height), and parent-chain continuity breaks. Available and missing ranges are printed interleaved so the full picture of which blocks exist and which are absent is immediately visible. Uses the finalized block number (`LibNum`) embedded in each file to prune internal state so it does not grow infinitely. Progress is reported with an automatic ladder (every 10K below 100K processed, every 100K below 500K, every 500K below 1M, then every 1M); pass `--progress-each N` to override with a fixed cadence. The final summary ends with a colour-coded `Status : ok` (green) or `Status : broken` (red) line.
->>>>>>> develop
 
 ## v1.14.4
 
