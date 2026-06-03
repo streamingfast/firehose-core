@@ -57,12 +57,15 @@ func (c *Clients[C]) Add(client C) {
 	c.clients = append(c.clients, client)
 }
 func WithClientsContext[C any, V any](clients *Clients[C], ctx context.Context, f func(context.Context, C) (v V, err error)) (v V, err error) {
-	clients.lock.Lock()
-	defer clients.lock.Unlock()
 	var errs error
 
+	// The lock only guards the rolling-strategy state (client selection), NOT the
+	// call to f. Holding it across f serializes all concurrent callers (e.g. the
+	// block poller's parallel-prefetch workers), defeating the parallelism.
+	clients.lock.Lock()
 	clients.rollingStrategy.reset()
 	client, err := clients.rollingStrategy.next(clients)
+	clients.lock.Unlock()
 	if err != nil {
 		errs = multierror.Append(errs, err)
 		return v, errs
@@ -76,7 +79,9 @@ func WithClientsContext[C any, V any](clients *Clients[C], ctx context.Context, 
 
 		if err != nil {
 			errs = multierror.Append(errs, err)
+			clients.lock.Lock()
 			client, err = clients.rollingStrategy.next(clients)
+			clients.lock.Unlock()
 			if err != nil {
 				errs = multierror.Append(errs, err)
 				return v, errs
