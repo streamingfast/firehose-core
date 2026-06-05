@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
-	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
+	dockercontainer "github.com/moby/moby/api/types/container"
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dgrpc"
