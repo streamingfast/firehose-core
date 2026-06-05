@@ -10,6 +10,11 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Added
+
+- `tools wkp descriptors [output-file]`: new command that exports all well-known blockchain protobuf descriptors as a self-contained, serialized `google.protobuf.FileDescriptorSet` (binary wire format). The set includes every transitive import (google/protobuf/* well-known types included) so consumers can build a descriptor registry with no external resolution. Output is deterministic (stable topological + alphabetical ordering) enabling "is it up to date?" CI checks via a regenerate-and-diff workflow. Use `-` as `output-file` to write to stdout; the default output name is `well-known-descriptors.binpb`.
+- `proto/generator`: switched from the BSR Reflection v1beta1 API to the BSR HTTP descriptor endpoint (`/descriptor/<ref>?source_info=true`). Regenerated WKP files will now embed `source_code_info` (proto field/message comments), enabling documentation renderers and tooling that reads comment annotations. Authentication via `BUFBUILD_AUTH_TOKEN` is now optional for public modules (a warning is emitted when the token is absent).
+
 ### Changed
 
 - Bumped `dstore`: S3 store now suppresses the SDK's checksum validation warnings (sets `DisableLogOutputChecksumValidationSkipped` to `true`) and updates the AWS S3 SDK to a newer version.
