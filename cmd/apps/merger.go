@@ -26,6 +26,7 @@ func RegisterMergerApp(rootLog *zap.Logger) {
 			cmd.Flags().Duration("merger-time-between-store-pruning", time.Minute, "Delay between source store pruning loops")
 			cmd.Flags().Int("merger-delete-threads", 8, "Number of threads for deleting files in parallel (increase this in case the merger isn't able to keep up with deleting one-block files).")
 			cmd.Flags().Int("merger-max-merging-threads", 4, "Maximum number of bundles that can be merged in parallel. Increasing this allows the merger to catch up faster when behind, at the cost of more memory usage.")
+			cmd.Flags().Bool("merger-validate-one-block-files", false, "Validate that each one-block file contains a single well-formed block (DBIN framing, block envelope and protobuf wire-format of the payload) before merging it, failing the merge instead of propagating a corrupted block to the merged-blocks store. Adds some CPU and memory overhead.")
 			return nil
 		},
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
@@ -46,6 +47,7 @@ func RegisterMergerApp(rootLog *zap.Logger) {
 				TimeBetweenPolling:           viper.GetDuration("merger-time-between-store-lookups"),
 				FilesDeleteThreads:           viper.GetInt("merger-delete-threads"),
 				MaxMergingThreads:            viper.GetInt("merger-max-merging-threads"),
+				ValidateOneBlockFiles:        viper.GetBool("merger-validate-one-block-files"),
 				IsPendingShutdown:            runtime.IsPendingShutdown,
 			}), nil
 		},

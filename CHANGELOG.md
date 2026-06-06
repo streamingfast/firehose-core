@@ -10,6 +10,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Added
+
+- `merger`: new `--merger-validate-one-block-files` flag (default `false`). When enabled, each one-block file is validated before being merged: the DBIN framing, the block envelope and the block payload (protobuf wire-format) must decode, otherwise the merge fails with an error naming the offending one-block file. Without it, a corrupted one-block file is silently propagated into the merged-blocks store, poisoning every downstream consumer of the bundle (index-builder, firehose, substreams, ...).
+
 ### Changed
 
 - Bumped `dstore`: S3 store now suppresses the SDK's checksum validation warnings (sets `DisableLogOutputChecksumValidationSkipped` to `true`) and updates the AWS S3 SDK to a newer version.

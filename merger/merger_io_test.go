@@ -42,6 +42,7 @@ func TestNewDstore(t *testing.T) {
 		0,
 		100,
 		0,
+		false,
 	)
 
 	_, ok := store.(ForkAwareIOInterface)
@@ -57,6 +58,7 @@ func TestNewDstore(t *testing.T) {
 		0,
 		100,
 		0,
+		false,
 	)
 
 	_, ok = store.(ForkAwareIOInterface)
@@ -67,7 +69,7 @@ func newTestDStoreIO(
 	oneBlocksStore dstore.Store,
 	mergedBlocksStore dstore.Store,
 ) IOInterface {
-	return NewDStoreIO(testLogger, oneBlocksStore, mergedBlocksStore, nil, 0, 0, 100, 0)
+	return NewDStoreIO(testLogger, oneBlocksStore, mergedBlocksStore, nil, 0, 0, 100, 0, false)
 }
 
 func makeBlockReader(t *testing.T) io.ReadCloser {
@@ -170,8 +172,8 @@ func TestMergerIO_MergeUploadFilteredToZero(t *testing.T) {
 	b101 := block103Final101()
 	files := []*bstream.OneBlockFile{b100, b101}
 
-	b100.MemoizeData = append(testOneBlockHeader, []byte{0x0, 0x1, 0x2, 0x3}...)
-	b101.MemoizeData = append(testOneBlockHeader, []byte{0x0, 0x1, 0x2, 0x3}...)
+	b100.MemoizeData = newTestOneBlockFile(t, "b100", 100, []byte{0x08, 0x01}).MemoizeData
+	b101.MemoizeData = newTestOneBlockFile(t, "b101", 101, []byte{0x08, 0x01}).MemoizeData
 
 	oneBlockStore := dstore.NewMockStore(nil)
 	oneBlockStore.OpenObjectFunc = func(_ context.Context, name string) (io.ReadCloser, error) {
@@ -188,4 +190,29 @@ func TestMergerIO_MergeUploadFilteredToZero(t *testing.T) {
 	mio := newTestDStoreIO(oneBlockStore, dstore.NewMockStore(nil))
 	err := mio.MergeAndStore(context.Background(), 114, files)
 	require.NoError(t, err)
+}
+
+func TestMergerIO_MergeUploadCorruptBlockWithValidation(t *testing.T) {
+	files := []*bstream.OneBlockFile{
+		block100(),
+		block101(),
+	}
+
+	corrupted := newTestOneBlockFile(t, "corrupted", 100, []byte{0xff, 0xff, 0xff})
+
+	oneBlockStore := dstore.NewMockStore(nil)
+	oneBlockStore.OpenObjectFunc = func(_ context.Context, name string) (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(corrupted.MemoizeData)), nil
+	}
+	mergedBlocksStore := dstore.NewMockStore(func(base string, f io.Reader) error {
+		_, err := io.ReadAll(f)
+		return err
+	})
+
+	mio := NewDStoreIO(testLogger, oneBlockStore, mergedBlocksStore, nil, 0, 0, 100, 0, true)
+
+	err := mio.MergeAndStore(context.Background(), 100, files)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "refusing to merge corrupted one_block_file")
+	require.Contains(t, err.Error(), "invalid wire-format")
 }

@@ -36,8 +36,9 @@ type Config struct {
 	StorageMergedBlocksFilesPath string
 	StorageForkedBlocksFilesPath string
 
-	FilesDeleteThreads int
-	MaxMergingThreads  int
+	FilesDeleteThreads    int
+	MaxMergingThreads     int
+	ValidateOneBlockFiles bool
 
 	GRPCListenAddr        string
 	HTTPHealthzListenAddr string
@@ -98,7 +99,8 @@ func (a *App) Run() error {
 		5,
 		500*time.Millisecond,
 		bundleSize,
-		a.config.FilesDeleteThreads)
+		a.config.FilesDeleteThreads,
+		a.config.ValidateOneBlockFiles)
 
 	m := merger.NewMerger(
 		zlog,

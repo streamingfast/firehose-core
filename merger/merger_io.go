@@ -62,7 +62,8 @@ type DStoreIO struct {
 	retryAttempts int
 	retryCooldown time.Duration
 
-	bundleSize uint64
+	bundleSize         uint64
+	validateBlockFiles bool
 
 	logger *zap.Logger
 	od     *oneBlockFilesDeleter
@@ -78,18 +79,20 @@ func NewDStoreIO(
 	retryCooldown time.Duration,
 	bundleSize uint64,
 	numDeleteThreads int,
+	validateBlockFiles bool,
 ) IOInterface {
 
 	od := &oneBlockFilesDeleter{store: oneBlocksStore, logger: logger}
 	od.Start(numDeleteThreads, DefaultFilesDeleteBatchSize*2)
 	dstoreIO := &DStoreIO{
-		oneBlocksStore:    oneBlocksStore,
-		mergedBlocksStore: mergedBlocksStore,
-		retryAttempts:     retryAttempts,
-		retryCooldown:     retryCooldown,
-		bundleSize:        bundleSize,
-		logger:            logger,
-		od:                od,
+		oneBlocksStore:     oneBlocksStore,
+		mergedBlocksStore:  mergedBlocksStore,
+		retryAttempts:      retryAttempts,
+		retryCooldown:      retryCooldown,
+		bundleSize:         bundleSize,
+		validateBlockFiles: validateBlockFiles,
+		logger:             logger,
+		od:                 od,
 	}
 
 	forkAware := forkedBlocksStore != nil
@@ -139,7 +142,7 @@ func (s *DStoreIO) MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64
 	err = Retry(s.logger, s.retryAttempts, s.retryCooldown, func() error {
 		inCtx, cancel := context.WithTimeout(ctx, WriteObjectTimeout)
 		defer cancel()
-		streamReader, err := NewStreamingBundleReader(ctx, s.logger, filteredOBF, anyOneBlockFile, s.OpenOneBlockFile)
+		streamReader, err := NewStreamingBundleReader(ctx, s.logger, filteredOBF, anyOneBlockFile, s.OpenOneBlockFile, s.validateBlockFiles)
 		if err != nil {
 			return err
 		}
