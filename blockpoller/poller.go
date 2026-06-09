@@ -356,8 +356,6 @@ func (p *BlockPoller[C]) requestBlock(blockNumber uint64, numberOfBlockToFetch i
 		blockItem, found := p.optimisticallyPolledBlocks[blockNumber]
 		p.optimisticallyPolledBlocksLock.Unlock()
 		if !found {
-			// CompareAndSwap ensures exactly one fetch goroutine is in flight at a
-			// time, and makes the flag safe to read/write across goroutines.
 			if p.fetching.CompareAndSwap(false, true) {
 				go func() {
 					p.optimisticallyPolledBlocksLock.Lock()

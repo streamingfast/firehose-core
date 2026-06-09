@@ -59,9 +59,7 @@ func (c *Clients[C]) Add(client C) {
 func WithClientsContext[C any, V any](clients *Clients[C], ctx context.Context, f func(context.Context, C) (v V, err error)) (v V, err error) {
 	var errs error
 
-	// The lock only guards the rolling-strategy state (client selection), NOT the
-	// call to f. Holding it across f serializes all concurrent callers (e.g. the
-	// block poller's parallel-prefetch workers), defeating the parallelism.
+	// guard the rolling-strategy state (client selection), NOT the call to f
 	clients.lock.Lock()
 	clients.rollingStrategy.reset()
 	client, err := clients.rollingStrategy.next(clients)
