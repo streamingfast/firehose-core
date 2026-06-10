@@ -12,7 +12,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
-- New `fireproto` package with `WalkNonDeterministicFields`, `ClearNonDeterministicFields`, and `FindTransactionsField` utilities for walking and manipulating proto fields annotated with the `(firehose.nondeterministic)` and `(firehose.transactions)` field extensions.
+- Add `pb/firehose/options.proto` defining `(firehose.transactions)` and `(firehose.nondeterministic)` custom `FieldOptions` extensions for annotating Block proto fields with semantic meaning (transaction list and non-deterministic values).
+- Add `fireproto` package providing `WalkNonDeterministicFields`, `ClearNonDeterministicFields`, and `FindTransactionsField` utilities for walking and manipulating proto fields annotated with the `(firehose.nondeterministic)` and `(firehose.transactions)` field extensions.
 
 ### Changed
 
