@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package firehose;
+
+import "google/protobuf/descriptor.proto";
+
+option go_package = "github.com/streamingfast/firehose-core/pb/firehose;pbfirehose";
+
+extend google.protobuf.FieldOptions {
+  // transactions marks the repeated field that holds the block's transaction list.
+  // Exactly one field per Block message should carry this annotation.
+  bool transactions = 50000;
+
+  // nondeterministic marks fields whose values may differ between nodes
+  // (e.g. gas used, fees) and should be cleared for deterministic comparisons.
+  bool nondeterministic = 50001;
+}
