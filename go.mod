@@ -40,6 +40,7 @@ require (
 	github.com/streamingfast/logging v1.2.2
 	github.com/streamingfast/payment-gateway v0.0.0-20260527144655-d0576d2a4ee3
 	github.com/streamingfast/pbgo v0.0.6-0.20260206150405-2b95acf70437
+	github.com/streamingfast/protox v0.0.0-00010101000000-000000000000
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
 	github.com/streamingfast/substreams v1.18.6-0.20260514140025-e5ca79eade0d
 	github.com/stretchr/testify v1.11.1
