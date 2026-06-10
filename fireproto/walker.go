@@ -10,6 +10,13 @@ import (
 // WalkNonDeterministicFields walks the proto.Message tree rooted at root and calls fn
 // for each field tagged with (firehose.nondeterministic) = true.
 // fn receives the containing message instance and the field descriptor.
+//
+// fn is called for every non-deterministic field in the message type regardless of
+// whether the field is currently populated in the instance; clearing an unset field
+// is a no-op, so this is safe to use with ClearNonDeterministicFields.
+//
+// Well-known Google types (google.protobuf.*) are not recursed into.
+// Self-referential message types are handled via DFS cycle prevention in the walker.
 func WalkNonDeterministicFields(root proto.Message, fn func(msg protoreflect.Message, field protoreflect.FieldDescriptor)) {
 	for msg, field := range protox.WalkMessageInstanceFields(root.ProtoReflect(), nil) {
 		if isNonDeterministic(field) {
@@ -28,6 +35,8 @@ func ClearNonDeterministicFields(root proto.Message) {
 
 // FindTransactionsField returns the first field descriptor in root's message type
 // tagged with (firehose.transactions) = true, or nil if none is tagged.
+// Only the top-level fields of root's message type are examined; nested messages
+// are not searched.
 func FindTransactionsField(root proto.Message) protoreflect.FieldDescriptor {
 	fields := root.ProtoReflect().Descriptor().Fields()
 	for i := range fields.Len() {

@@ -23,27 +23,27 @@ func buildAnnotatedDescriptors(t *testing.T) (blockType protoreflect.MessageType
 	t.Helper()
 
 	txFDP := &descriptorpb.FileDescriptorProto{
-		Name:    proto.String("fireproto_test_tx.proto"),
-		Syntax:  proto.String("proto3"),
-		Package: proto.String("fireproto.test"),
-		Options: &descriptorpb.FileOptions{GoPackage: proto.String("fireproto/test;fireprototest")},
+		Name:    new("fireproto_test_tx.proto"),
+		Syntax:  new("proto3"),
+		Package: new("fireproto.test"),
+		Options: &descriptorpb.FileOptions{GoPackage: new("fireproto/test;fireprototest")},
 		MessageType: []*descriptorpb.DescriptorProto{
 			{
-				Name: proto.String("Tx"),
+				Name: new("Tx"),
 				Field: []*descriptorpb.FieldDescriptorProto{
 					{
-						Name:     proto.String("hash"),
-						Number:   proto.Int32(1),
+						Name:     new("hash"),
+						Number:   new(int32(1)),
 						Type:     descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
 						Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-						JsonName: proto.String("hash"),
+						JsonName: new("hash"),
 					},
 					{
-						Name:     proto.String("fee"),
-						Number:   proto.Int32(2),
+						Name:     new("fee"),
+						Number:   new(int32(2)),
 						Type:     descriptorpb.FieldDescriptorProto_TYPE_BYTES.Enum(),
 						Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-						JsonName: proto.String("fee"),
+						JsonName: new("fee"),
 						Options: func() *descriptorpb.FieldOptions {
 							opts := &descriptorpb.FieldOptions{}
 							proto.SetExtension(opts, pbfirehose.E_Nondeterministic, true)
@@ -56,22 +56,22 @@ func buildAnnotatedDescriptors(t *testing.T) (blockType protoreflect.MessageType
 	}
 
 	blockFDP := &descriptorpb.FileDescriptorProto{
-		Name:       proto.String("fireproto_test_block.proto"),
-		Syntax:     proto.String("proto3"),
-		Package:    proto.String("fireproto.test"),
+		Name:       new("fireproto_test_block.proto"),
+		Syntax:     new("proto3"),
+		Package:    new("fireproto.test"),
 		Dependency: []string{"fireproto_test_tx.proto"},
-		Options:    &descriptorpb.FileOptions{GoPackage: proto.String("fireproto/test;fireprototest")},
+		Options:    &descriptorpb.FileOptions{GoPackage: new("fireproto/test;fireprototest")},
 		MessageType: []*descriptorpb.DescriptorProto{
 			{
-				Name: proto.String("Block"),
+				Name: new("Block"),
 				Field: []*descriptorpb.FieldDescriptorProto{
 					{
-						Name:     proto.String("transactions"),
-						Number:   proto.Int32(1),
+						Name:     new("transactions"),
+						Number:   new(int32(1)),
 						Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
 						Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
-						TypeName: proto.String(".fireproto.test.Tx"),
-						JsonName: proto.String("transactions"),
+						TypeName: new(".fireproto.test.Tx"),
+						JsonName: new("transactions"),
 						Options: func() *descriptorpb.FieldOptions {
 							opts := &descriptorpb.FieldOptions{}
 							proto.SetExtension(opts, pbfirehose.E_Transactions, true)
@@ -79,11 +79,11 @@ func buildAnnotatedDescriptors(t *testing.T) (blockType protoreflect.MessageType
 						}(),
 					},
 					{
-						Name:     proto.String("gas"),
-						Number:   proto.Int32(2),
+						Name:     new("gas"),
+						Number:   new(int32(2)),
 						Type:     descriptorpb.FieldDescriptorProto_TYPE_BYTES.Enum(),
 						Label:    descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
-						JsonName: proto.String("gas"),
+						JsonName: new("gas"),
 						Options: func() *descriptorpb.FieldOptions {
 							opts := &descriptorpb.FieldOptions{}
 							proto.SetExtension(opts, pbfirehose.E_Nondeterministic, true)
