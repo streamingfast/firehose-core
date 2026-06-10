@@ -40,7 +40,7 @@ require (
 	github.com/streamingfast/logging v1.2.2
 	github.com/streamingfast/payment-gateway v0.0.0-20260527144655-d0576d2a4ee3
 	github.com/streamingfast/pbgo v0.0.6-0.20260206150405-2b95acf70437
-	github.com/streamingfast/protox v0.0.0-00010101000000-000000000000
+	github.com/streamingfast/protox v0.0.0-20260610151242-cd8a8cf98c45
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
 	github.com/streamingfast/substreams v1.18.6-0.20260514140025-e5ca79eade0d
 	github.com/stretchr/testify v1.11.1
@@ -312,6 +312,5 @@ replace (
 	cloud.google.com/go => github.com/streamingfast/google-cloud-go v0.0.0-20241202194114-f77ff78d4f66
 	github.com/ShinyTrinkets/overseer => github.com/streamingfast/overseer v0.2.1-0.20210326144022-ee491780e3ef
 	github.com/jhump/protoreflect => github.com/streamingfast/protoreflect v0.0.0-20231205191344-4b629d20ce8d
-	github.com/streamingfast/protox => /Users/maoueh/work/sf/protox
 	github.com/tetratelabs/wazero => github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed
 )
