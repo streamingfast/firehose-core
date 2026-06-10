@@ -47,7 +47,7 @@ require (
 	github.com/testcontainers/testcontainers-go v0.40.0
 	go.opentelemetry.io/otel v1.43.0
 	go.uber.org/multierr v1.11.0
-	go.uber.org/zap v1.27.1
+	go.uber.org/zap v1.28.0
 	golang.org/x/exp v0.0.0-20250813145105-42675adae3e6
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11
@@ -311,5 +311,6 @@ replace (
 	cloud.google.com/go => github.com/streamingfast/google-cloud-go v0.0.0-20241202194114-f77ff78d4f66
 	github.com/ShinyTrinkets/overseer => github.com/streamingfast/overseer v0.2.1-0.20210326144022-ee491780e3ef
 	github.com/jhump/protoreflect => github.com/streamingfast/protoreflect v0.0.0-20231205191344-4b629d20ce8d
+	github.com/streamingfast/protox => /Users/maoueh/work/sf/protox
 	github.com/tetratelabs/wazero => github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed
 )
