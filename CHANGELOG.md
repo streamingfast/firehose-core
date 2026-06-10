@@ -10,6 +10,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Added
+
+- New `fireproto` package with `WalkNonDeterministicFields`, `ClearNonDeterministicFields`, and `FindTransactionsField` utilities for walking and manipulating proto fields annotated with the `(firehose.nondeterministic)` and `(firehose.transactions)` field extensions.
+
 ### Changed
 
 - `reader-node-firehose`: if the persisted cursor in the state file points to a block older than `--reader-node-start-block-num`, the cursor is now discarded (with a warning log) and the syncer restarts from the configured start block. Previously the stale cursor was always honored.
