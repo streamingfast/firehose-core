@@ -63,7 +63,7 @@ Note: Currently only GCP Cloud Logging backend is supported.`,
 	cmd.Flags().String("backend", "gcp", "Log backend to use (currently only 'gcp' supported)")
 	cmd.Flags().Duration("since", time.Duration(0), "Look back duration (e.g., '1h', '30m', '2d'). Mutually exclusive with --date-range")
 	cmd.Flags().String("date-range", "", "Date range in format '<start>[/<end>]'. End defaults to now. Mutually exclusive with --since")
-	cmd.Flags().StringP("k8s-namespace", "n", "", "Kubernetes namespace to filter logs")
+	cmd.Flags().StringP("k8s-namespace", "n", "", "Kubernetes namespace to filter logs (does not work when on OVH)")
 	cmd.Flags().String("gcp-project", "", "GCP project ID (required for GCP backend)")
 
 	return cmd

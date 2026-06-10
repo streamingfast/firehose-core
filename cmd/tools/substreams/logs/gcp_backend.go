@@ -80,8 +80,7 @@ func (b *GCPBackend) iterateEntries(ctx context.Context, filter string) iter.Seq
 // buildFilter constructs the Cloud Logging filter string
 func (b *GCPBackend) buildFilter(opts QueryOptions) string {
 	// Base filter for k8s container logs with the specific user_id
-	filter := fmt.Sprintf(`resource.type="k8s_container"
-jsonPayload.user_id="%s"
+	filter := fmt.Sprintf(`jsonPayload.user_id="%s"
 (
   jsonPayload.message="incoming Substreams Blocks request" OR
   (jsonPayload.message="substreams request stats" AND jsonPayload.tier="tier1")
