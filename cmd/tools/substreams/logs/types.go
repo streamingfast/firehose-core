@@ -15,8 +15,12 @@ const (
 )
 
 // QueryOptions contains parameters for querying connection logs
+//
+// Either UserID or TraceID must be set. UserID matches all requests for an
+// organization; TraceID matches a single request via Cloud Logging SEARCH().
 type QueryOptions struct {
 	UserID    string
+	TraceID   string
 	Namespace string
 	StartTime time.Time
 	EndTime   time.Time
