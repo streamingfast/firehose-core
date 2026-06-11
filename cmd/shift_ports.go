@@ -17,7 +17,9 @@ var portFlags = []string{
 	// Server-side listen addresses
 	"firehose-grpc-listen-addr",
 	"merger-grpc-listen-addr",
+	"merger-http-healthz-addr",
 	"relayer-grpc-listen-addr",
+	"relayer-http-healthz-addr",
 	"reader-node-grpc-listen-addr",
 	"reader-node-manager-api-addr",
 	"substreams-tier1-grpc-listen-addr",

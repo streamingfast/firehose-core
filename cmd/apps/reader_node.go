@@ -171,6 +171,7 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 			)
 
 			lineBufferSize := viper.GetUint64("reader-node-line-buffer-size")
+			metrics.LineBufferSize.SetUint64(lineBufferSize)
 
 			superviser := sv.SupervisorFactory(chain.ExecutableName, nodePath, nodeArguments, lineBufferSize, appLogger)
 			superviser.RegisterLogPlugin(sv.NewNodeLogPlugin(debugFirehose))
