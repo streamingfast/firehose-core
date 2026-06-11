@@ -17,11 +17,39 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Changed
 
+- Bumped `dstore`: S3 store now suppresses the SDK's checksum validation warnings (sets `DisableLogOutputChecksumValidationSkipped` to `true`) and updates the AWS S3 SDK to a newer version.
+- Substreams: the tier1 job scheduler no longer slows down on very large reprocessings (100_000s of segments). `NextJob` and `AllStoresCompleted` used to rescan the whole completed-segment prefix on every scheduling event (O(segments²) over a run) and now advance a forward-only cursor (O(1) amortized). Progress reporting (`UpdateStats`) builds each stage's ranges in a single sort-free pass, the scheduler event loop drops per-message overhead (debug-state env var read once at startup, debug log fields built only when debug logging is enabled), and the cached-output streaming buffer appends and checks for flushing under a single lock per block.
+- Substreams: `SUBSTREAMS_STORE_SIZE_LIMIT` is now passed from tier1 to tier2; when set on tier1 it overrides the tier2 env var value.
+
+### Added
+
+- Reader: two prometheus gauges to watch how close blocks read out of the node are to the `reader-node-line-buffer-size` hard limit: `reader_node_max_read_block_size_bytes` (high-water mark of the largest line/block read) and `reader_node_line_buffer_size_bytes` (the configured limit).
+
+### Fixed
+
+- Substreams: fix some edge cases with partial blocks that would prevent proper detection of invalid partials that need to be undone, or causing spurious UNDO events.
+- Substreams: fix `Sinker.requestActiveStartBlock` not being set when the handler implements `SinkerSessionInitHandler`, which previously caused `ProgressMessageLastContiguousBlock` to be incorrect for production-mode mapper stages.
+- Substreams: detect reorgs in executed partial blocks even when the transaction hashes are identical. Previously a recomputed block whose only difference was its state (same, equally-ordered transactions) was not detected as replaced, so no reorg was triggered; more block fields are now validated to catch this.
+
+## v1.14.5
+
+### Changed
+
 - `reader-node-firehose`: if the persisted cursor in the state file points to a block older than `--reader-node-start-block-num`, the cursor is now discarded (with a warning log) and the syncer restarts from the configured start block. Previously the stale cursor was always honored.
+- Bumped `golang.org/x/net` to `v0.55.0` and `golang.org/x/crypto` to `v0.52.0` (along with `x/sys`, `x/term` and `x/text`) to pick up the latest security fixes.
 
 ### Fixed
 
 - Substreams: fix tier1 not forwarding the subrequest secret key to tier2 in the live backfiller, which could cause backfill jobs to fail authentication against tier2 when the tier2 secret key was configured.
+- Substreams: per-block execution timeouts are now surfaced as a `DeadlineExceeded` gRPC error instead of being silently swallowed (and the affected block dropped). Previously a deadline-exceeded panic during block execution could be caught by the generic context-cancelled handler, so the timeout was hidden and the block silently skipped.
+- Substreams: stop the `progressBlockRate` janitor goroutine when closing the sink stats, fixing a goroutine leak.
+- `payment-gateway`: fix a nil-pointer panic in session `Release` when `sessionInfo` is `nil`.
+
+### Added
+
+- `tools relayer write-one-blocks` New command to write one-block-files directly from the relayer. Can write partial blocks too, for comparing.
+- `tools check one-blocks`: New command that walks one-block files in streaming mode and reports issues inline as they are detected: available block ranges (printed as `✅ Available blocks in range [#X to #Y]`), missing block ranges (printed as `❌ Missing blocks in range [#X to #Y]`), forks (multiple distinct IDs at the same height), and parent-chain continuity breaks. Available and missing ranges are printed interleaved so the full picture of which blocks exist and which are absent is immediately visible. Uses the finalized block number (`LibNum`) embedded in each file to prune internal state so it does not grow infinitely. Progress is reported with an automatic ladder (every 10K below 100K processed, every 100K below 500K, every 500K below 1M, then every 1M); pass `--progress-each N` to override with a fixed cadence. The final summary ends with a colour-coded `Status : ok` (green) or `Status : broken` (red) line.
+- Substreams: added more metrics to identify time spent squashing
 
 ## v1.14.4
 
