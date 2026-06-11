@@ -22,6 +22,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Fixed
 
+- Firehose: fix `sf.firehose.v2.Fetch/Block` hanging forever when requesting the first streamable block on a freshly started chain. The single-block handler used a strict `>` comparison against the hub's lowest retained block, so a request for exactly that block (the first streamable block at startup) skipped the live hub and fell through to the merged-blocks store, where it waited indefinitely for a merged bundle that had not been flushed yet. The comparison is now `>=`, so the lowest retained block is served from the hub.
 - Substreams: fix some edge cases with partial blocks that would prevent proper detection of invalid partials that need to be undone, or causing spurious UNDO events.
 - Substreams: fix `Sinker.requestActiveStartBlock` not being set when the handler implements `SinkerSessionInitHandler`, which previously caused `ProgressMessageLastContiguousBlock` to be incorrect for production-mode mapper stages.
 - Substreams: detect reorgs in executed partial blocks even when the transaction hashes are identical. Previously a recomputed block whose only difference was its state (same, equally-ordered transactions) was not detected as replaced, so no reorg was triggered; more block fields are now validated to catch this.
