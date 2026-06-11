@@ -25,6 +25,7 @@ jobs:
 
     steps:
       - name: Check SLACK_IDS env variable
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         run: |
           if [ -z "${SLACK_IDS}" ]; then
             echo "The secret 'vars.SLACK_IDS' is empty"
