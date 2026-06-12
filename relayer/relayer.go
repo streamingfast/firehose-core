@@ -85,7 +85,7 @@ func NewRelayer(
 		r.liveSourceFactory,
 		10,
 		oneBlocksStore,
-		[]hub.Option{hub.WithMaxConsecutiveUnlinkableBlocks(5)},
+		[]hub.Option{hub.WithMaxConsecutiveUnlinkableBlocks(5), hub.WithLogger(zlog)},
 		options...,
 	)
 

@@ -151,6 +151,7 @@ func (b *Bundler) forkedBlocksInCurrentBundle() (out []*bstream.OneBlockFile) {
 
 func (b *Bundler) Reset(nextBase uint64, lib bstream.BlockRef) {
 	options := []forkable.Option{
+		forkable.WithLogger(b.logger),
 		forkable.WithFilters(bstream.StepIrreversible),
 		forkable.HoldBlocksUntilLIB(),
 		forkable.WithWarnOnUnlinkableBlocks(100), // don't warn too soon, sometimes oneBlockFiles are uploaded out of order from mindreader (on remote I/O)
