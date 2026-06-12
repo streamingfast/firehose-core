@@ -27,6 +27,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - Substreams: fix `Sinker.requestActiveStartBlock` not being set when the handler implements `SinkerSessionInitHandler`, which previously caused `ProgressMessageLastContiguousBlock` to be incorrect for production-mode mapper stages.
 - Substreams: detect reorgs in executed partial blocks even when the transaction hashes are identical. Previously a recomputed block whose only difference was its state (same, equally-ordered transactions) was not detected as replaced, so no reorg was triggered; more block fields are now validated to catch this.
 
+### Security
+
+- Docker: the runtime image now runs `apt-get upgrade` and clears the apt cache during build, pulling in available OS security patches (fixes `CVE-2026-45447` in `openssl`).
+
 ## v1.14.5
 
 ### Changed
