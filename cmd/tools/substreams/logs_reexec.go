@@ -72,6 +72,7 @@ The date-range argument(s) accept various formats:
 	cmd.MarkFlagRequired("gcp-project")
 
 	cmd.Flags().String("cursor", "", "Starting cursor, overrides the cursor from the log entry")
+	cmd.Flags().Bool("production-mode", true, "Override execution mode: 'true' forces production mode, 'false' forces development mode; when not provided, keeps the original request's mode")
 	cmd.Flags().Bool("insecure", false, "Allow insecure TLS connections to the endpoint")
 	cmd.Flags().Bool("plain-text", false, "Use unencrypted plain-text connection to the endpoint")
 	cmd.Flags().StringP("output", "o", "clock", "Output format for blocks: clock, json, or protojson")
@@ -90,6 +91,7 @@ func runReexec(ctx context.Context, args []string, cmd *cobra.Command, logger *z
 	stateStore := sflags.MustGetString(cmd, "state-store")
 	endpointFlag := sflags.MustGetString(cmd, "endpoint")
 	cursorFlag := sflags.MustGetString(cmd, "cursor")
+	productionModeFlag, productionModeFlagProvided := sflags.MustGetBoolProvided(cmd, "production-mode")
 	apiKey := sflags.MustGetString(cmd, "api-key")
 	if apiKey == "" {
 		apiKey = os.Getenv("SUBSTREAMS_API_KEY")
@@ -161,7 +163,12 @@ func runReexec(ctx context.Context, args []string, cmd *cobra.Command, logger *z
 	} else {
 		fmt.Printf("%s %s\n", stylex.Label("Stop block:"), stylex.Dim("open-ended"))
 	}
-	fmt.Printf("%s %v\n", stylex.Label("Production mode:"), req.ProductionMode)
+	if productionModeFlagProvided {
+		req.ProductionMode = productionModeFlag
+		fmt.Printf("%s %v %s\n", stylex.Label("Production mode:"), req.ProductionMode, stylex.Dim("(forced by --production-mode)"))
+	} else {
+		fmt.Printf("%s %v\n", stylex.Label("Production mode:"), req.ProductionMode)
+	}
 	fmt.Printf("%s %v\n", stylex.Label("Final blocks only:"), req.FinalBlocksOnly)
 	if req.Namespace != "" {
 		fmt.Printf("%s %s\n", stylex.Label("Namespace:"), stylex.Value(req.Namespace))

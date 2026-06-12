@@ -48,7 +48,15 @@ func (g *BlockGetter) Get(
 	)
 
 	// check for block in live segment: Hub
-	if g.hub != nil && num > g.hub.LowestBlockNum() {
+	//
+	// `LowestBlockNum()` is the lowest block still retained by the hub's forkable
+	// segment, so it is itself a valid block to serve from the hub. The comparison
+	// must be `>=` and not `>`: with `>`, a request for exactly the lowest retained
+	// block (which, on a freshly started chain, is the first streamable block) would
+	// skip the hub and fall through to the merged-blocks store. There, no merged
+	// bundle has been flushed yet, and the single-block fetcher waits indefinitely
+	// for a file that will not exist for a long time, hanging the Fetch RPC forever.
+	if g.hub != nil && num >= g.hub.LowestBlockNum() {
 		if blk := g.hub.GetBlock(num, id); blk != nil {
 			reqLogger.Info("single block request", zap.String("source", "hub"), zap.Bool("found", true))
 			return blk, nil
