@@ -15,10 +15,12 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - Bumped `dstore`: S3 store now suppresses the SDK's checksum validation warnings (sets `DisableLogOutputChecksumValidationSkipped` to `true`) and updates the AWS S3 SDK to a newer version.
 - Substreams: the tier1 job scheduler no longer slows down on very large reprocessings (100_000s of segments). `NextJob` and `AllStoresCompleted` used to rescan the whole completed-segment prefix on every scheduling event (O(segments²) over a run) and now advance a forward-only cursor (O(1) amortized). Progress reporting (`UpdateStats`) builds each stage's ranges in a single sort-free pass, the scheduler event loop drops per-message overhead (debug-state env var read once at startup, debug log fields built only when debug logging is enabled), and the cached-output streaming buffer appends and checks for flushing under a single lock per block.
 - Substreams: `SUBSTREAMS_STORE_SIZE_LIMIT` is now passed from tier1 to tier2; when set on tier1 it overrides the tier2 env var value.
+- `tools substreams logs connection`: the Request section now always shows the `Cursor:` field, displaying `None` when no cursor was provided.
 
 ### Added
 
 - Reader: two prometheus gauges to watch how close blocks read out of the node are to the `reader-node-line-buffer-size` hard limit: `reader_node_max_read_block_size_bytes` (high-water mark of the largest line/block read) and `reader_node_line_buffer_size_bytes` (the configured limit).
+- `tools substreams logs reexec`: new `--production-mode` flag to override the execution mode of the re-exec'ed request; when not provided, keeps the original request's mode, `--production-mode` forces production mode, `--production-mode=false` forces development mode.
 
 ### Fixed
 
