@@ -224,6 +224,8 @@ func printConnectionRequest(request, stats *logs.LogEntry) {
 				cur = cur[:24] + "..."
 			}
 			fmt.Printf("%s %s\n", stylex.Label("Cursor:"), stylex.Dim(cur))
+		} else {
+			fmt.Printf("%s %s\n", stylex.Label("Cursor:"), stylex.Dim("None"))
 		}
 		printField("User ID:", request.UserID)
 		printField("IP address:", request.IPAddress)
