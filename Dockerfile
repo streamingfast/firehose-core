@@ -15,7 +15,7 @@ FROM ubuntu:24.04
 ARG TARGETPLATFORM
 
 # gettext-base is needed for envsubst
-RUN apt-get update && apt-get -y install ca-certificates htop iotop sysstat strace lsof curl jq tzdata file gettext-base
+RUN apt-get update && apt-get -y upgrade && apt-get -y install ca-certificates htop iotop sysstat strace lsof curl jq tzdata file gettext-base && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
