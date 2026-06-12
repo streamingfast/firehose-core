@@ -109,6 +109,7 @@ func NewMultiplexedSource(handler bstream.Handler, sources []SourceAddr, maxSour
 			gate := bstream.NewRealtimeGate(maxSourceLatency, subHandler, bstream.GateOptionWithLogger(logger))
 			var upstreamHandler bstream.Handler
 			upstreamHandler = bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+				metrics.SourceHeadBlockTimeDrift.SetBlockTime(sourceName, blk.Timestamp.AsTime())
 				if ztrace.Enabled() {
 					logger.Debug("received block", zap.Uint64("number", blk.Number), zap.String("id", blk.Id), zap.Int64("latency_ms", time.Since(blk.Timestamp.AsTime()).Milliseconds()))
 				}
