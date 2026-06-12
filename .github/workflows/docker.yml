@@ -34,6 +34,7 @@ jobs:
 
       - name: Get Slack ID
         id: get-slack-id
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         run: |
           SLACK_IDS=$(echo "$SLACK_IDS" | sed 's/\\//g')
           SLACK_ID=$(echo "$SLACK_IDS" | jq -r '.["${{ github.actor }}"]')
@@ -118,7 +119,7 @@ jobs:
 
       - name: Get Job ID from GH API
         id: get_job_id
-        if: ${{ failure() }}
+        if: ${{ failure() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -127,7 +128,7 @@ jobs:
           echo "job_id=$job_id" >> $GITHUB_OUTPUT
 
       - name: Notify build failure on Slack
-        if: ${{ failure() }}
+        if: ${{ failure() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
         uses: Ilshidur/action-slack@2.1.0
