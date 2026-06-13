@@ -28,6 +28,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - Substreams: fix some edge cases with partial blocks that would prevent proper detection of invalid partials that need to be undone, or causing spurious UNDO events.
 - Substreams: fix `Sinker.requestActiveStartBlock` not being set when the handler implements `SinkerSessionInitHandler`, which previously caused `ProgressMessageLastContiguousBlock` to be incorrect for production-mode mapper stages.
 - Substreams: detect reorgs in executed partial blocks even when the transaction hashes are identical. Previously a recomputed block whose only difference was its state (same, equally-ordered transactions) was not detected as replaced, so no reorg was triggered; more block fields are now validated to catch this.
+- Logging: `processing block` (and other bstream forkable hub/forkable lines) are now logged under the owning component's logger (`relayer`, `firehose`, `merger`, ...) instead of all appearing under the generic `bstream` logger, making it possible to tell which component emitted each line. Requires bstream `hub.WithLogger`.
 
 ### Security
 
