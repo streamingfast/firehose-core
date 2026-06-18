@@ -6,7 +6,6 @@ import (
 	"maps"
 	"os"
 	"slices"
-	"strings"
 
 	"github.com/spf13/cobra"
 	firecore "github.com/streamingfast/firehose-core"
@@ -101,32 +100,4 @@ func collectSortedDescriptors() []*descriptorpb.FileDescriptorProto {
 	}
 
 	return result
-}
-
-// blockTypeNames returns the fully-qualified block type message names (e.g.
-// "sf.ethereum.type.v2.Block") for all well-known chain block types, sorted
-// alphabetically. Only packages under the "sf." namespace are included to
-// exclude dependency protos (e.g. Tron's internal core/Tron.proto "protocol"
-// package). This is informational; the export itself contains all files.
-func blockTypeNames() []string {
-	all := wkp.WellKnownProtos()
-	names := make([]string, 0, len(all))
-	seen := make(map[string]bool)
-	for _, d := range all {
-		pkg := d.GetPackage()
-		if !strings.HasPrefix(pkg, "sf.") {
-			continue
-		}
-		for _, msg := range d.MessageType {
-			if msg.GetName() == "Block" {
-				fqn := pkg + ".Block"
-				if !seen[fqn] {
-					seen[fqn] = true
-					names = append(names, fqn)
-				}
-			}
-		}
-	}
-	slices.Sort(names)
-	return names
 }

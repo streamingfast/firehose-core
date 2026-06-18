@@ -3,7 +3,6 @@ package wkp
 import (
 	"os"
 	"path/filepath"
-	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -113,22 +112,6 @@ func TestDescriptorsTopologicalOrder(t *testing.T) {
 				"dependency %q must appear before %q", dep, d.GetName())
 		}
 	}
-}
-
-// TestDescriptorsBlockTypeNames verifies that blockTypeNames returns the expected
-// fully-qualified "Block" message names for the embedded chain protos.
-func TestDescriptorsBlockTypeNames(t *testing.T) {
-	names := blockTypeNames()
-	require.NotEmpty(t, names)
-
-	// Ethereum is the primary consumer target — must always be present.
-	assert.True(t, slices.Contains(names, "sf.ethereum.type.v2.Block"),
-		"sf.ethereum.type.v2.Block must be in the block type list, got: %v", names)
-
-	// Names must be sorted.
-	sorted := slices.Clone(names)
-	slices.Sort(sorted)
-	assert.Equal(t, sorted, names, "block type names must be alphabetically sorted")
 }
 
 // TestDescriptorsWriteToFile verifies end-to-end: collect → marshal → write → read back.
