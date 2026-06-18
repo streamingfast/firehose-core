@@ -23,8 +23,11 @@ import (
 	"testing"
 	"time"
 
-	dockercontainer "github.com/docker/docker/api/types/container"
+	"net/netip"
+
 	"github.com/docker/go-connections/nat"
+	dockercontainer "github.com/moby/moby/api/types/container"
+	dockernetwork "github.com/moby/moby/api/types/network"
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dgrpc"
@@ -302,9 +305,9 @@ func startReaderNodeContainer(t *testing.T, ctx context.Context, tmpDir string, 
 		ExposedPorts: []string{string(containerPort)},
 		HostConfigModifier: func(hc *dockercontainer.HostConfig) {
 			// Fix the host-side binding so stop+start reuses the same port.
-			hc.PortBindings = nat.PortMap{
-				containerPort: []nat.PortBinding{
-					{HostIP: "127.0.0.1", HostPort: fmt.Sprintf("%d", readerHostPort)},
+			hc.PortBindings = dockernetwork.PortMap{
+				dockernetwork.MustParsePort(string(containerPort)): []dockernetwork.PortBinding{
+					{HostIP: netip.MustParseAddr("127.0.0.1"), HostPort: fmt.Sprintf("%d", readerHostPort)},
 				},
 			}
 			hc.Binds = []string{
@@ -315,7 +318,7 @@ func startReaderNodeContainer(t *testing.T, ctx context.Context, tmpDir string, 
 			}
 		},
 		WaitingFor: wait.ForAll(
-			wait.ForListeningPort(containerPort),
+			wait.ForListeningPort(string(containerPort)),
 			wait.ForLog("serving gRPC").WithStartupTimeout(30*time.Second),
 		),
 	}
