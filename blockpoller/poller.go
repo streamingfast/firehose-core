@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -49,7 +50,7 @@ type BlockPoller[C any] struct {
 
 	optimisticallyPolledBlocks map[uint64]*BlockItem
 
-	fetching                       bool
+	fetching                       atomic.Bool
 	optimisticallyPolledBlocksLock sync.Mutex
 }
 
@@ -333,7 +334,7 @@ func (p *BlockPoller[C]) loadNextBlocks(requestedBlock uint64, numberOfBlockToFe
 
 	<-done
 
-	p.fetching = false
+	p.fetching.Store(false)
 
 	if nailer.Err() != nil {
 		return fmt.Errorf("failed optimistically fetch blocks starting at %d: %w", requestedBlock, nailer.Err())
@@ -355,12 +356,11 @@ func (p *BlockPoller[C]) requestBlock(blockNumber uint64, numberOfBlockToFetch i
 		blockItem, found := p.optimisticallyPolledBlocks[blockNumber]
 		p.optimisticallyPolledBlocksLock.Unlock()
 		if !found {
-			if !p.fetching {
+			if p.fetching.CompareAndSwap(false, true) {
 				go func() {
 					p.optimisticallyPolledBlocksLock.Lock()
 					p.optimisticallyPolledBlocks = map[uint64]*BlockItem{}
 					p.optimisticallyPolledBlocksLock.Unlock()
-					p.fetching = true
 					err := p.loadNextBlocks(blockNumber, numberOfBlockToFetch)
 					if err != nil {
 						p.Shutdown(err)
