@@ -161,6 +161,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			config.QuickSaveStoreURL = viper.GetString("substreams-tier1-quicksave-store")
 			config.FoundationalStoresConfigPath = viper.GetString("substreams-tier1-foundational-stores-config-path")
 			config.OutputBufferSize = viper.GetUint64("substreams-tier1-output-buffer-size")
+			config.StoresScratchSpace = viper.GetString("substreams-stores-scratch-space")
 
 			sessionPlugin := viper.GetString("common-session-plugin")
 			sessionPool, err := dsession.New(sessionPlugin, appLogger)
