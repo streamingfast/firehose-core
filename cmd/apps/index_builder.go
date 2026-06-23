@@ -75,7 +75,7 @@ func RegisterIndexBuilderApp[B firecore.Block](chain *firecore.Chain[B], rootLog
 			handler := bstream.HandlerFunc(func(blk *pbbstream.Block, _ interface{}) error {
 				var b = chain.BlockFactory()
 				if err := blk.Payload.UnmarshalTo(b); err != nil {
-					return err
+					return fmt.Errorf("unmarshalling block #%d (%s) payload (%s): %w", blk.Number, blk.Id, blk.Payload.TypeUrl, err)
 				}
 				return indexer.ProcessBlock(any(b).(B))
 			})
