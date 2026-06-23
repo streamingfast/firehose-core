@@ -38,6 +38,7 @@ require (
 	github.com/streamingfast/logging v1.2.2
 	github.com/streamingfast/payment-gateway v0.0.0-20260527144655-d0576d2a4ee3
 	github.com/streamingfast/pbgo v0.0.6-0.20260206150405-2b95acf70437
+	github.com/streamingfast/protox v0.0.0-20260610151242-cd8a8cf98c45
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
 	github.com/streamingfast/substreams v1.18.6-0.20260612185556-609bd2f621f2
 	github.com/stretchr/testify v1.11.1
@@ -45,7 +46,7 @@ require (
 	github.com/testcontainers/testcontainers-go v0.42.0
 	go.opentelemetry.io/otel v1.43.0
 	go.uber.org/multierr v1.11.0
-	go.uber.org/zap v1.27.1
+	go.uber.org/zap v1.28.0
 	golang.org/x/exp v0.0.0-20250813145105-42675adae3e6
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11

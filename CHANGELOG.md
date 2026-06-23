@@ -19,6 +19,11 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Removed vulnerable `github.com/docker/docker` dependency (GHSA-x744-4wpc-v9h2, GHSA-x86f-5xw2-fm2r, GHSA-rg2x-37c3-w2rh). Upgraded `testcontainers-go` to v0.42.0 (which uses `github.com/moby/moby/api` instead) and updated the single import in `relayer/relayer_e2e_test.go` from `github.com/docker/docker/api/types/container` to `github.com/moby/moby/api/types/container`.
 
+### Added
+
+- Add `pb/firehose/options.proto` defining `(firehose.transactions)` and `(firehose.nondeterministic)` custom `FieldOptions` extensions for annotating Block proto fields with semantic meaning (transaction list and non-deterministic values).
+- Add `fireproto` package providing `WalkNonDeterministicFields`, `ClearNonDeterministicFields`, and `FindTransactionsField` utilities for walking and manipulating proto fields annotated with the `(firehose.nondeterministic)` and `(firehose.transactions)` field extensions.
+
 ### Changed
 
 - `index-builder`: block payload unmarshalling errors now include the block number, block ID and payload type (previously a bare `proto: cannot parse invalid wire-format data` with no way to locate the offending block/bundle).
