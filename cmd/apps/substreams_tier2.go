@@ -48,6 +48,7 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().String("substreams-tier2-discovery-service-url", "", "URL to advertise presence to the grpc discovery service") //traffic-director://xds?vpc_network=vpc-global&use_xds_reds=true
 			cmd.Flags().Uint64("substreams-tier2-max-concurrent-requests", 0, "Maximum number of concurrent requests allowed on the server. When the tier2 service hits this limit, it will set itself as 'Not Ready' until requests are processed. Default 0 (no limit)")
 			cmd.Flags().Duration("substreams-tier2-segment-execution-timeout", time.Hour, "Maximum duration a segment can take to execute before being forcefully stopped with DeadlineExceeded error")
+			cmd.Flags().String("substreams-tier2-hosted-store-registry-address", "", "gRPC address of the control-plane registry service used to resolve hosted foundational stores (legacy/current stores continue to use the JSON config path)")
 			// all substreams
 			registerCommonSubstreamsFlags(cmd)
 			return nil
@@ -106,6 +107,7 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 			config.BlockExecutionTimeout = executionTimeout
 			config.SegmentExecutionTimeout = segmentExecutionTimeout
 			config.MaximumConcurrentRequests = maximumConcurrentRequests
+			config.HostedStoreRegistryAddress = viper.GetString("substreams-tier2-hosted-store-registry-address")
 
 			return app.NewTier2(appLogger,
 				config,
