@@ -113,10 +113,20 @@ func (c *TestModeComparator) Close() error {
 	return nil
 }
 
+// libLagWarnThreshold is the maximum number of blocks the LIB (last final block)
+// may lag behind the head block before test mode emits a prominent warning.
+// Beyond libLagErrorThreshold the lag is escalated to a prominent error.
+const (
+	libLagWarnThreshold  = 65  // eth-mainnet finality is 64
+	libLagErrorThreshold = 201 // we have override usually at 200 for unset...
+)
+
 func (c *TestModeComparator) CompareBlock(ctx context.Context, testingBlock *pbbstream.Block) error {
 	// Track metrics - increment total blocks seen
 	TestModeBlocksSeen.Inc()
 	defer c.updatePercentageMetrics()
+
+	c.checkLIB(testingBlock)
 
 	// Fetch the production block from the remote endpoint
 	req := &pbfirehose.SingleBlockRequest{
@@ -211,6 +221,40 @@ func (c *TestModeComparator) CompareBlock(ctx context.Context, testingBlock *pbb
 	TestModeBlocksCompared.Inc()
 	TestModeBlocksComparedMismatched.Inc()
 	return c.generateDiff(testingBlock.Number, testingBlock.Id, testingChainBlock, productionChainBlock)
+}
+
+// checkLIB validates the LIB (last final block) of an output block and emits a
+// prominent error when it is 0, or a prominent warning when it lags more than
+// libLagWarnThreshold blocks behind the head block.
+func (c *TestModeComparator) checkLIB(block *pbbstream.Block) {
+	if block.LibNum == 0 {
+		fmt.Printf("\n🛑🛑🛑 ERROR: output block %d (%s) has a LIB (last final block) of 0 🛑🛑🛑\n\n", block.Number, block.Id)
+		c.logger.Error("output block has a LIB (last final block) of 0",
+			zap.Uint64("block_num", block.Number),
+			zap.String("block_id", block.Id),
+		)
+		return
+	}
+
+	lag := block.Number - block.LibNum
+	switch {
+	case lag > libLagErrorThreshold:
+		fmt.Printf("\n🛑🛑🛑 ERROR: output block %d has LIB %d lagging %d blocks behind head (threshold %d) 🛑🛑🛑\n\n", block.Number, block.LibNum, lag, libLagErrorThreshold)
+		c.logger.Error("output block LIB lags far behind head",
+			zap.Uint64("block_num", block.Number),
+			zap.Uint64("lib_num", block.LibNum),
+			zap.Uint64("lag", lag),
+			zap.Uint64("threshold", libLagErrorThreshold),
+		)
+	case lag > libLagWarnThreshold:
+		fmt.Printf("\n⚠️⚠️⚠️  WARNING: output block %d has LIB %d lagging %d blocks behind head (threshold %d) ⚠️⚠️⚠️\n\n", block.Number, block.LibNum, lag, libLagWarnThreshold)
+		c.logger.Warn("output block LIB lags far behind head",
+			zap.Uint64("block_num", block.Number),
+			zap.Uint64("lib_num", block.LibNum),
+			zap.Uint64("lag", lag),
+			zap.Uint64("threshold", libLagWarnThreshold),
+		)
+	}
 }
 
 func (c *TestModeComparator) generateDiff(
