@@ -10,5 +10,6 @@
 firehose-data*
 /.fleet/settings.json
 /firecore
+/generator
 /firehose.yaml
 .claude

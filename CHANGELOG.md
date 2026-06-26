@@ -8,10 +8,20 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.14.6
+
+### Added
+
+- `tools wkp descriptors [output-file]`: new command that exports all well-known blockchain protobuf descriptors as a self-contained, serialized `google.protobuf.FileDescriptorSet` (binary wire format). The set includes every transitive import (google/protobuf/* well-known types included) so consumers can build a descriptor registry with no external resolution. Output is deterministic (stable topological + alphabetical ordering) enabling "is it up to date?" CI checks via a regenerate-and-diff workflow. Use `-` as `output-file` to write to stdout; the default output name is `well-known-descriptors.binpb`.
+- `proto/generator`: switched from the BSR Reflection v1beta1 API to the BSR HTTP descriptor endpoint (`/descriptor/<ref>?source_info=true`). Regenerated WKP files will now embed `source_code_info` (proto field/message comments), enabling documentation renderers and tooling that reads comment annotations. Authentication via `BUFBUILD_AUTH_TOKEN` is now optional for public modules (a warning is emitted when the token is absent).
+
+### Fixed
+
+- Removed vulnerable `github.com/docker/docker` dependency (GHSA-x744-4wpc-v9h2, GHSA-x86f-5xw2-fm2r, GHSA-rg2x-37c3-w2rh). Upgraded `testcontainers-go` to v0.42.0 (which uses `github.com/moby/moby/api` instead) and updated the single import in `relayer/relayer_e2e_test.go` from `github.com/docker/docker/api/types/container` to `github.com/moby/moby/api/types/container`.
 
 ### Changed
 
+- `index-builder`: block payload unmarshalling errors now include the block number, block ID and payload type (previously a bare `proto: cannot parse invalid wire-format data` with no way to locate the offending block/bundle).
 - Bumped `dstore`: S3 store now suppresses the SDK's checksum validation warnings (sets `DisableLogOutputChecksumValidationSkipped` to `true`) and updates the AWS S3 SDK to a newer version.
 - Substreams: the tier1 job scheduler no longer slows down on very large reprocessings (100_000s of segments). `NextJob` and `AllStoresCompleted` used to rescan the whole completed-segment prefix on every scheduling event (O(segments²) over a run) and now advance a forward-only cursor (O(1) amortized). Progress reporting (`UpdateStats`) builds each stage's ranges in a single sort-free pass, the scheduler event loop drops per-message overhead (debug-state env var read once at startup, debug log fields built only when debug logging is enabled), and the cached-output streaming buffer appends and checks for flushing under a single lock per block.
 - Substreams: `SUBSTREAMS_STORE_SIZE_LIMIT` is now passed from tier1 to tier2; when set on tier1 it overrides the tier2 env var value.
@@ -30,6 +40,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - Substreams: fix `Sinker.requestActiveStartBlock` not being set when the handler implements `SinkerSessionInitHandler`, which previously caused `ProgressMessageLastContiguousBlock` to be incorrect for production-mode mapper stages.
 - Substreams: detect reorgs in executed partial blocks even when the transaction hashes are identical. Previously a recomputed block whose only difference was its state (same, equally-ordered transactions) was not detected as replaced, so no reorg was triggered; more block fields are now validated to catch this.
 - Logging: `processing block` (and other bstream forkable hub/forkable lines) are now logged under the owning component's logger (`relayer`, `firehose`, `merger`, ...) instead of all appearing under the generic `bstream` logger, making it possible to tell which component emitted each line. Requires bstream `hub.WithLogger`.
+- `rpc`: `WithClientsContext` no longer holds the clients lock for the duration of the fetch callback, only while selecting a client. Holding it across the call serialized all concurrent callers, which made the block poller's parallel prefetching (`blockFetchBatchSize > 1`) run sequentially. The poller's in-flight fetch flag is now an `atomic.Bool`, fixing a data race on the parallel-fetch path.
 
 ### Security
 
