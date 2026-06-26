@@ -29,6 +29,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
+- Firehose: new `--firehose-discard-partial-blocks` flag (default `false`). When enabled, partial (flash) blocks coming from the live source are dropped before reaching the forkable hub, so the hub head only ever holds real blocks. Useful on chains with flash/partial blocks where the firehose app flaps (`cannot link block after reconnection, restart required`): partial blocks are never written to the one-block store, so after a live-source reconnection the hub cannot re-link a partial head and shuts down. This is a mitigation/experiment knob — it disables flash-block serving on that firehose instance.
 - Reader: two prometheus gauges to watch how close blocks read out of the node are to the `reader-node-line-buffer-size` hard limit: `reader_node_max_read_block_size_bytes` (high-water mark of the largest line/block read) and `reader_node_line_buffer_size_bytes` (the configured limit).
 - `tools substreams logs reexec`: new `--production-mode` flag to override the execution mode of the re-exec'ed request; when not provided, keeps the original request's mode, `--production-mode` forces production mode, `--production-mode=false` forces development mode.
 
