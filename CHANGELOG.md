@@ -8,6 +8,19 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleases
+
+### Changed
+
+- Bumped to [substreams@v1.19.0]()
+  - Server: `tier1` forkable hub now logs under the `tier1` logger instead of the generic `bstream` package logger, so `processing block` (and related hub) log lines are correctly attributed to the component (requires bstream `hub.WithLogger`).
+  - Server: per-block execution timeouts (`--substreams-block-execution-timeout`) are no longer silently swallowed when a WASM host-function panic (e.g. wasmtime) coincides with the deadline. Previously, `recoverExecutionPanic` would return `nil` instead of `CodeDeadlineExceeded`, causing the offending block to be skipped and the stream to complete successfully.
+  - added more metrics to identify time spent squashing
+  - Server: the tier1 job scheduler no longer slows down on very large reprocessings (100_000s of segments). Both `NextJob` and `AllStoresCompleted` used to rescan the whole completed-segment prefix on every scheduling event, making job selection O(segments²) over a run; they now advance a forward-only cursor and are O(1) amortized.
+  - Server: `UpdateStats` (progress reporting) now builds each stage's ranges in a single sort-free pass instead of one map+sort per stage every second.
+  - Server: removed per-message overhead in the scheduler event loop — the debug-state env var is read once at startup instead of on every message, and the per-message debug log no longer builds its fields when debug logging is disabled.
+  - Server: the cached-output streaming buffer now appends and checks for flushing under a single lock per block.
+
 ## v1.14.6
 
 ### Added
