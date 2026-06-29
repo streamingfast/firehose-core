@@ -44,6 +44,8 @@ type Config struct {
 
 	PruneForkedBlocksAfter uint64
 
+	PruneOneBlockFilesAfter uint64
+
 	TimeBetweenPruning time.Duration
 	TimeBetweenPolling time.Duration
 	StopBlock          uint64
@@ -107,6 +109,7 @@ func (a *App) Run() error {
 		bstream.GetProtocolFirstStreamableBlock,
 		bundleSize,
 		a.config.PruneForkedBlocksAfter,
+		a.config.PruneOneBlockFilesAfter,
 		a.config.TimeBetweenPruning,
 		a.config.TimeBetweenPolling,
 		a.config.StopBlock,

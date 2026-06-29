@@ -21,6 +21,7 @@ func RegisterMergerApp(rootLog *zap.Logger) {
 			cmd.Flags().String("merger-grpc-listen-addr", firecore.MergerServingAddr, "Address to listen for incoming gRPC requests")
 			cmd.Flags().String("merger-http-healthz-addr", firecore.MergerHTTPHealthzAddr, "Address to listen on for the HTTP /healthz endpoint. Set to an empty string to disable. Returns 200 when ready, 503 otherwise.")
 			cmd.Flags().Uint64("merger-prune-forked-blocks-after", 50000, "Number of blocks that must pass before we delete old forks (one-block-files lingering)")
+			cmd.Flags().Uint64("merger-prune-one-block-files-after", 100, "Number of blocks below the last merged block after which we delete merged one-block-files. Increase so a relayer/firehose that fell behind can still bridge the gap and relink (clamped to 100 minimum)")
 			cmd.Flags().Uint64("merger-stop-block", 0, "If non-zero, merger will trigger shutdown when blocks have been merged up to this block")
 			cmd.Flags().Duration("merger-time-between-store-lookups", 1*time.Second, "Delay between source store polling (should be higher for remote storage)")
 			cmd.Flags().Duration("merger-time-between-store-pruning", time.Minute, "Delay between source store pruning loops")
@@ -38,6 +39,7 @@ func RegisterMergerApp(rootLog *zap.Logger) {
 				GRPCListenAddr:               viper.GetString("merger-grpc-listen-addr"),
 				HTTPHealthzListenAddr:        viper.GetString("merger-http-healthz-addr"),
 				PruneForkedBlocksAfter:       viper.GetUint64("merger-prune-forked-blocks-after"),
+				PruneOneBlockFilesAfter:      viper.GetUint64("merger-prune-one-block-files-after"),
 				StorageOneBlockFilesPath:     oneBlocksStoreURL,
 				StorageMergedBlocksFilesPath: mergedBlocksStoreURL,
 				StorageForkedBlocksFilesPath: forkedBlocksStoreURL,
