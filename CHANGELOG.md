@@ -8,6 +8,14 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Changed
+
+- Bumped `substreams` to latest `develop`.
+  - Server: `tier1` calls to hosted foundational stores now forward the `x-organization-id` identity header (alongside the existing trusted headers), so a store's internal trust-based listener can authorize the request without an end-user JWT. This fixes `Unauthenticated: required authorization token not found` errors when reading from hosted foundational stores resolved via the control-plane registry.
+  - Server: foundational store calls that fail with authentication errors, organization id mismatch, or prolonged unreachability now bubble up to the user as a non-deterministic (uncached) error instead of retrying until the global deadline. Transient unavailability is still retried (~30s) to absorb blips and rolling restarts.
+
 ## v1.15.0
 
 ### Changed
