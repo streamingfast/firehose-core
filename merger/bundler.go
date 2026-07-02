@@ -93,8 +93,11 @@ func NewBundler(startBlock, stopBlock, firstStreamableBlock, bundleSize uint64, 
 // this is used to determine what we can safely delete from the one-block store
 func (b *Bundler) getSafeBaseBlockNum() uint64 {
 	b.Lock()
-	defer b.Unlock()
 	out := b.baseBlockNum
+	b.Unlock()
+
+	b.inFlightMu.Lock()
+	defer b.inFlightMu.Unlock()
 	for inflight := range b.inFlightBundles {
 		if inflight < out {
 			out = inflight
@@ -148,6 +151,7 @@ func (b *Bundler) forkedBlocksInCurrentBundle() (out []*bstream.OneBlockFile) {
 
 func (b *Bundler) Reset(nextBase uint64, lib bstream.BlockRef) {
 	options := []forkable.Option{
+		forkable.WithLogger(b.logger),
 		forkable.WithFilters(bstream.StepIrreversible),
 		forkable.HoldBlocksUntilLIB(),
 		forkable.WithWarnOnUnlinkableBlocks(100), // don't warn too soon, sometimes oneBlockFiles are uploaded out of order from mindreader (on remote I/O)

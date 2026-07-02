@@ -115,7 +115,9 @@ func Main[B firecore.Block](chain *firecore.Chain[B]) {
 			  Service ports:
 			    --firehose-grpc-listen-addr          :10015
 			    --merger-grpc-listen-addr             :10012
+			    --merger-http-healthz-addr            :10013
 			    --relayer-grpc-listen-addr            :10014
+			    --relayer-http-healthz-addr           :10018
 			    --reader-node-grpc-listen-addr        :10010
 			    --reader-node-manager-api-addr        :10011
 			    --substreams-tier1-grpc-listen-addr   :10016

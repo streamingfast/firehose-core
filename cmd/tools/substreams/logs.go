@@ -23,6 +23,7 @@ func NewToolsLogsCmd(logger *zap.Logger) *cobra.Command {
 Note: Currently only GCP Cloud Logging backend is supported.`,
 	}
 
+	cmd.AddCommand(NewToolsLogsConnectionCmd(logger))
 	cmd.AddCommand(NewToolsLogsConnectionsCmd(logger))
 	cmd.AddCommand(NewToolsLogsReexecCmd(logger))
 

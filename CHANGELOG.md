@@ -10,14 +10,101 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Changed
+
+- Bumped `substreams` to latest `develop`.
+  - Server: `tier1` calls to hosted foundational stores now forward the `x-organization-id` identity header (alongside the existing trusted headers), so a store's internal trust-based listener can authorize the request without an end-user JWT. This fixes `Unauthenticated: required authorization token not found` errors when reading from hosted foundational stores resolved via the control-plane registry.
+  - Server: foundational store calls that fail with authentication errors, organization id mismatch, or prolonged unreachability now bubble up to the user as a non-deterministic (uncached) error instead of retrying until the global deadline. Transient unavailability is still retried (~30s) to absorb blips and rolling restarts.
+
+## v1.15.0
+
+### Changed
+
+- Bumped to [substreams@v1.19.0](https://github.com/streamingfast/substreams/releases/tag/v1.19.0)
+  - Server: `tier1` forkable hub now logs under the `tier1` logger instead of the generic `bstream` package logger, so `processing block` (and related hub) log lines are correctly attributed to the component (requires bstream `hub.WithLogger`).
+  - Server: per-block execution timeouts (`--substreams-block-execution-timeout`) are no longer silently swallowed when a WASM host-function panic (e.g. wasmtime) coincides with the deadline. Previously, `recoverExecutionPanic` would return `nil` instead of `CodeDeadlineExceeded`, causing the offending block to be skipped and the stream to complete successfully.
+  - added more metrics to identify time spent squashing
+  - Server: the tier1 job scheduler no longer slows down on very large reprocessings (100_000s of segments). Both `NextJob` and `AllStoresCompleted` used to rescan the whole completed-segment prefix on every scheduling event, making job selection O(segments²) over a run; they now advance a forward-only cursor and are O(1) amortized.
+  - Server: `UpdateStats` (progress reporting) now builds each stage's ranges in a single sort-free pass instead of one map+sort per stage every second.
+  - Server: removed per-message overhead in the scheduler event loop — the debug-state env var is read once at startup instead of on every message, and the per-message debug log no longer builds its fields when debug logging is disabled.
+  - Server: the cached-output streaming buffer now appends and checks for flushing under a single lock per block.
+
+## v1.14.6
+
 ### Added
 
+- `tools wkp descriptors [output-file]`: new command that exports all well-known blockchain protobuf descriptors as a self-contained, serialized `google.protobuf.FileDescriptorSet` (binary wire format). The set includes every transitive import (google/protobuf/* well-known types included) so consumers can build a descriptor registry with no external resolution. Output is deterministic (stable topological + alphabetical ordering) enabling "is it up to date?" CI checks via a regenerate-and-diff workflow. Use `-` as `output-file` to write to stdout; the default output name is `well-known-descriptors.binpb`.
+- `proto/generator`: switched from the BSR Reflection v1beta1 API to the BSR HTTP descriptor endpoint (`/descriptor/<ref>?source_info=true`). Regenerated WKP files will now embed `source_code_info` (proto field/message comments), enabling documentation renderers and tooling that reads comment annotations. Authentication via `BUFBUILD_AUTH_TOKEN` is now optional for public modules (a warning is emitted when the token is absent).
+
+### Fixed
+
+- Removed vulnerable `github.com/docker/docker` dependency (GHSA-x744-4wpc-v9h2, GHSA-x86f-5xw2-fm2r, GHSA-rg2x-37c3-w2rh). Upgraded `testcontainers-go` to v0.42.0 (which uses `github.com/moby/moby/api` instead) and updated the single import in `relayer/relayer_e2e_test.go` from `github.com/docker/docker/api/types/container` to `github.com/moby/moby/api/types/container`.
+
+### Changed
+
+- `index-builder`: block payload unmarshalling errors now include the block number, block ID and payload type (previously a bare `proto: cannot parse invalid wire-format data` with no way to locate the offending block/bundle).
+- Bumped `dstore`: S3 store now suppresses the SDK's checksum validation warnings (sets `DisableLogOutputChecksumValidationSkipped` to `true`) and updates the AWS S3 SDK to a newer version.
+- Substreams: the tier1 job scheduler no longer slows down on very large reprocessings (100_000s of segments). `NextJob` and `AllStoresCompleted` used to rescan the whole completed-segment prefix on every scheduling event (O(segments²) over a run) and now advance a forward-only cursor (O(1) amortized). Progress reporting (`UpdateStats`) builds each stage's ranges in a single sort-free pass, the scheduler event loop drops per-message overhead (debug-state env var read once at startup, debug log fields built only when debug logging is enabled), and the cached-output streaming buffer appends and checks for flushing under a single lock per block.
+- Substreams: `SUBSTREAMS_STORE_SIZE_LIMIT` is now passed from tier1 to tier2; when set on tier1 it overrides the tier2 env var value.
+- `tools substreams logs connection`: the Request section now always shows the `Cursor:` field, displaying `None` when no cursor was provided.
+
+### Added
+
+- Firehose: new `--firehose-discard-partial-blocks` flag (default `false`). When enabled, partial (flash) blocks coming from the live source are dropped before reaching the forkable hub, so the hub head only ever holds real blocks. Useful on chains with flash/partial blocks where the firehose app flaps (`cannot link block after reconnection, restart required`): partial blocks are never written to the one-block store, so after a live-source reconnection the hub cannot re-link a partial head and shuts down. This is a mitigation/experiment knob — it disables flash-block serving on that firehose instance.
+- Reader: two prometheus gauges to watch how close blocks read out of the node are to the `reader-node-line-buffer-size` hard limit: `reader_node_max_read_block_size_bytes` (high-water mark of the largest line/block read) and `reader_node_line_buffer_size_bytes` (the configured limit).
+- `tools substreams logs reexec`: new `--production-mode` flag to override the execution mode of the re-exec'ed request; when not provided, keeps the original request's mode, `--production-mode` forces production mode, `--production-mode=false` forces development mode.
+
+### Fixed
+
+- Firehose: fix `sf.firehose.v2.Fetch/Block` hanging until merged bundle is created when requesting the first streamable block on a freshly started chain. The single-block handler used a strict `>` comparison against the hub's lowest retained block, so a request for exactly that block (the first streamable block at startup) skipped the live hub and fell through to the merged-blocks store, where it waited indefinitely for a merged bundle that had not been flushed yet. The comparison is now `>=`, so the lowest retained block is served from the hub.
+- Substreams: fix some edge cases with partial blocks that would prevent proper detection of invalid partials that need to be undone, or causing spurious UNDO events.
+- Substreams: fix `Sinker.requestActiveStartBlock` not being set when the handler implements `SinkerSessionInitHandler`, which previously caused `ProgressMessageLastContiguousBlock` to be incorrect for production-mode mapper stages.
+- Substreams: detect reorgs in executed partial blocks even when the transaction hashes are identical. Previously a recomputed block whose only difference was its state (same, equally-ordered transactions) was not detected as replaced, so no reorg was triggered; more block fields are now validated to catch this.
+- Logging: `processing block` (and other bstream forkable hub/forkable lines) are now logged under the owning component's logger (`relayer`, `firehose`, `merger`, ...) instead of all appearing under the generic `bstream` logger, making it possible to tell which component emitted each line. Requires bstream `hub.WithLogger`.
+- `rpc`: `WithClientsContext` no longer holds the clients lock for the duration of the fetch callback, only while selecting a client. Holding it across the call serialized all concurrent callers, which made the block poller's parallel prefetching (`blockFetchBatchSize > 1`) run sequentially. The poller's in-flight fetch flag is now an `atomic.Bool`, fixing a data race on the parallel-fetch path.
+
+### Security
+
+- Docker: the runtime image now runs `apt-get upgrade` and clears the apt cache during build, pulling in available OS security patches (fixes `CVE-2026-45447` in `openssl`).
+
+## v1.14.5
+
+### Changed
+
+- `reader-node-firehose`: if the persisted cursor in the state file points to a block older than `--reader-node-start-block-num`, the cursor is now discarded (with a warning log) and the syncer restarts from the configured start block. Previously the stale cursor was always honored.
+- Bumped `golang.org/x/net` to `v0.55.0` and `golang.org/x/crypto` to `v0.52.0` (along with `x/sys`, `x/term` and `x/text`) to pick up the latest security fixes.
+
+### Fixed
+
+- Substreams: fix tier1 not forwarding the subrequest secret key to tier2 in the live backfiller, which could cause backfill jobs to fail authentication against tier2 when the tier2 secret key was configured.
+- Substreams: per-block execution timeouts are now surfaced as a `DeadlineExceeded` gRPC error instead of being silently swallowed (and the affected block dropped). Previously a deadline-exceeded panic during block execution could be caught by the generic context-cancelled handler, so the timeout was hidden and the block silently skipped.
+- Substreams: stop the `progressBlockRate` janitor goroutine when closing the sink stats, fixing a goroutine leak.
+- `payment-gateway`: fix a nil-pointer panic in session `Release` when `sessionInfo` is `nil`.
+
+### Added
+
+- `tools relayer write-one-blocks` New command to write one-block-files directly from the relayer. Can write partial blocks too, for comparing.
+- `tools check one-blocks`: New command that walks one-block files in streaming mode and reports issues inline as they are detected: available block ranges (printed as `✅ Available blocks in range [#X to #Y]`), missing block ranges (printed as `❌ Missing blocks in range [#X to #Y]`), forks (multiple distinct IDs at the same height), and parent-chain continuity breaks. Available and missing ranges are printed interleaved so the full picture of which blocks exist and which are absent is immediately visible. Uses the finalized block number (`LibNum`) embedded in each file to prune internal state so it does not grow infinitely. Progress is reported with an automatic ladder (every 10K below 100K processed, every 100K below 500K, every 500K below 1M, then every 1M); pass `--progress-each N` to override with a fixed cadence. The final summary ends with a colour-coded `Status : ok` (green) or `Status : broken` (red) line.
+- Substreams: added more metrics to identify time spent squashing
+
+## v1.14.4
+
+### Removed from docker image
+
+- The 'grpc_health_probe' binary is no longer included in the docker image. You can use the HTTP '/healthz' endpoints instead or use your own GRPC poller.
+
+### Added
+
+- `merger` and `relayer` now expose an HTTP `/healthz` endpoint on a dedicated port via the new `--merger-http-healthz-addr` (default `:10013`) and `--relayer-http-healthz-addr` (default `:10018`) flags. Set the flag to an empty string to disable. The endpoint returns HTTP 200 when the service is ready and 503 otherwise (including during the `common-system-shutdown-signal-delay` graceful-shutdown window).
 - Config file now supports a `global:` section for setting persistent (global) flags such as `shift-ports`, `log-format`, `log-to-file`, etc. These flags can also still be set under the command-specific section (e.g. `start.flags`), but `global:` is more intuitive for flags that apply regardless of command.
 - `tools compare-blocks`: A single block number (e.g. `2713`) is now accepted as the range argument, automatically expanding to the 100-block bundle that contains that block (e.g. `2700:2799`).
+- Substreams **Index optimisation**: Optimized `ClockDistributor` to skip blocks earlier and faster when using block filter.
+- Substreams: add substreams_tier2_max_concurrent_requests and substreams_tier1_active_requests_hard_limit metrics to prometheus
 
 ### Fixed
 
 - `tools substreams store-size`: Fix `N/A` shown for all stores. For local state stores, the compressed file size is now displayed as a fallback when no uncompressed metadata is available. For GCS state stores, the compressed size is now returned even when files lack `datasize` metadata, and both `.kv` and `.kv.zst` file extensions are now accepted. The "Live (uncompressed)" column is renamed to "Live Size" and now shows "Not found" when no state exists for a module. The computed module hash is shown in the table for easy manual GCS path verification. A warning is shown when no state data is found for any module, hinting at a possible wrong `--state-store` URL.
+- Substreams: Fix server-side bug that would cause Blocks request to fail after a few retries with 'load full store (...) load store stream: opening file for streaming: not found' when depending on a store that is being merged slowly
 
 ### Changed
 

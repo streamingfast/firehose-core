@@ -27,6 +27,7 @@ import (
 	dgrpcfactory "github.com/streamingfast/dgrpc/server/factory"
 	nodeManager "github.com/streamingfast/firehose-core/node-manager"
 	logplugin "github.com/streamingfast/firehose-core/node-manager/log_plugin"
+	"github.com/streamingfast/firehose-core/node-manager/metrics"
 	"github.com/streamingfast/firehose-core/node-manager/mindreader"
 	"github.com/streamingfast/logging"
 	pbheadinfo "github.com/streamingfast/pbgo/sf/headinfo/v1"
@@ -165,6 +166,7 @@ func (a *App) Run() error {
 	if maxLineLength == 0 {
 		maxLineLength = 50 * 1024 * 1024
 	}
+	metrics.LineBufferSize.SetUint64(uint64(maxLineLength))
 
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Buffer(make([]byte, int(maxLineLength)), int(maxLineLength))

@@ -10,13 +10,17 @@ type LogEntry struct {
 	// Common fields from jsonPayload
 	Message          string
 	TraceID          string
+	SessionID        string
 	UserID           string
 	IPAddress        string
 	OutputModule     string
 	OutputModuleHash string
 	StartBlock       int64
 	StopBlock        uint64
+	Cursor           string
 	ProductionMode   bool
+	FinalBlocksOnly  bool
+	NoopMode         bool
 	Timestamp        string
 
 	// Stats-specific fields (only present for "substreams request stats")

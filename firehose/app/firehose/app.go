@@ -45,6 +45,7 @@ type Config struct {
 	OneBlocksStoreURL       string
 	ForkedBlocksStoreURL    string
 	BlockStreamAddr         string        // gRPC endpoint to get real-time blocks, can be "" in which live streams is disabled
+	DiscardPartialBlocks    bool          // When true, partial (flash) blocks received from the live source are dropped before reaching the forkable hub
 	GRPCListenAddr          string        // gRPC address where this app will listen to
 	GRPCShutdownGracePeriod time.Duration // The duration we allow for gRPC connections to terminate gracefully prior forcing shutdown
 	ServiceDiscoveryURL     *url.URL
@@ -115,13 +116,21 @@ func (a *App) Run() error {
 	var forkableHub *hub.ForkableHub
 
 	if withLive {
+		discardPartialBlocks := a.config.DiscardPartialBlocks
+		if discardPartialBlocks {
+			a.logger.Info("partial (flash) blocks will be discarded from the live source before reaching the forkable hub")
+		}
+
 		liveSourceFactory := bstream.SourceFactory(func(h bstream.Handler) bstream.Source {
 
 			return blockstream.NewSource(
 				context.Background(),
 				a.config.BlockStreamAddr,
 				2,
-				bstream.HandlerFunc(func(blk *pbbstream.Block, obj interface{}) error {
+				bstream.HandlerFunc(func(blk *pbbstream.Block, obj any) error {
+					if discardPartialBlocks && blk.PartialIndex != 0 {
+						return nil
+					}
 					a.modules.HeadBlockNumberMetric.SetUint64(blk.Number)
 					a.modules.HeadTimeDriftMetric.SetBlockTime(blk.Time())
 					return h.ProcessBlock(blk, obj)
@@ -130,7 +139,7 @@ func (a *App) Run() error {
 			)
 		})
 
-		forkableHub = hub.NewForkableHub(liveSourceFactory, 500, oneBlocksStore)
+		forkableHub = hub.NewForkableHubWithOptions(liveSourceFactory, 500, oneBlocksStore, []hub.Option{hub.WithLogger(a.logger)})
 		forkableHub.OnTerminated(a.Shutdown)
 
 		go forkableHub.Run()
