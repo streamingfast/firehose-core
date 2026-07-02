@@ -10,6 +10,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Added
+
+- merger: new `--merger-prune-one-block-files-after` flag (default `100`) controlling how many blocks below the last merged block one-block files are kept before deletion. Raise it so a relayer/firehose that briefly falls behind can still find the one-block files needed to bridge the gap and relink, instead of getting stuck in a reconnect loop or dying with `cannot link block after reconnection, restart required`. Clamped to a minimum of `100` (the bundle size) to preserve the safety margin against deleting not-yet-merged files.
+
 ### Changed
 
 - Bumped `substreams` to latest `develop`.

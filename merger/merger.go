@@ -35,8 +35,9 @@ type Merger struct {
 
 	timeBetweenPolling time.Duration
 
-	timeBetweenPruning   time.Duration
-	pruningDistanceToLIB uint64
+	timeBetweenPruning         time.Duration
+	pruningDistanceToLIB       uint64
+	oneBlockFilesPruneDistance uint64
 
 	bundler *Bundler
 }
@@ -49,20 +50,33 @@ func NewMerger(
 	firstStreamableBlock uint64,
 	bundleSize uint64,
 	pruningDistanceToLIB uint64,
+	oneBlockFilesPruneDistance uint64,
 	timeBetweenPruning time.Duration,
 	timeBetweenPolling time.Duration,
 	stopBlock uint64,
 	maxMergingThreads int,
 ) *Merger {
+	// floor at bundleSize so we never delete not-yet-merged one-block files
+	if oneBlockFilesPruneDistance < bundleSize {
+		if oneBlockFilesPruneDistance != 0 {
+			logger.Warn("one-block-files prune distance is below the bundle size, raising it to the bundle size",
+				zap.Uint64("requested", oneBlockFilesPruneDistance),
+				zap.Uint64("bundle_size", bundleSize),
+			)
+		}
+		oneBlockFilesPruneDistance = bundleSize
+	}
+
 	m := &Merger{
-		Shutter:              shutter.New(),
-		grpcListenAddr:       grpcListenAddr,
-		io:                   io,
-		firstStreamableBlock: firstStreamableBlock,
-		pruningDistanceToLIB: pruningDistanceToLIB,
-		timeBetweenPolling:   timeBetweenPolling,
-		timeBetweenPruning:   timeBetweenPruning,
-		logger:               logger,
+		Shutter:                    shutter.New(),
+		grpcListenAddr:             grpcListenAddr,
+		io:                         io,
+		firstStreamableBlock:       firstStreamableBlock,
+		pruningDistanceToLIB:       pruningDistanceToLIB,
+		oneBlockFilesPruneDistance: oneBlockFilesPruneDistance,
+		timeBetweenPolling:         timeBetweenPolling,
+		timeBetweenPruning:         timeBetweenPruning,
+		logger:                     logger,
 	}
 
 	m.bundler = NewBundler(firstStreamableBlock, stopBlock, firstStreamableBlock, bundleSize, io, maxMergingThreads, m.Shutdown)
@@ -115,7 +129,7 @@ func (m *Merger) startForkedBlocksPruner() {
 
 func (m *Merger) startOldFilesPruner() {
 	m.logger.Info("starting pruning of unused (old) one-block-files",
-		zap.Uint64("pruning_distance_to_lib", m.bundler.bundleSize),
+		zap.Uint64("pruning_distance_to_lib", m.oneBlockFilesPruneDistance),
 		zap.Duration("time_between_pruning", m.timeBetweenPruning),
 	)
 	go func() {
@@ -132,7 +146,7 @@ func (m *Merger) startOldFilesPruner() {
 
 			var toDelete []*bstream.OneBlockFile
 
-			pruningTarget := m.pruningTarget(m.bundler.bundleSize)
+			pruningTarget := m.pruningTarget(m.oneBlockFilesPruneDistance)
 			if pruningTarget == 0 {
 				m.logger.Debug("skipping file deletion until we have a pruning target")
 				continue
