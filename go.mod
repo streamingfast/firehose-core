@@ -39,7 +39,7 @@ require (
 	github.com/streamingfast/payment-gateway v0.0.0-20260527144655-d0576d2a4ee3
 	github.com/streamingfast/pbgo v0.0.6-0.20260206150405-2b95acf70437
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.18.5-0.20260702143852-02e9405751a9
+	github.com/streamingfast/substreams v1.19.1-0.20260702154028-ebc3e2c97c51
 	github.com/stretchr/testify v1.11.1
 	github.com/test-go/testify v1.1.4
 	github.com/testcontainers/testcontainers-go v0.42.0
@@ -166,6 +166,7 @@ require (
 	github.com/streamingfast/dummy-blockchain v1.7.3 // indirect
 	github.com/streamingfast/eth-go v0.0.0-20260216202159-4e2b7501894a // indirect
 	github.com/streamingfast/firehose-ethereum/types v0.0.0-20251113151010-c9c94d64348a // indirect
+	github.com/streamingfast/services-control-plane v0.0.0-20260619122356-7b2e68aea813 // indirect
 	github.com/streamingfast/worker-pool-protocol v0.0.0-20251029142144-b539534f3eb1 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
