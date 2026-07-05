@@ -91,6 +91,9 @@ func runFixBloatedMergedBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 				if errors.Is(err, io.EOF) {
 					break
 				}
+				if err != nil {
+					return fmt.Errorf("reading block from %s: %w", filename, err)
+				}
 
 				if block.Number < startBlock {
 					continue
