@@ -23,10 +23,14 @@ import (
 	"go.uber.org/zap"
 )
 
-// NewStreamingBundleReader creates an io.Reader that streams one-block-files directly from storage
+// NewStreamingBundleReader creates an io.ReadCloser that streams one-block-files directly from storage
 // without loading them into memory. It opens each file via opener one at a time, strips DBIN headers
 // from all files except the first, and pipes the concatenated output to the returned reader.
-func NewStreamingBundleReader(ctx context.Context, logger *zap.Logger, oneBlockFiles []*bstream.OneBlockFile, anyOneBlockFile *bstream.OneBlockFile, opener func(context.Context, *bstream.OneBlockFile) (io.ReadCloser, error)) (io.Reader, error) {
+//
+// The caller must Close the returned reader: if the consumer stops reading before EOF (e.g. a
+// store WriteObject timing out or erroring), closing unblocks the feeding goroutine so it can
+// release its open one-block reader and exit.
+func NewStreamingBundleReader(ctx context.Context, logger *zap.Logger, oneBlockFiles []*bstream.OneBlockFile, anyOneBlockFile *bstream.OneBlockFile, opener func(context.Context, *bstream.OneBlockFile) (io.ReadCloser, error)) (io.ReadCloser, error) {
 	// Open anyOneBlockFile just to determine the DBIN header length
 	headerReader, err := opener(ctx, anyOneBlockFile)
 	if err != nil {
