@@ -2,6 +2,7 @@ package merger
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -295,5 +296,61 @@ func TestBundlerMergeKeepOne(t *testing.T) {
 			assert.Equal(t, c.expectRemaining, b.irreversibleBlocks)
 			assert.Equal(t, int(c.expectBase), int(b.baseBlockNum))
 		})
+	}
+}
+
+// testObjWrapper wraps a OneBlockFile the way the forkable does when it calls ProcessBlock.
+type testObjWrapper struct{ obf *bstream.OneBlockFile }
+
+func (w testObjWrapper) WrappedObject() any { return w.obf }
+
+func TestBundlerProcessBlockTerminatingReleasesLock(t *testing.T) {
+	// A merge failure marks the errgroup as stopped. When ProcessBlock is inside the
+	// skip-forward loop at that moment, it returns errTerminating: the bundler lock
+	// must not be left held, otherwise pruners calling getSafeBaseBlockNum deadlock.
+	started := make(chan struct{}, 1)
+	proceed := make(chan struct{})
+
+	b := NewBundler(100, 0, 2, 100, &TestMergerIO{
+		MergeAndStoreFunc: func(_ context.Context, _ uint64, _ []*bstream.OneBlockFile) error {
+			select {
+			case started <- struct{}{}:
+			default:
+			}
+			<-proceed
+			return errors.New("merge failed")
+		},
+	}, 1, func(error) {})
+	b.enforceNextBlockOnBoundary = false
+	b.irreversibleBlocks = []*bstream.OneBlockFile{block100(), block101()}
+
+	done := make(chan error, 1)
+	go func() {
+		// block 1000 triggers the merge of bundle 100 (which blocks, then fails), then
+		// enters the skip-forward loop where eg.Stop() turns true once the merge has failed
+		done <- b.ProcessBlock(nil, testObjWrapper{obf: chainBlock(1000, 999, 999)})
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("first merge never started")
+	}
+	close(proceed) // let the merge fail, stopping the errgroup
+
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, errTerminating)
+	case <-time.After(5 * time.Second):
+		t.Fatal("ProcessBlock did not return")
+	}
+
+	// the bundler lock must be free after ProcessBlock returned errTerminating
+	got := make(chan uint64, 1)
+	go func() { got <- b.getSafeBaseBlockNum() }()
+	select {
+	case <-got:
+	case <-time.After(2 * time.Second):
+		t.Fatal("bundler lock leaked: getSafeBaseBlockNum deadlocked")
 	}
 }
