@@ -139,10 +139,14 @@ func (s *DStoreIO) MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64
 	err = Retry(s.logger, s.retryAttempts, s.retryCooldown, func() error {
 		inCtx, cancel := context.WithTimeout(ctx, WriteObjectTimeout)
 		defer cancel()
-		streamReader, err := NewStreamingBundleReader(ctx, s.logger, filteredOBF, anyOneBlockFile, s.OpenOneBlockFile)
+		streamReader, err := NewStreamingBundleReader(inCtx, s.logger, filteredOBF, anyOneBlockFile, s.OpenOneBlockFile)
 		if err != nil {
 			return err
 		}
+		// If WriteObject returns without draining the reader (timeout or error), the
+		// feeding goroutine would block forever on the pipe, holding an open one-block
+		// reader on every retry. Closing the read end unblocks it so it can exit.
+		defer streamReader.Close()
 		return s.mergedBlocksStore.WriteObject(inCtx, bundleFilename, streamReader)
 	})
 	if err != nil {

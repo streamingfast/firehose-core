@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"testing"
+	"time"
 
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -188,4 +189,59 @@ func TestMergerIO_MergeUploadFilteredToZero(t *testing.T) {
 	mio := newTestDStoreIO(oneBlockStore, dstore.NewMockStore(nil))
 	err := mio.MergeAndStore(context.Background(), 114, files)
 	require.NoError(t, err)
+}
+
+// notifyingReadCloser reports on a channel when it gets closed.
+type notifyingReadCloser struct {
+	io.ReadCloser
+	name   string
+	closed chan<- string
+}
+
+func (rc *notifyingReadCloser) Close() error {
+	rc.closed <- rc.name
+	return rc.ReadCloser.Close()
+}
+
+// TestMergerIO_WriteObjectErrorClosesStreamReader verifies that when WriteObject fails
+// without draining the streaming bundle reader, MergeAndStore closes the pipe so the
+// feeding goroutine exits and releases its open one-block reader instead of blocking
+// forever in io.Copy (leaking a goroutine and a reader on every retry).
+func TestMergerIO_WriteObjectErrorClosesStreamReader(t *testing.T) {
+	files := []*bstream.OneBlockFile{block100(), block101()}
+
+	// determine the DBIN header length so WriteObject can consume just past it,
+	// guaranteeing the feeding goroutine is inside io.Copy of block100 when we fail
+	hdrReader, err := bstream.NewDBinBlockReader(makeBlockReader(t))
+	require.NoError(t, err)
+	headerLen := len(hdrReader.Header.RawBytes)
+
+	closed := make(chan string, 10)
+	oneBlockStore := dstore.NewMockStore(nil)
+	oneBlockStore.OpenObjectFunc = func(_ context.Context, name string) (io.ReadCloser, error) {
+		return &notifyingReadCloser{ReadCloser: makeBlockReader(t), name: name, closed: closed}, nil
+	}
+
+	mergedBlocksStore := dstore.NewMockStore(func(base string, f io.Reader) error {
+		// read the bundle header plus one byte, then fail without draining the stream
+		if _, err := io.ReadFull(f, make([]byte, headerLen+1)); err != nil {
+			return err
+		}
+		return fmt.Errorf("write refused")
+	})
+
+	mio := newTestDStoreIO(oneBlockStore, mergedBlocksStore)
+	err = mio.MergeAndStore(context.Background(), 100, files)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "write refused")
+
+	// two closes expected: the synchronous header read, and the block100 streaming
+	// reader that the feeding goroutine must release once the pipe is closed
+	for i := 0; i < 2; i++ {
+		select {
+		case <-closed:
+		case <-time.After(3 * time.Second):
+			t.Fatal("feeding goroutine leaked: one-block reader never closed after WriteObject error")
+		}
+	}
 }
