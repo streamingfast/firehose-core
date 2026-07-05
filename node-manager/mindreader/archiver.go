@@ -71,6 +71,12 @@ func NewArchiver(
 func (a *Archiver) Start(ctx context.Context) {
 	a.OnTerminating(func(err error) {
 		a.logger.Info("archiver selector is terminating", zap.Error(err))
+
+		// Shut down the file uploader and wait for it to complete its final
+		// upload pass, so that no one-block file remains stranded locally.
+		a.fileUploader.Shutdown(err)
+		<-a.fileUploader.Done()
+		a.logger.Info("file uploader terminated")
 	})
 
 	a.OnTerminated(func(err error) {
