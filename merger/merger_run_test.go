@@ -363,3 +363,30 @@ func TestMergerRun_CheckAlreadyMergedAfterManyBlocks(t *testing.T) {
 	assert.Less(t, highestCheckedOneBlock, uint64(200), "highestCheckedOneBlock should be less than 200")
 
 }
+
+// TestMergerRun_ConsecutiveWalkErrorsTriggerShutdown verifies the circuit breaker:
+// a persistently failing WalkOneBlockFiles must make run() return
+// "too many consecutive errors" after 10 attempts instead of retrying forever.
+func TestMergerRun_ConsecutiveWalkErrorsTriggerShutdown(t *testing.T) {
+	walkCalls := 0
+	testIO := &TestMergerIO{
+		WalkOneBlockFilesFunc: func(_ context.Context, _ uint64, _ func(*bstream.OneBlockFile) error) error {
+			walkCalls++
+			return errors.New("persistent store failure")
+		},
+	}
+
+	merger := newRunTestMerger(testIO, 0, 10, 1)
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- merger.run() }()
+
+	select {
+	case err := <-errCh:
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "too many consecutive errors")
+		assert.Equal(t, 10, walkCalls, "circuit breaker should trip after exactly 10 consecutive errors")
+	case <-time.After(5 * time.Second):
+		t.Fatal("merger did not shut down on persistent walk errors")
+	}
+}
