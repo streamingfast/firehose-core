@@ -354,3 +354,95 @@ func TestBundlerProcessBlockTerminatingReleasesLock(t *testing.T) {
 		t.Fatal("bundler lock leaked: getSafeBaseBlockNum deadlocked")
 	}
 }
+
+// TestBundlerSkipLoopBoundary verifies bundle attribution when a gap in irreversible
+// blocks ends near a bundle boundary. A bundle covers [base, base+size): a block whose
+// number is exactly base+size belongs to the NEXT bundle, so the skip-forward loop must
+// also fire on equality, otherwise that block gets attributed to the previous bundle.
+func TestBundlerSkipLoopBoundary(t *testing.T) {
+	obf := func(name string) *bstream.OneBlockFile { return bstream.MustNewOneBlockFile(name) }
+
+	commonChain := []*bstream.OneBlockFile{
+		block100(), block101(), block102Final100(), block103Final101(),
+		block104Final102(), block105Final103(), block106Final104(),
+	}
+
+	tests := []struct {
+		name            string
+		gapBlocks       []*bstream.OneBlockFile
+		expectMerged    []uint64
+		expectBase      uint64
+		expectRemaining []*bstream.OneBlockFile
+	}{
+		{
+			// block 300 == base(200)+size(100) after the first merge: it belongs to
+			// bundle 300, so bundle 200 must be skip-merged
+			name: "gap_ends_exactly_on_boundary",
+			gapBlocks: []*bstream.OneBlockFile{
+				obf("0000000300-0000000000000300a-0000000000000106a-106-suffix"),
+				obf("0000000301-0000000000000301a-0000000000000300a-300-suffix"),
+				obf("0000000302-0000000000000302a-0000000000000301a-301-suffix"),
+			},
+			expectMerged: []uint64{100, 200},
+			expectBase:   300,
+			expectRemaining: []*bstream.OneBlockFile{
+				block106Final104(),
+				obf("0000000300-0000000000000300a-0000000000000106a-106-suffix"),
+				obf("0000000301-0000000000000301a-0000000000000300a-300-suffix"),
+			},
+		},
+		{
+			name: "gap_ends_one_past_boundary",
+			gapBlocks: []*bstream.OneBlockFile{
+				obf("0000000301-0000000000000301a-0000000000000106a-106-suffix"),
+				obf("0000000302-0000000000000302a-0000000000000301a-301-suffix"),
+				obf("0000000303-0000000000000303a-0000000000000302a-302-suffix"),
+			},
+			expectMerged: []uint64{100, 200},
+			expectBase:   300,
+			expectRemaining: []*bstream.OneBlockFile{
+				block106Final104(),
+				obf("0000000301-0000000000000301a-0000000000000106a-106-suffix"),
+				obf("0000000302-0000000000000302a-0000000000000301a-301-suffix"),
+			},
+		},
+		{
+			// block 200 == base(100)+size(100): triggers the main merge only, no skip
+			name: "gap_ends_exactly_on_next_bundle_start",
+			gapBlocks: []*bstream.OneBlockFile{
+				obf("0000000200-0000000000000200a-0000000000000106a-106-suffix"),
+				obf("0000000201-0000000000000201a-0000000000000200a-200-suffix"),
+				obf("0000000202-0000000000000202a-0000000000000201a-201-suffix"),
+			},
+			expectMerged: []uint64{100},
+			expectBase:   200,
+			expectRemaining: []*bstream.OneBlockFile{
+				block106Final104(),
+				obf("0000000200-0000000000000200a-0000000000000106a-106-suffix"),
+				obf("0000000201-0000000000000201a-0000000000000200a-200-suffix"),
+			},
+		},
+	}
+
+	for _, c := range tests {
+		t.Run(c.name, func(t *testing.T) {
+			var merged []uint64
+			b := NewBundler(100, 700, 2, 100, &TestMergerIO{
+				MergeAndStoreFunc: func(_ context.Context, inclusiveLowerBlock uint64, _ []*bstream.OneBlockFile) error {
+					merged = append(merged, inclusiveLowerBlock)
+					return nil
+				},
+			}, 1, nil)
+			b.irreversibleBlocks = []*bstream.OneBlockFile{block100(), block101()}
+
+			for _, blk := range append(append([]*bstream.OneBlockFile{}, commonChain...), c.gapBlocks...) {
+				require.NoError(t, b.HandleBlockFile(blk))
+			}
+			b.WaitForMerges()
+
+			assert.Equal(t, c.expectMerged, merged)
+			assert.Equal(t, int(c.expectBase), int(b.baseBlockNum))
+			assert.Equal(t, c.expectRemaining, b.irreversibleBlocks)
+		})
+	}
+}

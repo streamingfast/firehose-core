@@ -259,7 +259,9 @@ func (b *Bundler) ProcessBlock(_ *pbbstream.Block, obj interface{}) error {
 	lastBlock := b.irreversibleBlocks[len(b.irreversibleBlocks)-1]
 	b.irreversibleBlocks = []*bstream.OneBlockFile{lastBlock, obf}
 	b.baseBlockNum += b.bundleSize
-	for obf.Num > b.baseBlockNum+b.bundleSize { // skip more merged-block-files
+	// a bundle covers [baseBlockNum, baseBlockNum+bundleSize): a block landing exactly
+	// on baseBlockNum+bundleSize belongs to the *next* bundle, so skip-merge on >= too
+	for obf.Num >= b.baseBlockNum+b.bundleSize { // skip more merged-block-files
 		capturedBase := b.baseBlockNum
 		if b.eg.Stop() { // check before marking in-flight so termination does not leave a stale in-flight entry
 			return errTerminating
