@@ -76,6 +76,7 @@ func runFixBloatedMergedBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 
 			mergeWriter := &firecore.MergedBlocksWriter{
 				Store:      destStore,
+				BundleSize: bundleSize,
 				TweakBlock: func(b *pbbstream.Block) (*pbbstream.Block, error) { return b, nil },
 				Logger:     zlog,
 			}
