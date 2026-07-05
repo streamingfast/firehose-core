@@ -392,7 +392,9 @@ func (p *BlockPoller[C]) fetchBlockWithHash(blkNum uint64, hash string) (*pbbstr
 	p.logger.Info("fetching block with hash", zap.Uint64("block_num", blkNum), zap.String("hash", hash))
 	_ = hash //todo: hash will be used to fetch block from  cache
 
+	p.optimisticallyPolledBlocksLock.Lock()
 	p.optimisticallyPolledBlocks = map[uint64]*BlockItem{}
+	p.optimisticallyPolledBlocksLock.Unlock()
 
 	var out *pbbstream.Block
 	var skipped bool
