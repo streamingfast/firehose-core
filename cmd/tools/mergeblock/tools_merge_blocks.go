@@ -1,7 +1,6 @@
 package mergeblock
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -64,6 +63,7 @@ func runMergeBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 
 		var lastFilename string
 		var blockCount int
+		var seenBlockNumber bool
 		var previousBlockNumber uint64
 		err = srcStore.WalkFrom(ctx, "", fmt.Sprintf("%010d", lowBundary), func(filename string) error {
 			var currentBlockNumber uint64
@@ -72,7 +72,7 @@ func runMergeBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 				return fmt.Errorf("parsing filename %s: %w", filename, err)
 			}
 
-			if previousBlockNumber == currentBlockNumber {
+			if seenBlockNumber && previousBlockNumber == currentBlockNumber {
 				zlog.Warn("skipping duplicate block", zap.String("filename", filename))
 				return nil
 			}
@@ -107,23 +107,19 @@ func runMergeBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 			blockCount += 1
 
 			previousBlockNumber = currentBlockNumber
+			seenBlockNumber = true
 			return nil
 		})
 
 		mergeWriter.Logger = mergeWriter.Logger.With(zap.String("last_filename", lastFilename), zap.Int("block_count", blockCount))
 		if err != nil {
-			if errors.Is(err, dstore.StopIteration) {
-				err = mergeWriter.WriteBundle()
-				if err != nil {
-					return fmt.Errorf("writing bundle: %w", err)
-				}
-				fmt.Println("done")
-			}
+			// dstore Walk implementations never propagate StopIteration, they
+			// swallow it and end the walk normally, so any error here is real.
 			return fmt.Errorf("walking source store: %w", err)
 		}
 
-		err = mergeWriter.WriteBundle()
-		if err != nil {
+		// flush a final partial bundle, if any blocks remain unwritten
+		if err := mergeWriter.Flush(); err != nil {
 			return fmt.Errorf("writing bundle: %w", err)
 		}
 
