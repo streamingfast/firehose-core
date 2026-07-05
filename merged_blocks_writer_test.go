@@ -139,6 +139,49 @@ func TestMergedBlocksWriterSkippedBlocks(t *testing.T) {
 	assert.Equal(t, uint64(2000), writer.LowBlockNum)
 }
 
+func TestMergedBlocksWriterMultiBundleGap(t *testing.T) {
+	// a gap spanning more than one bundle must not produce misnamed files
+	store := dstore.NewMockStore(nil)
+	writer := &MergedBlocksWriter{
+		Store:      store,
+		BundleSize: 100,
+		Logger:     zap.NewNop(),
+	}
+
+	require.NoError(t, writer.ProcessBlock(testBlock(5), nil))
+	// blocks 6..249 do not exist on this chain
+	require.NoError(t, writer.ProcessBlock(testBlock(250), nil))
+	assert.Equal(t, uint64(200), writer.LowBlockNum)
+
+	for i := uint64(251); i < 300; i++ {
+		require.NoError(t, writer.ProcessBlock(testBlock(i), nil))
+	}
+
+	files := writtenFiles(t, store)
+	require.Len(t, files, 2)
+	assert.Equal(t, []uint64{5}, files["0000000000"])
+	assert.Equal(t, uint64(250), files["0000000200"][0])
+	assert.Equal(t, uint64(299), files["0000000200"][49])
+}
+
+func TestMergedBlocksWriterMultiBundleGapFourBundles(t *testing.T) {
+	store := dstore.NewMockStore(nil)
+	writer := &MergedBlocksWriter{
+		Store:      store,
+		BundleSize: 100,
+		Logger:     zap.NewNop(),
+	}
+
+	require.NoError(t, writer.ProcessBlock(testBlock(5), nil))
+	// blocks 6..449 do not exist on this chain
+	require.NoError(t, writer.ProcessBlock(testBlock(450), nil))
+	assert.Equal(t, uint64(400), writer.LowBlockNum)
+
+	files := writtenFiles(t, store)
+	require.Len(t, files, 1)
+	assert.Equal(t, []uint64{5}, files["0000000000"])
+}
+
 func TestLowBoundaryFor(t *testing.T) {
 	assert.Equal(t, uint64(12300), LowBoundaryFor(12345, 100))
 	assert.Equal(t, uint64(12000), LowBoundaryFor(12345, 1000))
