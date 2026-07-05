@@ -93,6 +93,15 @@ func (w *MergedBlocksWriter) ProcessBlock(blk *pbbstream.Block, obj interface{})
 	return nil
 }
 
+// Flush writes any pending blocks as a (possibly partial) bundle. Unlike
+// WriteBundle, it is a no-op when no blocks are pending.
+func (w *MergedBlocksWriter) Flush() error {
+	if len(w.blocks) == 0 {
+		return nil
+	}
+	return w.WriteBundle()
+}
+
 func (w *MergedBlocksWriter) WriteBundle() error {
 	file := filename(w.LowBlockNum)
 	w.Logger.Info("writing merged file to store (suffix: .dbin.zst)", zap.String("filename", file), zap.Uint64("lowBlockNum", w.LowBlockNum))
