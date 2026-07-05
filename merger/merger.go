@@ -250,7 +250,6 @@ func (m *Merger) run() error {
 			m.logger.Info("stop block reached")
 			return nil
 		default:
-			consecutiveErrors = 0
 			consecutiveErrors++
 			if consecutiveErrors >= 10 {
 				return fmt.Errorf("too many consecutive errors: %w", err)
