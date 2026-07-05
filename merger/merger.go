@@ -113,7 +113,11 @@ func (m *Merger) startForkedBlocksPruner() {
 	go func() {
 		delay := m.timeBetweenPruning // do not start pruning immediately
 		for {
-			time.Sleep(delay)
+			select {
+			case <-m.Terminating():
+				return
+			case <-time.After(delay):
+			}
 			now := time.Now()
 
 			pruningTarget := m.pruningTarget(m.pruningDistanceToLIB)
@@ -142,7 +146,11 @@ func (m *Merger) startOldFilesPruner() {
 
 		ctx := context.Background()
 		for {
-			time.Sleep(delay)
+			select {
+			case <-m.Terminating():
+				return
+			case <-time.After(delay):
+			}
 
 			var toDelete []*bstream.OneBlockFile
 
