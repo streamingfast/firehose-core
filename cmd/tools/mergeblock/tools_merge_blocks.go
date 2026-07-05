@@ -77,7 +77,7 @@ func runMergeBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 				return nil
 			}
 
-			if currentBlockNumber > lowBundary+bundleSize {
+			if currentBlockNumber >= lowBundary+bundleSize {
 				return dstore.StopIteration
 			}
 
