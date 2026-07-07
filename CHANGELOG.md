@@ -22,6 +22,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - New `fire{chain} tools resize-merged-blocks <source> <destination> <start> <stop> --source-bundle-size=100 --target-bundle-size=1000` command rewriting a merged-blocks store to a different bundle size (both up- and down-sizing, sizes must divide evenly, start/stop must be aligned on target boundaries).
 - Tools: new shared `--merged-blocks-bundle-size` flag (default `100`) on `tools` subcommands reading or writing merged blocks (`check merged-blocks`, `print merged-blocks`, `compare-blocks`, `merge-blocks`, `unmerge-blocks`, `upgrade-merged-blocks`, `download-from-firehose`, `fix-bloated-merged-blocks`, ...).
 
+### Fixed
+
+- `tools print merged-blocks <store>` (no explicit block range) no longer truncates its output after the first couple of files: it now stops cleanly on the last available merged-blocks file instead of racing ahead to the first missing one and shutting down while earlier files were still being printed.
+
 ### Changed
 
 - The firehose and substreams-tier1 hubs now keep `max(500|200, 2 x merged-blocks bundle size)` final blocks in memory so the joining source can hand off from a merged-blocks file boundary.

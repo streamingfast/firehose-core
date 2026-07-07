@@ -108,6 +108,16 @@ func createToolsPrintMergedBlocksE[B firecore.Block](chain *firecore.Chain[B], l
 		}
 		if !blockRange.IsOpen() {
 			options = append(options, bstream.FileSourceWithStopBlock(blockRange.MustGetStopBlock()))
+		} else {
+			// Open range: stop cleanly on the last available merged-blocks file instead of
+			// racing to the first missing one. Without a stop block, FileSource keeps reading
+			// past the end of the store, hits the missing next file and shuts down
+			// asynchronously, discarding files still being processed and truncating the output.
+			lastBase, found, err := highestMergedBlocksBase(cmd.Context(), store, uint64(blockRange.GetStartBlock()), bundleSize)
+			cli.NoError(err, "Unable to list merged-blocks files in store %q", args[0])
+			if found {
+				options = append(options, bstream.FileSourceWithStopBlock(lastBase+bundleSize-1))
+			}
 		}
 
 		source := bstream.NewFileSource(store, uint64(blockRange.GetStartBlock()), bstream.HandlerFunc(func(blk *pbbstream.Block, obj any) error {
@@ -153,6 +163,29 @@ func storeURLFileLikeRange(path string, bundleSize uint64) types.BlockRange {
 
 	startBlock, _ := strconv.ParseUint(groups[1], 10, 64)
 	return types.NewClosedRange(int64(startBlock), uint64(startBlock)+bundleSize)
+}
+
+// highestMergedBlocksBase walks the store and returns the base block number of the
+// last merged-blocks file at or after startBlock, aligned on bundleSize. found is
+// false when the store contains no merged-blocks file in that range.
+func highestMergedBlocksBase(ctx context.Context, store dstore.Store, startBlock, bundleSize uint64) (base uint64, found bool, err error) {
+	startFilename := fmt.Sprintf("%010d", startBlock-(startBlock%bundleSize))
+	err = store.WalkFrom(ctx, "", startFilename, func(filename string) error {
+		groups := mergedBlocksFileRegex.FindStringSubmatch(filepath.Base(filename))
+		if len(groups) != 2 {
+			return nil
+		}
+
+		fileBase, parseErr := strconv.ParseUint(groups[1], 10, 64)
+		if parseErr != nil {
+			return nil
+		}
+
+		base = fileBase
+		found = true
+		return nil
+	})
+	return
 }
 
 func storeURLFromFileInput(input string) string {
