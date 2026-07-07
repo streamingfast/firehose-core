@@ -15,8 +15,9 @@ still serve chains with different sizes at once. All work is on branch
   `bstream.FileSourceWithBundleSize` / `stream.WithMergedBlocksBundleSize`. Substreams
   tier2 always uses the per-request value from the subrequest, never the process flag.
 - **Filenames unchanged** (`%010d` base block num); the size is configuration, not
-  encoded in the file name. A reader configured too small now fails fast with a clear
-  error; a reader configured too big cannot be detected (see caveats).
+  encoded in the file name. A merged-blocks consumer configured too small fails fast
+  with a clear error; a size mismatch in either direction is also caught at startup by
+  the advertise/info server (see caveats).
 - **Valid values**: positive multiples of 100 (validated at startup and in tools).
 
 ## Changes per repo
@@ -98,11 +99,18 @@ still serve chains with different sizes at once. All work is on branch
 
 ## Caveats / things to look into before prod
 
-1. **Reader configured bigger than the files (undetectable).** Flag=1000 over
-   100-files: the filesource reads `0000000000` then jumps to `0000001000`; blocks
-   100–999 are silently skipped and the stream stalls with unlinkable blocks far from
-   the root cause. This direction cannot be reliably detected (chains legitimately skip
-   block numbers). The reverse direction (flag smaller than files) now fails fast.
+1. **Bundle size does not match the files.** A merged-blocks consumer configured
+   smaller than the files (e.g. default 100 over a 200-block store) looks for
+   `0000000100`, which does not exist; configured bigger (100-store read at 1000) jumps
+   over blocks. Either way the stream silently skips blocks and stalls with unlinkable
+   blocks far from the root cause — and the consumer itself only *warns* ("hole in
+   merged files", "too many unlinkable blocks"), it does not fail. The advertise/info server now hard-errors at
+   startup (`--ignore-advertise-validation` skips it). Merged-blocks stores have no
+   holes in normal operation (an empty bundle is still written as an empty file), so it
+   works from the listing alone: the gap between the first two file boundaries is the
+   real bundle size and must equal the configured one, else it errors with the value to
+   set. Only the degenerate single-file store falls back to reading that one file's
+   content (no second boundary to measure against).
 2. **Fleet-wide consistency per chain.** Merger, firehose, substreams-tier1 and any
    index-builder must all agree on the value for a given chain's store. Multi-machine
    config drift = silent skipping (see #1).

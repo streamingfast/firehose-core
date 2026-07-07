@@ -21,12 +21,18 @@ type MergedBlocksWriter struct {
 	// bstream.DefaultMergedBlocksBundleSize applies.
 	BundleSize uint64
 
-	blocks []*pbbstream.Block
-	Logger *zap.Logger
-	Cmd    *cobra.Command
+	blocks         []*pbbstream.Block
+	processedCount uint64
+	Logger         *zap.Logger
+	Cmd            *cobra.Command
 
 	TweakBlock func(*pbbstream.Block) (*pbbstream.Block, error)
 }
+
+// progressLogInterval is how often ProcessBlock emits a progress log, so a long
+// run (e.g. resize-merged-blocks over a big range) does not look stuck between
+// bundle writes.
+const progressLogInterval = 100_000
 
 func (w *MergedBlocksWriter) bundleSize() uint64 {
 	if w.BundleSize != 0 {
@@ -45,6 +51,15 @@ func (w *MergedBlocksWriter) ProcessBlock(blk *pbbstream.Block, obj interface{})
 	}
 
 	bundleSize := w.bundleSize()
+
+	w.processedCount++
+	if w.processedCount%progressLogInterval == 0 {
+		w.Logger.Info("processing blocks",
+			zap.Uint64("processed_count", w.processedCount),
+			zap.Uint64("current_block", blk.Number),
+			zap.Uint64("current_bundle_low_block", w.LowBlockNum),
+		)
+	}
 
 	if w.LowBlockNum == 0 && blk.Number >= bundleSize { // initial block
 		if blk.Number%bundleSize != 0 && blk.Number != bstream.GetProtocolFirstStreamableBlock {
