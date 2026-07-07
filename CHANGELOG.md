@@ -24,7 +24,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Fixed
 
-- `tools print merged-blocks <store>` (no explicit block range) no longer truncates its output after the first couple of files: it now stops cleanly on the last available merged-blocks file instead of racing ahead to the first missing one and shutting down while earlier files were still being printed.
+- `tools print merged-blocks <store>` no longer truncates its output when a merged-blocks file is missing (open range with no explicit stop, or a bounded range extending past the last available file): with the bumped `bstream` dependency it now prints every available block first and only then errors on the missing file, instead of discarding in-flight files on an async shutdown. Also fixes an off-by-one that stopped one block early on a closed range.
 
 ### Changed
 

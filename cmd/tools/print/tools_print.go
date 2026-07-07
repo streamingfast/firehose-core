@@ -107,12 +107,14 @@ func createToolsPrintMergedBlocksE[B firecore.Block](chain *firecore.Chain[B], l
 			bstream.FileSourceWithBundleSize(bundleSize),
 		}
 		if !blockRange.IsOpen() {
-			options = append(options, bstream.FileSourceWithStopBlock(blockRange.MustGetStopBlock()))
+			// The range end is exclusive but FileSource's stop block is inclusive, so stop one
+			// block earlier. When the requested range runs past the available data, FileSource
+			// prints everything it has and then errors on the first missing file.
+			options = append(options, bstream.FileSourceWithStopBlock(blockRange.MustGetStopBlock()-1))
 		} else {
-			// Open range: stop cleanly on the last available merged-blocks file instead of
-			// racing to the first missing one. Without a stop block, FileSource keeps reading
-			// past the end of the store, hits the missing next file and shuts down
-			// asynchronously, discarding files still being processed and truncating the output.
+			// Open range (print everything available): there is no stop block to reach, so cap it
+			// at the last available merged-blocks file. Otherwise FileSource would print every
+			// block and then error on the (expected) missing next file.
 			lastBase, found, err := highestMergedBlocksBase(cmd.Context(), store, uint64(blockRange.GetStartBlock()), bundleSize)
 			cli.NoError(err, "Unable to list merged-blocks files in store %q", args[0])
 			if found {
