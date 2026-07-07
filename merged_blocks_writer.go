@@ -153,3 +153,18 @@ func ValidateMergedBlocksBundleSize(size uint64) error {
 	}
 	return nil
 }
+
+// GetMergedBlocksBundleSizeFlag reads and validates the shared
+// "merged-blocks-bundle-size" tools flag. Every tool reading that flag should go
+// through this so an invalid value (0 or not a multiple of 100) is rejected
+// up-front instead of panicking on a modulo/divide deeper in the process.
+func GetMergedBlocksBundleSizeFlag(cmd *cobra.Command) (uint64, error) {
+	size, err := cmd.Flags().GetUint64("merged-blocks-bundle-size")
+	if err != nil {
+		return 0, err
+	}
+	if err := ValidateMergedBlocksBundleSize(size); err != nil {
+		return 0, err
+	}
+	return size, nil
+}

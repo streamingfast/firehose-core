@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
-	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
 	"go.uber.org/zap"
@@ -45,7 +44,10 @@ func runUnmergeBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 			return fmt.Errorf("parsing block range: %w", err)
 		}
 
-		bundleSize := sflags.MustGetUint64(cmd, "merged-blocks-bundle-size")
+		bundleSize, err := firecore.GetMergedBlocksBundleSizeFlag(cmd)
+		if err != nil {
+			return err
+		}
 
 		err = srcStore.Walk(ctx, check.WalkBlockPrefix(blockRange, bundleSize), func(filename string) error {
 			zlog.Debug("checking merged block file", zap.String("filename", filename))

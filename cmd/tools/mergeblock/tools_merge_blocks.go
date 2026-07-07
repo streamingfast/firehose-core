@@ -11,7 +11,6 @@ import (
 	"github.com/streamingfast/bstream"
 
 	"github.com/spf13/cobra"
-	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
 	"go.uber.org/zap"
@@ -47,7 +46,10 @@ func runMergeBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 			return fmt.Errorf("converting low bundary string to uint64: %w", err)
 		}
 
-		bundleSize := sflags.MustGetUint64(cmd, "merged-blocks-bundle-size")
+		bundleSize, err := firecore.GetMergedBlocksBundleSizeFlag(cmd)
+		if err != nil {
+			return err
+		}
 
 		mergeWriter := &firecore.MergedBlocksWriter{
 			Store:        destStore,

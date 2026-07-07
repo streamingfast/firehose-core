@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/cobra"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/bstream/stream"
-	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
 	"go.uber.org/zap"
@@ -48,7 +47,10 @@ func getMergedBlockUpgrader(tweakFunc func(block *pbbstream.Block) (*pbbstream.B
 			return fmt.Errorf("parsing stop block num: %w", err)
 		}
 
-		bundleSize := sflags.MustGetUint64(cmd, "merged-blocks-bundle-size")
+		bundleSize, err := firecore.GetMergedBlocksBundleSizeFlag(cmd)
+		if err != nil {
+			return err
+		}
 
 		rootLog.Info("starting block upgrader process", zap.Uint64("start", start), zap.Uint64("stop", stop), zap.String("source", source), zap.String("dest", dest))
 		writer := &firecore.MergedBlocksWriter{

@@ -56,7 +56,16 @@ still serve chains with different sizes at once. All work is on branch
   `LowBoundary` kept, new `LowBoundaryFor(num, size)`.
 - Firehose hub `keepFinalBlocks = max(500, 2×bundleSize)`.
 - Tools: shared `--merged-blocks-bundle-size` flag (check, print, compare, merge,
-  unmerge, upgrade, download-from-firehose, fix tools).
+  unmerge, upgrade, download-from-firehose, fix tools). Read through
+  `firecore.GetMergedBlocksBundleSizeFlag(cmd)`, which validates the value (positive
+  multiple of 100) at every call site so a bad size errors up-front instead of
+  panicking on a modulo/divide deeper in the process. A `ToolsCmd.PersistentPreRunE`
+  can't be used for this — it would shadow the root command's setup hook.
+- `tools print merged-blocks` open-range fix: caps the stream at the last available
+  merged-blocks file (found via an `O(log n)` exponential-probe + binary-search on
+  `FileExists`, not a full store listing) so it stops cleanly instead of erroring on
+  the expected-missing next file; also guards an unsigned underflow when a closed
+  range ends at block 0.
 - **New conversion tool**:
   `firecore tools resize-merged-blocks <src> <dst> <start> <stop> --source-bundle-size=100 --target-bundle-size=1000`.
   Both directions supported; sizes must divide evenly; start/stop must be aligned on

@@ -11,7 +11,6 @@ import (
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/cli"
-	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/types"
@@ -62,7 +61,10 @@ func createToolsDownloadFromFirehoseE[B firecore.Block](chain *firecore.Chain[B]
 			return err
 		}
 
-		bundleSize := sflags.MustGetUint64(cmd, "merged-blocks-bundle-size")
+		bundleSize, err := firecore.GetMergedBlocksBundleSizeFlag(cmd)
+		if err != nil {
+			return err
+		}
 
 		mergeWriter := &firecore.MergedBlocksWriter{
 			Store:      store,
