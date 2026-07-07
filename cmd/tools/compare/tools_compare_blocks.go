@@ -117,7 +117,10 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Log
 			return fmt.Errorf("parsing range: %w", err)
 		}
 
-		const bundleSize = uint64(100)
+		bundleSize, err := firecore.GetMergedBlocksBundleSizeFlag(cmd)
+		if err != nil {
+			return err
+		}
 		if !strings.Contains(args[2], ":") && blockRange.IsOpen() && blockRange.Start >= 0 {
 			n := uint64(blockRange.Start)
 			blockRange = types.NewClosedRange(int64(n), n+1)

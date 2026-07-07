@@ -39,6 +39,9 @@ type Config struct {
 	FilesDeleteThreads int
 	MaxMergingThreads  int
 
+	// BundleSize is the number of blocks per merged-blocks file (0 means bstream.DefaultMergedBlocksBundleSize)
+	BundleSize uint64
+
 	GRPCListenAddr        string
 	HTTPHealthzListenAddr string
 
@@ -89,7 +92,10 @@ func (a *App) Run() error {
 		}
 	}
 
-	bundleSize := uint64(100)
+	bundleSize := a.config.BundleSize
+	if bundleSize == 0 {
+		bundleSize = bstream.DefaultMergedBlocksBundleSize
+	}
 
 	// we are setting the backoff here for dstoreIO
 	io := merger.NewDStoreIO(

@@ -61,13 +61,19 @@ func createToolsDownloadFromFirehoseE[B firecore.Block](chain *firecore.Chain[B]
 			return err
 		}
 
+		bundleSize, err := firecore.GetMergedBlocksBundleSizeFlag(cmd)
+		if err != nil {
+			return err
+		}
+
 		mergeWriter := &firecore.MergedBlocksWriter{
 			Store:      store,
+			BundleSize: bundleSize,
 			TweakBlock: func(b *pbbstream.Block) (*pbbstream.Block, error) { return b, nil },
 			Logger:     zlog,
 		}
 
-		if lowBlock := uint64(blockRange.Start); lowBlock%100 == 0 {
+		if lowBlock := uint64(blockRange.Start); lowBlock%bundleSize == 0 {
 			mergeWriter.LowBlockNum = lowBlock
 		}
 

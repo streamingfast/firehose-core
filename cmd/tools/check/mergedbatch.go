@@ -19,6 +19,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli/sflags"
+	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/types"
 )
 
@@ -44,7 +45,10 @@ func checkMergedBlocksBatchRunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	fileBlockSize := uint64(100)
+	fileBlockSize, err := firecore.GetMergedBlocksBundleSizeFlag(cmd)
+	if err != nil {
+		return err
+	}
 
 	blockRange := types.BlockRange{
 		Start: int64(start),

@@ -3,6 +3,7 @@ package info
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -147,10 +148,140 @@ func (s *InfoServer) getBlockFromOneBlockStore(ctx context.Context, blockNum uin
 	}
 }
 
+// detectBundleSizeMismatch checks the merged-blocks store for a bundle-size
+// misconfiguration in either direction, both of which silently skip blocks and
+// stall the stream on unlinkable blocks far from the root cause:
+//
+//   - Configured smaller than the files (e.g. reading a 200-block store with the
+//     default 100): the merged-blocks consumer would look for 0000000100 which
+//     does not exist.
+//   - Configured bigger than the files (e.g. reading a 100-block store with 1000):
+//     the merged-blocks consumer jumps over the blocks between the sparse
+//     boundaries.
+//
+// Merged-blocks stores have no holes in normal operation (an empty bundle is
+// still written as an empty file), so detection is done from the listing alone:
+// the gap between the first two file boundaries is the actual bundle size and
+// must equal the configured one. A file read is only needed for the degenerate
+// single-file store, where there is no second boundary to measure against
+// (merged-file writes are atomic, so that lone file is a *completed* bundle whose
+// highest block reveals the size).
+//
+//   - gap == configured: aligned.
+//   - gap < configured: files are smaller than configured; the merged-blocks
+//     consumer jumps over blocks. Set the flag down to the gap.
+//   - gap > configured: files are bigger than configured; the merged-blocks
+//     consumer looks for boundaries that do not exist. Set the flag up to the gap.
+//
+// The merged-blocks consumer does not hard-fail on a mismatch on its own (it only
+// warns about holes and unlinkable blocks), which is why this proactive check
+// exists. Returns a nil error when nothing is off or the store is empty/unreadable.
+func detectBundleSizeMismatch(ctx context.Context, mergedBlocksStore dstore.Store, firstStreamableBlock uint64) error {
+	configured := bstream.DefaultMergedBlocksBundleSize
+	if configured == 0 {
+		return nil
+	}
+	lowBoundary := firstStreamableBlock - (firstStreamableBlock % configured)
+	startFilename := fmt.Sprintf("%010d", lowBoundary)
+
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var boundaries []uint64
+	walkErr := mergedBlocksStore.WalkFrom(ctx, "", startFilename, func(filename string) error {
+		num, err := strconv.ParseUint(filename, 10, 64)
+		if err != nil {
+			return nil // skip non merged-blocks files (indexes, etc.)
+		}
+		boundaries = append(boundaries, num)
+		if len(boundaries) >= 2 {
+			return dstore.StopIteration
+		}
+		return nil
+	})
+	if walkErr != nil && walkErr != dstore.StopIteration {
+		return nil // listing failed; don't block startup on a best-effort check
+	}
+	if len(boundaries) == 0 {
+		return nil // empty store: nothing to infer
+	}
+
+	first := boundaries[0]
+	firstFile := fmt.Sprintf("%010d", first)
+
+	if len(boundaries) >= 2 {
+		gap := boundaries[1] - boundaries[0]
+		if gap == configured {
+			return nil // aligned
+		}
+		return fmt.Errorf("merged-blocks bundle size mismatch: configured %d but the store's files are %d blocks apart (%010d then %010d) -- reading it silently skips blocks; set --common-merged-blocks-bundle-size=%d to match the store",
+			configured, gap, boundaries[0], boundaries[1], gap)
+	}
+
+	// Single completed bundle: no gap to measure, so read its content.
+	maxBlock, overflow, ok := scanMergedFile(ctx, mergedBlocksStore, firstFile, first+configured)
+	if !ok {
+		return nil
+	}
+	if overflow { // file reaches into the next configured window -> bigger than configured
+		return fmt.Errorf("merged-blocks bundle size mismatch: configured %d but the only bundle file %s contains block %d (at or beyond boundary %d) -- the store uses a larger bundle size, so reading it skips blocks; increase --common-merged-blocks-bundle-size to match the store",
+			configured, firstFile, maxBlock, first+configured)
+	}
+	end := maxBlock + 1
+	if end < configured && end%100 == 0 { // file closed on a smaller bundle boundary
+		return fmt.Errorf("merged-blocks bundle size mismatch: configured %d but the only bundle file %s ends on block %d (a %d-block boundary) -- the store uses a smaller bundle size, which silently skips blocks; set --common-merged-blocks-bundle-size=%d to match the store",
+			configured, firstFile, maxBlock, end, end)
+	}
+	return nil
+}
+
+// scanMergedFile reads a merged-blocks file and returns the highest block number
+// it contains. It stops early, returning overflow=true, as soon as it sees a
+// block whose number is >= overflowAt (pass 0 to disable early exit and read the
+// whole file). Merged-file writes are atomic, so a present file is a complete
+// bundle. Returns ok=false if the file cannot be read.
+func scanMergedFile(ctx context.Context, store dstore.Store, filename string, overflowAt uint64) (highest uint64, overflow bool, ok bool) {
+	reader, err := store.OpenObject(ctx, filename)
+	if err != nil {
+		return 0, false, false
+	}
+	defer reader.Close()
+
+	blockReader, err := bstream.NewDBinBlockReader(reader)
+	if err != nil {
+		return 0, false, false
+	}
+
+	seen := false
+	for {
+		block, err := blockReader.Read()
+		if block != nil {
+			if block.Number > highest {
+				highest = block.Number
+			}
+			seen = true
+			if overflowAt != 0 && block.Number >= overflowAt {
+				return highest, true, true
+			}
+		}
+		if err != nil {
+			break
+		}
+	}
+	return highest, false, seen
+}
+
 // init tries to fetch the first streamable block from the different sources and fills the response with it
 // returns an error if it is incomplete
 // it can be called only once
 func (s *InfoServer) init(ctx context.Context, fhub *hub.ForkableHub, mergedBlocksStore dstore.Store, oneBlockStore dstore.Store, logger *zap.Logger) error {
+	if err := detectBundleSizeMismatch(ctx, mergedBlocksStore, s.response.FirstStreamableBlockNum); err != nil {
+		if s.validate {
+			return fmt.Errorf("%w -- use --ignore-advertise-validation to skip these checks", err)
+		}
+		logger.Warn("merged-blocks bundle size check", zap.Error(err))
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
 	// cancel is later and depends on s.validate
 

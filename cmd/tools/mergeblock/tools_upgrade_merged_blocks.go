@@ -47,16 +47,22 @@ func getMergedBlockUpgrader(tweakFunc func(block *pbbstream.Block) (*pbbstream.B
 			return fmt.Errorf("parsing stop block num: %w", err)
 		}
 
+		bundleSize, err := firecore.GetMergedBlocksBundleSizeFlag(cmd)
+		if err != nil {
+			return err
+		}
+
 		rootLog.Info("starting block upgrader process", zap.Uint64("start", start), zap.Uint64("stop", stop), zap.String("source", source), zap.String("dest", dest))
 		writer := &firecore.MergedBlocksWriter{
 			Cmd:          cmd,
 			Store:        destStore,
-			LowBlockNum:  firecore.LowBoundary(start),
+			LowBlockNum:  firecore.LowBoundaryFor(start, bundleSize),
+			BundleSize:   bundleSize,
 			StopBlockNum: stop,
 			TweakBlock:   tweakFunc,
 			Logger:       rootLog,
 		}
-		stream := stream.New(nil, sourceStore, nil, int64(start), writer, stream.WithFinalBlocksOnly())
+		stream := stream.New(nil, sourceStore, nil, int64(start), writer, stream.WithFinalBlocksOnly(), stream.WithMergedBlocksBundleSize(bundleSize))
 
 		err = stream.Run(context.Background())
 		if errors.Is(err, io.EOF) {

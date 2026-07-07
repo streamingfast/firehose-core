@@ -72,6 +72,9 @@ func createToolsPrintMergedBlocksE[B firecore.Block](chain *firecore.Chain[B], l
 		store, err := dstore.NewDBinStore(args[0])
 		cli.NoError(err, "Unable to create store %q", args[0])
 
+		bundleSize, err := firecore.GetMergedBlocksBundleSizeFlag(cmd)
+		cli.NoError(err, "Invalid merged-blocks bundle size")
+
 		blockRange := types.NewOpenRange(int64(bstream.GetProtocolFirstStreamableBlock))
 		if len(args) > 1 {
 			blockRange, err = types.GetBlockRangeFromArg(args[1])
@@ -89,7 +92,7 @@ func createToolsPrintMergedBlocksE[B firecore.Block](chain *firecore.Chain[B], l
 			store, err = dstore.NewDBinStore(storeURLFromFileInput(args[0]))
 			cli.NoError(err, "Unable to create store %q", path.Dir(args[0]))
 
-			storeFileRange := storeURLFileLikeRange(args[0])
+			storeFileRange := storeURLFileLikeRange(args[0], bundleSize)
 			if len(args) <= 1 {
 				// No block range explicitly specified, we will use the range from the filename
 				blockRange = storeFileRange
@@ -101,9 +104,24 @@ func createToolsPrintMergedBlocksE[B firecore.Block](chain *firecore.Chain[B], l
 
 		options := []bstream.FileSourceOption{
 			bstream.FileSourceErrorOnMissingMergedBlocksFile(),
+			bstream.FileSourceWithBundleSize(bundleSize),
 		}
 		if !blockRange.IsOpen() {
-			options = append(options, bstream.FileSourceWithStopBlock(blockRange.MustGetStopBlock()))
+			// The range end is exclusive but FileSource's stop block is inclusive, so stop one
+			// block earlier. When the requested range runs past the available data, FileSource
+			// prints everything it has and then errors on the first missing file.
+			if stopBlock := blockRange.MustGetStopBlock(); stopBlock > 0 {
+				options = append(options, bstream.FileSourceWithStopBlock(stopBlock-1))
+			}
+		} else {
+			// Open range (print everything available): there is no stop block to reach, so cap it
+			// at the last available merged-blocks file. Otherwise FileSource would print every
+			// block and then error on the (expected) missing next file.
+			lastBase, found, err := highestMergedBlocksBase(cmd.Context(), store, uint64(blockRange.GetStartBlock()), bundleSize)
+			cli.NoError(err, "Unable to locate last merged-blocks file in store %q", args[0])
+			if found {
+				options = append(options, bstream.FileSourceWithStopBlock(lastBase+bundleSize-1))
+			}
 		}
 
 		source := bstream.NewFileSource(store, uint64(blockRange.GetStartBlock()), bstream.HandlerFunc(func(blk *pbbstream.Block, obj any) error {
@@ -140,7 +158,7 @@ func looksLikeMergedBlocksFile(path string) bool {
 	return mergedBlocksFileRegex.MatchString(base)
 }
 
-func storeURLFileLikeRange(path string) types.BlockRange {
+func storeURLFileLikeRange(path string, bundleSize uint64) types.BlockRange {
 	base := filepath.Base(path)
 	groups := mergedBlocksFileRegex.FindStringSubmatch(base)
 	if len(groups) != 2 {
@@ -148,7 +166,62 @@ func storeURLFileLikeRange(path string) types.BlockRange {
 	}
 
 	startBlock, _ := strconv.ParseUint(groups[1], 10, 64)
-	return types.NewClosedRange(int64(startBlock), uint64(startBlock)+100)
+	return types.NewClosedRange(int64(startBlock), uint64(startBlock)+bundleSize)
+}
+
+// highestMergedBlocksBase returns the base block number of the last merged-blocks
+// file at or after startBlock's bundle boundary. Instead of listing the whole
+// store, it probes for file existence in exponentially growing steps and then
+// binary-searches, so it costs O(log n) store lookups. found is false when no
+// merged-blocks file exists at the starting boundary.
+//
+// It assumes the gap-free store the merger produces. A hole makes the probe
+// return some existing base past it rather than the true last file; that is
+// harmless here because FileSource reads sequentially and errors on the first
+// missing file anyway, surfacing the hole just as it did before.
+func highestMergedBlocksBase(ctx context.Context, store dstore.Store, startBlock, bundleSize uint64) (base uint64, found bool, err error) {
+	firstBase := startBlock - (startBlock % bundleSize)
+
+	if exists, err := mergedBlocksFileExists(ctx, store, firstBase); err != nil || !exists {
+		return 0, false, err
+	}
+
+	// Exponential search for an upper bound whose file does NOT exist. lo always
+	// points at a base known to exist, hi at one known to be missing.
+	lo := firstBase
+	var hi uint64
+	for step := uint64(1); ; step *= 2 {
+		candidate := firstBase + step*bundleSize
+		exists, err := mergedBlocksFileExists(ctx, store, candidate)
+		if err != nil {
+			return 0, false, err
+		}
+		if !exists {
+			hi = candidate
+			break
+		}
+		lo = candidate
+	}
+
+	// Binary search in (lo, hi] for the highest existing base.
+	for hi-lo > bundleSize {
+		mid := lo + ((hi-lo)/bundleSize/2)*bundleSize
+		exists, err := mergedBlocksFileExists(ctx, store, mid)
+		if err != nil {
+			return 0, false, err
+		}
+		if exists {
+			lo = mid
+		} else {
+			hi = mid
+		}
+	}
+
+	return lo, true, nil
+}
+
+func mergedBlocksFileExists(ctx context.Context, store dstore.Store, base uint64) (bool, error) {
+	return store.FileExists(ctx, fmt.Sprintf("%010d", base))
 }
 
 func storeURLFromFileInput(input string) string {

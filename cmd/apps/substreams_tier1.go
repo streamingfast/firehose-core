@@ -145,6 +145,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			config.StateStoreURL = firecore.MustReplaceDataDir(sfDataDir, viper.GetString("substreams-state-store-url"))
 			config.StateStoreDefaultTag = viper.GetString("substreams-state-store-default-tag")
 			config.StateBundleSize = viper.GetUint64("substreams-state-bundle-size")
+			config.MergedBlocksBundleSize = viper.GetUint64("common-merged-blocks-bundle-size")
 			config.MaxSubrequests = viper.GetUint64("substreams-tier1-max-subrequests")
 			config.SubrequestsEndpoint = viper.GetString("substreams-tier1-subrequests-endpoint")
 			config.ActiveRequestsSoftLimit = viper.GetInt("substreams-tier1-active-requests-soft-limit")

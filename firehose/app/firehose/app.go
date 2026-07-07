@@ -139,7 +139,10 @@ func (a *App) Run() error {
 			)
 		})
 
-		forkableHub = hub.NewForkableHubWithOptions(liveSourceFactory, 500, oneBlocksStore, []hub.Option{hub.WithLogger(a.logger)})
+		// the hub must hold at least two merged-blocks files worth of final
+		// blocks so the joining source can hand off from a file boundary
+		keepFinalBlocks := int(max(500, 2*bstream.DefaultMergedBlocksBundleSize))
+		forkableHub = hub.NewForkableHubWithOptions(liveSourceFactory, keepFinalBlocks, oneBlocksStore, []hub.Option{hub.WithLogger(a.logger)})
 		forkableHub.OnTerminated(a.Shutdown)
 
 		go forkableHub.Run()

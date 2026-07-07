@@ -20,10 +20,10 @@ var zlog, _ = logging.PackageLogger("substreams-store-size", "github.com/streami
 
 // StoreSizes contains the compressed (total) and uncompressed (live) sizes
 type StoreSizes struct {
-	TotalCompressed   int64  // Total size of all files (compressed)
-	LiveUncompressed  *int64 // Uncompressed size from latest file metadata (nil if not available)
-	LiveCompressed    int64  // Compressed size of latest file only
-	LatestFile        string // Name of the latest file
+	TotalCompressed  int64  // Total size of all files (compressed)
+	LiveUncompressed *int64 // Uncompressed size from latest file metadata (nil if not available)
+	LiveCompressed   int64  // Compressed size of latest file only
+	LatestFile       string // Name of the latest file
 }
 
 // StoreSizeQuerier provides an interface for getting the total size of files

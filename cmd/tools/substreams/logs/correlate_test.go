@@ -135,16 +135,16 @@ func TestCorrelateConnections(t *testing.T) {
 			name: "mixed connections and orphans",
 			entries: []LogEntry{
 				{
-					Message:          "incoming Substreams Blocks request",
-					TraceID:          "trace1",
-					UserID:           "sfinfra",
-					Timestamp:        ts1,
+					Message:   "incoming Substreams Blocks request",
+					TraceID:   "trace1",
+					UserID:    "sfinfra",
+					Timestamp: ts1,
 				},
 				{
-					Message:          "incoming Substreams Blocks request",
-					TraceID:          "trace2",
-					UserID:           "sfinfra",
-					Timestamp:        ts2,
+					Message:   "incoming Substreams Blocks request",
+					TraceID:   "trace2",
+					UserID:    "sfinfra",
+					Timestamp: ts2,
 				},
 				{
 					Message:              "substreams request stats",
@@ -170,10 +170,10 @@ func TestCorrelateConnections(t *testing.T) {
 			name: "tier2 stats should be ignored",
 			entries: []LogEntry{
 				{
-					Message:          "incoming Substreams Blocks request",
-					TraceID:          "trace1",
-					UserID:           "sfinfra",
-					Timestamp:        ts1,
+					Message:   "incoming Substreams Blocks request",
+					TraceID:   "trace1",
+					UserID:    "sfinfra",
+					Timestamp: ts1,
 				},
 				{
 					Message:              "substreams request stats",
@@ -219,14 +219,14 @@ func TestCorrelateConnections(t *testing.T) {
 
 func TestConnectionLogStatus(t *testing.T) {
 	tests := []struct {
-		name   string
-		conn   *ConnectionLog
-		want   ConnectionStatus
+		name string
+		conn *ConnectionLog
+		want ConnectionStatus
 	}{
 		{
-			name:   "no stats means active",
-			conn:   &ConnectionLog{},
-			want:   StatusActive,
+			name: "no stats means active",
+			conn: &ConnectionLog{},
+			want: StatusActive,
 		},
 		{
 			name: "stats without error means closed",

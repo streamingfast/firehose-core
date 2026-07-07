@@ -87,7 +87,10 @@ func NewCheckCommand[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Lo
 func createToolsCheckMergedBlocksE[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) firecore.CommandExecutor {
 	return func(cmd *cobra.Command, args []string) error {
 		storeURL := args[0]
-		fileBlockSize := uint64(100)
+		fileBlockSize, err := firecore.GetMergedBlocksBundleSizeFlag(cmd)
+		if err != nil {
+			return err
+		}
 
 		blockRange, err := types.GetBlockRangeFromFlagDefault(cmd, "range", types.NewOpenRange(0))
 		if err != nil {
