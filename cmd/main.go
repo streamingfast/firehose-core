@@ -210,6 +210,7 @@ func registerCommonFlags[B firecore.Block](chain *firecore.Chain[B]) {
 		// Common stores configuration flags
 		cmd.Flags().String("common-one-block-store-url", firecore.OneBlockStoreURL, "[COMMON] Store URL to read/write one-block files")
 		cmd.Flags().String("common-merged-blocks-store-url", firecore.MergedBlocksStoreURL, "[COMMON] Store URL where to read/write merged blocks.")
+		cmd.Flags().Uint64("common-merged-blocks-bundle-size", 100, "[COMMON] Number of blocks per merged-blocks file, must be a positive multiple of 100. Applies to the merger (writes) and to every merged-blocks reader (firehose, substreams-tier1/tier2, ...). It must match the size of the files actually present in the store: a full bundle of blocks is buffered in memory when merging, so beware of memory usage on chains with big blocks.")
 		cmd.Flags().String("common-forked-blocks-store-url", firecore.ForkedBlocksStoreURL, "[COMMON] Store URL where to read/write forked block files that we want to keep.")
 		cmd.Flags().String("common-live-blocks-addr", firecore.RelayerServingAddr, "[COMMON] gRPC endpoint to get real-time blocks.")
 		cmd.Flags().String("common-tmp-dir", firecore.TmpDir, "[COMMON] Local directory to store temporary files")

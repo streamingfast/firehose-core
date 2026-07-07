@@ -30,6 +30,7 @@ import (
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/cli"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/types"
@@ -72,6 +73,8 @@ func createToolsPrintMergedBlocksE[B firecore.Block](chain *firecore.Chain[B], l
 		store, err := dstore.NewDBinStore(args[0])
 		cli.NoError(err, "Unable to create store %q", args[0])
 
+		bundleSize := sflags.MustGetUint64(cmd, "merged-blocks-bundle-size")
+
 		blockRange := types.NewOpenRange(int64(bstream.GetProtocolFirstStreamableBlock))
 		if len(args) > 1 {
 			blockRange, err = types.GetBlockRangeFromArg(args[1])
@@ -89,7 +92,7 @@ func createToolsPrintMergedBlocksE[B firecore.Block](chain *firecore.Chain[B], l
 			store, err = dstore.NewDBinStore(storeURLFromFileInput(args[0]))
 			cli.NoError(err, "Unable to create store %q", path.Dir(args[0]))
 
-			storeFileRange := storeURLFileLikeRange(args[0])
+			storeFileRange := storeURLFileLikeRange(args[0], bundleSize)
 			if len(args) <= 1 {
 				// No block range explicitly specified, we will use the range from the filename
 				blockRange = storeFileRange
@@ -101,6 +104,7 @@ func createToolsPrintMergedBlocksE[B firecore.Block](chain *firecore.Chain[B], l
 
 		options := []bstream.FileSourceOption{
 			bstream.FileSourceErrorOnMissingMergedBlocksFile(),
+			bstream.FileSourceWithBundleSize(bundleSize),
 		}
 		if !blockRange.IsOpen() {
 			options = append(options, bstream.FileSourceWithStopBlock(blockRange.MustGetStopBlock()))
@@ -140,7 +144,7 @@ func looksLikeMergedBlocksFile(path string) bool {
 	return mergedBlocksFileRegex.MatchString(base)
 }
 
-func storeURLFileLikeRange(path string) types.BlockRange {
+func storeURLFileLikeRange(path string, bundleSize uint64) types.BlockRange {
 	base := filepath.Base(path)
 	groups := mergedBlocksFileRegex.FindStringSubmatch(base)
 	if len(groups) != 2 {
@@ -148,7 +152,7 @@ func storeURLFileLikeRange(path string) types.BlockRange {
 	}
 
 	startBlock, _ := strconv.ParseUint(groups[1], 10, 64)
-	return types.NewClosedRange(int64(startBlock), uint64(startBlock)+100)
+	return types.NewClosedRange(int64(startBlock), uint64(startBlock)+bundleSize)
 }
 
 func storeURLFromFileInput(input string) string {

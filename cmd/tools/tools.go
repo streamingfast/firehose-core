@@ -68,6 +68,7 @@ func ConfigureToolsCmd[B firecore.Block](
 		`))
 
 		flags.String("bytes-encoding", "hex", "Encoding for bytes fields when printing in 'text', 'json' or 'jsonl' --output, either 'hex', 'base58' or 'base64'")
+		flags.Uint64("merged-blocks-bundle-size", 100, "Number of blocks per merged-blocks file in the store(s) being read or written")
 		flags.StringSlice("proto-paths", []string{""}, "Paths to proto files to use for dynamic decoding of responses and blocks")
 	}
 
@@ -81,6 +82,7 @@ func ConfigureToolsCmd[B firecore.Block](
 	ToolsCmd.AddCommand(firehose.NewToolsFirehosePrometheusExporterCmd(chain, logger, tracer))
 	ToolsCmd.AddCommand(mergeblock.NewToolsUnmergeBlocksCmd(chain, logger))
 	ToolsCmd.AddCommand(mergeblock.NewToolsMergeBlocksCmd(chain, logger))
+	ToolsCmd.AddCommand(mergeblock.NewToolsResizeMergedBlocksCmd(chain, logger))
 	ToolsCmd.AddCommand(fix.NewToolsFixBloatedMergedBlocks(chain, logger))
 	ToolsCmd.AddCommand(relayer.NewToolsRelayerGroup(chain, logger))
 	ToolsCmd.AddCommand(substreams.NewToolsSubstreamsCmd(chain, logger))

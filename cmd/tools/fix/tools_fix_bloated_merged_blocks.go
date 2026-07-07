@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/cmd/tools/check"
@@ -43,7 +44,9 @@ func runFixBloatedMergedBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 			return fmt.Errorf("parsing block range: %w", err)
 		}
 
-		err = srcStore.Walk(ctx, check.WalkBlockPrefix(blockRange, 100), func(filename string) error {
+		bundleSize := sflags.MustGetUint64(cmd, "merged-blocks-bundle-size")
+
+		err = srcStore.Walk(ctx, check.WalkBlockPrefix(blockRange, bundleSize), func(filename string) error {
 			zlog.Debug("checking merged block file", zap.String("filename", filename))
 
 			startBlock := firecore.MustParseUint64(filename)
@@ -53,7 +56,7 @@ func runFixBloatedMergedBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 				return dstore.StopIteration
 			}
 
-			if startBlock+100 < uint64(blockRange.Start) {
+			if startBlock+bundleSize < uint64(blockRange.Start) {
 				zlog.Debug("skipping merged block file", zap.String("reason", "before start block"), zap.String("filename", filename))
 				return nil
 			}

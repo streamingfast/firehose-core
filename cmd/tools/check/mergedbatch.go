@@ -44,7 +44,7 @@ func checkMergedBlocksBatchRunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	fileBlockSize := uint64(100)
+	fileBlockSize := sflags.MustGetUint64(cmd, "merged-blocks-bundle-size")
 
 	blockRange := types.BlockRange{
 		Start: int64(start),
