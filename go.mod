@@ -33,7 +33,7 @@ require (
 	github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97
 	github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62
 	github.com/streamingfast/dsession v0.0.0-20260414190543-79b9846e7c58
-	github.com/streamingfast/dstore v0.2.4-0.20260520032149-6421410d7faa
+	github.com/streamingfast/dstore v0.2.4-0.20260709193311-122163592902
 	github.com/streamingfast/firehose-networks v0.2.2
 	github.com/streamingfast/logging v1.2.2
 	github.com/streamingfast/payment-gateway v0.0.0-20260527144655-d0576d2a4ee3

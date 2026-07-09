@@ -12,6 +12,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Changed
 
+- Bumped `dstore` to include the S3 request-checksum fix: sends the required checksum on S3 uploads when the bucket/endpoint mandates it, avoiding upload failures against providers that require request checksums.
 - Bumped `substreams` to latest `develop`.
   - Server: store quicksave/quickload now run up to 8 stores concurrently instead of one at a time, and quicksave streams the store lazily and unsorted (one KV entry at a time, no key sort/allocation) instead of buffering the whole serialized store, lowering peak memory and save time for large stores. On-disk format is unchanged; quickload is order-independent.
   - Server: tier1 store loading at request start now loads up to 8 stores concurrently (size probe + download/decode) instead of one at a time.
