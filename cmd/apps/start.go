@@ -71,6 +71,12 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 
 	bstream.GetProtocolFirstStreamableBlock = sflags.MustGetUint64(cmd, "common-first-streamable-block")
 
+	mergedBlocksBundleSize := sflags.MustGetUint64(cmd, "common-merged-blocks-bundle-size")
+	if err := firecore.ValidateMergedBlocksBundleSize(mergedBlocksBundleSize); err != nil {
+		return err
+	}
+	bstream.DefaultMergedBlocksBundleSize = mergedBlocksBundleSize
+
 	err = bstream.ValidateRegistry()
 	if err != nil {
 		return fmt.Errorf("protocol specific hooks not configured correctly: %w", err)

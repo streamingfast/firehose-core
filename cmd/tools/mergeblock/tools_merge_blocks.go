@@ -46,9 +46,15 @@ func runMergeBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 			return fmt.Errorf("converting low bundary string to uint64: %w", err)
 		}
 
+		bundleSize, err := firecore.GetMergedBlocksBundleSizeFlag(cmd)
+		if err != nil {
+			return err
+		}
+
 		mergeWriter := &firecore.MergedBlocksWriter{
 			Store:        destStore,
 			LowBlockNum:  lowBundary,
+			BundleSize:   bundleSize,
 			StopBlockNum: 0,
 			Logger:       zlog,
 			Cmd:          cmd,
@@ -71,7 +77,7 @@ func runMergeBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 				return nil
 			}
 
-			if currentBlockNumber > lowBundary+100 {
+			if currentBlockNumber > lowBundary+bundleSize {
 				return dstore.StopIteration
 			}
 

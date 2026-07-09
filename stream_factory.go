@@ -137,6 +137,10 @@ func (sf *StreamFactory) New(
 		options = append(options, opt)
 	}
 
+	// redundant with the FileSource default, but makes the process-wide
+	// configuration explicit at the stream level
+	options = append(options, stream.WithMergedBlocksBundleSize(bstream.DefaultMergedBlocksBundleSize))
+
 	str := stream.New(
 		forkedBlocksStore,
 		mergedBlocksStore,

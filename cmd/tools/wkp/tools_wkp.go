@@ -1,8 +1,8 @@
 package wkp
 
 import (
-	. "github.com/streamingfast/cli"
 	"github.com/spf13/cobra"
+	. "github.com/streamingfast/cli"
 	firecore "github.com/streamingfast/firehose-core"
 	"go.uber.org/zap"
 )

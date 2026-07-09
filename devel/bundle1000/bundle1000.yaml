@@ -1,0 +1,33 @@
+start:
+  args:
+    - reader-node
+    - merger
+    - relayer
+    - firehose
+    - substreams-tier1
+    - substreams-tier2
+  flags:
+    # Produce and consume 1000-blocks merged-blocks files instead of the
+    # default 100. Applies to the merger (writer) and to every reader
+    # (firehose, substreams-tier1); substreams-tier2 receives the value
+    # per-request from tier1.
+    common-merged-blocks-bundle-size: 1000
+
+    advertise-block-id-encoding: "hex"
+    advertise-chain-name: "acme-dummy-blockchain"
+    # Specifies the path to the binary, we assume you did
+    # `go install github.com/streamingfast/dummy-blockchain@latest` (and that you have value
+    # of `go env GOPATH` in your environment).
+    reader-node-path: "dummy-blockchain"
+    reader-node-data-dir: "{data-dir}/reader-node"
+
+    # Flags that will be added to the dummy chain process command.
+    # The genesis burst is above the bundle size so the first
+    # 1000-blocks merged file appears within seconds; the chain then
+    # produces 10 blocks/s, one new bundle every ~100 seconds.
+    reader-node-arguments: start
+      --tracer=firehose
+      --store-dir="{node-data-dir}"
+      --block-rate=600
+      --genesis-height=0
+      --genesis-block-burst=1200

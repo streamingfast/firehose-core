@@ -104,7 +104,7 @@ func CheckMergedBlocksBatch(
 					destStore.WriteObject(ctx, outputFile, strings.NewReader(""))
 				}
 			} else {
-				brokenSince := types.RoundToBundleStartBlock(uint64(lastSeenBlock.num+1), 100)
+				brokenSince := types.RoundToBundleStartBlock(uint64(lastSeenBlock.num+1), fileBlockSize)
 				for i := brokenSince; i <= baseNum; i += fileBlockSize64 {
 					fmt.Printf("found broken file %q, %s\n", filename, details)
 					if destStore != nil {

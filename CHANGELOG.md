@@ -12,7 +12,34 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Changed
 
+- Bumped `dstore` to include the S3 request-checksum fix: sends the required checksum on S3 uploads when the bucket/endpoint mandates it, avoiding upload failures against providers that require request checksums.
 - Bumped `substreams` to latest `develop`.
+  - Server: store quicksave/quickload now run up to 8 stores concurrently instead of one at a time, and quicksave streams the store lazily and unsorted (one KV entry at a time, no key sort/allocation) instead of buffering the whole serialized store, lowering peak memory and save time for large stores. On-disk format is unchanged; quickload is order-independent.
+  - Server: tier1 store loading at request start now loads up to 8 stores concurrently (size probe + download/decode) instead of one at a time.
+
+### Added
+
+- New `--common-merged-blocks-bundle-size` flag (default `100`, must be a positive multiple of 100) setting the number of blocks per merged-blocks file for the whole process: the merger writes bundles of that size and every reader (firehose, substreams-tier1, cursor resolution, single-block fetch) expects files of that size. substreams-tier1 forwards the value to tier2 on each subrequest, so a shared tier2 fleet can serve chains with different bundle sizes (upgrade tier2s first). The value must match the files actually present in the store; see `devel/bundle1000/` for a working 1000-blocks example.
+- New `fire{chain} tools resize-merged-blocks <source> <destination> <start> <stop> --source-bundle-size=100 --target-bundle-size=1000` command rewriting a merged-blocks store to a different bundle size (both up- and down-sizing, sizes must divide evenly, start/stop must be aligned on target boundaries).
+- Tools: new shared `--merged-blocks-bundle-size` flag (default `100`) on `tools` subcommands reading or writing merged blocks (`check merged-blocks`, `print merged-blocks`, `compare-blocks`, `merge-blocks`, `unmerge-blocks`, `upgrade-merged-blocks`, `download-from-firehose`, `fix-bloated-merged-blocks`, ...). The value is validated up-front (must be a positive multiple of 100) so an invalid size fails with a clear error instead of a later panic.
+
+### Fixed
+
+- `tools print merged-blocks <store>` no longer truncates its output when a merged-blocks file is missing (open range with no explicit stop, or a bounded range extending past the last available file): with the bumped `bstream` dependency it now prints every available block first, instead of discarding in-flight files on an async shutdown. On an open range it caps the stream at the last available merged-blocks file (found with an `O(log n)` existence probe rather than a full store listing) so it stops cleanly instead of erroring on the expected-missing next file. Also fixes an off-by-one that stopped one block early on a closed range, and a potential unsigned underflow when a closed range ends at block 0.
+
+### Changed
+
+- The firehose and substreams-tier1 hubs now keep `max(500|200, 2 x merged-blocks bundle size)` final blocks in memory so the joining source can hand off from a merged-blocks file boundary.
+- A merged-blocks reader now fails fast with a clear error when a file contains blocks beyond the configured bundle size (e.g. reading a 1000-blocks store with the default of 100).
+
+- merger: new `--merger-prune-one-block-files-after` flag (default `100`) controlling how many blocks below the last merged block one-block files are kept before deletion. Raise it so a relayer/firehose that briefly falls behind can still find the one-block files needed to bridge the gap and relink, instead of getting stuck in a reconnect loop or dying with `cannot link block after reconnection, restart required`. Clamped to a minimum of `100` (the bundle size) to preserve the safety margin against deleting not-yet-merged files.
+
+### Changed
+
+- Bumped `substreams` to latest `develop`.
+  - Server: store quicksave now also triggers on client disconnect (context canceled), not only on graceful server shutdown, so a reconnecting client can resume without reprocessing. Only applies to production-mode requests.
+  - Server: quicksave block count now counts settled blocks (normal or last-partial) instead of skipping partials entirely, so quicksave arms correctly on flash-block chains; the minimum sent-block threshold before a quicksave triggers was raised from 25 to 50.
+  - Server: the `substreams request stats` log now includes the last block sent to the client (`last_sent_block_num`, `last_sent_block_id`, `last_sent_block_time`), and quicksave/quickload logs now report their duration (`save_duration` / `load_duration`).
   - Server: `tier1` calls to hosted foundational stores now forward the `x-organization-id` identity header (alongside the existing trusted headers), so a store's internal trust-based listener can authorize the request without an end-user JWT. This fixes `Unauthenticated: required authorization token not found` errors when reading from hosted foundational stores resolved via the control-plane registry.
   - Server: foundational store calls that fail with authentication errors, organization id mismatch, or prolonged unreachability now bubble up to the user as a non-deterministic (uncached) error instead of retrying until the global deadline. Transient unavailability is still retried (~30s) to absorb blips and rolling restarts.
 

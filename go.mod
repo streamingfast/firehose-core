@@ -23,7 +23,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
-	github.com/streamingfast/bstream v0.0.2-0.20260707150341-487b28967227
+	github.com/streamingfast/bstream v0.0.2-0.20260709191130-aecaf73e1c32
 	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b
 	github.com/streamingfast/dauth v0.0.0-20260318230957-4ab1e1d2ebc3
 	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7
@@ -33,7 +33,7 @@ require (
 	github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97
 	github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62
 	github.com/streamingfast/dsession v0.0.0-20260414190543-79b9846e7c58
-	github.com/streamingfast/dstore v0.2.4-0.20260520032149-6421410d7faa
+	github.com/streamingfast/dstore v0.2.4-0.20260709193311-122163592902
 	github.com/streamingfast/firehose-networks v0.2.2
 	github.com/streamingfast/logging v1.2.2
 	github.com/streamingfast/payment-gateway v0.0.0-20260527144655-d0576d2a4ee3
