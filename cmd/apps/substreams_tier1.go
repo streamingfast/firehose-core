@@ -164,7 +164,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			config.FoundationalStoresConfigPath = viper.GetString("substreams-tier1-foundational-stores-config-path")
 			config.HostedStoreRegistryAddress = viper.GetString("substreams-tier1-hosted-store-registry-address")
 			config.OutputBufferSize = viper.GetUint64("substreams-tier1-output-buffer-size")
-			config.StoresScratchSpace = viper.GetString("substreams-stores-scratch-space")
+			config.StoresScratchSpace = firecore.MustReplaceDataDir(sfDataDir, viper.GetString("substreams-stores-scratch-space"))
 			config.StoresBackend = viper.GetString("substreams-stores-backend")
 
 			sessionPlugin := viper.GetString("common-session-plugin")
