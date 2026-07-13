@@ -107,6 +107,8 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 			config.BlockExecutionTimeout = executionTimeout
 			config.SegmentExecutionTimeout = segmentExecutionTimeout
 			config.MaximumConcurrentRequests = maximumConcurrentRequests
+			config.StoresScratchSpace = firecore.MustReplaceDataDir(runtime.AbsDataDir, viper.GetString("substreams-stores-scratch-space"))
+			config.StoresBackend = viper.GetString("substreams-stores-backend")
 			config.HostedStoreRegistryAddress = viper.GetString("substreams-tier2-hosted-store-registry-address")
 
 			return app.NewTier2(appLogger,

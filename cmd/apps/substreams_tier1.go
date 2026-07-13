@@ -80,6 +80,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().String("substreams-tier1-foundational-stores-config-path", "", "default path for foundational stores endpoint configuration file")
 			cmd.Flags().String("substreams-tier1-hosted-store-registry-address", "", "gRPC address of the control-plane registry service used to resolve hosted foundational stores (legacy/current stores continue to use the JSON config path)")
 			cmd.Flags().Uint64("substreams-tier1-output-buffer-size", 100, "max number of messages bundled into BlockScopedDatas (for clients using v4)")
+			cmd.Flags().Uint64("substreams-tier1-store-size-limit", 0, "Override the default store size limit (in bytes) for tier2 stores. 0 keeps the default of 1GiB. Forwarded to tier2 on each subrequest.")
 			// all substreams
 			registerCommonSubstreamsFlags(cmd)
 			return nil
@@ -164,6 +165,9 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			config.FoundationalStoresConfigPath = viper.GetString("substreams-tier1-foundational-stores-config-path")
 			config.HostedStoreRegistryAddress = viper.GetString("substreams-tier1-hosted-store-registry-address")
 			config.OutputBufferSize = viper.GetUint64("substreams-tier1-output-buffer-size")
+			config.StoresScratchSpace = firecore.MustReplaceDataDir(sfDataDir, viper.GetString("substreams-stores-scratch-space"))
+			config.StoresBackend = viper.GetString("substreams-stores-backend")
+			config.StoreSizeLimit = viper.GetUint64("substreams-tier1-store-size-limit")
 
 			sessionPlugin := viper.GetString("common-session-plugin")
 			sessionPool, err := dsession.New(sessionPlugin, appLogger)
