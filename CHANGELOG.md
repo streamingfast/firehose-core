@@ -8,19 +8,7 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
-
-### Changed
-
-- Bumped `dstore` to include the S3 request-checksum fix: sends the required checksum on S3 uploads when the bucket/endpoint mandates it, avoiding upload failures against providers that require request checksums.
-- Bumped `substreams` to latest `develop`.
-  - Server: new opt-in mmap (bbolt-backed) store backend, selectable via `--substreams-stores-backend=mmap` (default `memory`). It keeps FullKV store data in a memory-mapped file so cold pages are reclaimable by the kernel under memory pressure, instead of pinning everything on the non-reclaimable Go heap — this addresses production OOMs with large or highly concurrent stores. The in-memory backend remains the default and is byte-for-byte unchanged; mmap is validated to produce identical output. **The scratch-space directory holding the bbolt files (`--substreams-stores-scratch-space`) must live on a local NVMe SSD**: the store is continuously read and written through the mmap and the kernel pages it straight to that file, so a slow or network-backed disk (EBS-class, NFS) turns store operations into an I/O bottleneck and negates the benefit.
-  - Server: store quicksave/quickload now run up to 8 stores concurrently instead of one at a time, and quicksave streams the store lazily and unsorted (one KV entry at a time, no key sort/allocation) instead of buffering the whole serialized store, lowering peak memory and save time for large stores. On-disk format is unchanged; quickload is order-independent.
-  - Server: tier1 store loading at request start now loads up to 8 stores concurrently (size probe + download/decode) instead of one at a time.
-  - Server: cached deterministic errors now expire. Each error file carries a write timestamp in its name (`errors.<block>.<hash>.<unix>`), and on read tier1 discards any error older than `SUBSTREAMS_DETERMINISTIC_ERROR_MAX_AGE` (Go duration, default `1h`) and retries execution. Legacy error files without a timestamp are deleted on read.
-  - Server: canceled store loads now abort promptly instead of reading the entire (multi-GB) store file into the heap before returning, so a canceled/disconnected request stops hydrating immediately and no longer transiently pins gigabytes of store data.
-  - Server: a Blocks request whose start block resolves (from a cursor) to exactly the exclusive stop block now completes cleanly instead of returning `InvalidArgument: start block and stop block are the same`. This previously surfaced as a fatal, non-retryable error to clients that reconnected with a cursor sitting on the last block of the range after a transient disconnect. Raw (cursor-less) requests with `start == stop` still return the InvalidArgument as before.
-  - Server: client disconnects (`context canceled`) on a tier1 Blocks stream are no longer logged as `WARNING`/`ERROR` with `code Unknown`; they now resolve to `codes.Canceled` and are logged at Debug/Info as intended.
+## v1.16.0
 
 ### Added
 
@@ -28,28 +16,33 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - New `fire{chain} tools resize-merged-blocks <source> <destination> <start> <stop> --source-bundle-size=100 --target-bundle-size=1000` command rewriting a merged-blocks store to a different bundle size (both up- and down-sizing, sizes must divide evenly, start/stop must be aligned on target boundaries).
 - Tools: new shared `--merged-blocks-bundle-size` flag (default `100`) on `tools` subcommands reading or writing merged blocks (`check merged-blocks`, `print merged-blocks`, `compare-blocks`, `merge-blocks`, `unmerge-blocks`, `upgrade-merged-blocks`, `download-from-firehose`, `fix-bloated-merged-blocks`, ...). The value is validated up-front (must be a positive multiple of 100) so an invalid size fails with a clear error instead of a later panic.
 - New `--substreams-tier1-store-size-limit` flag (default `0` = 1GiB) overriding the store size limit (in bytes) for tier2 stores; the value is forwarded from tier1 to tier2 on each subrequest. Replaces the removed `SUBSTREAMS_STORE_SIZE_LIMIT` environment variable, which no longer needs to be set on tier2.
-- New `--substreams-stores-backend` flag (default `memory`) on `substreams-tier1` and `substreams-tier2`, selecting the FullKV store KV backend: `memory` (Go heap) or `mmap` (bbolt-backed, opt-in — reclaimable under memory pressure, see the `substreams` bump above).
+- New `--substreams-stores-backend` flag (default `memory`) on `substreams-tier1` and `substreams-tier2`, selecting the FullKV store KV backend: `memory` (Go heap) or `mmap` (bbolt-backed, opt-in — reclaimable under memory pressure, see the `substreams` bump below).
 - New `--substreams-stores-scratch-space` flag (default `{sf-data-dir}/substreams/stores-scratch`) for the local scratch directory used by store KV backends (e.g. the `mmap` bbolt files). Must be on a local NVMe SSD when using `mmap`.
-
-### Fixed
-
-- `tools print merged-blocks <store>` no longer truncates its output when a merged-blocks file is missing (open range with no explicit stop, or a bounded range extending past the last available file): with the bumped `bstream` dependency it now prints every available block first, instead of discarding in-flight files on an async shutdown. On an open range it caps the stream at the last available merged-blocks file (found with an `O(log n)` existence probe rather than a full store listing) so it stops cleanly instead of erroring on the expected-missing next file. Also fixes an off-by-one that stopped one block early on a closed range, and a potential unsigned underflow when a closed range ends at block 0.
+- New `--merger-prune-one-block-files-after` flag (default `100`) controlling how many blocks below the last merged block one-block files are kept before deletion. Raise it so a relayer/firehose that briefly falls behind can still find the one-block files needed to bridge the gap and relink, instead of getting stuck in a reconnect loop or dying with `cannot link block after reconnection, restart required`. Clamped to a minimum of `100` (the bundle size) to preserve the safety margin against deleting not-yet-merged files.
 
 ### Changed
 
-- The firehose and substreams-tier1 hubs now keep `max(500|200, 2 x merged-blocks bundle size)` final blocks in memory so the joining source can hand off from a merged-blocks file boundary.
-- A merged-blocks reader now fails fast with a clear error when a file contains blocks beyond the configured bundle size (e.g. reading a 1000-blocks store with the default of 100).
-
-- merger: new `--merger-prune-one-block-files-after` flag (default `100`) controlling how many blocks below the last merged block one-block files are kept before deletion. Raise it so a relayer/firehose that briefly falls behind can still find the one-block files needed to bridge the gap and relink, instead of getting stuck in a reconnect loop or dying with `cannot link block after reconnection, restart required`. Clamped to a minimum of `100` (the bundle size) to preserve the safety margin against deleting not-yet-merged files.
-
-### Changed
-
-- Bumped `substreams` to latest `develop`.
+- Bumped [substreams@v1.20.1](https://github.com/streamingfast/substreams/releases/tag/v1.20.1)
+  - Server: new opt-in mmap (bbolt-backed) store backend, selectable via `--substreams-stores-backend=mmap` (default `memory`). It keeps FullKV store data in a memory-mapped file so cold pages are reclaimable by the kernel under memory pressure, instead of pinning everything on the non-reclaimable Go heap — this addresses production OOMs with large or highly concurrent stores. The in-memory backend remains the default and is byte-for-byte unchanged; mmap is validated to produce identical output. **The scratch-space directory holding the bbolt files (`--substreams-stores-scratch-space`) must live on a local NVMe SSD**: the store is continuously read and written through the mmap and the kernel pages it straight to that file, so a slow or network-backed disk (EBS-class, NFS) turns store operations into an I/O bottleneck and negates the benefit.
+  - Server: store quicksave/quickload now run up to 8 stores concurrently instead of one at a time, and quicksave streams the store lazily and unsorted (one KV entry at a time, no key sort/allocation) instead of buffering the whole serialized store, lowering peak memory and save time for large stores. On-disk format is unchanged; quickload is order-independent.
+  - Server: tier1 store loading at request start now loads up to 8 stores concurrently (size probe + download/decode) instead of one at a time.
+  - Server: cached deterministic errors now expire. Each error file carries a write timestamp in its name (`errors.<block>.<hash>.<unix>`), and on read tier1 discards any error older than `SUBSTREAMS_DETERMINISTIC_ERROR_MAX_AGE` (Go duration, default `1h`) and retries execution. Legacy error files without a timestamp are deleted on read.
+  - Server: canceled store loads now abort promptly instead of reading the entire (multi-GB) store file into the heap before returning, so a canceled/disconnected request stops hydrating immediately and no longer transiently pins gigabytes of store data.
+  - Server: a Blocks request whose start block resolves (from a cursor) to exactly the exclusive stop block now completes cleanly instead of returning `InvalidArgument: start block and stop block are the same`. This previously surfaced as a fatal, non-retryable error to clients that reconnected with a cursor sitting on the last block of the range after a transient disconnect. Raw (cursor-less) requests with `start == stop` still return the InvalidArgument as before.
+  - Server: client disconnects (`context canceled`) on a tier1 Blocks stream are no longer logged as `WARNING`/`ERROR` with `code Unknown`; they now resolve to `codes.Canceled` and are logged at Debug/Info as intended.
   - Server: store quicksave now also triggers on client disconnect (context canceled), not only on graceful server shutdown, so a reconnecting client can resume without reprocessing. Only applies to production-mode requests.
   - Server: quicksave block count now counts settled blocks (normal or last-partial) instead of skipping partials entirely, so quicksave arms correctly on flash-block chains; the minimum sent-block threshold before a quicksave triggers was raised from 25 to 50.
   - Server: the `substreams request stats` log now includes the last block sent to the client (`last_sent_block_num`, `last_sent_block_id`, `last_sent_block_time`), and quicksave/quickload logs now report their duration (`save_duration` / `load_duration`).
   - Server: `tier1` calls to hosted foundational stores now forward the `x-organization-id` identity header (alongside the existing trusted headers), so a store's internal trust-based listener can authorize the request without an end-user JWT. This fixes `Unauthenticated: required authorization token not found` errors when reading from hosted foundational stores resolved via the control-plane registry.
   - Server: foundational store calls that fail with authentication errors, organization id mismatch, or prolonged unreachability now bubble up to the user as a non-deterministic (uncached) error instead of retrying until the global deadline. Transient unavailability is still retried (~30s) to absorb blips and rolling restarts.
+  - Server: on a linear resume from a cursor, tier1 now emits the client session (trace id) and starts keepalives *before* streaming the quicksave files into the stores, instead of after. Decoding a large store from a cold/remote quicksave can take a long time and previously ran with zero output, risking a gateway/client idle-timeout before the trace id ever arrived; the store files are opened (existence-checked) first, then streamed once the session is sent.
+- Bumped `dstore` to include the S3 request-checksum fix: sends the required checksum on S3 uploads when the bucket/endpoint mandates it, avoiding upload failures against providers that require request checksums.
+- The firehose and substreams-tier1 hubs now keep `max(500|200, 2 x merged-blocks bundle size)` final blocks in memory so the joining source can hand off from a merged-blocks file boundary.
+- A merged-blocks reader now fails fast with a clear error when a file contains blocks beyond the configured bundle size (e.g. reading a 1000-blocks store with the default of 100).
+
+### Fixed
+
+- `tools print merged-blocks <store>` no longer truncates its output when a merged-blocks file is missing (open range with no explicit stop, or a bounded range extending past the last available file): with the bumped `bstream` dependency it now prints every available block first, instead of discarding in-flight files on an async shutdown. On an open range it caps the stream at the last available merged-blocks file (found with an `O(log n)` existence probe rather than a full store listing) so it stops cleanly instead of erroring on the expected-missing next file. Also fixes an off-by-one that stopped one block early on a closed range, and a potential unsigned underflow when a closed range ends at block 0.
 
 ## v1.15.0
 
