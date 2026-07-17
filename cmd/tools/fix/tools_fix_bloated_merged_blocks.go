@@ -76,6 +76,7 @@ func runFixBloatedMergedBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 
 			mergeWriter := &firecore.MergedBlocksWriter{
 				Store:      destStore,
+				BundleSize: bundleSize,
 				TweakBlock: func(b *pbbstream.Block) (*pbbstream.Block, error) { return b, nil },
 				Logger:     zlog,
 			}
@@ -90,6 +91,9 @@ func runFixBloatedMergedBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 				block, err := br.Read()
 				if errors.Is(err, io.EOF) {
 					break
+				}
+				if err != nil {
+					return fmt.Errorf("reading block from %s: %w", filename, err)
 				}
 
 				if block.Number < startBlock {

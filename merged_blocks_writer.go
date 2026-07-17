@@ -22,6 +22,7 @@ type MergedBlocksWriter struct {
 	BundleSize uint64
 
 	blocks         []*pbbstream.Block
+	lastBlock      *pbbstream.Block // last block of the previously written bundle, carried into empty gap bundles
 	processedCount uint64
 	Logger         *zap.Logger
 	Cmd            *cobra.Command
@@ -61,7 +62,7 @@ func (w *MergedBlocksWriter) ProcessBlock(blk *pbbstream.Block, obj interface{})
 		)
 	}
 
-	if w.LowBlockNum == 0 && blk.Number >= bundleSize { // initial block
+	if w.LowBlockNum == 0 && len(w.blocks) == 0 && blk.Number >= bundleSize { // initial block
 		if blk.Number%bundleSize != 0 && blk.Number != bstream.GetProtocolFirstStreamableBlock {
 			return fmt.Errorf("received unexpected block %s (not a boundary, not the first streamable block %d)", blk, bstream.GetProtocolFirstStreamableBlock)
 		}
@@ -71,8 +72,33 @@ func (w *MergedBlocksWriter) ProcessBlock(blk *pbbstream.Block, obj interface{})
 
 	if blk.Number > w.LowBlockNum+bundleSize-1 {
 		w.Logger.Debug("bundling because we saw block %s from next bundle (%d was not seen, it must not exist on this chain)", zap.Uint64("blk_num", blk.Number), zap.Uint64("last_bundle_block", w.LowBlockNum+bundleSize-1))
-		if err := w.WriteBundle(); err != nil {
-			return err
+		if len(w.blocks) > 0 {
+			if err := w.WriteBundle(); err != nil {
+				return err
+			}
+		}
+
+		// A gap can span more than one bundle (skipped blocks on some chains).
+		// Merged-blocks files must stay contiguous by boundary: filesource walks
+		// boundaries one bundle at a time and stalls (or errors) on a missing
+		// file, so we cannot just jump the boundary. Instead, mirror the
+		// production merger (merger/bundler.go) and write one file per skipped
+		// boundary carrying the previous bundle's last block. That block is below
+		// the file's base num, so filesource skips it while still seeing a
+		// non-empty, readable file at every boundary.
+		for blk.Number > w.LowBlockNum+bundleSize-1 {
+			if w.lastBlock == nil {
+				// Gap before any bundle was written (nothing to carry): jump the
+				// boundary. In practice unreachable, the initial-boundary logic
+				// above already snaps LowBlockNum onto the first block's window.
+				w.LowBlockNum = LowBoundaryFor(blk.Number, bundleSize)
+				break
+			}
+			w.Logger.Debug("writing empty gap bundle, those blocks must not exist on this chain", zap.Uint64("low_block_num", w.LowBlockNum), zap.Uint64("carry_block", w.lastBlock.Number))
+			w.blocks = []*pbbstream.Block{w.lastBlock}
+			if err := w.WriteBundle(); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -91,6 +117,15 @@ func (w *MergedBlocksWriter) ProcessBlock(blk *pbbstream.Block, obj interface{})
 	}
 
 	return nil
+}
+
+// Flush writes any pending blocks as a (possibly partial) bundle. Unlike
+// WriteBundle, it is a no-op when no blocks are pending.
+func (w *MergedBlocksWriter) Flush() error {
+	if len(w.blocks) == 0 {
+		return nil
+	}
+	return w.WriteBundle()
 }
 
 func (w *MergedBlocksWriter) WriteBundle() error {
@@ -138,6 +173,7 @@ func (w *MergedBlocksWriter) WriteBundle() error {
 	<-done
 
 	w.LowBlockNum += w.bundleSize()
+	w.lastBlock = w.blocks[len(w.blocks)-1]
 	w.blocks = nil
 
 	return err
