@@ -63,7 +63,7 @@ func runMergeBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 
 		var lastFilename string
 		var blockCount int
-		var seenBlockNumber bool
+		var seenAnyBlock bool
 		var previousBlockNumber uint64
 		err = srcStore.WalkFrom(ctx, "", fmt.Sprintf("%010d", lowBundary), func(filename string) error {
 			var currentBlockNumber uint64
@@ -72,7 +72,7 @@ func runMergeBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 				return fmt.Errorf("parsing filename %s: %w", filename, err)
 			}
 
-			if seenBlockNumber && previousBlockNumber == currentBlockNumber {
+			if seenAnyBlock && previousBlockNumber == currentBlockNumber {
 				zlog.Warn("skipping duplicate block", zap.String("filename", filename))
 				return nil
 			}
@@ -107,7 +107,7 @@ func runMergeBlocksE(zlog *zap.Logger) firecore.CommandExecutor {
 			blockCount += 1
 
 			previousBlockNumber = currentBlockNumber
-			seenBlockNumber = true
+			seenAnyBlock = true
 			return nil
 		})
 
