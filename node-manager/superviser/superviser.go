@@ -114,6 +114,9 @@ func (s *Superviser) setDeepMindDebug(enabled bool) {
 }
 
 func (s *Superviser) Stopped() <-chan struct{} {
+	s.cmdLock.Lock()
+	defer s.cmdLock.Unlock()
+
 	if s.cmd != nil {
 		return s.cmd.Done()
 	}
@@ -121,6 +124,9 @@ func (s *Superviser) Stopped() <-chan struct{} {
 }
 
 func (s *Superviser) LastExitCode() int {
+	s.cmdLock.Lock()
+	defer s.cmdLock.Unlock()
+
 	if s.cmd != nil {
 		return s.cmd.Status().Exit
 	}
@@ -145,7 +151,12 @@ func (s *Superviser) LastLogLines() []string {
 func (s *Superviser) LastSeenBlockNum() uint64 {
 	for _, plugin := range s.GetLogPlugins() {
 		if v, ok := plugin.(mindreaderPlugin); ok {
-			return v.LastSeenBlock().Num()
+			// The plugin might not have seen any block yet, in which case the
+			// last seen block is nil and we must not dereference it.
+			if lastSeenBlock := v.LastSeenBlock(); lastSeenBlock != nil {
+				return lastSeenBlock.Num()
+			}
+			return 0
 		}
 	}
 	return 0

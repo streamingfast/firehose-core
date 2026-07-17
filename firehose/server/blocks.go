@@ -291,7 +291,6 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 		stream.WithCustomStepTypeFilter(stepFilter),
 	)
 	if err != nil {
-		fmt.Println("returning new stream factory")
 		return err
 	}
 
@@ -332,30 +331,25 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 
 		if errors.Is(err, context.DeadlineExceeded) {
 			logger.Info("stream of blocks ended with context deadline exceeded", zap.Error(err))
-			fmt.Println("dealdine exceed")
 			return status.Error(codes.DeadlineExceeded, "source deadline exceeded")
 		}
 
 		var errInvalidArg *stream.ErrInvalidArg
 		if errors.As(err, &errInvalidArg) {
-			fmt.Println("invalid")
 			return status.Error(codes.InvalidArgument, errInvalidArg.Error())
 		}
 
 		var errSendBlock *ErrSendBlock
 		if errors.As(err, &errSendBlock) {
 			logger.Info("unable to send block probably due to client disconnecting", zap.Error(errSendBlock.inner))
-			fmt.Println("unavailable")
 			return status.Error(codes.Unavailable, errSendBlock.inner.Error())
 		}
 
 		logger.Info("unexpected stream of blocks termination", zap.Error(err))
-		fmt.Println("internal")
 		return status.Errorf(codes.Internal, "unexpected stream termination")
 	}
 
 	logger.Error("source is not expected to terminate gracefully, should stop at block or continue forever")
-	fmt.Println("internal unexpected")
 	return status.Error(codes.Internal, "unexpected stream completion")
 
 }
