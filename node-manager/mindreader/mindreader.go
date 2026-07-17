@@ -206,6 +206,7 @@ func (p *MindReaderPlugin) Launch() {
 	consoleReader, err := p.consoleReaderFactory(lines)
 	if err != nil {
 		p.Shutdown(err)
+		return
 	}
 
 	p.consoleReader = consoleReader
