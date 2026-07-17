@@ -144,6 +144,11 @@ func (r *Relayer) Run() {
 	zlog.Info("waiting for hub to be ready...")
 	<-r.hub.Ready
 
+	// Set head_block_number so we know the head immediately
+	if headNum := r.hub.HeadNum(); headNum != 0 {
+		metrics.HeadBlockNumber.SetUint64(headNum)
+	}
+
 	r.OnTerminating(func(e error) {
 		zlog.Info("closing block stream server")
 		r.blockStreamServer.Close()
