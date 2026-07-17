@@ -140,7 +140,9 @@ func TestMergedBlocksWriterSkippedBlocks(t *testing.T) {
 }
 
 func TestMergedBlocksWriterMultiBundleGap(t *testing.T) {
-	// a gap spanning more than one bundle must not produce misnamed files
+	// a gap spanning more than one bundle must not produce misnamed files, and
+	// must keep the merged-blocks sequence contiguous by writing a file per
+	// skipped boundary (filesource stalls on a missing file)
 	store := dstore.NewMockStore(nil)
 	writer := &MergedBlocksWriter{
 		Store:      store,
@@ -158,8 +160,11 @@ func TestMergedBlocksWriterMultiBundleGap(t *testing.T) {
 	}
 
 	files := writtenFiles(t, store)
-	require.Len(t, files, 2)
+	require.Len(t, files, 3)
 	assert.Equal(t, []uint64{5}, files["0000000000"])
+	// the skipped boundary carries the previous bundle's last block (5), which
+	// is below the file's base num and is skipped by filesource on read
+	assert.Equal(t, []uint64{5}, files["0000000100"])
 	assert.Equal(t, uint64(250), files["0000000200"][0])
 	assert.Equal(t, uint64(299), files["0000000200"][49])
 }
@@ -177,9 +182,14 @@ func TestMergedBlocksWriterMultiBundleGapFourBundles(t *testing.T) {
 	require.NoError(t, writer.ProcessBlock(testBlock(450), nil))
 	assert.Equal(t, uint64(400), writer.LowBlockNum)
 
+	// every skipped boundary gets a contiguous carry-over file so there is no
+	// hole in the sequence up to the block's own window
 	files := writtenFiles(t, store)
-	require.Len(t, files, 1)
+	require.Len(t, files, 4)
 	assert.Equal(t, []uint64{5}, files["0000000000"])
+	assert.Equal(t, []uint64{5}, files["0000000100"])
+	assert.Equal(t, []uint64{5}, files["0000000200"])
+	assert.Equal(t, []uint64{5}, files["0000000300"])
 }
 
 func TestLowBoundaryFor(t *testing.T) {
