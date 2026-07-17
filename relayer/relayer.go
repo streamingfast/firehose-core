@@ -144,9 +144,17 @@ func (r *Relayer) Run() {
 	zlog.Info("waiting for hub to be ready...")
 	<-r.hub.Ready
 
-	// Set head_block_number so we know the head immediately
-	if headNum := r.hub.HeadNum(); headNum != 0 {
+	// Seed head metrics from the bootstrapped hub head so we report it
+	// immediately, instead of only once a live block flows through the forkable.
+	if headNum, headID, headTime, _, err := r.hub.HeadInfo(); err == nil {
+		zlog.Info("seeding head metrics from hub head",
+			zap.Uint64("head_num", headNum),
+			zap.String("head_id", headID),
+			zap.Time("head_time", headTime),
+		)
 		metrics.HeadBlockNumber.SetUint64(headNum)
+		metrics.HeadBlockTimeDrift.SetBlockTime(headTime)
+		metrics.HeadBlockRelativeDrift.SetLastBlock(headTime)
 	}
 
 	r.OnTerminating(func(e error) {
