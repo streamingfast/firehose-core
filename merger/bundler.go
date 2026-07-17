@@ -253,16 +253,20 @@ func (b *Bundler) ProcessBlock(_ *pbbstream.Block, obj interface{}) error {
 	})
 
 	b.Lock()
+	defer b.Unlock() // we may return early from inside the skip-forward loop, never leave the lock held
+
 	// we keep the last block of the bundle, only deleting it on next merge, to facilitate joining to one-block-filled hub
 	lastBlock := b.irreversibleBlocks[len(b.irreversibleBlocks)-1]
 	b.irreversibleBlocks = []*bstream.OneBlockFile{lastBlock, obf}
 	b.baseBlockNum += b.bundleSize
-	for obf.Num > b.baseBlockNum+b.bundleSize { // skip more merged-block-files
+	// a bundle covers [baseBlockNum, baseBlockNum+bundleSize): a block landing exactly
+	// on baseBlockNum+bundleSize belongs to the *next* bundle, so skip-merge on >= too
+	for obf.Num >= b.baseBlockNum+b.bundleSize { // skip more merged-block-files
 		capturedBase := b.baseBlockNum
-		b.markBundleInFlight(capturedBase)
-		if b.eg.Stop() {
+		if b.eg.Stop() { // check before marking in-flight so termination does not leave a stale in-flight entry
 			return errTerminating
 		}
+		b.markBundleInFlight(capturedBase)
 		b.eg.Go(func() error { // lastBlock will be excluded from bundle but is useful to bundler
 			if err := b.io.MergeAndStore(context.Background(), capturedBase, []*bstream.OneBlockFile{lastBlock}); err != nil {
 				go b.shutDownFunc(err) // in a go func so it doesn't block waiting for b.eg
@@ -273,10 +277,8 @@ func (b *Bundler) ProcessBlock(_ *pbbstream.Block, obj interface{}) error {
 		})
 		b.baseBlockNum += b.bundleSize
 	}
-	reachedStop := b.stopBlock != 0 && b.baseBlockNum >= b.stopBlock
-	b.Unlock()
 
-	if reachedStop {
+	if b.stopBlock != 0 && b.baseBlockNum >= b.stopBlock {
 		return ErrStopBlockReached
 	}
 

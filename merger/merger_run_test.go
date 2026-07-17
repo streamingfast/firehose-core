@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -362,4 +363,84 @@ func TestMergerRun_CheckAlreadyMergedAfterManyBlocks(t *testing.T) {
 	assert.Greater(t, nextBundleCount, 10, "nextBundleCount should be greater than 10")
 	assert.Less(t, highestCheckedOneBlock, uint64(200), "highestCheckedOneBlock should be less than 200")
 
+}
+
+// TestMergerRun_ConsecutiveWalkErrorsTriggerShutdown verifies the circuit breaker:
+// a persistently failing WalkOneBlockFiles must make run() return
+// "too many consecutive errors" after 10 attempts instead of retrying forever.
+func TestMergerRun_ConsecutiveWalkErrorsTriggerShutdown(t *testing.T) {
+	walkCalls := 0
+	testIO := &TestMergerIO{
+		WalkOneBlockFilesFunc: func(_ context.Context, _ uint64, _ func(*bstream.OneBlockFile) error) error {
+			walkCalls++
+			return errors.New("persistent store failure")
+		},
+	}
+
+	merger := newRunTestMerger(testIO, 0, 10, 1)
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- merger.run() }()
+
+	select {
+	case err := <-errCh:
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "too many consecutive errors")
+		assert.Equal(t, 10, walkCalls, "circuit breaker should trip after exactly 10 consecutive errors")
+	case <-time.After(5 * time.Second):
+		t.Fatal("merger did not shut down on persistent walk errors")
+	}
+}
+
+// forkAwareTestIO adds ForkAwareIOInterface on top of TestMergerIO so the
+// forked-blocks pruner can be exercised in tests.
+type forkAwareTestIO struct {
+	*TestMergerIO
+	deleteForkedCalls *atomic.Int64
+}
+
+func (f *forkAwareTestIO) DeleteForkedBlocksAsync(_, _ uint64) { f.deleteForkedCalls.Add(1) }
+func (f *forkAwareTestIO) MoveForkedBlocks(_ context.Context, _ []*bstream.OneBlockFile) {}
+
+// TestPrunersStopOnShutdown verifies that both pruner goroutines observe
+// merger termination and stop deleting files after Shutdown.
+func TestPrunersStopOnShutdown(t *testing.T) {
+	var walkCalls, deleteForkedCalls atomic.Int64
+
+	testIO := &forkAwareTestIO{
+		TestMergerIO: &TestMergerIO{
+			WalkOneBlockFilesFunc: func(_ context.Context, _ uint64, _ func(*bstream.OneBlockFile) error) error {
+				walkCalls.Add(1)
+				return nil
+			},
+		},
+		deleteForkedCalls: &deleteForkedCalls,
+	}
+
+	m := &Merger{
+		Shutter:                    shutter.New(),
+		io:                         testIO,
+		logger:                     testLogger,
+		timeBetweenPruning:         time.Millisecond,
+		pruningDistanceToLIB:       100,
+		oneBlockFilesPruneDistance: 100,
+		firstStreamableBlock:       2,
+	}
+	// bundler base 1000 makes the pruning target non-zero (1000 - 100 = 900)
+	m.bundler = NewBundler(1000, 0, 2, 100, testIO, 1, m.Shutdown)
+
+	m.startOldFilesPruner()
+	m.startForkedBlocksPruner()
+
+	require.Eventually(t, func() bool {
+		return walkCalls.Load() >= 1 && deleteForkedCalls.Load() >= 1
+	}, 2*time.Second, time.Millisecond, "pruners never ran")
+
+	m.Shutdown(nil)
+
+	time.Sleep(20 * time.Millisecond) // let any in-flight iteration finish
+	walksAfter, deletesAfter := walkCalls.Load(), deleteForkedCalls.Load()
+	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, walksAfter, walkCalls.Load(), "old-files pruner kept running after shutdown")
+	assert.Equal(t, deletesAfter, deleteForkedCalls.Load(), "forked-blocks pruner kept running after shutdown")
 }
