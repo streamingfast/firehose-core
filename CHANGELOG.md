@@ -44,6 +44,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - `tools print merged-blocks <store>` no longer truncates its output when a merged-blocks file is missing (open range with no explicit stop, or a bounded range extending past the last available file): with the bumped `bstream` dependency it now prints every available block first, instead of discarding in-flight files on an async shutdown. On an open range it caps the stream at the last available merged-blocks file (found with an `O(log n)` existence probe rather than a full store listing) so it stops cleanly instead of erroring on the expected-missing next file. Also fixes an off-by-one that stopped one block early on a closed range, and a potential unsigned underflow when a closed range ends at block 0.
 - Merger: fixed a lock leak, a dead consecutive-errors circuit breaker, a skip-loop boundary off-by-one, a streaming bundle-reader goroutine leak, and pruners that ignored shutdown.
+- Relayer: the head metrics (`head_block_number`, `head_block_time_drift`, `head_block_relative_time`) are now seeded from the hub's head once it is ready (bootstrapped from one-block files), instead of only after a live block flows through. On chains that produce blocks on demand, these metrics no longer stay absent after a restart until the next block is mined.
 
 ## v1.15.0
 
