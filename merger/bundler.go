@@ -216,6 +216,9 @@ func (b *Bundler) ProcessBlock(_ *pbbstream.Block, obj interface{}) error {
 		metrics.AppReadiness.SetReady()
 		b.irreversibleBlocks = append(b.irreversibleBlocks, obf)
 		metrics.HeadBlockNumber.SetUint64(obf.Num)
+		// The merger only ever bundles irreversible blocks, so its head block is a
+		// finalized block, hence both metrics reporting the same value.
+		metrics.FinalizedBlockNumber.SetUint64(obf.Num)
 		b.Unlock()
 		if time.Since(time.Unix(0, b.blockTimestampLastRun.Load())) >= time.Second*5 && b.blockTimestampInFlight.CompareAndSwap(false, true) {
 			b.blockTimestampLastRun.Store(time.Now().UnixNano())

@@ -21,6 +21,7 @@ import (
 	"github.com/spf13/viper"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/launcher"
+	coremetrics "github.com/streamingfast/firehose-core/metrics"
 	nodeManager "github.com/streamingfast/firehose-core/node-manager"
 	nodeReaderStdinApp "github.com/streamingfast/firehose-core/node-manager/app/node_reader_stdin"
 	"github.com/streamingfast/firehose-core/node-manager/metrics"
@@ -62,8 +63,9 @@ func RegisterReaderNodeStdinApp[B firecore.Block](chain *firecore.Chain[B], root
 			headBlockTimeDrift := metrics.NewHeadBlockTimeDrift(metricID)
 			headBlockNumber := metrics.NewHeadBlockNumber(metricID)
 			headBlockRelativeTime := metrics.NewHeadBlockRelativeTime(metricID)
+			finalizedBlockNumber := coremetrics.NewFinalizedBlockNumber(metricID)
 			appReadiness := metrics.NewAppReadiness(metricID)
-			metricsAndReadinessManager := nodeManager.NewMetricsAndReadinessManager(headBlockTimeDrift, headBlockNumber, headBlockRelativeTime, appReadiness, viper.GetDuration("reader-node-readiness-max-latency"))
+			metricsAndReadinessManager := nodeManager.NewMetricsAndReadinessManager(headBlockTimeDrift, headBlockNumber, headBlockRelativeTime, appReadiness, viper.GetDuration("reader-node-readiness-max-latency"), nodeManager.WithFinalizedBlockNumberMetric(finalizedBlockNumber))
 
 			return nodeReaderStdinApp.New(&nodeReaderStdinApp.Config{
 				GRPCAddr:                   viper.GetString("reader-node-grpc-listen-addr"),

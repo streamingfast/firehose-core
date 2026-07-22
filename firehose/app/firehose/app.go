@@ -34,6 +34,7 @@ import (
 	"github.com/streamingfast/firehose-core/firehose/info"
 	"github.com/streamingfast/firehose-core/firehose/metrics"
 	"github.com/streamingfast/firehose-core/firehose/server"
+	coremetrics "github.com/streamingfast/firehose-core/metrics"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/atomic"
@@ -61,6 +62,9 @@ type Modules struct {
 	TransformRegistry     *transform.Registry
 	CheckPendingShutdown  func() bool
 	InfoServer            *info.InfoServer
+
+	// Optional dependencies
+	FinalizedBlockNumberMetric *coremetrics.FinalizedBlockNum
 }
 
 type App struct {
@@ -133,6 +137,9 @@ func (a *App) Run() error {
 					}
 					a.modules.HeadBlockNumberMetric.SetUint64(blk.Number)
 					a.modules.HeadTimeDriftMetric.SetBlockTime(blk.Time())
+					if a.modules.FinalizedBlockNumberMetric != nil {
+						a.modules.FinalizedBlockNumberMetric.SetUint64(blk.LibNum)
+					}
 					return h.ProcessBlock(blk, obj)
 				}),
 				blockstream.WithRequester("firehose"),

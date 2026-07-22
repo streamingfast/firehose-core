@@ -14,10 +14,19 @@
 
 package metrics
 
-import "github.com/streamingfast/dmetrics"
+import (
+	"github.com/streamingfast/dmetrics"
+	coremetrics "github.com/streamingfast/firehose-core/metrics"
+)
 
 var MetricSet = dmetrics.NewSet()
 
 var HeadBlockTimeDrift = MetricSet.NewHeadTimeDrift("merger")
 var HeadBlockNumber = MetricSet.NewHeadBlockNumber("merger")
+
+// FinalizedBlockNumber always tracks HeadBlockNumber: the merger only ever bundles
+// irreversible blocks, so its head is finalized by construction. Reporting the LIB
+// number carried by those blocks would trail our own head and read as if the merger
+// were lagging finality.
+var FinalizedBlockNumber = coremetrics.NewFinalizedBlockNumber("merger")
 var AppReadiness = MetricSet.NewAppReadiness("merger")

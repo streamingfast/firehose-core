@@ -2283,6 +2283,10 @@ github.com/spiffe/go-spiffe/v2 v2.6.0/go.mod h1:gm2SeUoMZEtpnzPNs2Csc0D/gX33k1xI
 github.com/stoewer/go-strcase v1.3.0/go.mod h1:fAH5hQ5pehh+j3nZfvwdk2RgEgQjAoM8wodgtPmh1xo=
 github.com/streamingfast/bstream v0.0.2-0.20260709191130-aecaf73e1c32 h1:lXdt7nh4oP3+x+uf+E/R3GkZ1gvUOldFIJLMMxhjupk=
 github.com/streamingfast/bstream v0.0.2-0.20260709191130-aecaf73e1c32/go.mod h1:Asuul2Rnxln0Vk6eY869AZ2UybIQcB7eYOQAIhfQHzE=
+github.com/streamingfast/bstream v0.0.2-0.20260721235130-d566a9ffae22 h1:5L3oI2FFjSdB29NKZnb2FivYWkdBnNesjBMunP8pN34=
+github.com/streamingfast/bstream v0.0.2-0.20260721235130-d566a9ffae22/go.mod h1:Asuul2Rnxln0Vk6eY869AZ2UybIQcB7eYOQAIhfQHzE=
+github.com/streamingfast/bstream v0.0.2-0.20260722130256-743b153b4fa9 h1:h4wlxecft/9fF+gzYR73m7HAEa9vMzRyfTdY91D7l9M=
+github.com/streamingfast/bstream v0.0.2-0.20260722130256-743b153b4fa9/go.mod h1:Asuul2Rnxln0Vk6eY869AZ2UybIQcB7eYOQAIhfQHzE=
 github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b h1:ztYeX3/5rg2tV2EU7edcrcHzMz6wUbdJB+LqCrP5W8s=
 github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b/go.mod h1:o9R/tjNON01X2mgWL5qirl2MV6xQ4EZI5D504ST3K/M=
 github.com/streamingfast/dauth v0.0.0-20260318230957-4ab1e1d2ebc3 h1:Zo2daSGDUPoK32w9G1e9fZO3Q6b5Cvu5ZojdoD/Wgp8=
@@ -3277,6 +3281,8 @@ google.golang.org/grpc v1.63.2/go.mod h1:WAX/8DgncnokcFUldAxq7GeB5DXHDbMF+lLvDom
 google.golang.org/grpc v1.64.0/go.mod h1:oxjF8E3FBnjp+/gVFYdWacaLDx9na1aqy9oovLpxQYg=
 google.golang.org/grpc v1.82.0 h1:vguDnZUPjE26w09A63VoxZPnvPjB5Riyc0mkXPFmAIU=
 google.golang.org/grpc v1.82.0/go.mod h1:yzTZ1TB1Z3SG+LIYaI+WiE8D5+PZ3ArnrSp8zF3+/ZA=
+google.golang.org/grpc v1.82.1 h1:NnAxzGRA0677vCa4BUkOAnO5+FfQqVl9iUXeD0IqcGE=
+google.golang.org/grpc v1.82.1/go.mod h1:yzTZ1TB1Z3SG+LIYaI+WiE8D5+PZ3ArnrSp8zF3+/ZA=
 google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0/go.mod h1:6Kw0yEErY5E/yWrBtf03jp27GLLJujG4z/JK95pnjjw=
 google.golang.org/protobuf v0.0.0-20200109180630-ec00e32a8dfd/go.mod h1:DFci5gLYBciE7Vtevhsrf46CRTquxDuWsQurQQe4oz8=
 google.golang.org/protobuf v0.0.0-20200221191635-4d8936d0db64/go.mod h1:kwYJMbMJ01Woi6D6+Kah6886xMZcty6N08ah7+eCXa0=
