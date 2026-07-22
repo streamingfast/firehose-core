@@ -95,7 +95,7 @@ func (s *syncer) Run() error {
 		s.logger.Info("no state file found, starting from block num", zap.Uint64("start_block_num", s.config.StartBlockNum))
 	}
 
-	metricsManager := nodeManager.NewMetricsAndReadinessManager(HeadBlockTimeDrift, HeadBlockNumber, HeadBlockRelativeTime, AppReadiness, s.config.ReadinessMaxLatency)
+	metricsManager := nodeManager.NewMetricsAndReadinessManager(HeadBlockTimeDrift, HeadBlockNumber, HeadBlockRelativeTime, AppReadiness, s.config.ReadinessMaxLatency, nodeManager.WithFinalizedBlockNumberMetric(FinalizedBlockNumber))
 	go metricsManager.Launch()
 
 	stats := newSyncerStats(metricsManager)

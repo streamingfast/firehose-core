@@ -9,6 +9,7 @@ import (
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 
 	"github.com/streamingfast/dmetrics"
+	coremetrics "github.com/streamingfast/firehose-core/metrics"
 	"go.uber.org/atomic"
 )
 
@@ -34,6 +35,7 @@ type MetricsAndReadinessManager struct {
 	headBlockTimeDrift     *dmetrics.HeadTimeDrift
 	headBlockNumber        *dmetrics.HeadBlockNum
 	headBlockRelativeDrift *dmetrics.HeadBlockRelativeTime
+	finalizedBlockNumber   *coremetrics.FinalizedBlockNum
 	appReadiness           *dmetrics.AppReadiness
 	readinessProbe         *atomic.Bool
 
@@ -44,8 +46,20 @@ type MetricsAndReadinessManager struct {
 	lastSeenBlock *atomic.Pointer[pbbstream.Block]
 }
 
-func NewMetricsAndReadinessManager(headBlockTimeDrift *dmetrics.HeadTimeDrift, headBlockNumber *dmetrics.HeadBlockNum, headBlockRelativeDrift *dmetrics.HeadBlockRelativeTime, appReadiness *dmetrics.AppReadiness, readinessMaxLatency time.Duration) *MetricsAndReadinessManager {
-	return &MetricsAndReadinessManager{
+// MetricsAndReadinessOption customizes a MetricsAndReadinessManager. It exists so that new
+// metrics can be added without breaking chain repositories calling NewMetricsAndReadinessManager.
+type MetricsAndReadinessOption func(*MetricsAndReadinessManager)
+
+// WithFinalizedBlockNumberMetric reports the LIB number of each head block seen, so that
+// head to finality drift can be computed from `head_block_number - finalized_block_number`.
+func WithFinalizedBlockNumberMetric(finalizedBlockNumber *coremetrics.FinalizedBlockNum) MetricsAndReadinessOption {
+	return func(m *MetricsAndReadinessManager) {
+		m.finalizedBlockNumber = finalizedBlockNumber
+	}
+}
+
+func NewMetricsAndReadinessManager(headBlockTimeDrift *dmetrics.HeadTimeDrift, headBlockNumber *dmetrics.HeadBlockNum, headBlockRelativeDrift *dmetrics.HeadBlockRelativeTime, appReadiness *dmetrics.AppReadiness, readinessMaxLatency time.Duration, options ...MetricsAndReadinessOption) *MetricsAndReadinessManager {
+	manager := &MetricsAndReadinessManager{
 		headBlockChan:          make(chan *pbbstream.Block, 1), // just for non-blocking, saving a few nanoseconds here
 		readinessProbe:         atomic.NewBool(false),
 		appReadiness:           appReadiness,
@@ -56,6 +70,12 @@ func NewMetricsAndReadinessManager(headBlockTimeDrift *dmetrics.HeadTimeDrift, h
 
 		lastSeenBlock: atomic.NewPointer[pbbstream.Block](nil),
 	}
+
+	for _, option := range options {
+		option(manager)
+	}
+
+	return manager
 }
 
 func (m *MetricsAndReadinessManager) setReadinessProbeOn() {
@@ -82,6 +102,12 @@ func (m *MetricsAndReadinessManager) Launch() {
 			// metrics
 			if m.headBlockNumber != nil {
 				m.headBlockNumber.SetUint64(block.Number)
+			}
+
+			// Set before the zero timestamp check below, a block without a timestamp still
+			// carries a valid LIB number.
+			if m.finalizedBlockNumber != nil {
+				m.finalizedBlockNumber.SetUint64(block.LibNum)
 			}
 
 			bt := block.Time()

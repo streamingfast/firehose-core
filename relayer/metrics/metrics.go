@@ -16,6 +16,7 @@ package metrics
 
 import (
 	"github.com/streamingfast/dmetrics"
+	coremetrics "github.com/streamingfast/firehose-core/metrics"
 )
 
 var MetricSet = dmetrics.NewSet()
@@ -23,4 +24,5 @@ var MetricSet = dmetrics.NewSet()
 var HeadBlockTimeDrift = MetricSet.NewHeadTimeDrift("relayer")
 var HeadBlockNumber = MetricSet.NewHeadBlockNumber("relayer")
 var HeadBlockRelativeDrift = MetricSet.NewHeadBlockRelativeTime("relayer")
+var FinalizedBlockNumber = coremetrics.NewFinalizedBlockNumber("relayer")
 var AppReadiness = MetricSet.NewAppReadiness("relayer")

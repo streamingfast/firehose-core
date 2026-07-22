@@ -79,6 +79,7 @@ func NewRelayer(
 	options := []forkable.Option{
 		forkable.WithFilters(bstream.StepNew | bstream.StepPartial),
 		forkable.WithMetrics(metrics.HeadBlockNumber, metrics.HeadBlockTimeDrift, metrics.HeadBlockRelativeDrift),
+		forkable.WithFinalizedBlockNumMetric(metrics.FinalizedBlockNumber),
 	}
 
 	forkableHub := hub.NewForkableHubWithOptions(
@@ -146,15 +147,17 @@ func (r *Relayer) Run() {
 
 	// Seed head metrics from the bootstrapped hub head so we report it
 	// immediately, instead of only once a live block flows through the forkable.
-	if headNum, headID, headTime, _, err := r.hub.HeadInfo(); err == nil {
+	if headNum, headID, headTime, libNum, err := r.hub.HeadInfo(); err == nil {
 		zlog.Info("seeding head metrics from hub head",
 			zap.Uint64("head_num", headNum),
 			zap.String("head_id", headID),
 			zap.Time("head_time", headTime),
+			zap.Uint64("lib_num", libNum),
 		)
 		metrics.HeadBlockNumber.SetUint64(headNum)
 		metrics.HeadBlockTimeDrift.SetBlockTime(headTime)
 		metrics.HeadBlockRelativeDrift.SetLastBlock(headTime)
+		metrics.FinalizedBlockNumber.SetUint64(libNum)
 	}
 
 	r.OnTerminating(func(e error) {

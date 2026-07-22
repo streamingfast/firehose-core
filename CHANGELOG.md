@@ -8,6 +8,16 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Added
+
+- New `finalized_block_number{app}` metric, reported by `reader-node`, `reader-node-stdin`, `reader-node-firehose`, `relayer`, `firehose`, `merger` and `block-indexer`. Paired with the existing `head_block_number{app}`, it lets dashboards show how far behind finality each app's head is, as `head_block_number - finalized_block_number`. The `merger` and `block-indexer` only ever process final blocks, so they report the same value for both.
+
+### Changed
+
+- Bumped `bstream` for `forkable.WithFinalizedBlockNumMetric`, the option backing the new `finalized_block_number` metric on the `relayer`.
+
 ## v1.16.0
 
 ### Added

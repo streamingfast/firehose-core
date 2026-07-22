@@ -208,6 +208,9 @@ func (s *DStoreIO) NextBundle(ctx context.Context, lowestBaseBlock uint64) (outB
 		}
 		metrics.HeadBlockTimeDrift.SetBlockTime(*lastTime)
 		metrics.HeadBlockNumber.SetUint64(last.Num())
+		// The merger only ever bundles irreversible blocks, so its head block is a
+		// finalized block, hence both metrics reporting the same value.
+		metrics.FinalizedBlockNumber.SetUint64(last.Num())
 		lib = last
 	}
 

@@ -73,6 +73,7 @@ func (app *IndexBuilder) launch() error {
 		app.logger.Debug("handling block", zap.Uint64("block_num", block.Number))
 
 		metrics.HeadBlockNumber.SetUint64(block.Number)
+		metrics.FinalizedBlockNumber.SetUint64(block.Number)
 		metrics.HeadBlockTimeDrift.SetBlockTime(block.Time())
 		metrics.AppReadiness.SetReady()
 

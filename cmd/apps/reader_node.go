@@ -15,6 +15,7 @@ import (
 	"github.com/streamingfast/cli"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/launcher"
+	coremetrics "github.com/streamingfast/firehose-core/metrics"
 	nodeManager "github.com/streamingfast/firehose-core/node-manager"
 	nodeManagerApp "github.com/streamingfast/firehose-core/node-manager/app/node_manager"
 	"github.com/streamingfast/firehose-core/node-manager/metrics"
@@ -160,6 +161,7 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 			headBlockTimeDrift := metrics.NewHeadBlockTimeDrift("reader-node")
 			headBlockNumber := metrics.NewHeadBlockNumber("reader-node")
 			headBlockRelativeTime := metrics.NewHeadBlockRelativeTime("reader-node")
+			finalizedBlockNumber := coremetrics.NewFinalizedBlockNumber("reader-node")
 			appReadiness := metrics.NewAppReadiness("reader-node")
 
 			metricsAndReadinessManager := nodeManager.NewMetricsAndReadinessManager(
@@ -168,6 +170,7 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 				headBlockRelativeTime,
 				appReadiness,
 				readinessMaxLatency,
+				nodeManager.WithFinalizedBlockNumberMetric(finalizedBlockNumber),
 			)
 
 			lineBufferSize := viper.GetUint64("reader-node-line-buffer-size")

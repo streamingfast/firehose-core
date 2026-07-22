@@ -17,6 +17,7 @@ import (
 	"github.com/streamingfast/firehose-core/firehose/app/firehose"
 	"github.com/streamingfast/firehose-core/firehose/server"
 	"github.com/streamingfast/firehose-core/launcher"
+	coremetrics "github.com/streamingfast/firehose-core/metrics"
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 )
@@ -24,6 +25,7 @@ import (
 var metricset = dmetrics.NewSet()
 var headBlockNumMetric = metricset.NewHeadBlockNumber("firehose")
 var headTimeDriftmetric = metricset.NewHeadTimeDrift("firehose")
+var finalizedBlockNumMetric = coremetrics.NewFinalizedBlockNumber("firehose")
 
 func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) {
 	appLogger, appTracer := logging.PackageLogger("firehose", "firehose")
@@ -114,13 +116,14 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 				ServiceDiscoveryURL:     serviceDiscoveryURL,
 				ServerOptions:           serverOptions,
 			}, &firehose.Modules{
-				Authenticator:         authenticator,
-				SessionPool:           sessionPool,
-				HeadTimeDriftMetric:   headTimeDriftmetric,
-				HeadBlockNumberMetric: headBlockNumMetric,
-				TransformRegistry:     registry,
-				CheckPendingShutdown:  runtime.IsPendingShutdown,
-				InfoServer:            runtime.InfoServer,
+				Authenticator:              authenticator,
+				SessionPool:                sessionPool,
+				HeadTimeDriftMetric:        headTimeDriftmetric,
+				HeadBlockNumberMetric:      headBlockNumMetric,
+				FinalizedBlockNumberMetric: finalizedBlockNumMetric,
+				TransformRegistry:          registry,
+				CheckPendingShutdown:       runtime.IsPendingShutdown,
+				InfoServer:                 runtime.InfoServer,
 			}), nil
 		},
 	})
