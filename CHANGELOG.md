@@ -18,6 +18,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Bumped `bstream` for `forkable.WithFinalizedBlockNumMetric`, the option backing the new `finalized_block_number` metric on the `relayer`.
 
+### Security
+
+- Bumped `google.golang.org/grpc` to `v1.82.1`, fixing GHSA-hrxh-6v49-42gf (HIGH, CVSS 8.8), an uncaught exception reachable from the network.
+
 ## v1.16.0
 
 ### Added
