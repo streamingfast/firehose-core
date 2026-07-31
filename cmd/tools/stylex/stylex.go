@@ -30,6 +30,12 @@ var (
 	ConnectionOrphanStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("13")) // Magenta
 	ConnectionErrorStyle  = ErrorStyle
 
+	// Styles used when rendering raw log lines, kept desaturated so long log
+	// dumps stay easy on the eyes
+	LogLoggerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("73"))             // Cadet teal
+	LogKeyStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("252")) // Off-white, emphasized
+	LogValueStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))            // Grey
+
 	separator = "─"
 )
 
@@ -57,6 +63,10 @@ func DisableColors() {
 	ConnectionClosedStyle = lipgloss.NewStyle()
 	ConnectionOrphanStyle = lipgloss.NewStyle()
 	ConnectionErrorStyle = lipgloss.NewStyle()
+
+	LogLoggerStyle = lipgloss.NewStyle()
+	LogKeyStyle = lipgloss.NewStyle()
+	LogValueStyle = lipgloss.NewStyle()
 }
 
 // Titlef is a helper function equivalent to Title.Render(fmt.Sprintf(...))
@@ -187,6 +197,36 @@ func ConnectionErrorf(format string, a ...any) string {
 // ConnectionError is a helper function equivalent to ConnectionError.Render(...)
 func ConnectionError(str string) string {
 	return ConnectionErrorStyle.Render(str)
+}
+
+// LogLoggerf is a helper function equivalent to LogLogger.Render(fmt.Sprintf(...))
+func LogLoggerf(format string, a ...any) string {
+	return LogLoggerStyle.Render(fmt.Sprintf(format, a...))
+}
+
+// LogLogger is a helper function equivalent to LogLogger.Render(...)
+func LogLogger(str string) string {
+	return LogLoggerStyle.Render(str)
+}
+
+// LogKeyf is a helper function equivalent to LogKey.Render(fmt.Sprintf(...))
+func LogKeyf(format string, a ...any) string {
+	return LogKeyStyle.Render(fmt.Sprintf(format, a...))
+}
+
+// LogKey is a helper function equivalent to LogKey.Render(...)
+func LogKey(str string) string {
+	return LogKeyStyle.Render(str)
+}
+
+// LogValuef is a helper function equivalent to LogValue.Render(fmt.Sprintf(...))
+func LogValuef(format string, a ...any) string {
+	return LogValueStyle.Render(fmt.Sprintf(format, a...))
+}
+
+// LogValue is a helper function equivalent to LogValue.Render(...)
+func LogValue(str string) string {
+	return LogValueStyle.Render(str)
 }
 
 func Separator(count int) string {

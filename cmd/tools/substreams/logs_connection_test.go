@@ -25,6 +25,58 @@ func TestNewToolsLogsConnectionCmd(t *testing.T) {
 
 	gcpProjectFlag := flags.Lookup("gcp-project")
 	require.NotNil(t, gcpProjectFlag, "gcp-project flag should exist")
+
+	logsFlag := flags.Lookup("logs")
+	require.NotNil(t, logsFlag, "logs flag should exist")
+	assert.Equal(t, "false", logsFlag.DefValue)
+
+	logsLimitFlag := flags.Lookup("logs-limit")
+	require.NotNil(t, logsLimitFlag, "logs-limit flag should exist")
+	assert.Equal(t, "500", logsLimitFlag.DefValue)
+}
+
+func TestRequestLogWindow(t *testing.T) {
+	startTime := time.Date(2026, 2, 18, 0, 0, 0, 0, time.UTC)
+	endTime := time.Date(2026, 2, 18, 12, 0, 0, 0, time.UTC)
+	at := func(hour int) string {
+		return time.Date(2026, 2, 18, hour, 0, 0, 0, time.UTC).Format(time.RFC3339Nano)
+	}
+
+	t.Run("narrows to padded request lifetime", func(t *testing.T) {
+		start, end := requestLogWindow(
+			&logs.LogEntry{Timestamp: at(5)},
+			&logs.LogEntry{Timestamp: at(6)},
+			startTime, endTime,
+		)
+
+		assert.Equal(t, time.Date(2026, 2, 18, 4, 59, 0, 0, time.UTC), start.UTC())
+		assert.Equal(t, time.Date(2026, 2, 18, 6, 1, 0, 0, time.UTC), end.UTC())
+	})
+
+	t.Run("keeps queried end when request is still running", func(t *testing.T) {
+		start, end := requestLogWindow(&logs.LogEntry{Timestamp: at(5)}, nil, startTime, endTime)
+
+		assert.Equal(t, time.Date(2026, 2, 18, 4, 59, 0, 0, time.UTC), start.UTC())
+		assert.Equal(t, endTime, end.UTC())
+	})
+
+	t.Run("falls back on queried range", func(t *testing.T) {
+		start, end := requestLogWindow(nil, nil, startTime, endTime)
+
+		assert.Equal(t, startTime, start.UTC())
+		assert.Equal(t, endTime, end.UTC())
+	})
+
+	t.Run("falls back on queried bounds when timestamps are unparseable", func(t *testing.T) {
+		start, end := requestLogWindow(
+			&logs.LogEntry{Timestamp: "nope"},
+			&logs.LogEntry{Timestamp: "nope"},
+			startTime, endTime,
+		)
+
+		assert.Equal(t, startTime, start.UTC())
+		assert.Equal(t, endTime, end.UTC())
+	})
 }
 
 func TestConnectionCommandHelp(t *testing.T) {
