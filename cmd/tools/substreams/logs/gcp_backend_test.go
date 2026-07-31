@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/logging"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,12 +34,11 @@ jsonPayload.message="X`, `evil\"jsonPayload.message=\"X`},
 }
 
 func TestBuildFilterEscapesValues(t *testing.T) {
-	b := &GCPBackend{}
 	start := time.Date(2026, 2, 18, 5, 0, 0, 0, time.UTC)
 	end := start.Add(time.Hour)
 
 	t.Run("trace id with quote/backslash is escaped", func(t *testing.T) {
-		f := b.buildFilter(QueryOptions{
+		f := BuildFilter(QueryOptions{
 			TraceID:   `evil"\`,
 			StartTime: start,
 			EndTime:   end,
@@ -47,7 +47,7 @@ func TestBuildFilterEscapesValues(t *testing.T) {
 	})
 
 	t.Run("user id with quote is escaped", func(t *testing.T) {
-		f := b.buildFilter(QueryOptions{
+		f := BuildFilter(QueryOptions{
 			UserID:    `org"injected`,
 			StartTime: start,
 			EndTime:   end,
@@ -56,7 +56,7 @@ func TestBuildFilterEscapesValues(t *testing.T) {
 	})
 
 	t.Run("namespace with quote is escaped", func(t *testing.T) {
-		f := b.buildFilter(QueryOptions{
+		f := BuildFilter(QueryOptions{
 			UserID:    "sfinfra",
 			Namespace: `evil"ns`,
 			StartTime: start,
@@ -66,7 +66,7 @@ func TestBuildFilterEscapesValues(t *testing.T) {
 	})
 
 	t.Run("trace id wins over user id", func(t *testing.T) {
-		f := b.buildFilter(QueryOptions{
+		f := BuildFilter(QueryOptions{
 			TraceID:   "abc123",
 			UserID:    "should-be-ignored",
 			StartTime: start,
@@ -75,4 +75,23 @@ func TestBuildFilterEscapesValues(t *testing.T) {
 		assert.Contains(t, f, `SEARCH("abc123")`)
 		assert.NotContains(t, f, "should-be-ignored")
 	})
+}
+
+func TestSeverityString(t *testing.T) {
+	tests := []struct {
+		name string
+		in   logging.Severity
+		want string
+	}{
+		{"default is empty", logging.Default, ""},
+		{"info is upper-cased", logging.Info, "INFO"},
+		{"warning is upper-cased", logging.Warning, "WARNING"},
+		{"error is upper-cased", logging.Error, "ERROR"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, severityString(tt.in))
+		})
+	}
 }

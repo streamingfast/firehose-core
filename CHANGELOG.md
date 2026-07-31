@@ -14,6 +14,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - New `finalized_block_number{app}` metric, reported by `reader-node`, `reader-node-stdin`, `reader-node-firehose`, `relayer`, `firehose`, `merger` and `block-indexer`. Paired with the existing `head_block_number{app}`, it lets dashboards show how far behind finality each app's head is, as `head_block_number - finalized_block_number`. The `merger` and `block-indexer` only ever process final blocks, so they report the same value for both.
 
+- `tools substreams logs connection`: new final `Logs` section which asks whether the full logs should be printed (defaults to yes when you just hit enter) and, when declined or when running non-interactively, shows a Cloud Logging console link scoped to the request's own time window instead.
+
+- `tools substreams logs connection`: new `--logs` flag printing every log line of the request (tier1 and tier2 alike) in the final `Logs` section instead of the console link, rendered as `<time> <severity> <logger> <message>` with the remaining fields listed one `<key>: <value>` per line under it, numeric duration fields (`duration`, `parallel_duration`, `time_to_first_data`, ...) being shown as human durations. Use `--logs-limit` (default `500`, `0` disables) to control how many of the most recent lines are printed.
+
 ### Changed
 
 - Bumped `bstream` for `forkable.WithFinalizedBlockNumMetric`, the option backing the new `finalized_block_number` metric on the `relayer`.

@@ -37,10 +37,11 @@ func NewGCPBackend(ctx context.Context, projectID string, logger *zap.Logger) (*
 
 // QueryLogs queries Cloud Logging for connection-related log entries
 func (b *GCPBackend) QueryLogs(ctx context.Context, opts QueryOptions) ([]LogEntry, error) {
-	filter := b.buildFilter(opts)
+	filter := BuildFilter(opts)
 	b.logger.Debug("querying GCP Cloud Logging",
 		zap.String("project_id", b.projectID),
 		zap.String("filter", filter),
+		zap.Int("limit", opts.Limit),
 	)
 
 	var entries []LogEntry
@@ -49,6 +50,11 @@ func (b *GCPBackend) QueryLogs(ctx context.Context, opts QueryOptions) ([]LogEnt
 			return nil, fmt.Errorf("iterating log entries: %w", err)
 		}
 		entries = append(entries, entry)
+
+		// Entries are returned newest first, so capping here keeps the most recent ones
+		if opts.Limit > 0 && len(entries) >= opts.Limit {
+			break
+		}
 	}
 
 	b.logger.Debug("query completed", zap.Int("entries_found", len(entries)))
@@ -78,11 +84,16 @@ func (b *GCPBackend) iterateEntries(ctx context.Context, filter string) iter.Seq
 	}
 }
 
-// buildFilter constructs the Cloud Logging filter string
+// BuildFilter constructs the Cloud Logging filter string
 //
 // When TraceID is set, filters by SEARCH() across the entry payload. Otherwise
-// filters by jsonPayload.user_id.
-func (b *GCPBackend) buildFilter(opts QueryOptions) string {
+// filters by jsonPayload.user_id. When AllMessages is set, the filter is not
+// restricted to the incoming-request/request-stats messages, returning every
+// log entry of the matched request instead.
+//
+// The filter is exported because it is also rendered back to the user, both as
+// a Cloud Logging console link and as a `gcloud logging read` invocation.
+func BuildFilter(opts QueryOptions) string {
 	var subjectFilter string
 	if opts.TraceID != "" {
 		subjectFilter = fmt.Sprintf(`SEARCH("%s")`, escapeFilterValue(opts.TraceID))
@@ -90,15 +101,21 @@ func (b *GCPBackend) buildFilter(opts QueryOptions) string {
 		subjectFilter = fmt.Sprintf(`jsonPayload.user_id="%s"`, escapeFilterValue(opts.UserID))
 	}
 
-	filter := fmt.Sprintf(`resource.type="k8s_container"
-%s
+	messageFilter := `
 (
   jsonPayload.message="incoming Substreams Blocks request" OR
   (jsonPayload.message="substreams request stats" AND jsonPayload.tier="tier1")
-)
+)`
+	if opts.AllMessages {
+		messageFilter = ""
+	}
+
+	filter := fmt.Sprintf(`resource.type="k8s_container"
+%s%s
 timestamp >= "%s"
 timestamp <= "%s"`,
 		subjectFilter,
+		messageFilter,
 		opts.StartTime.Format(time.RFC3339),
 		opts.EndTime.Format(time.RFC3339),
 	)
@@ -132,7 +149,11 @@ func escapeFilterValue(s string) string {
 
 // parseEntry extracts fields from a Cloud Logging entry into a LogEntry
 func (b *GCPBackend) parseEntry(entry *logging.Entry) LogEntry {
-	le := LogEntry{}
+	le := LogEntry{
+		EntryTime: entry.Timestamp,
+		Severity:  severityString(entry.Severity),
+	}
+	le.Namespace, le.ClusterName, le.PodName = resourceLabels(entry)
 
 	// Extract jsonPayload fields
 	// Cloud Logging returns Payload as *structpb.Struct for JSON logs
@@ -142,10 +163,15 @@ func (b *GCPBackend) parseEntry(entry *logging.Entry) LogEntry {
 		payload = p.AsMap()
 	case map[string]any:
 		payload = p
+	case string:
+		// Plain text payload, only reachable when querying every message of a request
+		le.Message = p
+		return le
 	default:
 		b.logger.Debug("unknown payload type", zap.String("type", fmt.Sprintf("%T", entry.Payload)))
 		return le
 	}
+	le.Fields = payload
 
 	// Trace log the raw entry for debugging
 	if b.logger.Core().Enabled(zap.DebugLevel) {
@@ -195,14 +221,28 @@ func (b *GCPBackend) parseEntry(entry *logging.Entry) LogEntry {
 		zap.String("tier", le.Tier),
 	)
 
-	// Extract resource labels (GCP-specific envelope)
-	if entry.Resource != nil && entry.Resource.Labels != nil {
-		le.Namespace = entry.Resource.Labels["namespace_name"]
-		le.ClusterName = entry.Resource.Labels["cluster_name"]
-		le.PodName = entry.Resource.Labels["pod_name"]
+	return le
+}
+
+// resourceLabels extracts the GCP-specific resource envelope labels
+func resourceLabels(entry *logging.Entry) (namespace, cluster, pod string) {
+	if entry.Resource == nil || entry.Resource.Labels == nil {
+		return "", "", ""
 	}
 
-	return le
+	labels := entry.Resource.Labels
+	return labels["namespace_name"], labels["cluster_name"], labels["pod_name"]
+}
+
+// severityString renders a Cloud Logging severity, mapping the "no severity
+// reported" default to an empty string. The client renders severities in title
+// case ("Info", "Warning"), they are upper-cased to match how Cloud Logging
+// itself names them.
+func severityString(severity logging.Severity) string {
+	if severity == logging.Default {
+		return ""
+	}
+	return strings.ToUpper(severity.String())
 }
 
 // Close releases resources held by the backend

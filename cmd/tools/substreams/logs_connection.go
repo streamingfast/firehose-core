@@ -2,10 +2,14 @@ package substreams
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/firehose-core/cmd/tools/stylex"
 	"github.com/streamingfast/firehose-core/cmd/tools/substreams/logs"
@@ -38,7 +42,11 @@ The date-range argument(s) accept various formats:
 
   firecore tools substreams logs connection bfb0980c436f3fd6f5564a31311d583f 2h \
     --state-store gs://my-bucket/substreams-states \
-    --gcp-project my-project`,
+    --gcp-project my-project
+
+  # Print every log line of the request at the end of the report
+  firecore tools substreams logs connection bfb0980c436f3fd6f5564a31311d583f \
+    --gcp-project my-project --logs`,
 		Args: cobra.RangeArgs(1, 3),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runConnection(cmd.Context(), args, cmd, logger)
@@ -47,6 +55,8 @@ The date-range argument(s) accept various formats:
 
 	cmd.Flags().String("state-store", "", "State store URL where spkg files are stored (supports file:// and gs://). When set, the spkg is loaded to display the package name and full URL")
 	cmd.Flags().String("gcp-project", "", "GCP project ID used for log querying")
+	cmd.Flags().Bool("logs", false, "Print every log line of the request in a final 'Logs' section")
+	cmd.Flags().Int("logs-limit", 500, "Maximum number of log lines to print with --logs, keeping the most recent ones (0 means no limit)")
 	cmd.MarkFlagRequired("gcp-project")
 
 	return cmd
@@ -62,6 +72,12 @@ func runConnection(ctx context.Context, args []string, cmd *cobra.Command, logge
 
 	stateStore := sflags.MustGetString(cmd, "state-store")
 	gcpProject := sflags.MustGetString(cmd, "gcp-project")
+	showLogs := sflags.MustGetBool(cmd, "logs")
+	logsLimit := sflags.MustGetInt(cmd, "logs-limit")
+
+	if logsLimit < 0 {
+		return fmt.Errorf("--logs-limit must be greater than or equal to 0, got %d", logsLimit)
+	}
 
 	var startTime, endTime time.Time
 	if len(dateArgs) == 0 {
@@ -165,7 +181,107 @@ func runConnection(ctx context.Context, args []string, cmd *cobra.Command, logge
 		}
 	}
 
+	// Raw logs of the request itself, both as browsable links and, on demand, inlined
+	rawOpts := logs.QueryOptions{
+		TraceID:     traceID,
+		AllMessages: true,
+		Limit:       logsLimit,
+	}
+	rawOpts.StartTime, rawOpts.EndTime = requestLogWindow(request, stats, startTime, endTime)
+
+	fmt.Println()
+	fmt.Println(stylex.Header("Logs"))
+
+	// Without --logs, offer to print them anyway, falling back on the console
+	// link when the answer is no (or when nobody is there to answer)
+	if !showLogs && !promptShowLogs() {
+		fmt.Printf("%s %s\n", stylex.Label("Console:"), stylex.Value(logs.ConsoleURL(gcpProject, rawOpts)))
+		fmt.Println(stylex.Note("Pass --logs to print the log lines here right away"))
+		return nil
+	}
+
+	fmt.Print(stylex.Label("Fetching logs... "))
+	rawEntries, err := backend.QueryLogs(ctx, rawOpts)
+	if err != nil {
+		fmt.Println(stylex.Error("✗"))
+		return fmt.Errorf("querying raw logs: %w", err)
+	}
+	fmt.Println(stylex.Success("✓"))
+
+	if logsLimit > 0 && len(rawEntries) >= logsLimit {
+		fmt.Printf("%s\n", stylex.Warnf("Truncated to the %d most recent log lines — raise or disable it with --logs-limit", logsLimit))
+	}
+	fmt.Println()
+
+	printRawLogs(rawEntries)
+
 	return nil
+}
+
+// promptShowLogs asks whether the full logs should be printed, defaulting to
+// yes. Returns false when there is nobody to answer (output is not a terminal)
+// or when the prompt could not be run at all, the console link is shown in
+// those cases.
+func promptShowLogs() bool {
+	if !stylex.IsTTY {
+		return false
+	}
+
+	confirmTemplate := `{{ "?" | blue }} {{ . | bold }} {{ "[Y/n]" | faint }} `
+	answer, err := cli.MaybePrompt("Show the full logs?", promptAnswerYesByDefault,
+		cli.WithPromptValidate("answer with y/yes or n/no", validatePromptYesNoOrEmpty),
+		cli.WithPromptTemplates(&promptui.PromptTemplates{
+			Valid:   confirmTemplate,
+			Invalid: confirmTemplate,
+			Success: `{{ . | faint }}{{ ":" | faint }} `,
+		}),
+	)
+	if err != nil {
+		return false
+	}
+
+	return answer
+}
+
+// promptAnswerYesByDefault turns a yes/no answer into a boolean, an empty
+// answer (the user just hit enter) meaning yes
+func promptAnswerYesByDefault(answer string) (bool, error) {
+	answer = strings.ToLower(strings.TrimSpace(answer))
+
+	return answer == "" || answer == "y" || answer == "yes", nil
+}
+
+// validatePromptYesNoOrEmpty accepts a yes/no answer as well as an empty one,
+// which stands for the default
+func validatePromptYesNoOrEmpty(answer string) error {
+	switch strings.ToLower(strings.TrimSpace(answer)) {
+	case "", "y", "yes", "n", "no":
+		return nil
+	default:
+		return errors.New("answer with y/yes or n/no")
+	}
+}
+
+// requestLogWindow narrows the time range to the request's own lifetime, padded
+// on both sides so the surrounding lines are visible. Falls back to the queried
+// range when the corresponding log is missing (e.g. a still-running request has
+// no stats log yet).
+func requestLogWindow(request, stats *logs.LogEntry, startTime, endTime time.Time) (time.Time, time.Time) {
+	const padding = time.Minute
+
+	windowStart, windowEnd := startTime, endTime
+	if request != nil {
+		if ts, ok := parseLogTimestamp(request.Timestamp); ok {
+			windowStart = ts.Add(-padding)
+		}
+	}
+	if stats != nil {
+		if ts, ok := parseLogTimestamp(stats.Timestamp); ok {
+			windowEnd = ts.Add(padding)
+		}
+	}
+
+	return windowStart, windowEnd
 }
 
 // pickConnectionEntries selects the oldest incoming-request log and the most
