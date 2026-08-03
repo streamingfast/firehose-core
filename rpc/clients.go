@@ -14,9 +14,9 @@ import (
 
 var ErrorNoMoreClient = errors.New("no more clients")
 
-// defaultRollLogSamplingInterval is how often at most a given `from -> to` roll is
-// logged at `warn` level, see [Clients.logRoll].
-const defaultRollLogSamplingInterval = 30 * time.Second
+// rollLogInterval is how often at most a given `from -> to` roll is logged at `warn`
+// level, see [Clients.logRoll].
+const rollLogInterval = 30 * time.Second
 
 type Clients[C any] struct {
 	clients               []C
@@ -26,13 +26,8 @@ type Clients[C any] struct {
 	lock                  sync.Mutex
 	logger                *zap.Logger
 
-	rollLogSamplingInterval time.Duration
-	rollLogs                map[string]*rollLogState
-}
-
-type rollLogState struct {
-	lastLoggedAt time.Time
-	suppressed   int
+	// rollLoggedAt is the last time a given `from -> to` roll was logged at `warn` level.
+	rollLoggedAt map[string]time.Time
 }
 
 func NewClients[C any](maxBlockFetchDuration time.Duration, rollingStrategy RollingStrategy[C], logger *zap.Logger) *Clients[C] {
@@ -45,8 +40,7 @@ func NewClients[C any](maxBlockFetchDuration time.Duration, rollingStrategy Roll
 		rollingStrategy:       rollingStrategy,
 		logger:                logger,
 
-		rollLogSamplingInterval: defaultRollLogSamplingInterval,
-		rollLogs:                map[string]*rollLogState{},
+		rollLoggedAt: map[string]time.Time{},
 	}
 }
 
@@ -122,47 +116,33 @@ func (c *Clients[C]) nameAt(index int) string {
 }
 
 // logRoll reports that we rolled from provider `from` to provider `to` because of
-// `err`. A given `from -> to` pair is logged at `warn` level at most once per
-// [Clients.rollLogSamplingInterval], the rolls suppressed in between being reported
-// as `suppressed_rolls` on the next logged one. Without this, a pool using
-// [RollingStrategyAlwaysUseFirst] whose first provider is down would emit one
-// warning on every single RPC call.
+// `err`. A given `from -> to` pair is logged at `warn` level again only once
+// [rollLogInterval] elapsed since the last time it was, the rolls in between going to
+// `debug` level. Without this, a pool using [RollingStrategyAlwaysUseFirst] whose
+// first provider is down would emit one warning on every single RPC call.
 func (c *Clients[C]) logRoll(from string, to string, err error) {
-	c.lock.Lock()
-
-	if c.rollLogs == nil {
-		c.rollLogs = map[string]*rollLogState{}
-	}
-
 	key := from + " -> " + to
-	state := c.rollLogs[key]
-	if state == nil {
-		state = &rollLogState{}
-		c.rollLogs[key] = state
+
+	c.lock.Lock()
+	if c.rollLoggedAt == nil {
+		c.rollLoggedAt = map[string]time.Time{}
 	}
 
 	now := time.Now()
-	if !state.lastLoggedAt.IsZero() && now.Sub(state.lastLoggedAt) < c.rollLogSamplingInterval {
-		state.suppressed++
-		c.lock.Unlock()
-
-		c.logger.Debug("rolling to next RPC provider",
-			zap.String("from_provider", from),
-			zap.String("to_provider", to),
-			zap.Error(err),
-		)
-		return
+	logIt := now.Sub(c.rollLoggedAt[key]) > rollLogInterval
+	if logIt {
+		c.rollLoggedAt[key] = now
 	}
-
-	suppressed := state.suppressed
-	state.suppressed = 0
-	state.lastLoggedAt = now
 	c.lock.Unlock()
 
-	c.logger.Warn("rolling to next RPC provider",
+	log := c.logger.Debug
+	if logIt {
+		log = c.logger.Warn
+	}
+
+	log("rolling to next RPC provider",
 		zap.String("from_provider", from),
 		zap.String("to_provider", to),
-		zap.Int("suppressed_rolls", suppressed),
 		zap.Error(err),
 	)
 }

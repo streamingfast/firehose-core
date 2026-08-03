@@ -18,7 +18,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Changed
 
-- `rpc.WithClients`/`rpc.WithClientsContext` now attribute each failed attempt to its provider, the returned error reads `provider "<name>": <error>`, and each roll to another provider is logged at `warn` level with the `from_provider`/`to_provider` names. A given `from -> to` roll is logged at most once every 30s (the ones in between are logged at `debug` level and counted as `suppressed_rolls` on the next warning), so a permanently down provider does not warn on every single call.
+- `rpc.WithClients`/`rpc.WithClientsContext` now attribute each failed attempt to its provider, the returned error reads `provider "<name>": <error>`, and each roll to another provider is logged at `warn` level with the `from_provider`/`to_provider` names. A given `from -> to` roll only warns again once 30s elapsed since the last time it did (the ones in between are logged at `debug` level), so a permanently down provider does not warn on every single call.
 
 ### Fixed
 

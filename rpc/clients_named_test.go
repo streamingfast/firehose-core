@@ -108,22 +108,19 @@ func TestWithClientsRollLogIsSampled(t *testing.T) {
 	}
 
 	rolls := logs.FilterMessage("rolling to next RPC provider").All()
-	warns := filterLevel(rolls, zapcore.WarnLevel)
-	require.Len(t, warns, 1, "the 5 rolls of the same primary -> fallback pair must be sampled down to a single warning")
-	assert.Equal(t, int64(0), warns[0].ContextMap()["suppressed_rolls"])
+	require.Len(t, filterLevel(rolls, zapcore.WarnLevel), 1, "the 5 rolls of the same primary -> fallback pair must be sampled down to a single warning")
 
-	// The suppressed ones are still there at debug level for whoever wants them.
+	// The sampled out ones are still there at debug level for whoever wants them.
 	assert.Len(t, filterLevel(rolls, zapcore.DebugLevel), 4)
 
-	// Once the sampling window elapsed, we log again and report what was suppressed.
-	clients.rollLogSamplingInterval = 0
+	// Once `rollLogInterval` elapsed, the roll warns again.
+	clients.rollLoggedAt["primary -> quicknode"] = time.Now().Add(-rollLogInterval - time.Second)
 
 	_, err := WithClients(clients, downPrimary)
 	require.NoError(t, err)
 
-	warns = filterLevel(logs.FilterMessage("rolling to next RPC provider").All(), zapcore.WarnLevel)
-	require.Len(t, warns, 2)
-	assert.Equal(t, int64(4), warns[1].ContextMap()["suppressed_rolls"])
+	warns := filterLevel(logs.FilterMessage("rolling to next RPC provider").All(), zapcore.WarnLevel)
+	assert.Len(t, warns, 2)
 }
 
 // TestWithClientsRollLogPerProviderPair ensures the sampling is per `from -> to`
