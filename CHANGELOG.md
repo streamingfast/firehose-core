@@ -8,6 +8,18 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Added
+
+- `rpc.Clients` now tracks a provider name per client. New `AddNamed(client, name)` registers a client under an explicit name, `Add(client)` keeps working unchanged and auto-names the client `client-<index>`, and `Names()` returns all provider names in pool order.
+
+- `rpc.Clients.Reset()` brings the rolling strategy back to the pool's declared order, so the next call goes to the primary provider again. Without it, a `StickyRollingStrategy` that rolled to a fallback after a single transient error stayed on that fallback until the process restarted. `StartSorting` now uses it instead of resetting the strategy itself.
+
+### Changed
+
+- `rpc.WithClients`/`rpc.WithClientsContext` now attribute each failed attempt to its provider, the returned error reads `provider "<name>": <error>`, and each roll to another provider is logged at `warn` level with the `from_provider`/`to_provider` names.
+
 ## v1.16.1
 
 ### Added

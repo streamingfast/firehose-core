@@ -40,13 +40,16 @@ func Sort[C any](ctx context.Context, clients *Clients[C], sortValueFetch SortVa
 	})
 
 	var sorted []C
+	var sortedNames []string
 	for _, v := range sortableValues {
 		sorted = append(sorted, clients.clients[v.clientIndex])
+		sortedNames = append(sortedNames, clients.nameAt(v.clientIndex))
 	}
 
 	clients.lock.Lock()
 	defer clients.lock.Unlock()
 	clients.clients = sorted
+	clients.names = sortedNames
 
 	return nil
 }

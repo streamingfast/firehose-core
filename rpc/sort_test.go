@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,7 +19,7 @@ func TestClientsSort(t *testing.T) {
 	rollingStrategy := NewStickyRollingStrategy[*rollClient]()
 	rollingStrategy.reset()
 
-	clients := NewClients(2*time.Second, rollingStrategy, zap.NewNop())
+	clients := NewClients(2*time.Second, rollingStrategy, zlogTest)
 	clients.Add(&rollClient{name: "c.1", sortValue: 100})
 	clients.Add(&rollClient{name: "c.2", sortValue: 101})
 	clients.Add(&rollClient{name: "c.3", sortValue: 102})

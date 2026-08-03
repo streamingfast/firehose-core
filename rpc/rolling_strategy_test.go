@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +24,7 @@ func TestStickyRollingStrategy(t *testing.T) {
 	rollingStrategy := NewStickyRollingStrategy[*rollClient]()
 	rollingStrategy.reset()
 
-	clients := NewClients(2*time.Second, rollingStrategy, zap.NewNop())
+	clients := NewClients(2*time.Second, rollingStrategy, zlogTest)
 	clients.Add(&rollClient{name: "c.1"})
 	clients.Add(&rollClient{name: "c.2"})
 	clients.Add(&rollClient{name: "c.3"})
