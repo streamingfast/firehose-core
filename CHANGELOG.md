@@ -20,6 +20,12 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - `rpc.WithClients`/`rpc.WithClientsContext` now attribute each failed attempt to its provider, the returned error reads `provider "<name>": <error>`, and each roll to another provider is logged at `warn` level with the `from_provider`/`to_provider` names.
 
+### Fixed
+
+- `rpc.Sort` no longer reads the clients pool without holding the lock, which was a data race against `Add`/`AddNamed` and against the client selection in `WithClientsContext`, since `StartSorting` runs `Sort` on its own goroutine. It now sorts a snapshot taken under the lock, keeping the per-client network fetches lock-free.
+
+- A client added to the pool while `rpc.Sort` was running is no longer dropped. `Sort` snapshots the pool, fetches a sort value per client over the network, then writes the pool back, and that write used to overwrite anything appended in between. It now redoes the round instead of publishing, so the new client is sorted along with the rest.
+
 ## v1.16.1
 
 ### Added
