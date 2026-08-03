@@ -13,6 +13,7 @@ type rollClient struct {
 	callCount int
 	name      string
 	sortValue uint64
+	pool      *Clients[*rollClient] // only set by tests that reach back into the pool
 }
 
 func (r *rollClient) fetchSortValue(_ context.Context) (sortValue uint64, err error) {
