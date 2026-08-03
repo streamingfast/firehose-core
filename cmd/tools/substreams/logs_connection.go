@@ -76,8 +76,8 @@ func runConnection(ctx context.Context, args []string, cmd *cobra.Command, logge
 
 	stateStore := sflags.MustGetString(cmd, "state-store")
 	gcpProject := sflags.MustGetString(cmd, "gcp-project")
-	showLogs := sflags.MustGetBool(cmd, "logs")
-	skipLogs := cmd.Flags().Changed("logs") && !showLogs
+	showLogs, showLogsProvided := sflags.MustGetBoolProvided(cmd, "logs")
+	skipLogs := showLogsProvided && !showLogs
 	logsLimit := sflags.MustGetInt(cmd, "logs-limit")
 
 	if logsLimit < 0 {
