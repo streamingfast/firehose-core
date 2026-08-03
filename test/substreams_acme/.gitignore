@@ -9,3 +9,8 @@ sink-data/
 
 # The spkg packed by the subtreams cli
 *.spkg
+
+# Not tracked on purpose: GitHub's dependency graph parses any committed Cargo.lock
+# and raises Dependabot alerts for this test-only Substreams package's transitive
+# dependencies, which are never shipped nor built in CI.
+Cargo.lock
