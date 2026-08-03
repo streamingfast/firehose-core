@@ -14,6 +14,10 @@ import (
 
 var ErrorNoMoreClient = errors.New("no more clients")
 
+// defaultRollLogSamplingInterval is how often at most a given `from -> to` roll is
+// logged at `warn` level, see [Clients.logRoll].
+const defaultRollLogSamplingInterval = 30 * time.Second
+
 type Clients[C any] struct {
 	clients               []C
 	names                 []string
@@ -21,6 +25,14 @@ type Clients[C any] struct {
 	rollingStrategy       RollingStrategy[C]
 	lock                  sync.Mutex
 	logger                *zap.Logger
+
+	rollLogSamplingInterval time.Duration
+	rollLogs                map[string]*rollLogState
+}
+
+type rollLogState struct {
+	lastLoggedAt time.Time
+	suppressed   int
 }
 
 func NewClients[C any](maxBlockFetchDuration time.Duration, rollingStrategy RollingStrategy[C], logger *zap.Logger) *Clients[C] {
@@ -32,6 +44,9 @@ func NewClients[C any](maxBlockFetchDuration time.Duration, rollingStrategy Roll
 		maxBlockFetchDuration: maxBlockFetchDuration,
 		rollingStrategy:       rollingStrategy,
 		logger:                logger,
+
+		rollLogSamplingInterval: defaultRollLogSamplingInterval,
+		rollLogs:                map[string]*rollLogState{},
 	}
 }
 
@@ -106,6 +121,52 @@ func (c *Clients[C]) nameAt(index int) string {
 	return c.names[index]
 }
 
+// logRoll reports that we rolled from provider `from` to provider `to` because of
+// `err`. A given `from -> to` pair is logged at `warn` level at most once per
+// [Clients.rollLogSamplingInterval], the rolls suppressed in between being reported
+// as `suppressed_rolls` on the next logged one. Without this, a pool using
+// [RollingStrategyAlwaysUseFirst] whose first provider is down would emit one
+// warning on every single RPC call.
+func (c *Clients[C]) logRoll(from string, to string, err error) {
+	c.lock.Lock()
+
+	if c.rollLogs == nil {
+		c.rollLogs = map[string]*rollLogState{}
+	}
+
+	key := from + " -> " + to
+	state := c.rollLogs[key]
+	if state == nil {
+		state = &rollLogState{}
+		c.rollLogs[key] = state
+	}
+
+	now := time.Now()
+	if !state.lastLoggedAt.IsZero() && now.Sub(state.lastLoggedAt) < c.rollLogSamplingInterval {
+		state.suppressed++
+		c.lock.Unlock()
+
+		c.logger.Debug("rolling to next RPC provider",
+			zap.String("from_provider", from),
+			zap.String("to_provider", to),
+			zap.Error(err),
+		)
+		return
+	}
+
+	suppressed := state.suppressed
+	state.suppressed = 0
+	state.lastLoggedAt = now
+	c.lock.Unlock()
+
+	c.logger.Warn("rolling to next RPC provider",
+		zap.String("from_provider", from),
+		zap.String("to_provider", to),
+		zap.Int("suppressed_rolls", suppressed),
+		zap.Error(err),
+	)
+}
+
 func WithClientsContext[C any, V any](clients *Clients[C], ctx context.Context, f func(context.Context, C) (v V, err error)) (v V, err error) {
 	var errs error
 
@@ -144,11 +205,7 @@ func WithClientsContext[C any, V any](clients *Clients[C], ctx context.Context, 
 				return v, errs
 			}
 
-			clients.logger.Warn("rolling to next RPC provider",
-				zap.String("from_provider", name),
-				zap.String("to_provider", nextName),
-				zap.Error(err),
-			)
+			clients.logRoll(name, nextName, err)
 
 			client, name = nextClient, nextName
 			continue

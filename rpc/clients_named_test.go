@@ -84,6 +84,87 @@ func TestWithClientsLogsRoll(t *testing.T) {
 	assert.Equal(t, "quicknode", fields["to_provider"])
 }
 
+// TestWithClientsRollLogIsSampled guards against log spam: a pool using
+// RollingStrategyAlwaysUseFirst whose first provider is down rolls on every single
+// call, we must not emit a warning each time.
+func TestWithClientsRollLogIsSampled(t *testing.T) {
+	core, logs := observer.New(zapcore.DebugLevel)
+
+	clients := NewClients(2*time.Second, NewRollingStrategyAlwaysUseFirst[*rollClient](), zap.New(core))
+	clients.AddNamed(&rollClient{name: "c.1"}, "primary")
+	clients.AddNamed(&rollClient{name: "c.2"}, "quicknode")
+
+	downPrimary := func(_ context.Context, client *rollClient) (any, error) {
+		if client.name == "c.1" {
+			return nil, fmt.Errorf("connection refused")
+		}
+
+		return nil, nil
+	}
+
+	for range 5 {
+		_, err := WithClients(clients, downPrimary)
+		require.NoError(t, err)
+	}
+
+	rolls := logs.FilterMessage("rolling to next RPC provider").All()
+	warns := filterLevel(rolls, zapcore.WarnLevel)
+	require.Len(t, warns, 1, "the 5 rolls of the same primary -> fallback pair must be sampled down to a single warning")
+	assert.Equal(t, int64(0), warns[0].ContextMap()["suppressed_rolls"])
+
+	// The suppressed ones are still there at debug level for whoever wants them.
+	assert.Len(t, filterLevel(rolls, zapcore.DebugLevel), 4)
+
+	// Once the sampling window elapsed, we log again and report what was suppressed.
+	clients.rollLogSamplingInterval = 0
+
+	_, err := WithClients(clients, downPrimary)
+	require.NoError(t, err)
+
+	warns = filterLevel(logs.FilterMessage("rolling to next RPC provider").All(), zapcore.WarnLevel)
+	require.Len(t, warns, 2)
+	assert.Equal(t, int64(4), warns[1].ContextMap()["suppressed_rolls"])
+}
+
+// TestWithClientsRollLogPerProviderPair ensures the sampling is per `from -> to`
+// pair, rolling to a different provider must not be swallowed by an earlier roll.
+func TestWithClientsRollLogPerProviderPair(t *testing.T) {
+	core, logs := observer.New(zapcore.WarnLevel)
+
+	clients := NewClients(2*time.Second, NewRollingStrategyAlwaysUseFirst[*rollClient](), zap.New(core))
+	clients.AddNamed(&rollClient{name: "c.1"}, "primary")
+	clients.AddNamed(&rollClient{name: "c.2"}, "quicknode")
+	clients.AddNamed(&rollClient{name: "c.3"}, "last-resort")
+
+	_, err := WithClients(clients, func(_ context.Context, client *rollClient) (any, error) {
+		if client.name == "c.3" {
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("boom")
+	})
+	require.NoError(t, err)
+
+	var pairs [][2]string
+	for _, roll := range logs.FilterMessage("rolling to next RPC provider").All() {
+		fields := roll.ContextMap()
+		pairs = append(pairs, [2]string{fields["from_provider"].(string), fields["to_provider"].(string)})
+	}
+
+	assert.Equal(t, [][2]string{{"primary", "quicknode"}, {"quicknode", "last-resort"}}, pairs)
+}
+
+func filterLevel(entries []observer.LoggedEntry, level zapcore.Level) []observer.LoggedEntry {
+	var out []observer.LoggedEntry
+	for _, entry := range entries {
+		if entry.Level == level {
+			out = append(out, entry)
+		}
+	}
+
+	return out
+}
+
 // TestStickyRollingStrategyResetFailback ensures that a sticky strategy which rolled
 // to the fallback provider after a transient error goes back to the declared-order
 // primary once Clients.Reset is called.

@@ -64,12 +64,6 @@ func (s *StickyRollingStrategy[C]) next(clients *Clients[C]) (client C, index in
 		return client, index, nil
 	}
 
-	if s.nextClientIndex == len(clients.clients) { //roll to 1st client
-		client = clients.clients[0]
-		s.usedClientCount = s.usedClientCount + 1
-		return client, 0, nil
-	}
-
 	index = s.nextClientIndex
 	client = clients.clients[index]
 	s.usedClientCount = s.usedClientCount + 1
