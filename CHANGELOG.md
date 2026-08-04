@@ -8,15 +8,33 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.17.0
 
 ### Added
+
+- New `--substreams-tier2-segment-stall-timeout` flag (default `10m`) on `substreams-tier2`: a segment is now killed when it stops processing blocks for that long, the deadline resetting on every block processed. See the `substreams` bump below for why this replaces the fixed execution budget as the primary guard.
 
 - `rpc.Clients` now tracks a provider name per client. New `AddNamed(client, name)` registers a client under an explicit name, `Add(client)` keeps working unchanged and auto-names the client `client-<index>`, and `Names()` returns all provider names in pool order.
 
 - `rpc.Clients.Reset()` brings the rolling strategy back to the pool's declared order, so the next call goes to the primary provider again. Without it, a `StickyRollingStrategy` that rolled to a fallback after a single transient error stayed on that fallback until the process restarted. `StartSorting` now uses it instead of resetting the strategy itself.
 
 ### Changed
+
+- **Operators** the default of `--substreams-tier2-segment-execution-timeout` moves from `1h` to `4h`. It is now only an absolute backstop, the new `--substreams-tier2-segment-stall-timeout` being the guard that actually kills wedged segments. If you pinned the flag to a value of your own, raise it or drop the override, otherwise expensive-but-healthy segments keep being killed.
+
+- Bumped `substreams` to [v1.21.0](https://github.com/streamingfast/substreams/releases/tag/v1.21.0):
+
+  - Server: tier2 now aborts a segment when it **stops making progress** rather than when it exceeds a fixed time budget. The new stall timeout (10 minutes by default, `--substreams-tier2-segment-stall-timeout`) resets on every block processed, and the pre-existing segment execution timeout (`--substreams-tier2-segment-execution-timeout`) is kept only as an absolute backstop, its default raised from 60 minutes to 4 hours.
+
+    The old fixed budget was fatal to expensive-but-healthy workloads: a segment making thousands of RPC calls per block could take slightly longer than 60 minutes while still advancing block by block, get killed, and — since a killed segment is never cached — have its retry redo the same work and hit the same wall. Such a request could never complete, no matter how many times it reconnected. A stalled segment is still killed promptly, and since a single block is already bounded by the block execution timeout (`--substreams-block-execution-timeout`, 3 minutes by default), the stall timeout cannot be tripped by one legitimately slow block.
+
+    The `request active for a long time` log gained a `since_last_progress` field, and a segment killed for stalling now reports `request stalled, no block progress` instead of `request active for too long`.
+
+  - Server: new `substreams_undo_signal_distance_blocks` prometheus histogram, observing how many blocks each `BlockUndoSignal` sent to clients reverts, labeled by `source` (`reorg` when a fork is seen while streaming, `cursor_resolution` when the cursor of an incoming request points to a block that was reorged out). Its `_count` gives the total number of undo signals sent; subtracting the `le="5"` bucket from it gives the number of large ones. Undo signals reverting more than 5 blocks are also logged as a warning with `trace_id`, `head`, `revert_up_to`, `distance` and, on the `cursor_resolution` path, the client `cursor`.
+
+  - Server: tier2 no longer logs `tls: first record does not look like a TLS handshake` errors from plain-HTTP health probes / load balancers hitting a TLS port (same suppress list as the existing EOF and connection-reset handshake noise).
+
+  - Server: a tier1 shutdown happening while a request was still in its parallel backprocessing phase was reported to the client as `Internal` instead of `Unavailable`, so clients did not see the reconnect signal during a tier1 rollout.
 
 - `rpc.WithClients`/`rpc.WithClientsContext` now attribute each failed attempt to its provider, the returned error reads `provider "<name>": <error>`, and each roll to another provider is logged at `warn` level with the `from_provider`/`to_provider` names. A given `from -> to` roll only warns again once 30s elapsed since the last time it did (the ones in between are logged at `debug` level), so a permanently down provider does not warn on every single call.
 
