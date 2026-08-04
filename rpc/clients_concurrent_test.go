@@ -7,8 +7,6 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
-
-	"go.uber.org/zap"
 )
 
 // TestWithClients_doesNotSerialize guards the fix in WithClientsContext: the
@@ -23,7 +21,7 @@ import (
 // never reaches an all-durably-blocked state, so the test hangs and fails.
 func TestWithClients_doesNotSerialize(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		clients := NewClients[any](time.Second, NewStickyRollingStrategy[any](), zap.NewNop())
+		clients := NewClients[any](time.Second, NewStickyRollingStrategy[any](), zlogTest)
 		for i := 0; i < 4; i++ {
 			clients.Add(new(any))
 		}
@@ -39,7 +37,7 @@ func TestWithClients_doesNotSerialize(t *testing.T) {
 				defer wg.Done()
 				_, _ = WithClients(clients, func(ctx context.Context, c any) (any, error) {
 					inside.Add(1) // record that we're inside f
-					<-release      // hold here until every caller is inside f
+					<-release     // hold here until every caller is inside f
 					return nil, nil
 				})
 			}()
