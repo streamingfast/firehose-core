@@ -20,6 +20,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - `rpc.WithClients`/`rpc.WithClientsContext` now attribute each failed attempt to its provider, the returned error reads `provider "<name>": <error>`, and each roll to another provider is logged at `warn` level with the `from_provider`/`to_provider` names. A given `from -> to` roll only warns again once 30s elapsed since the last time it did (the ones in between are logged at `debug` level), so a permanently down provider does not warn on every single call.
 
+- `tools substreams logs connection`: explicitly passing `--logs=false` now skips the final `Logs` section altogether, printing neither the prompt nor the Cloud Logging console link. Omitting the flag keeps the previous behavior (prompt, falling back on the console link).
+
 ### Fixed
 
 - `rpc.Sort` no longer reads the clients pool without holding the lock, which was a data race against `Add`/`AddNamed` and against the client selection in `WithClientsContext`, since `StartSorting` runs `Sort` on its own goroutine. It now sorts a snapshot taken under the lock, keeping the per-client network fetches lock-free.

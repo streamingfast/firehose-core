@@ -46,7 +46,11 @@ The date-range argument(s) accept various formats:
 
   # Print every log line of the request at the end of the report
   firecore tools substreams logs connection bfb0980c436f3fd6f5564a31311d583f \
-    --gcp-project my-project --logs`,
+    --gcp-project my-project --logs
+
+  # Skip the 'Logs' section entirely, no question asked
+  firecore tools substreams logs connection bfb0980c436f3fd6f5564a31311d583f \
+    --gcp-project my-project --logs=false`,
 		Args: cobra.RangeArgs(1, 3),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runConnection(cmd.Context(), args, cmd, logger)
@@ -55,7 +59,7 @@ The date-range argument(s) accept various formats:
 
 	cmd.Flags().String("state-store", "", "State store URL where spkg files are stored (supports file:// and gs://). When set, the spkg is loaded to display the package name and full URL")
 	cmd.Flags().String("gcp-project", "", "GCP project ID used for log querying")
-	cmd.Flags().Bool("logs", false, "Print every log line of the request in a final 'Logs' section")
+	cmd.Flags().Bool("logs", false, "Print every log line of the request in a final 'Logs' section, explicitly passing --logs=false skips the section altogether")
 	cmd.Flags().Int("logs-limit", 500, "Maximum number of log lines to print with --logs, keeping the most recent ones (0 means no limit)")
 	cmd.MarkFlagRequired("gcp-project")
 
@@ -72,7 +76,8 @@ func runConnection(ctx context.Context, args []string, cmd *cobra.Command, logge
 
 	stateStore := sflags.MustGetString(cmd, "state-store")
 	gcpProject := sflags.MustGetString(cmd, "gcp-project")
-	showLogs := sflags.MustGetBool(cmd, "logs")
+	showLogs, showLogsProvided := sflags.MustGetBoolProvided(cmd, "logs")
+	skipLogs := showLogsProvided && !showLogs
 	logsLimit := sflags.MustGetInt(cmd, "logs-limit")
 
 	if logsLimit < 0 {
@@ -179,6 +184,12 @@ func runConnection(ctx context.Context, args []string, cmd *cobra.Command, logge
 				stylex.Dimf("(from namespace %q)", request.Namespace),
 			)
 		}
+	}
+
+	// An explicit --logs=false means the caller wants nothing to do with the
+	// 'Logs' section, not even the console link nor the prompt
+	if skipLogs {
+		return nil
 	}
 
 	// Raw logs of the request itself, both as browsable links and, on demand, inlined
