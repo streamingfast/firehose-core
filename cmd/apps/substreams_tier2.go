@@ -47,7 +47,8 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().String("substreams-tier2-authenticator", "trust://", "Authenticator to use for tier2 requests. Can be 'trust://' or 'secret://<key>'. Supports environment variable interpolation with ${ENV_VAR_NAME} syntax, e.g. 'secret://${TIER2_SECRET}'.")
 			cmd.Flags().String("substreams-tier2-discovery-service-url", "", "URL to advertise presence to the grpc discovery service") //traffic-director://xds?vpc_network=vpc-global&use_xds_reds=true
 			cmd.Flags().Uint64("substreams-tier2-max-concurrent-requests", 0, "Maximum number of concurrent requests allowed on the server. When the tier2 service hits this limit, it will set itself as 'Not Ready' until requests are processed. Default 0 (no limit)")
-			cmd.Flags().Duration("substreams-tier2-segment-execution-timeout", time.Hour, "Maximum duration a segment can take to execute before being forcefully stopped with DeadlineExceeded error")
+			cmd.Flags().Duration("substreams-tier2-segment-execution-timeout", 4*time.Hour, "Absolute backstop on a segment execution: maximum duration a segment can take, even while it keeps making progress, before being forcefully stopped with a DeadlineExceeded error")
+			cmd.Flags().Duration("substreams-tier2-segment-stall-timeout", 10*time.Minute, "Maximum duration a segment can go without processing a single block before being forcefully stopped with a DeadlineExceeded error. Keep it well above --substreams-block-execution-timeout, which already bounds a single block")
 			cmd.Flags().String("substreams-tier2-hosted-store-registry-address", "", "gRPC address of the control-plane registry service used to resolve hosted foundational stores (legacy/current stores continue to use the JSON config path)")
 			// all substreams
 			registerCommonSubstreamsFlags(cmd)
@@ -61,6 +62,7 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 			maximumConcurrentRequests := viper.GetUint64("substreams-tier2-max-concurrent-requests")
 			executionTimeout := viper.GetDuration("substreams-block-execution-timeout")
 			segmentExecutionTimeout := viper.GetDuration("substreams-tier2-segment-execution-timeout")
+			segmentStallTimeout := viper.GetDuration("substreams-tier2-segment-stall-timeout")
 
 			tracing := os.Getenv("SUBSTREAMS_TRACING") == "modules_exec"
 
@@ -106,6 +108,7 @@ func RegisterSubstreamsTier2App[B firecore.Block](chain *firecore.Chain[B], root
 			config.WASMExtensions = wasmExtensions
 			config.BlockExecutionTimeout = executionTimeout
 			config.SegmentExecutionTimeout = segmentExecutionTimeout
+			config.SegmentStallTimeout = segmentStallTimeout
 			config.MaximumConcurrentRequests = maximumConcurrentRequests
 			config.StoresScratchSpace = firecore.MustReplaceDataDir(runtime.AbsDataDir, viper.GetString("substreams-stores-scratch-space"))
 			config.StoresBackend = viper.GetString("substreams-stores-backend")
