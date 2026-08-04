@@ -8,6 +8,24 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Added
+
+- `rpc.Clients` now tracks a provider name per client. New `AddNamed(client, name)` registers a client under an explicit name, `Add(client)` keeps working unchanged and auto-names the client `client-<index>`, and `Names()` returns all provider names in pool order.
+
+- `rpc.Clients.Reset()` brings the rolling strategy back to the pool's declared order, so the next call goes to the primary provider again. Without it, a `StickyRollingStrategy` that rolled to a fallback after a single transient error stayed on that fallback until the process restarted. `StartSorting` now uses it instead of resetting the strategy itself.
+
+### Changed
+
+- `rpc.WithClients`/`rpc.WithClientsContext` now attribute each failed attempt to its provider, the returned error reads `provider "<name>": <error>`, and each roll to another provider is logged at `warn` level with the `from_provider`/`to_provider` names. A given `from -> to` roll only warns again once 30s elapsed since the last time it did (the ones in between are logged at `debug` level), so a permanently down provider does not warn on every single call.
+
+### Fixed
+
+- `rpc.Sort` no longer reads the clients pool without holding the lock, which was a data race against `Add`/`AddNamed` and against the client selection in `WithClientsContext`, since `StartSorting` runs `Sort` on its own goroutine. It now sorts a snapshot taken under the lock, keeping the per-client network fetches lock-free.
+
+- A client added to the pool while `rpc.Sort` was running is no longer dropped. `Sort` snapshots the pool, fetches a sort value per client over the network, then writes the pool back, and that write used to overwrite anything appended in between. It now redoes the round instead of publishing, so the new client is sorted along with the rest.
+
 ## v1.16.1
 
 ### Added
