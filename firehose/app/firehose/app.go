@@ -41,6 +41,10 @@ import (
 	"go.uber.org/zap"
 )
 
+// Unlinkable live blocks in a row that mean the hub is wedged for good. Resets on
+// any linkable block and only armed once ready; same value the relayer uses.
+const maxConsecutiveUnlinkableBlocks = 5
+
 type Config struct {
 	MergedBlocksStoreURL    string
 	OneBlocksStoreURL       string
@@ -149,7 +153,15 @@ func (a *App) Run() error {
 		// the hub must hold at least two merged-blocks files worth of final
 		// blocks so the joining source can hand off from a file boundary
 		keepFinalBlocks := int(max(500, 2*bstream.DefaultMergedBlocksBundleSize))
-		forkableHub = hub.NewForkableHubWithOptions(liveSourceFactory, keepFinalBlocks, oneBlocksStore, []hub.Option{hub.WithLogger(a.logger)})
+		forkableHub = hub.NewForkableHubWithOptions(
+			liveSourceFactory,
+			keepFinalBlocks,
+			oneBlocksStore,
+			[]hub.Option{
+				hub.WithLogger(a.logger),
+				hub.WithMaxConsecutiveUnlinkableBlocks(maxConsecutiveUnlinkableBlocks),
+			},
+		)
 		forkableHub.OnTerminated(a.Shutdown)
 
 		go forkableHub.Run()
