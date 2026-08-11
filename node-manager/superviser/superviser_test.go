@@ -22,6 +22,7 @@ import (
 	logplugin "github.com/streamingfast/firehose-core/node-manager/log_plugin"
 	"github.com/streamingfast/logging"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
@@ -52,14 +53,11 @@ func TestSuperviser_StartsCorrectly(t *testing.T) {
 	superviser := testSuperviserInfinite()
 	defer superviser.Stop()
 
-	lineChan := make(chan string)
-	superviser.RegisterLogPlugin(logplugin.LogPluginFunc(func(line string) {
-		lineChan <- line
-	}))
+	lineChan := registerLineChanPlugin(superviser)
 
 	go superviser.Start()
 
-	waitForSuperviserTaskCompletion(superviser)
+	waitForSuperviserTaskCompletion(t, superviser)
 	waitForOutput(t, lineChan, waitDefaultTimeout)
 
 	assert.Equal(t, true, superviser.IsRunning())
@@ -69,20 +67,17 @@ func TestSuperviser_CanBeRestartedCorrectly(t *testing.T) {
 	superviser := testSuperviserInfinite()
 	defer superviser.Stop()
 
-	lineChan := make(chan string)
-	superviser.RegisterLogPlugin(logplugin.LogPluginFunc(func(line string) {
-		lineChan <- line
-	}))
+	lineChan := registerLineChanPlugin(superviser)
 
 	go superviser.Start()
-	waitForSuperviserTaskCompletion(superviser)
+	waitForSuperviserTaskCompletion(t, superviser)
 	waitForOutput(t, lineChan, waitDefaultTimeout)
 
-	superviser.Stop()
+	require.NoError(t, superviser.Stop())
 	assert.Equal(t, false, superviser.IsRunning())
 
 	go superviser.Start()
-	waitForSuperviserTaskCompletion(superviser)
+	waitForSuperviserTaskCompletion(t, superviser)
 	waitForOutput(t, lineChan, waitDefaultTimeout)
 
 	assert.Equal(t, true, superviser.IsRunning())
@@ -92,13 +87,10 @@ func TestSuperviser_CapturesStdoutCorrectly(t *testing.T) {
 	superviser := testSuperviserSh("echo first; sleep 0.1; echo second")
 	defer superviser.Stop()
 
-	lineChan := make(chan string)
-	superviser.RegisterLogPlugin(logplugin.LogPluginFunc(func(line string) {
-		lineChan <- line
-	}))
+	lineChan := registerLineChanPlugin(superviser)
 
 	go superviser.Start()
-	waitForSuperviserTaskCompletion(superviser)
+	waitForSuperviserTaskCompletion(t, superviser)
 
 	var lines []string
 	lines = append(lines, waitForOutput(t, lineChan, waitDefaultTimeout))
@@ -119,9 +111,29 @@ func testSuperviserInfinite() *Superviser {
 	return testSuperviserSh(infiniteScript)
 }
 
-func waitForSuperviserTaskCompletion(superviser *Superviser) {
-	superviser.cmdLock.Lock()
-	superviser.cmdLock.Unlock()
+// registerLineChanPlugin registers a log plugin forwarding every line to the returned
+// channel. The channel is buffered and never blocks the superviser read loop: a blocked
+// read loop stops draining overseer's stdout/stderr channels, which in turn keeps the
+// underlying `exec.Cmd.Wait` from ever returning, so the command never reaches a final
+// state and `Done()` never fires.
+func registerLineChanPlugin(superviser *Superviser) chan string {
+	lineChan := make(chan string, 1024)
+	superviser.RegisterLogPlugin(logplugin.LogPluginFunc(func(line string) {
+		select {
+		case lineChan <- line:
+		default:
+		}
+	}))
+
+	return lineChan
+}
+
+func waitForSuperviserTaskCompletion(t *testing.T, superviser *Superviser) {
+	t.Helper()
+
+	require.Eventually(t, func() bool {
+		return superviser.getCmd() != nil
+	}, 5*time.Second, 2*time.Millisecond, "superviser never created its command")
 }
 
 func waitForOutput(t *testing.T, lineChan chan string, timeout time.Duration) (line string) {

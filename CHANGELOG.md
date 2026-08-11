@@ -28,6 +28,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - The `firehose` app now restarts when its block hub can no longer link incoming live blocks, instead of hanging every request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be linked, and `head_block_number`/`finalized_block_number` keep tracking the live source, so the process looked healthy throughout.
 
+- Restarting a supervised node process no longer deadlocks the whole superviser. `Start` waited for a previous process still stopping while holding the lock that also guards `IsRunning`, `LastExitCode` and `Stopped`, so a process that never reached a final state — one ignoring `SIGTERM`, or whose children keep its stdout/stderr open — froze every one of those calls forever. Waiting no longer holds that lock, and `Start` now gives up after 30s with an error instead of blocking indefinitely.
+
 ## v1.17.0
 
 ### Added
