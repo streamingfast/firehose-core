@@ -85,6 +85,12 @@ func (a *App) Run() error {
 	defer cancel(nil)
 	a.OnTerminating(func(err error) { cancel(err) })
 
+	defer func() {
+		if err := a.testModeComparator.Close(); err != nil {
+			a.zlogger.Warn("failed to close test mode comparator", zap.Error(err))
+		}
+	}()
+
 	appWrapper := cli.NewApplication(appCtx)
 
 	store, err := dstore.NewDBinStore(a.config.OneBlocksStoreURL)

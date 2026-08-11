@@ -24,6 +24,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Fixed
 
+- The reader running in test mode (`--reader-node-test-mode`) now shuts down promptly: pending block comparisons against the production endpoint are cancelled when the process starts terminating, instead of draining the whole buffered blocks channel one remote fetch (and its retry backoff) at a time. Comparisons are still completed when the termination comes from reaching `--reader-node-stop-block-num`. The comparator's gRPC connection is also closed on the way out.
+
 - The `firehose` app now restarts when its block hub can no longer link incoming live blocks, instead of hanging every request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be linked, and `head_block_number`/`finalized_block_number` keep tracking the live source, so the process looked healthy throughout.
 
 ## v1.17.0

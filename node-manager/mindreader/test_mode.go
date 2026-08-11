@@ -107,8 +107,13 @@ func (c *TestModeComparator) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 }
 
 func (c *TestModeComparator) Close() error {
-	if c.closeFunc != nil {
-		return c.closeFunc()
+	if c == nil {
+		return nil
+	}
+
+	if closeFunc := c.closeFunc; closeFunc != nil {
+		c.closeFunc = nil
+		return closeFunc()
 	}
 	return nil
 }
@@ -139,7 +144,10 @@ func (c *TestModeComparator) CompareBlock(ctx context.Context, testingBlock *pbb
 	}
 
 	var response *pbfirehose.SingleBlockResponse
-	err := derr.Retry(3, func(ctx context.Context) (err error) {
+
+	// `RetryContext` and not `Retry` so that a cancelled context (shutdown) aborts both the
+	// in-flight request and the backoff sleep between two attempts.
+	err := derr.RetryContext(ctx, 3, func(ctx context.Context) (err error) {
 		response, err = c.fetchClient.Block(ctx, req, c.callOpts...)
 		if err != nil {
 			if strings.Contains(err.Error(), "not found") {
