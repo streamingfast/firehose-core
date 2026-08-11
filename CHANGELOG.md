@@ -14,7 +14,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Bumped `firehose-networks` to [v0.2.3](https://github.com/streamingfast/firehose-networks/releases/tag/v0.2.3): Added Ethereum Hoodi testnet (`hoodi`, `eip155:560048`)  StreamingFast Firehose and Substreams endpoints (`hoodi.eth.streamingfast.io:443`).
 
-- Bumped `substreams` to [v1.21.1-0.20260810123612-a6afd3480e24](https://github.com/streamingfast/substreams/compare/v1.21.0...a6afd3480e24):
+- Bumped `substreams` to [v1.21.1-0.20260811030713-864626c02e63](https://github.com/streamingfast/substreams/compare/v1.21.0...864626c02e63):
 
   - Server: `substreams-tier1` emits a periodic `substreams request progress` log per request (after 1 minute, then every 5 minutes) meant to answer "why is my substreams slow?" while the request is still running: phase, per-stage module and job progress, external call cost, last job error, and time spent blocked writing to the consumer. It ends with a short `hints` list naming the likely bottleneck when one is detected. Rates and deltas are suffixed `_5m` and cover a fixed trailing 5 minutes whatever the emission interval is; cadence is tunable with `SUBSTREAMS_PROGRESS_LOG_FIRST_DELAY` and `SUBSTREAMS_PROGRESS_LOG_INTERVAL`.
 
@@ -22,9 +22,13 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
   - Server: `substreams-tier1` now restarts when its block hub can no longer link incoming live blocks, the same fix as the `firehose` app one below.
 
+  - Server: the `incoming Substreams Blocks request` log of `substreams-tier1` now carries a `parallelism` object (requested, granted by the authentication layer, effective count and which of the two capped it, plan tier, stage layer executors) plus `parallel_segment_count` and `stage_count`. A client asking for 300 parallel workers and getting 15 previously left no trace of the negotiation in the logs.
+
 ### Fixed
 
 - The `firehose` app now restarts when its block hub can no longer link incoming live blocks, instead of hanging every request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be linked, and `head_block_number`/`finalized_block_number` keep tracking the live source, so the process looked healthy throughout.
+
+- Restarting a supervised node process no longer deadlocks the whole superviser. `Start` waited for a previous process still stopping while holding the lock that also guards `IsRunning`, `LastExitCode` and `Stopped`, so a process that never reached a final state — one ignoring `SIGTERM`, or whose children keep its stdout/stderr open — froze every one of those calls forever. Waiting no longer holds that lock, and `Start` now gives up after 30s with an error instead of blocking indefinitely.
 
 ## v1.17.0
 

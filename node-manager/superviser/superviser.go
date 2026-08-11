@@ -37,6 +37,12 @@ type mindreaderPlugin interface {
 	LastSeenBlock() bstream.BlockRef
 }
 
+// stoppingWaitTimeout is how long `Start` waits for a previous command still in the
+// `STOPPING` state before giving up. A supervised process that ignores SIGTERM, or whose
+// children keep its stdout/stderr open, never reaches a final state and would otherwise
+// block the restart forever. It is a variable only so that tests can shorten it.
+var stoppingWaitTimeout = 30 * time.Second
+
 type Superviser struct {
 	*shutter.Shutter
 	Binary    string
@@ -48,6 +54,14 @@ type Superviser struct {
 	Env    []string
 	Logger *zap.Logger
 
+	// runLock serializes the process lifecycle operations (`Start` and `Stop`) against
+	// each other. It is held for the whole duration of those operations, including while
+	// waiting for the underlying process to actually terminate.
+	runLock sync.Mutex
+
+	// cmdLock guards access to `cmd` only. It must never be held while waiting on
+	// anything, otherwise observers like `IsRunning`, `LastExitCode` and `Stopped` block
+	// for as long as the wait lasts (and deadlock outright when the wait never completes).
 	cmd     *overseer.Cmd
 	cmdLock sync.Mutex
 
@@ -113,22 +127,32 @@ func (s *Superviser) setDeepMindDebug(enabled bool) {
 	}
 }
 
-func (s *Superviser) Stopped() <-chan struct{} {
+// getCmd returns the current command, or `nil` if there is none. The lock is released
+// before returning, the caller is free to block on the returned command.
+func (s *Superviser) getCmd() *overseer.Cmd {
 	s.cmdLock.Lock()
 	defer s.cmdLock.Unlock()
 
-	if s.cmd != nil {
-		return s.cmd.Done()
+	return s.cmd
+}
+
+func (s *Superviser) setCmd(cmd *overseer.Cmd) {
+	s.cmdLock.Lock()
+	defer s.cmdLock.Unlock()
+
+	s.cmd = cmd
+}
+
+func (s *Superviser) Stopped() <-chan struct{} {
+	if cmd := s.getCmd(); cmd != nil {
+		return cmd.Done()
 	}
 	return nil
 }
 
 func (s *Superviser) LastExitCode() int {
-	s.cmdLock.Lock()
-	defer s.cmdLock.Unlock()
-
-	if s.cmd != nil {
-		return s.cmd.Status().Exit
+	if cmd := s.getCmd(); cmd != nil {
+		return cmd.Status().Exit
 	}
 	return 0
 }
@@ -172,18 +196,25 @@ func (s *Superviser) Start(options ...nodeManager.StartOption) error {
 		plugin.Launch()
 	}
 
-	s.cmdLock.Lock()
-	defer s.cmdLock.Unlock()
+	s.runLock.Lock()
+	defer s.runLock.Unlock()
 
-	if s.cmd != nil {
-		if s.cmd.State == overseer.STARTING || s.cmd.State == overseer.RUNNING {
+	if cmd := s.getCmd(); cmd != nil {
+		if cmd.IsRunningState() {
 			s.Logger.Info("underlying process already running, nothing to do")
 			return nil
 		}
 
-		if s.cmd.State == overseer.STOPPING {
+		if cmdIsStopping(cmd) {
 			s.Logger.Info("underlying process is currently stopping, waiting for it to finish")
-			<-s.cmd.Done()
+
+			// A previous process that never reaches its final state would otherwise wedge
+			// the superviser forever, so we give up after a while and report it instead.
+			select {
+			case <-cmd.Done():
+			case <-time.After(stoppingWaitTimeout):
+				return fmt.Errorf("previous process is still stopping after %s, refusing to start a new one", stoppingWaitTimeout)
+			}
 		}
 	}
 
@@ -216,9 +247,10 @@ func (s *Superviser) Start(options ...nodeManager.StartOption) error {
 		zap.Strings("arguments", s.Arguments),
 		zap.Any("env", explodeToMap(envToLog)))
 
-	s.cmd = overseer.NewCmd(s.Binary, s.Arguments, overseer.Options{Streaming: true, Env: env})
+	cmd := overseer.NewCmd(s.Binary, s.Arguments, overseer.Options{Streaming: true, Env: env})
+	s.setCmd(cmd)
 
-	go s.start(s.cmd)
+	go s.start(cmd)
 
 	return nil
 }
@@ -233,20 +265,24 @@ func explodeToMap(env []string) map[string]string {
 }
 
 func (s *Superviser) Stop() error {
-	s.cmdLock.Lock()
-	defer s.cmdLock.Unlock()
+	s.runLock.Lock()
+	defer s.runLock.Unlock()
 
 	s.Logger.Info("supervisor received a stop request, terminating supervised node process")
 
-	if !s.isRunning() {
+	cmd := s.getCmd()
+	if !cmdIsRunning(cmd) {
 		s.Logger.Info("underlying process is not running, nothing to do")
 		return nil
 	}
 
-	if s.cmd.State == overseer.STARTING || s.cmd.State == overseer.RUNNING {
+	if cmd.IsRunningState() {
 		s.Logger.Info("stopping underlying process")
-		err := s.cmd.Stop()
-		if err != nil {
+		if err := cmd.Stop(); err != nil {
+			// The command is left in place on purpose even though `Stop` already flipped it
+			// to `STOPPING`: the process may well still be alive, and dropping our handle on
+			// it would let a later `Start` spawn a second process over the same data. A
+			// later `Start` bails out through `stoppingWaitTimeout` instead.
 			s.Logger.Error("failed to stop overseer cmd", zap.Error(err))
 			return err
 		}
@@ -258,7 +294,7 @@ func (s *Superviser) Stop() error {
 nodeProcessDone:
 	for {
 		select {
-		case <-s.cmd.Done():
+		case <-cmd.Done():
 			break nodeProcessDone
 		case <-time.After(500 * time.Millisecond):
 			s.Logger.Debug("still blocking until command actually ends")
@@ -267,61 +303,59 @@ nodeProcessDone:
 
 	s.Logger.Info("supervised process has been terminated")
 
-	s.Logger.Info("waiting for stdout and stderr to be drained", s.getProcessOutputStatsLogFields()...)
-	for {
-		if s.isBufferEmpty() {
-			break
-		}
-
-		s.Logger.Debug("draining stdout and stderr", s.getProcessOutputStatsLogFields()...)
+	s.Logger.Info("waiting for stdout and stderr to be drained", cmdOutputStatsLogFields(cmd)...)
+	for !cmdBufferEmpty(cmd) {
+		s.Logger.Debug("draining stdout and stderr", cmdOutputStatsLogFields(cmd)...)
 		time.Sleep(500 * time.Millisecond)
 	}
 
 	s.Logger.Info("stdout and stderr are now drained")
 
-	// Must be after `for { ... }` as `s.cmd` is used within the loop and also before it via call to `getProcessOutputStatsLogFields`
-	s.cmd = nil
+	s.setCmd(nil)
 
 	return nil
 }
 
-func (s *Superviser) getProcessOutputStats() (stdoutLineCount, stderrLineCount int) {
-	// Capture s.cmd in local variable to prevent race condition with termination
-	if cmd := s.cmd; cmd != nil {
-		return len(cmd.Stdout), len(cmd.Stderr)
+func cmdOutputStatsLogFields(cmd *overseer.Cmd) []zap.Field {
+	var stdoutLineCount, stderrLineCount int
+	if cmd != nil {
+		stdoutLineCount, stderrLineCount = len(cmd.Stdout), len(cmd.Stderr)
 	}
-
-	return
-}
-
-func (s *Superviser) getProcessOutputStatsLogFields() []zap.Field {
-	stdoutLineCount, stderrLineCount := s.getProcessOutputStats()
 
 	return []zap.Field{zap.Int("stdout_len", stdoutLineCount), zap.Int("stderr_len", stderrLineCount)}
 }
 
 func (s *Superviser) IsRunning() bool {
-	s.cmdLock.Lock()
-	defer s.cmdLock.Unlock()
-
-	return s.isRunning()
+	return cmdIsRunning(s.getCmd())
 }
 
-// This one assuming the lock is properly held already
-func (s *Superviser) isRunning() bool {
-	if s.cmd == nil {
+// cmdIsRunning reports whether the command is starting, running or stopping.
+//
+// overseer guards `Cmd.State` with an unexported lock, reading the field directly races
+// with the command's own goroutine, so everything here goes through the locked accessors
+// it exposes. Not being initial nor final leaves exactly those three states.
+func cmdIsRunning(cmd *overseer.Cmd) bool {
+	if cmd == nil {
 		return false
 	}
-	return s.cmd.State == overseer.STARTING || s.cmd.State == overseer.RUNNING || s.cmd.State == overseer.STOPPING
+	return !cmd.IsInitialState() && !cmd.IsFinalState()
 }
 
-func (s *Superviser) isBufferEmpty() bool {
-	// Capture s.cmd in local variable to prevent race condition with termination
-	if cmd := s.cmd; cmd != nil {
-		return len(cmd.Stdout) == 0 && len(cmd.Stderr) == 0
+// cmdIsStopping reports whether the command is in the `STOPPING` state, which overseer
+// has no accessor for, so we exclude every other non-final state instead.
+func cmdIsStopping(cmd *overseer.Cmd) bool {
+	if cmd == nil {
+		return false
 	}
-	
-	return true
+	return !cmd.IsInitialState() && !cmd.IsRunningState() && !cmd.IsFinalState()
+}
+
+func cmdBufferEmpty(cmd *overseer.Cmd) bool {
+	if cmd == nil {
+		return true
+	}
+
+	return len(cmd.Stdout) == 0 && len(cmd.Stderr) == 0
 }
 
 func (s *Superviser) start(cmd *overseer.Cmd) {
@@ -333,7 +367,7 @@ func (s *Superviser) start(cmd *overseer.Cmd) {
 		case status := <-statusChan:
 			processTerminated = true
 			if status.Exit == 0 {
-				s.Logger.Info("command terminated with zero status", s.getProcessOutputStatsLogFields()...)
+				s.Logger.Info("command terminated with zero status", cmdOutputStatsLogFields(cmd)...)
 			} else {
 				s.Logger.Error(fmt.Sprintf("command terminated with non-zero status, last log lines:\n%s\n", formatLogLines(s.LastLogLines())), overseerStatusLogFields(status)...)
 			}
@@ -345,8 +379,8 @@ func (s *Superviser) start(cmd *overseer.Cmd) {
 		}
 
 		if processTerminated {
-			s.Logger.Debug("command terminated but continue read loop to fully consume stdout/sdterr line channels", zap.Bool("buffer_empty", s.isBufferEmpty()))
-			if s.isBufferEmpty() {
+			s.Logger.Debug("command terminated but continue read loop to fully consume stdout/sdterr line channels", zap.Bool("buffer_empty", cmdBufferEmpty(cmd)))
+			if cmdBufferEmpty(cmd) {
 				return
 			}
 		}
