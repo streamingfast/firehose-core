@@ -23,6 +23,7 @@ import (
 	"path"
 	"regexp"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -88,6 +89,7 @@ type MindReaderPlugin struct {
 	pushBlockSamples      []readBlockSample
 
 	testModeComparator *TestModeComparator
+	stopBlockReached   atomic.Bool
 }
 
 // NewMindReaderPlugin initiates its own:
@@ -317,7 +319,7 @@ func (p *MindReaderPlugin) launch() {
 	}()
 }
 
-func (p MindReaderPlugin) Stop() {
+func (p *MindReaderPlugin) Stop() {
 	p.zlogger.Info("mindreader is stopping")
 	if p.lines == nil {
 		// If the `lines` channel was not created yet, it means everything was shut down very rapidly
@@ -345,6 +347,41 @@ func (p *MindReaderPlugin) consumeReadFlow(blocks <-chan *pbbstream.Block) {
 	defer close(p.consumeReadFlowDone)
 	logger := p.zlogger.Named("consumer flow")
 	ctx := context.Background()
+
+	// In test mode, comparing a block is a remote call against the production endpoint, it
+	// can take seconds (retries included) and nothing is persisted out of it. Blocking the
+	// shutdown until the whole buffered channel has been compared can take minutes, so we
+	// abort pending comparisons as soon as we start terminating. The exception is a
+	// termination caused by reaching the stop block: there, comparing the blocks that are
+	// still buffered *is* the work that was requested, so we let it complete.
+	compareCtx := ctx
+	skippedComparisons := 0
+	if p.testModeComparator != nil {
+		var cancelComparisons context.CancelFunc
+		compareCtx, cancelComparisons = context.WithCancel(ctx)
+		defer cancelComparisons()
+
+		go func() {
+			select {
+			case <-p.Terminating():
+				if !p.stopBlockReached.Load() {
+					cancelComparisons()
+				}
+			case <-compareCtx.Done():
+			}
+		}()
+
+		defer func() {
+			if skippedComparisons > 0 {
+				logger.Info("skipped block comparisons because of shutdown", zap.Int("count", skippedComparisons))
+			}
+
+			if err := p.testModeComparator.Close(); err != nil {
+				logger.Warn("failed to close test mode comparator", zap.Error(err))
+			}
+		}()
+	}
+
 	for {
 		p.zlogger.Debug("waiting to consume next block")
 		block, ok := <-blocks
@@ -365,7 +402,12 @@ func (p *MindReaderPlugin) consumeReadFlow(blocks <-chan *pbbstream.Block) {
 		if p.testModeComparator != nil {
 			logger.Debug("test mode comparator")
 
-			err := p.testModeComparator.CompareBlock(ctx, block)
+			if compareCtx.Err() != nil {
+				skippedComparisons++
+				continue
+			}
+
+			err := p.testModeComparator.CompareBlock(compareCtx, block)
 			if err != nil {
 				logger.Warn("failed to compare block in test mode",
 					zap.Uint64("block_num", block.Number),
@@ -485,6 +527,9 @@ func (p *MindReaderPlugin) readOneMessage(blocks chan<- *pbbstream.Block) error 
 
 	if p.stopBlock != 0 && block.Number >= p.stopBlock && !p.IsTerminating() {
 		p.zlogger.Info("shutting down because requested end block reached", zap.Stringer("block", block))
+
+		// Blocks still buffered must be fully processed in this case, see `consumeReadFlow`
+		p.stopBlockReached.Store(true)
 
 		// See comment tagged 0a33f6b578cc4d0b
 		go p.Shutdown(nil)
