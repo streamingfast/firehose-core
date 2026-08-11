@@ -12,6 +12,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
+- Bumped `firehose-networks` to [v0.2.3](https://github.com/streamingfast/firehose-networks/releases/tag/v0.2.3): the Ethereum Hoodi testnet (`hoodi`, `eip155:560048`) now resolves to StreamingFast Firehose and Substreams endpoints (`hoodi.eth.streamingfast.io:443`) instead of only the Pinax ones listed by the upstream networks registry.
+
 - Bumped `substreams` to [v1.21.1-0.20260810123612-a6afd3480e24](https://github.com/streamingfast/substreams/compare/v1.21.0...a6afd3480e24):
 
   - Server: `substreams-tier1` emits a periodic `substreams request progress` log per request (after 1 minute, then every 5 minutes) meant to answer "why is my substreams slow?" while the request is still running: phase, per-stage module and job progress, external call cost, last job error, and time spent blocked writing to the consumer. It ends with a short `hints` list naming the likely bottleneck when one is detected. Rates and deltas are suffixed `_5m` and cover a fixed trailing 5 minutes whatever the emission interval is; cadence is tunable with `SUBSTREAMS_PROGRESS_LOG_FIRST_DELAY` and `SUBSTREAMS_PROGRESS_LOG_INTERVAL`.
