@@ -99,15 +99,6 @@ func ConfigureToolsCmd[B firecore.Block](
 		}
 	}
 
-	var walkCmd func(node *cobra.Command)
-	walkCmd = func(node *cobra.Command) {
-		firecore.HideGlobalFlagsOnChildCmd(node)
-		for _, child := range node.Commands() {
-			walkCmd(child)
-		}
-	}
-	walkCmd(ToolsCmd)
-
 	return nil
 }
 

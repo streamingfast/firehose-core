@@ -1,22 +1,23 @@
 package firecore
 
-import "github.com/spf13/cobra"
+import (
+	"fmt"
+	"os"
+	"sync"
 
-// globalFlagsHiddenOnChildCmd represents the list of global flags that should be hidden on child commands
-var globalFlagsHiddenOnChildCmd = []string{
-	"log-level-switcher-listen-addr",
-	"metrics-listen-addr",
-	"pprof-listen-addr",
-	"startup-delay",
-}
+	"github.com/spf13/cobra"
+)
 
-func HideGlobalFlagsOnChildCmd(cmd *cobra.Command) {
-	actual := cmd.HelpFunc()
-	cmd.SetHelpFunc(func(command *cobra.Command, strings []string) {
-		for _, flag := range globalFlagsHiddenOnChildCmd {
-			command.Flags().MarkHidden(flag)
-		}
+var hideGlobalFlagsWarnOnce sync.Once
 
-		actual(command, strings)
+// HideGlobalFlagsOnChildCmd used to hide the noisiest global flags from the help output of
+// child commands.
+//
+// Deprecated: This is now a no-op. Every command except the root command and 'start' hides
+// all the global flags behind a single '--gh' ('--global-help') flag, which makes hiding a
+// hand-picked subset of them useless. It will be removed in a future version.
+func HideGlobalFlagsOnChildCmd(_ *cobra.Command) {
+	hideGlobalFlagsWarnOnce.Do(func() {
+		fmt.Fprintln(os.Stderr, "DEPRECATED: 'firecore.HideGlobalFlagsOnChildCmd' is a no-op and can be removed, global flags are now hidden behind the '--gh' flag on all commands except the root command and 'start'")
 	})
 }

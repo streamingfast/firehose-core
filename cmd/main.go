@@ -179,6 +179,7 @@ func Main[B firecore.Block](chain *firecore.Chain[B]) {
 
 	apps.StartCmd.SetHelpTemplate(fmt.Sprintf(startCmdHelpTemplate, strings.Join(availableCmds, "\n  ")))
 	apps.StartCmd.Example = fmt.Sprintf("%s start reader-node", binaryName)
+	showGlobalFlagsInHelp(apps.StartCmd)
 
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
 		if err := setupCmd(cmd, chain.BinaryName()); err != nil {
@@ -193,6 +194,9 @@ func Main[B firecore.Block](chain *firecore.Chain[B]) {
 
 		return nil
 	}
+
+	configureGlobalHelp(rootCmd)
+	rootCmd.SetArgs(expandGlobalHelpArgs(os.Args[1:]))
 
 	if err := rootCmd.Execute(); err != nil {
 		exitWithError("failed to run", err)
@@ -291,10 +295,7 @@ Available Commands:
   %s{{if .HasAvailableLocalFlags}}
 
 Flags:
-{{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasAvailableInheritedFlags}}
-
-Global Flags:
-{{.InheritedFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasHelpSubCommands}}
+{{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{inheritedFlagSections .}}{{if .HasHelpSubCommands}}
 
 Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
   {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableSubCommands}}

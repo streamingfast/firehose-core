@@ -20,6 +20,23 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
   - Server: `substreams-tier1` now restarts when its block hub can no longer link incoming live blocks, the same fix as the `firehose` app one below.
 
+### Changed
+
+- The help output of every command except the root command and `start` no longer prints the global flags in full, they are replaced by a single line pointing at the new `--gh` flag:
+
+  ```
+  Global Flags:
+        --gh   Show global flags help, 10 global flags hidden
+  ```
+
+  Use `fire{chain} tools print one-block --gh` (or `--global-help`) to display them, either on its own or together with `-h`/`--help`. Long global flag descriptions were pushing a command's own flags out of sight, mostly under `fire{chain} tools ...`.
+
+- Flags inherited from an intermediate command are now printed in their own help section instead of being mixed into `Global Flags`, so `fire{chain} tools ...` commands show a `Tools Flags` section with `--output`, `--bytes-encoding`, `--proto-paths` and `--merged-blocks-bundle-size`.
+
+### Deprecated
+
+- `firecore.HideGlobalFlagsOnChildCmd` is now a no-op and prints a deprecation warning when called, remove the call from your chain. Global flags are all hidden behind `--gh` now, hiding a hand-picked subset of them is no longer useful.
+
 ### Fixed
 
 - The `firehose` app now restarts when its block hub can no longer link incoming live blocks, instead of hanging every request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be linked, and `head_block_number`/`finalized_block_number` keep tracking the live source, so the process looked healthy throughout.
