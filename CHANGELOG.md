@@ -10,6 +10,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Fixed
+
+- A Firehose `Blocks` request whose cursor this instance cannot resolve now fails with `Unavailable` instead of `InvalidArgument`, so clients retry with the cursor they have instead of discarding it. It covers a cursor block the live buffer never saw and the forked blocks do not hold, and one above the live head — a client reconnecting to an instance a few blocks behind the one that served it. Requires the matching `bstream` change: the same request used to sit silent until the merged-blocks bundle covering that block number was written (about twenty minutes on a chain bundling 100 blocks) before failing.
+
 ### Added
 
 - Bumped `firehose-networks` to [v0.2.3](https://github.com/streamingfast/firehose-networks/releases/tag/v0.2.3): Added Ethereum Hoodi testnet (`hoodi`, `eip155:560048`)  StreamingFast Firehose and Substreams endpoints (`hoodi.eth.streamingfast.io:443`).

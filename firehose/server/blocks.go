@@ -334,6 +334,13 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 			return status.Error(codes.DeadlineExceeded, "source deadline exceeded")
 		}
 
+		var errUnavailable *stream.ErrUnavailable
+		if errors.As(err, &errUnavailable) {
+			// The request is fine, this instance cannot serve it: the client should
+			// retry, here or on another instance, keeping its cursor.
+			return status.Error(codes.Unavailable, errUnavailable.Error())
+		}
+
 		var errInvalidArg *stream.ErrInvalidArg
 		if errors.As(err, &errInvalidArg) {
 			return status.Error(codes.InvalidArgument, errInvalidArg.Error())
