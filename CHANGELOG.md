@@ -22,6 +22,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
   - Server: `substreams-tier1` now restarts when its block hub can no longer link incoming live blocks, the same fix as the `firehose` app one below.
 
+  - Server: the `incoming Substreams Blocks request` log of `substreams-tier1` now carries a `parallelism` object (requested, granted by the authentication layer, effective count and which of the two capped it, plan tier, stage layer executors) plus `parallel_segment_count` and `stage_count`. A client asking for 300 parallel workers and getting 15 previously left no trace of the negotiation in the logs.
+
 ### Changed
 
 - The help output of every command except the root command and `start` no longer prints the global flags in full, they are replaced by a single line pointing at the new `--gh` flag:
@@ -38,7 +40,6 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### Deprecated
 
 - `firecore.HideGlobalFlagsOnChildCmd` is now a no-op and prints a deprecation warning when called, remove the call from your chain. Global flags are all hidden behind `--gh` now, hiding a hand-picked subset of them is no longer useful.
-  - Server: the `incoming Substreams Blocks request` log of `substreams-tier1` now carries a `parallelism` object (requested, granted by the authentication layer, effective count and which of the two capped it, plan tier, stage layer executors) plus `parallel_segment_count` and `stage_count`. A client asking for 300 parallel workers and getting 15 previously left no trace of the negotiation in the logs.
 
 ### Fixed
 
@@ -47,6 +48,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - The `firehose` app now restarts when its block hub can no longer link incoming live blocks, instead of hanging every request at a frozen head indefinitely. A live-source gap whose one-block files were already merged away can never be linked, and `head_block_number`/`finalized_block_number` keep tracking the live source, so the process looked healthy throughout.
 
 - Restarting a supervised node process no longer deadlocks the whole superviser. `Start` waited for a previous process still stopping while holding the lock that also guards `IsRunning`, `LastExitCode` and `Stopped`, so a process that never reached a final state — one ignoring `SIGTERM`, or whose children keep its stdout/stderr open — froze every one of those calls forever. Waiting no longer holds that lock, and `Start` now gives up after 30s with an error instead of blocking indefinitely.
+
+### Security
+
+- Bumped `golang.org/x/mod` to `v0.40.0`, fixing CVE-2026-56864 and CVE-2026-56865 (both HIGH), reported against the binary image by vulnerability scanners.
 
 ## v1.17.0
 
