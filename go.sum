@@ -2318,8 +2318,8 @@ github.com/streamingfast/eth-go v0.0.0-20260216202159-4e2b7501894a h1:jHKRM0gM5G
 github.com/streamingfast/eth-go v0.0.0-20260216202159-4e2b7501894a/go.mod h1:1szIYZI+rTjWWVYd1kFJomFiPCMvcZfBmylCwRaK8yY=
 github.com/streamingfast/firehose-ethereum/types v0.0.0-20251113151010-c9c94d64348a h1:qatil0YhFzTVAFQnH7iMcq+gpVUNEs9Se3lLq4eaof8=
 github.com/streamingfast/firehose-ethereum/types v0.0.0-20251113151010-c9c94d64348a/go.mod h1:CG22ObinxSbKIP19bAj0uro0a290kzZTiBbjL8VR0SE=
-github.com/streamingfast/firehose-networks v0.2.2 h1:araNCSHVa9C8+7hGrxNJYt8TlbK65kNDxQMBJuzBjxA=
-github.com/streamingfast/firehose-networks v0.2.2/go.mod h1:/XyroRcAUOO9DdxdgHktuVI1U6uKgjj6+1r+zgLEb90=
+github.com/streamingfast/firehose-networks v0.2.3 h1:kFqhWlp5QtkKW9kezee0cqVjZlChEMGqlkrHK+mtj38=
+github.com/streamingfast/firehose-networks v0.2.3/go.mod h1:/XyroRcAUOO9DdxdgHktuVI1U6uKgjj6+1r+zgLEb90=
 github.com/streamingfast/google-cloud-go v0.0.0-20241202194114-f77ff78d4f66 h1:c0cmKOyazz58F94SwI5a9qZswiJxk0cXSq08mhBGFAI=
 github.com/streamingfast/google-cloud-go v0.0.0-20241202194114-f77ff78d4f66/go.mod h1:SzlutmqoI//WgCLSNcuZ9qO52q+3nYNS2J7vOLlB6kI=
 github.com/streamingfast/logging v0.0.0-20210811175431-f3b44b61606a/go.mod h1:4GdqELhZOXj4xwc4IaBmzofzdErGynnaSzuzxy0ZIBo=
@@ -2345,8 +2345,8 @@ github.com/streamingfast/shutter v1.5.0 h1:NpzDYzj0HVpSiDJVO/FFSL6QIK/YKOxY0gJAt
 github.com/streamingfast/shutter v1.5.0/go.mod h1:B/T6efqdeMGbGwjzPS1ToXzYZI4kDzI5/u4I+7qbjY8=
 github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0 h1:Y15G1Z4fpEdm2b+/70owI7TLuXadlqBtGM7rk4Hxrzk=
 github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0/go.mod h1:/Rnz2TJvaShjUct0scZ9kKV2Jr9/+KBAoWy4UMYxgv4=
-github.com/streamingfast/substreams v1.21.1-0.20260810123612-a6afd3480e24 h1:G36rHghTrrlVZXGQNuugGUqSMExtsfcUKepQaF8Cj+8=
-github.com/streamingfast/substreams v1.21.1-0.20260810123612-a6afd3480e24/go.mod h1:L11+nAKugOfDjWV6qleMfDcW5gKrsk/ixTJRNaSjo9M=
+github.com/streamingfast/substreams v1.21.1-0.20260811030713-864626c02e63 h1:VkEQ6m8gp11cq3ts97XEfgBnNW6nMwkw2KKtmztjTtg=
+github.com/streamingfast/substreams v1.21.1-0.20260811030713-864626c02e63/go.mod h1:p7CaQ22aRhaONTN6yCUoD4tq4T4W5rJZD24HqLWVsIc=
 github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed h1:LU6/c376zP1cMAo9L6rFLyjo0W7RU+hIh7BegH8Zo5M=
 github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed/go.mod h1:yAI0XTsMBhREkM/YDAK/zNou3GoiAce1P6+rp/wQhjs=
 github.com/streamingfast/worker-pool-protocol v0.0.0-20251029142144-b539534f3eb1 h1:aoPCoeTHwCQbzRwLBpT45GUvZgAzevIUBgPZjJzBbug=

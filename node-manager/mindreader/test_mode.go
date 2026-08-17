@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/derr"
@@ -33,6 +34,7 @@ type TestModeComparator struct {
 	sanitizer   func(pbbstream *pbbstream.Block) *pbbstream.Block
 	fetchClient pbfirehose.FetchClient
 	closeFunc   func() error
+	closeOnce   sync.Once
 	callOpts    []grpc.CallOption
 	diffOutput  string
 	diffStore   dstore.Store
@@ -106,11 +108,23 @@ func (c *TestModeComparator) MarshalLogObject(enc zapcore.ObjectEncoder) error {
 	return nil
 }
 
+// Close is safe to call multiple times, from any goroutine. The comparator is shut down
+// from more than one place depending on the app: `reader-node` closes it from the mindreader
+// consume flow, `reader-node-firehose` from the app's `Run`, and a nil comparator (test mode
+// disabled) closes to a no-op.
 func (c *TestModeComparator) Close() error {
-	if c.closeFunc != nil {
-		return c.closeFunc()
+	if c == nil {
+		return nil
 	}
-	return nil
+
+	var err error
+	c.closeOnce.Do(func() {
+		if c.closeFunc != nil {
+			err = c.closeFunc()
+		}
+	})
+
+	return err
 }
 
 // libLagWarnThreshold is the maximum number of blocks the LIB (last final block)
@@ -139,7 +153,10 @@ func (c *TestModeComparator) CompareBlock(ctx context.Context, testingBlock *pbb
 	}
 
 	var response *pbfirehose.SingleBlockResponse
-	err := derr.Retry(3, func(ctx context.Context) (err error) {
+
+	// `RetryContext` and not `Retry` so that a cancelled context (shutdown) aborts both the
+	// in-flight request and the backoff sleep between two attempts.
+	err := derr.RetryContext(ctx, 3, func(ctx context.Context) (err error) {
 		response, err = c.fetchClient.Block(ctx, req, c.callOpts...)
 		if err != nil {
 			if strings.Contains(err.Error(), "not found") {
