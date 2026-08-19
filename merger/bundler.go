@@ -229,7 +229,7 @@ func (b *Bundler) ProcessBlock(_ *pbbstream.Block, obj interface{}) error {
 					b.logger.Debug("cannot read block timestamp for head drift metric", zap.Error(err))
 					return
 				}
-				metrics.HeadBlockTimeDrift.SetBlockTime(t)
+				metrics.HeadBlockTimeDrift.SetBlockTimeForward(t)
 			}()
 		}
 		return nil

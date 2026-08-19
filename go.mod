@@ -31,7 +31,7 @@ require (
 	github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4
 	github.com/streamingfast/diffx v0.0.0-20260428032925-db795b0d8333
 	github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97
-	github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62
+	github.com/streamingfast/dmetrics v0.0.0-20260819172634-28069dc8018a
 	github.com/streamingfast/dsession v0.0.0-20260414190543-79b9846e7c58
 	github.com/streamingfast/dstore v0.2.4-0.20260709193311-122163592902
 	github.com/streamingfast/firehose-networks v0.2.3
