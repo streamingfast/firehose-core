@@ -2305,8 +2305,8 @@ github.com/streamingfast/diffx v0.0.0-20260428032925-db795b0d8333 h1:qVO2Khx3BTd
 github.com/streamingfast/diffx v0.0.0-20260428032925-db795b0d8333/go.mod h1:8sL0EmNQgDLRtYzr7TXrX6VOoa3wQHwdTUUsok9CtMc=
 github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97 h1:rXZYa87AFt+kluwe4McC9jZgx/eRNSlOkWQaIj9Yv4w=
 github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97/go.mod h1:UqWuX3REU/IInBUaymFN2eLjuvz+/0SsoUFjeQlLNyI=
-github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62 h1:Tb4T34ImY7qvyrmW53/9ca5CxrXRThuFP1qx64i6FGk=
-github.com/streamingfast/dmetrics v0.0.0-20260109212625-35256f512c62/go.mod h1:JbxEDbzWRG1dHdNIPrYfuPllEkktZMgm40AwVIBENcw=
+github.com/streamingfast/dmetrics v0.0.0-20260819172634-28069dc8018a h1:PD+qW3nIdQu48+TmjVYGyWpLjFlW3JeYCQ02H1gIU80=
+github.com/streamingfast/dmetrics v0.0.0-20260819172634-28069dc8018a/go.mod h1:JbxEDbzWRG1dHdNIPrYfuPllEkktZMgm40AwVIBENcw=
 github.com/streamingfast/dregistry v0.0.0-20260818204944-2fed3956d4e1 h1:keuutoe31CyL7I/M4XCSLWrm7/rKDbqy+ZgQH7h3BMo=
 github.com/streamingfast/dregistry v0.0.0-20260818204944-2fed3956d4e1/go.mod h1:vfsE+IinxWwS89Zu7KdQAizkF+INgG9x/7V++Aeum6A=
 github.com/streamingfast/dsession v0.0.0-20260414190543-79b9846e7c58 h1:at7VPRhGImEz71Tr7I6Wtql9KSxQhKBAPkCDyuEIO9g=

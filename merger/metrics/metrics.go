@@ -15,9 +15,6 @@
 package metrics
 
 import (
-	"sync/atomic"
-	"time"
-
 	"github.com/streamingfast/dmetrics"
 	coremetrics "github.com/streamingfast/firehose-core/metrics"
 )
@@ -33,25 +30,3 @@ var HeadBlockNumber = MetricSet.NewHeadBlockNumber("merger")
 // were lagging finality.
 var FinalizedBlockNumber = coremetrics.NewFinalizedBlockNumber("merger")
 var AppReadiness = MetricSet.NewAppReadiness("merger")
-
-var headBlockTimeNanos atomic.Int64
-
-// SetHeadBlockTimeForward updates HeadBlockTimeDrift, ignoring block times older than the
-// one already reported. Two paths write it: the last block of the last merged bundle,
-// read on startup as a reference point, and the live one-block files, read
-// asynchronously as they are bundled. Without this guard the stale startup value (or
-// merged blocks produced by another process) can land after a fresher one and pin the
-// drift high until a brand new block shows up.
-func SetHeadBlockTimeForward(t time.Time) {
-	nanos := t.UnixNano()
-	for {
-		current := headBlockTimeNanos.Load()
-		if nanos <= current {
-			return
-		}
-		if headBlockTimeNanos.CompareAndSwap(current, nanos) {
-			HeadBlockTimeDrift.SetBlockTime(t)
-			return
-		}
-	}
-}
