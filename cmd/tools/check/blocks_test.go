@@ -114,7 +114,7 @@ func TestCheckMergedBlocks_ValidateBlocksCatchesBloatedBundle(t *testing.T) {
 	validated := runCheckMergedBlocks(t, storeURL, 100, types.NewClosedRange(100, 400), MergedBlocksCheckOptions{ValidateBlocks: true})
 	assert.Contains(t, validated, "🆗 No hole found")
 	assert.Contains(t, validated, "Merged blocks file 0000000200 holds 1 block(s) beyond its bundle boundary [#200, #299] (#320)")
-	assert.Contains(t, validated, "1 merged-blocks file(s) hold blocks beyond their own bundle boundaries")
+	assert.Contains(t, validated, "1 merged-blocks file(s) are either unreadable or hold blocks beyond their own bundle boundaries")
 	assert.Contains(t, validated, "[0000000200]")
 }
 
@@ -131,7 +131,7 @@ func TestCheckMergedBlocks_ValidateBlocksOnHealthyStore(t *testing.T) {
 
 	out := runCheckMergedBlocks(t, storeURL, 100, types.NewClosedRange(100, 300), MergedBlocksCheckOptions{ValidateBlocks: true})
 	assert.Contains(t, out, "🆗 No hole found")
-	assert.Contains(t, out, "🆗 No block outside of its bundle boundaries found")
+	assert.Contains(t, out, "🆗 All files readable, no block beyond its bundle boundaries")
 	assert.NotContains(t, out, "beyond its bundle boundary")
 }
 

@@ -176,10 +176,10 @@ func CheckMergedBlocksWithOptions[B firecore.Block](ctx context.Context, chain *
 
 	switch {
 	case len(brokenSegments) > 0:
-		fmt.Printf("> 🆘 %d merged-blocks file(s) hold blocks beyond their own bundle boundaries: %s\n", len(brokenSegments), formatBrokenSegments(brokenSegments))
-		fmt.Printf(">    Every Firehose or Substreams request covering them fails with \"beyond the configured bundle size\". Either the store was merged at a bundle size other than the %d used here, or those files are bloated and can be rewritten with `tools fix-bloated-merged-blocks`.\n", fileBlockSize)
+		fmt.Printf("> 🆘 %d merged-blocks file(s) are either unreadable or hold blocks beyond their own bundle boundaries: %s\n", len(brokenSegments), formatBrokenSegments(brokenSegments))
+		fmt.Println(">    See the ❌ lines above for which is which. Any Firehose or Substreams request covering them fails. You can try `tools fix-bloated-merged-blocks` on the latter.")
 	case readAllBlocks:
-		fmt.Printf("> 🆗 No block outside of its bundle boundaries found\n")
+		fmt.Printf("> 🆗 All files readable, no block beyond its bundle boundaries\n")
 	default:
 		fmt.Printf("> 🔶 File content not validated, run again with --validate-blocks to catch corrupted bundles\n")
 	}
