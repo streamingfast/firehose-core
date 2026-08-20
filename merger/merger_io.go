@@ -1,7 +1,6 @@
 package merger
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -392,22 +391,13 @@ func (od *oneBlockFilesDeleter) processDeletions() {
 	}
 }
 
-// lastBlock returns the last block of a merged-blocks file, or nil when the file
-// contains no block. A completely empty file (not even a DBIN header, as produced by
-// older merger versions for gap bundles) is also reported as "no block" rather than as
-// an error.
+// lastBlock returns the last block of a merged-blocks file, or nil when the file holds a
+// DBIN header and no block. A file without even a DBIN header is broken, not an empty
+// bundle, and is still reported as an error.
 func lastBlock(mergeFileReader io.ReadCloser) (out *pbbstream.Block, err error) {
 	defer mergeFileReader.Close()
 
-	bufferedReader := bufio.NewReader(mergeFileReader)
-	if _, err := bufferedReader.Peek(1); err != nil {
-		if errors.Is(err, io.EOF) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	blkReader, err := bstream.NewDBinBlockReader(bufferedReader)
+	blkReader, err := bstream.NewDBinBlockReader(mergeFileReader)
 	if err != nil {
 		return nil, err
 	}

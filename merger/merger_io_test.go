@@ -30,6 +30,7 @@ import (
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/dbin"
 	"github.com/streamingfast/dstore"
 	"github.com/stretchr/testify/require"
 )
@@ -258,6 +259,16 @@ func mergedBlocksContent(t *testing.T, blocks ...*pbbstream.Block) []byte {
 	return out.Bytes()
 }
 
+// emptyMergedBlocksContent returns a valid merged-blocks file holding a DBIN header and no
+// block, which is what the merger writes for a bundle range containing no block. Note that
+// NewDBinBlockWriter only writes its header on the first block, so it cannot produce this.
+func emptyMergedBlocksContent(t *testing.T) []byte {
+	t.Helper()
+	out := new(bytes.Buffer)
+	require.NoError(t, dbin.NewWriter(out).WriteHeader("type.googleapis.com/sf.bstream.type.v1.Block"))
+	return out.Bytes()
+}
+
 func testMergedBlock(t *testing.T, num uint64) *pbbstream.Block {
 	t.Helper()
 	anyB, err := anypb.New(&test.Block{Number: num})
@@ -278,8 +289,8 @@ func testMergedBlock(t *testing.T, num uint64) *pbbstream.Block {
 func TestMergerIO_NextBundleWithEmptyLastBundles(t *testing.T) {
 	mergedBlocksStore := dstore.NewMockStore(nil)
 	mergedBlocksStore.SetFile("0000000100", mergedBlocksContent(t, testMergedBlock(t, 100), testMergedBlock(t, 101)))
-	mergedBlocksStore.SetFile("0000000200", mergedBlocksContent(t)) // header-only, written by current mergers
-	mergedBlocksStore.SetFile("0000000300", []byte{})               // zero byte, written by older mergers
+	mergedBlocksStore.SetFile("0000000200", emptyMergedBlocksContent(t)) // no block in that bundle range
+	mergedBlocksStore.SetFile("0000000300", emptyMergedBlocksContent(t)) // idem
 
 	mio := newTestDStoreIO(dstore.NewMockStore(nil), mergedBlocksStore)
 
@@ -290,12 +301,25 @@ func TestMergerIO_NextBundleWithEmptyLastBundles(t *testing.T) {
 	require.Equal(t, uint64(101), lib.Num())
 }
 
+// TestMergerIO_NextBundleBrokenLastBundle ensures a merged-blocks file without even a DBIN
+// header is reported as broken instead of being taken for a bundle holding no block.
+func TestMergerIO_NextBundleBrokenLastBundle(t *testing.T) {
+	mergedBlocksStore := dstore.NewMockStore(nil)
+	mergedBlocksStore.SetFile("0000000100", mergedBlocksContent(t, testMergedBlock(t, 100)))
+	mergedBlocksStore.SetFile("0000000200", []byte{})
+
+	mio := newTestDStoreIO(dstore.NewMockStore(nil), mergedBlocksStore)
+
+	_, _, err := mio.NextBundle(context.Background(), 100)
+	require.ErrorContains(t, err, "unable to read file header")
+}
+
 // TestMergerIO_NextBundleAllBundlesEmpty ensures we do not walk below the lowest base block
 // (and do not underflow) when no merged-blocks file holds a single block.
 func TestMergerIO_NextBundleAllBundlesEmpty(t *testing.T) {
 	mergedBlocksStore := dstore.NewMockStore(nil)
-	mergedBlocksStore.SetFile("0000000100", mergedBlocksContent(t))
-	mergedBlocksStore.SetFile("0000000200", mergedBlocksContent(t))
+	mergedBlocksStore.SetFile("0000000100", emptyMergedBlocksContent(t))
+	mergedBlocksStore.SetFile("0000000200", emptyMergedBlocksContent(t))
 
 	mio := newTestDStoreIO(dstore.NewMockStore(nil), mergedBlocksStore)
 
