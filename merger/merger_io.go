@@ -1,6 +1,7 @@
 package merger
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -202,21 +203,37 @@ func (s *DStoreIO) NextBundle(ctx context.Context, lowestBaseBlock uint64) (outB
 	})
 
 	if lastFound != nil {
-		last, lastTime, err := s.readLastBlockFromMerged(ctx, *lastFound)
-		if err != nil {
-			return 0, nil, err
+		// On chains that skip block numbers a whole bundle range can contain no block at
+		// all, in which case the merger writes an empty (header-only) merged-blocks file to
+		// keep the boundaries contiguous. Walk backwards until we find a bundle that
+		// actually holds a block, otherwise we have no LIB to hand back.
+		for base := *lastFound; ; base -= s.bundleSize {
+			last, lastTime, err := s.readLastBlockFromMerged(ctx, base)
+			if err != nil {
+				return 0, nil, err
+			}
+			if last != nil {
+				metrics.HeadBlockTimeDrift.SetBlockTimeForward(*lastTime)
+				metrics.HeadBlockNumber.SetUint64(last.Num())
+				// The merger only ever bundles irreversible blocks, so its head block is a
+				// finalized block, hence both metrics reporting the same value.
+				metrics.FinalizedBlockNumber.SetUint64(last.Num())
+				lib = last
+				break
+			}
+			s.logger.Info("merged-blocks file contains no block, looking at the previous bundle for the last known block", zap.Uint64("base_block_num", base))
+			if base < lowestBaseBlock+s.bundleSize {
+				break
+			}
 		}
-		metrics.HeadBlockTimeDrift.SetBlockTimeForward(*lastTime)
-		metrics.HeadBlockNumber.SetUint64(last.Num())
-		// The merger only ever bundles irreversible blocks, so its head block is a
-		// finalized block, hence both metrics reporting the same value.
-		metrics.FinalizedBlockNumber.SetUint64(last.Num())
-		lib = last
 	}
 
 	return
 }
 
+// readLastBlockFromMerged returns the last block of a merged-blocks file, or a nil
+// BlockRef when the file holds no block at all (an empty gap bundle on a chain that
+// skips block numbers).
 func (s *DStoreIO) readLastBlockFromMerged(ctx context.Context, baseBlock uint64) (bstream.BlockRef, *time.Time, error) {
 	subCtx, cancel := context.WithTimeout(ctx, GetObjectTimeout)
 	defer cancel()
@@ -227,6 +244,9 @@ func (s *DStoreIO) readLastBlockFromMerged(ctx context.Context, baseBlock uint64
 	last, err := lastBlock(reader)
 	if err != nil {
 		return nil, nil, err
+	}
+	if last == nil {
+		return nil, nil, nil
 	}
 	// we truncate the block ID to have the short version that we get on oneBlockFiles
 	t := last.Timestamp.AsTime()
@@ -372,10 +392,22 @@ func (od *oneBlockFilesDeleter) processDeletions() {
 	}
 }
 
+// lastBlock returns the last block of a merged-blocks file, or nil when the file
+// contains no block. A completely empty file (not even a DBIN header, as produced by
+// older merger versions for gap bundles) is also reported as "no block" rather than as
+// an error.
 func lastBlock(mergeFileReader io.ReadCloser) (out *pbbstream.Block, err error) {
 	defer mergeFileReader.Close()
 
-	blkReader, err := bstream.NewDBinBlockReader(mergeFileReader)
+	bufferedReader := bufio.NewReader(mergeFileReader)
+	if _, err := bufferedReader.Peek(1); err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	blkReader, err := bstream.NewDBinBlockReader(bufferedReader)
 	if err != nil {
 		return nil, err
 	}

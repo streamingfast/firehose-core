@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/streamingfast/firehose-core/test"
 
@@ -244,4 +245,62 @@ func TestMergerIO_WriteObjectErrorClosesStreamReader(t *testing.T) {
 			t.Fatal("feeding goroutine leaked: one-block reader never closed after WriteObject error")
 		}
 	}
+}
+
+func mergedBlocksContent(t *testing.T, blocks ...*pbbstream.Block) []byte {
+	t.Helper()
+	out := new(bytes.Buffer)
+	w, err := bstream.NewDBinBlockWriter(out)
+	require.NoError(t, err)
+	for _, blk := range blocks {
+		require.NoError(t, w.Write(blk))
+	}
+	return out.Bytes()
+}
+
+func testMergedBlock(t *testing.T, num uint64) *pbbstream.Block {
+	t.Helper()
+	anyB, err := anypb.New(&test.Block{Number: num})
+	require.NoError(t, err)
+	return &pbbstream.Block{
+		Number:    num,
+		Id:        fmt.Sprintf("%08x%s", num, "a"),
+		ParentId:  fmt.Sprintf("%08x%s", num-1, "a"),
+		Timestamp: timestamppb.New(time.Unix(int64(num), 0)),
+		Payload:   anyB,
+	}
+}
+
+// TestMergerIO_NextBundleWithEmptyLastBundles covers a chain that skips block numbers: the
+// most recent merged-blocks files can hold no block at all (the merger still writes them so
+// boundaries stay contiguous). NextBundle must walk back to the last bundle that actually
+// has a block to report the LIB, instead of dereferencing a nil block.
+func TestMergerIO_NextBundleWithEmptyLastBundles(t *testing.T) {
+	mergedBlocksStore := dstore.NewMockStore(nil)
+	mergedBlocksStore.SetFile("0000000100", mergedBlocksContent(t, testMergedBlock(t, 100), testMergedBlock(t, 101)))
+	mergedBlocksStore.SetFile("0000000200", mergedBlocksContent(t)) // header-only, written by current mergers
+	mergedBlocksStore.SetFile("0000000300", []byte{})               // zero byte, written by older mergers
+
+	mio := newTestDStoreIO(dstore.NewMockStore(nil), mergedBlocksStore)
+
+	nextBase, lib, err := mio.NextBundle(context.Background(), 100)
+	require.NoError(t, err)
+	require.Equal(t, uint64(400), nextBase)
+	require.NotNil(t, lib)
+	require.Equal(t, uint64(101), lib.Num())
+}
+
+// TestMergerIO_NextBundleAllBundlesEmpty ensures we do not walk below the lowest base block
+// (and do not underflow) when no merged-blocks file holds a single block.
+func TestMergerIO_NextBundleAllBundlesEmpty(t *testing.T) {
+	mergedBlocksStore := dstore.NewMockStore(nil)
+	mergedBlocksStore.SetFile("0000000100", mergedBlocksContent(t))
+	mergedBlocksStore.SetFile("0000000200", mergedBlocksContent(t))
+
+	mio := newTestDStoreIO(dstore.NewMockStore(nil), mergedBlocksStore)
+
+	nextBase, lib, err := mio.NextBundle(context.Background(), 100)
+	require.NoError(t, err)
+	require.Equal(t, uint64(300), nextBase)
+	require.Nil(t, lib)
 }

@@ -150,7 +150,10 @@ func getFirehoseClientE[B firecore.Block](chain *firecore.Chain[B], rootLog *zap
 				resp.ch <- buffer.String()
 			}()
 		}
-		if printCursorOnly {
+		if printCursorOnly || printClockOnly {
+			// The response-ordering goroutine below is only started when we actually decode
+			// blocks; in cursor/clock-only mode nothing ever reads from 'resps' and nothing
+			// ever closes 'allDone', so falling through would block forever.
 			return nil
 		}
 
