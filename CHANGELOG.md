@@ -12,6 +12,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Fixed
 
+- Bumped `bstream`: a Firehose or Substreams request over a range containing an unreadable merged-blocks file no longer hangs. The goroutine reading a merged-blocks file shuts the stream down on failure without ever closing that file's blocks channel, and the consuming loop was a plain `range` over it, so depending on which of the two won the race the request could stall forever instead of returning the error. Found on a store holding a zero-byte merged-blocks file (no DBIN header at all, written by a merger predating the streaming bundle writer); such a file still fails, now deterministically, with `unable to create block reader: unable to read file header: EOF`. A merged-blocks file holding a DBIN header and no block stays valid: it is what the merger writes for a bundle range containing no block on chains that skip block numbers.
+
 - `firecore tools firehose-client --print-clock-only` no longer hangs once the stream is done. It printed every block, then waited forever on the response-ordering goroutine that only the block-decoding path ever starts. `--print-cursor-only` already returned early; the clock path now does too.
 
 - The merger no longer crashes at startup when the most recent merged-blocks bundles hold no block. On chains that skip block numbers a whole bundle range can contain nothing, and the merger writes a merged-blocks file with a header and no block so boundaries stay contiguous. Reading the last block back out of such a file returned no block and was then dereferenced. Startup now walks back to the last bundle that actually has a block. A file without even a DBIN header is still reported as broken.
