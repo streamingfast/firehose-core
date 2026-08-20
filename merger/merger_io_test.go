@@ -23,12 +23,14 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/streamingfast/firehose-core/test"
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/dbin"
 	"github.com/streamingfast/dstore"
 	"github.com/stretchr/testify/require"
 )
@@ -244,4 +246,85 @@ func TestMergerIO_WriteObjectErrorClosesStreamReader(t *testing.T) {
 			t.Fatal("feeding goroutine leaked: one-block reader never closed after WriteObject error")
 		}
 	}
+}
+
+func mergedBlocksContent(t *testing.T, blocks ...*pbbstream.Block) []byte {
+	t.Helper()
+	out := new(bytes.Buffer)
+	w, err := bstream.NewDBinBlockWriter(out)
+	require.NoError(t, err)
+	for _, blk := range blocks {
+		require.NoError(t, w.Write(blk))
+	}
+	return out.Bytes()
+}
+
+// emptyMergedBlocksContent returns a valid merged-blocks file holding a DBIN header and no
+// block, which is what the merger writes for a bundle range containing no block. Note that
+// NewDBinBlockWriter only writes its header on the first block, so it cannot produce this.
+func emptyMergedBlocksContent(t *testing.T) []byte {
+	t.Helper()
+	out := new(bytes.Buffer)
+	require.NoError(t, dbin.NewWriter(out).WriteHeader("type.googleapis.com/sf.bstream.type.v1.Block"))
+	return out.Bytes()
+}
+
+func testMergedBlock(t *testing.T, num uint64) *pbbstream.Block {
+	t.Helper()
+	anyB, err := anypb.New(&test.Block{Number: num})
+	require.NoError(t, err)
+	return &pbbstream.Block{
+		Number:    num,
+		Id:        fmt.Sprintf("%08x%s", num, "a"),
+		ParentId:  fmt.Sprintf("%08x%s", num-1, "a"),
+		Timestamp: timestamppb.New(time.Unix(int64(num), 0)),
+		Payload:   anyB,
+	}
+}
+
+// TestMergerIO_NextBundleWithEmptyLastBundles covers a chain that skips block numbers: the
+// most recent merged-blocks files can hold no block at all (the merger still writes them so
+// boundaries stay contiguous). NextBundle must walk back to the last bundle that actually
+// has a block to report the LIB, instead of dereferencing a nil block.
+func TestMergerIO_NextBundleWithEmptyLastBundles(t *testing.T) {
+	mergedBlocksStore := dstore.NewMockStore(nil)
+	mergedBlocksStore.SetFile("0000000100", mergedBlocksContent(t, testMergedBlock(t, 100), testMergedBlock(t, 101)))
+	mergedBlocksStore.SetFile("0000000200", emptyMergedBlocksContent(t)) // no block in that bundle range
+	mergedBlocksStore.SetFile("0000000300", emptyMergedBlocksContent(t)) // idem
+
+	mio := newTestDStoreIO(dstore.NewMockStore(nil), mergedBlocksStore)
+
+	nextBase, lib, err := mio.NextBundle(context.Background(), 100)
+	require.NoError(t, err)
+	require.Equal(t, uint64(400), nextBase)
+	require.NotNil(t, lib)
+	require.Equal(t, uint64(101), lib.Num())
+}
+
+// TestMergerIO_NextBundleBrokenLastBundle ensures a merged-blocks file without even a DBIN
+// header is reported as broken instead of being taken for a bundle holding no block.
+func TestMergerIO_NextBundleBrokenLastBundle(t *testing.T) {
+	mergedBlocksStore := dstore.NewMockStore(nil)
+	mergedBlocksStore.SetFile("0000000100", mergedBlocksContent(t, testMergedBlock(t, 100)))
+	mergedBlocksStore.SetFile("0000000200", []byte{})
+
+	mio := newTestDStoreIO(dstore.NewMockStore(nil), mergedBlocksStore)
+
+	_, _, err := mio.NextBundle(context.Background(), 100)
+	require.ErrorContains(t, err, "unable to read file header")
+}
+
+// TestMergerIO_NextBundleAllBundlesEmpty ensures we do not walk below the lowest base block
+// (and do not underflow) when no merged-blocks file holds a single block.
+func TestMergerIO_NextBundleAllBundlesEmpty(t *testing.T) {
+	mergedBlocksStore := dstore.NewMockStore(nil)
+	mergedBlocksStore.SetFile("0000000100", emptyMergedBlocksContent(t))
+	mergedBlocksStore.SetFile("0000000200", emptyMergedBlocksContent(t))
+
+	mio := newTestDStoreIO(dstore.NewMockStore(nil), mergedBlocksStore)
+
+	nextBase, lib, err := mio.NextBundle(context.Background(), 100)
+	require.NoError(t, err)
+	require.Equal(t, uint64(300), nextBase)
+	require.Nil(t, lib)
 }

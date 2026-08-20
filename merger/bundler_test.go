@@ -1,15 +1,22 @@
 package merger
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/streamingfast/bstream"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/firehose-core/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func setPbBlock(obf *bstream.OneBlockFile) {
@@ -445,4 +452,90 @@ func TestBundlerSkipLoopBoundary(t *testing.T) {
 			assert.Equal(t, c.expectRemaining, b.irreversibleBlocks)
 		})
 	}
+}
+
+// TestBundlerSkipsWholeBundles covers a chain that skips block numbers over one or more
+// full bundle ranges. Merged-blocks boundaries must stay contiguous (a reader walks them
+// one bundle at a time), so every skipped boundary has to get its own file, and blocks
+// landing after the gap must go to the bundle their number belongs to, not to the one the
+// merger was filling when the gap started. This drives the real DStoreIO so it also
+// asserts what actually lands in the store.
+func TestBundlerSkipsWholeBundles(t *testing.T) {
+	mk := func(num, prev, lib uint64) *bstream.OneBlockFile {
+		return bstream.MustNewOneBlockFile(fmt.Sprintf("%010d-%016da-%016da-%d-suffix", num, num, prev, lib))
+	}
+	oneBlockContent := func(num uint64) []byte {
+		out := new(bytes.Buffer)
+		w, err := bstream.NewDBinBlockWriter(out)
+		require.NoError(t, err)
+		anyB, err := anypb.New(&test.Block{Number: num})
+		require.NoError(t, err)
+		require.NoError(t, w.Write(&pbbstream.Block{Number: num, Id: fmt.Sprintf("%016da", num), Payload: anyB}))
+		return out.Bytes()
+	}
+
+	oneBlockStore := dstore.NewMockStore(nil)
+	oneBlockStore.OpenObjectFunc = func(_ context.Context, name string) (io.ReadCloser, error) {
+		num, _, _, _, _, err := bstream.ParseFilename(name)
+		require.NoError(t, err)
+		return io.NopCloser(bytes.NewReader(oneBlockContent(num))), nil
+	}
+
+	var mu sync.Mutex
+	written := map[string][]byte{}
+	mergedStore := dstore.NewMockStore(func(base string, f io.Reader) error {
+		data, err := io.ReadAll(f)
+		require.NoError(t, err)
+		mu.Lock()
+		defer mu.Unlock()
+		written[base] = data
+		return nil
+	})
+
+	mio := NewDStoreIO(testLogger, oneBlockStore, mergedStore, nil, 1, 0, 100, 0)
+	b := NewBundler(100, 0, 2, 100, mio, 1, nil)
+
+	chain := []*bstream.OneBlockFile{
+		block100(), block101(), block102Final100(), block103Final101(),
+		block104Final102(), block105Final103(), block106Final104(),
+		mk(320, 106, 106), mk(321, 320, 320), mk(322, 321, 321), // skips bundle 200 entirely
+		mk(450, 322, 322), mk(451, 450, 450),
+		mk(900, 451, 451), mk(901, 900, 900), mk(902, 901, 901), // skips bundles 500 to 800
+	}
+	for _, blk := range chain {
+		require.NoError(t, b.HandleBlockFile(blk))
+	}
+	b.WaitForMerges()
+
+	readBundle := func(t *testing.T, base string) []uint64 {
+		t.Helper()
+		data, ok := written[base]
+		require.True(t, ok, "no merged-blocks file written for bundle %s", base)
+
+		r, err := bstream.NewDBinBlockReader(bytes.NewReader(data))
+		require.NoError(t, err, "bundle %s is not a readable merged-blocks file", base)
+
+		var nums []uint64
+		for {
+			blk, err := r.Read()
+			if err != nil {
+				require.ErrorIs(t, err, io.EOF)
+				return nums
+			}
+			nums = append(nums, blk.Number)
+		}
+	}
+
+	// every boundary between the first and the last merged bundle has a file, and no
+	// block ever lands outside of the bundle its number belongs to
+	assert.Equal(t, []uint64{100, 101, 102, 103, 104, 105, 106}, readBundle(t, "0000000100"))
+	assert.Empty(t, readBundle(t, "0000000200"))
+	assert.Equal(t, []uint64{320, 321, 322}, readBundle(t, "0000000300"))
+	assert.Equal(t, []uint64{450, 451}, readBundle(t, "0000000400"))
+	for _, base := range []string{"0000000500", "0000000600", "0000000700", "0000000800"} {
+		assert.Empty(t, readBundle(t, base), "bundle %s", base)
+	}
+
+	assert.Equal(t, 8, len(written))
+	assert.Equal(t, uint64(900), b.baseBlockNum)
 }
