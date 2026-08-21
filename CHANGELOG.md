@@ -24,6 +24,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
+- Added flag `--validate-blocks` (`-b`) on `firecore tools check merged-blocks`, ensures that individual block sequence is checked (reading the content of the merged blocks, instead of just checking by file name). Flag is implied by `--print-stats` and `--print-full`
+
 - Bumped `firehose-networks` to [v0.2.3](https://github.com/streamingfast/firehose-networks/releases/tag/v0.2.3): Added Ethereum Hoodi testnet (`hoodi`, `eip155:560048`)  StreamingFast Firehose and Substreams endpoints (`hoodi.eth.streamingfast.io:443`).
 
 - Bumped `substreams` to [v1.21.1-0.20260820161654-1cffa6c10a8d](https://github.com/streamingfast/substreams/compare/v1.21.0...1cffa6c10a8d):

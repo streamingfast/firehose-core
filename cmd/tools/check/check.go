@@ -64,8 +64,9 @@ func NewCheckCommand[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Lo
 
 	toolsCheckCmd.PersistentFlags().StringP("range", "r", "", "Block range to use for the check")
 
-	toolsCheckMergedBlocksCmd.Flags().BoolP("print-stats", "s", false, "Natively decode each block in the segment and print statistics about it, ensuring it contains the required blocks")
-	toolsCheckMergedBlocksCmd.Flags().BoolP("print-full", "f", false, "Natively decode each block and print the full JSON representation of the block, should be used with a small range only if you don't want to be overwhelmed")
+	toolsCheckMergedBlocksCmd.Flags().BoolP("validate-blocks", "b", false, "Read every merged-blocks file and validate its content: block numbers within the bundle boundaries claimed by the file name, block ordering and chain linkability. Without it only the file names are listed, which finds holes but not corrupted bundles")
+	toolsCheckMergedBlocksCmd.Flags().BoolP("print-stats", "s", false, "Natively decode each block in the segment and print statistics about it, ensuring it contains the required blocks (implies --validate-blocks)")
+	toolsCheckMergedBlocksCmd.Flags().BoolP("print-full", "f", false, "Natively decode each block and print the full JSON representation of the block, should be used with a small range only if you don't want to be overwhelmed (implies --validate-blocks)")
 
 	toolsCheckForksCmd.Flags().Uint64("min-depth", 1, "Only show forks that are at least this deep")
 	toolsCheckForksCmd.Flags().Uint64("after-block", 0, "Only show forks that happened after this block number, if value is not 0")
@@ -77,6 +78,7 @@ func NewCheckCommand[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Lo
 		"s3://<project>/<bucket>/<path>" -f
 		"az://<project>/<bucket>/<path>" -r ":1_000_000"
 		"az://<project>/<bucket>/<path>" -r "100_000:1_000_000"
+		"az://<project>/<bucket>/<path>" -r "100_000:1_000_000" -b
 	`)
 
 	toolsCheckForksCmd.RunE = toolsCheckForksE
@@ -106,7 +108,10 @@ func createToolsCheckMergedBlocksE[B firecore.Block](chain *firecore.Chain[B], r
 			printDetails = PrintFull
 		}
 
-		return CheckMergedBlocks(cmd.Context(), chain, rootLog, storeURL, fileBlockSize, blockRange, printDetails)
+		return CheckMergedBlocksWithOptions(cmd.Context(), chain, rootLog, storeURL, fileBlockSize, blockRange, MergedBlocksCheckOptions{
+			PrintDetails:   printDetails,
+			ValidateBlocks: sflags.MustGetBool(cmd, "validate-blocks"),
+		})
 	}
 }
 
