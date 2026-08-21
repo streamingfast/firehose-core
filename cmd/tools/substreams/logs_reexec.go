@@ -44,7 +44,7 @@ The date-range is optional; when omitted it defaults to the last 7 days.
 
 The date-range argument(s) accept various formats:
 
-  Relative:   1d  2hr  30m  "1 day ago"  "2 hours ago"  "30 minutes ago"
+  Relative:   1d  2hr  30m  1w  "1 day ago"  "2 hours ago"  "30 minutes ago"
   Timestamp:  2024-01-15T10:00:00Z  (past → search start to now)
   Range:      "2024-01-15T10:00:00Z:2024-01-15T12:00:00Z"  (single arg with colon)
               "2024-01-15T10:00:00Z/2024-01-15T12:00:00Z"  (single arg with slash)

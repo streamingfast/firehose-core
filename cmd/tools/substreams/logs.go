@@ -30,6 +30,11 @@ Note: Currently only GCP Cloud Logging backend is supported.`,
 	return cmd
 }
 
+const (
+	sinceFlagHelp     = "Look back duration: relative value like '30m', '2h', '1d', '1w', or \"1 day ago\". Mutually exclusive with --date-range"
+	dateRangeFlagHelp = "Date range as '<start>/<end>', '<start>:<end>', or a single '<start>' (end defaults to now). Mutually exclusive with --since"
+)
+
 // NewToolsLogsConnectionsCmd returns the "connections" subcommand
 func NewToolsLogsConnectionsCmd(logger *zap.Logger) *cobra.Command {
 	cmd := &cobra.Command{
@@ -47,8 +52,10 @@ Note: Currently only GCP Cloud Logging backend is supported.`,
 		Example: `  # Show connections for the last hour (default)
   firecore tools substreams logs connections sfinfra --gcp-project my-project
 
-  # Show connections for the last 30 minutes
+  # Show connections for the last 30 minutes, 2 days, or 1 week
   firecore tools substreams logs connections sfinfra --gcp-project my-project --since 30m
+  firecore tools substreams logs connections sfinfra --gcp-project my-project --since 2d
+  firecore tools substreams logs connections sfinfra --gcp-project my-project --since 1w
 
   # Show connections for a specific date range
   firecore tools substreams logs connections sfinfra --gcp-project my-project --date-range 2024-01-15T10:00:00Z/2024-01-15T12:00:00Z
@@ -62,8 +69,8 @@ Note: Currently only GCP Cloud Logging backend is supported.`,
 	}
 
 	cmd.Flags().String("backend", "gcp", "Log backend to use (currently only 'gcp' supported)")
-	cmd.Flags().Duration("since", time.Duration(0), "Look back duration (e.g., '1h', '30m', '2d'). Mutually exclusive with --date-range")
-	cmd.Flags().String("date-range", "", "Date range in format '<start>[/<end>]'. End defaults to now. Mutually exclusive with --since")
+	cmd.Flags().String("since", "", sinceFlagHelp)
+	cmd.Flags().String("date-range", "", dateRangeFlagHelp)
 	cmd.Flags().StringP("k8s-namespace", "n", "", "Kubernetes namespace to filter logs")
 	cmd.Flags().String("gcp-project", "", "GCP project ID (required for GCP backend)")
 
@@ -72,7 +79,7 @@ Note: Currently only GCP Cloud Logging backend is supported.`,
 
 func runConnections(ctx context.Context, userID string, cmd *cobra.Command, logger *zap.Logger) error {
 	backend := sflags.MustGetString(cmd, "backend")
-	since := sflags.MustGetDuration(cmd, "since")
+	since := sflags.MustGetString(cmd, "since")
 	dateRange := sflags.MustGetString(cmd, "date-range")
 	namespace := sflags.MustGetString(cmd, "k8s-namespace")
 	gcpProject := sflags.MustGetString(cmd, "gcp-project")
@@ -80,19 +87,19 @@ func runConnections(ctx context.Context, userID string, cmd *cobra.Command, logg
 	logger.Debug("connections command invoked",
 		zap.String("user_id", userID),
 		zap.String("backend", backend),
-		zap.Duration("since", since),
+		zap.String("since", since),
 		zap.String("date_range", dateRange),
 		zap.String("namespace", namespace),
 		zap.String("gcp_project", gcpProject),
 	)
 
 	// Validate flags
-	if since != 0 && dateRange != "" {
+	if since != "" && dateRange != "" {
 		return fmt.Errorf("--since and --date-range are mutually exclusive")
 	}
 
 	// Parse time range
-	startTime, endTime, err := parseTimeRange(since, dateRange)
+	startTime, endTime, err := parseTimeRange(since, dateRange, time.Hour)
 	if err != nil {
 		return fmt.Errorf("parsing time range: %w", err)
 	}
@@ -157,58 +164,32 @@ func runConnections(ctx context.Context, userID string, cmd *cobra.Command, logg
 	return nil
 }
 
-// parseTimeRange parses the --since or --date-range flags into start/end times
-// If neither is provided, defaults to 1 hour ago
-func parseTimeRange(since time.Duration, dateRange string) (time.Time, time.Time, error) {
+// parseTimeRange parses the --since or --date-range flags into start/end times.
+// Both are parsed by the same logic used by the 'reexec' date-range argument
+// (ParseLogDateRange / parseRelativeDuration), so a value copied from one
+// command works unchanged on the other. If neither is provided, looks back
+// defaultLookback from now.
+func parseTimeRange(since, dateRange string, defaultLookback time.Duration) (time.Time, time.Time, error) {
 	now := time.Now()
 
-	// Default: 1 hour ago
-	if since == 0 && dateRange == "" {
-		return now.Add(-1 * time.Hour), now, nil
+	if since == "" && dateRange == "" {
+		return now.Add(-defaultLookback), now, nil
 	}
 
-	if (since != 0) && dateRange != "" {
+	if since != "" && dateRange != "" {
 		return time.Time{}, time.Time{}, fmt.Errorf("--since and --date-range are mutually exclusive")
 	}
 
-	if since != 0 {
-		return now.Add(-since), now, nil
-	}
-
-	// Parse --date-range
-	return parseDateRange(dateRange)
-}
-
-// parseDateRange parses a date range in format "<start>[/<end>]"
-// If end is omitted, uses current time
-func parseDateRange(dateRange string) (time.Time, time.Time, error) {
-	// Split by '/' separator
-	parts := strings.SplitN(dateRange, "/", 2)
-
-	if len(parts) == 0 || parts[0] == "" {
-		return time.Time{}, time.Time{}, fmt.Errorf("invalid date range format")
-	}
-
-	startTime, err := parseDateTime(parts[0])
-	if err != nil {
-		return time.Time{}, time.Time{}, fmt.Errorf("parsing start time: %w", err)
-	}
-
-	var endTime time.Time
-	if len(parts) == 1 || parts[1] == "" {
-		endTime = time.Now()
-	} else {
-		endTime, err = parseDateTime(parts[1])
-		if err != nil {
-			return time.Time{}, time.Time{}, fmt.Errorf("parsing end time: %w", err)
+	if since != "" {
+		d, ok := parseRelativeDuration(since)
+		if !ok {
+			return time.Time{}, time.Time{}, fmt.Errorf("invalid --since value %q (try: 30m, 2h, 1d, 1w, \"1 day ago\")", since)
 		}
+		return now.Add(-d), now, nil
 	}
 
-	if endTime.Before(startTime) {
-		return time.Time{}, time.Time{}, fmt.Errorf("end time must be after start time")
-	}
-
-	return startTime, endTime, nil
+	// Parse --date-range, same format as the reexec date-range argument
+	return ParseLogDateRange([]string{dateRange})
 }
 
 // Supported date/time formats in order of precedence
