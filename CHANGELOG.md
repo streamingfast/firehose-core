@@ -8,19 +8,7 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
-
-### Fixed
-
-- Bumped `bstream`: a Firehose or Substreams request over a range containing an unreadable merged-blocks file no longer hangs. The goroutine reading a merged-blocks file shuts the stream down on failure without ever closing that file's blocks channel, and the consuming loop was a plain `range` over it, so depending on which of the two won the race the request could stall forever instead of returning the error. Found on a store holding a zero-byte merged-blocks file (no DBIN header at all, written by a merger predating the streaming bundle writer); such a file still fails, now deterministically, with `unable to create block reader: unable to read file header: EOF`. A merged-blocks file holding a DBIN header and no block stays valid: it is what the merger writes for a bundle range containing no block on chains that skip block numbers.
-
-- `firecore tools firehose-client --print-clock-only` no longer hangs once the stream is done. It printed every block, then waited forever on the response-ordering goroutine that only the block-decoding path ever starts. `--print-cursor-only` already returned early; the clock path now does too.
-
-- The merger no longer crashes at startup when the most recent merged-blocks bundles hold no block. On chains that skip block numbers a whole bundle range can contain nothing, and the merger writes a merged-blocks file with a header and no block so boundaries stay contiguous. Reading the last block back out of such a file returned no block and was then dereferenced. Startup now walks back to the last bundle that actually has a block. A file without even a DBIN header is still reported as broken.
-
-- The merger's `head_block_time_drift` metric no longer moves backwards. The merger reports its head block time from two places: on startup it publishes the last block of the last merged bundle as a reference point, and while running it reports the one-block files it bundles, read asynchronously. Those writes were unordered, so a stale block time could land after a fresher one and hold the drift high until the next block was bundled. The metric now ignores block times older than the one already reported.
-
-- A Firehose `Blocks` request whose cursor points above this instance's head now fails with `Unavailable` instead of sitting silent until the merged-blocks bundle covering that block number is written (about twenty minutes on a chain bundling 100 blocks). We may simply be lagging while another instance already serves that block, so the client should retry rather than discard its cursor. A cursor no source can resolve stays `InvalidArgument`.
+## v1.18.0
 
 ### Added
 
@@ -76,6 +64,17 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - `firecore.HideGlobalFlagsOnChildCmd` is now a no-op and prints a deprecation warning when called, remove the call from your chain. Global flags are all hidden behind `--gh` now, hiding a hand-picked subset of them is no longer useful.
 
 ### Fixed
+
+- Bumped `bstream`: a Firehose or Substreams request over a range containing an unreadable merged-blocks file no longer hangs. The goroutine reading a merged-blocks file shuts the stream down on failure without ever closing that file's blocks channel, and the consuming loop was a plain `range` over it, so depending on which of the two won the race the request could stall forever instead of returning the error. Found on a store holding a zero-byte merged-blocks file (no DBIN header at all, written by a merger predating the streaming bundle writer); such a file still fails, now deterministically, with `unable to create block reader: unable to read file header: EOF`. A merged-blocks file holding a DBIN header and no block stays valid: it is what the merger writes for a bundle range containing no block on chains that skip block numbers.
+
+- `firecore tools firehose-client --print-clock-only` no longer hangs once the stream is done. It printed every block, then waited forever on the response-ordering goroutine that only the block-decoding path ever starts. `--print-cursor-only` already returned early; the clock path now does too.
+
+- The merger no longer crashes at startup when the most recent merged-blocks bundles hold no block. On chains that skip block numbers a whole bundle range can contain nothing, and the merger writes a merged-blocks file with a header and no block so boundaries stay contiguous. Reading the last block back out of such a file returned no block and was then dereferenced. Startup now walks back to the last bundle that actually has a block. A file without even a DBIN header is still reported as broken.
+
+- The merger's `head_block_time_drift` metric no longer moves backwards. The merger reports its head block time from two places: on startup it publishes the last block of the last merged bundle as a reference point, and while running it reports the one-block files it bundles, read asynchronously. Those writes were unordered, so a stale block time could land after a fresher one and hold the drift high until the next block was bundled. The metric now ignores block times older than the one already reported.
+
+- A Firehose `Blocks` request whose cursor points above this instance's head now fails with `Unavailable` instead of sitting silent until the merged-blocks bundle covering that block number is written (about twenty minutes on a chain bundling 100 blocks). We may simply be lagging while another instance already serves that block, so the client should retry rather than discard its cursor. A cursor no source can resolve stays `InvalidArgument`.
+
 
 - The reader running in test mode (`--reader-node-test-mode`) now shuts down promptly: pending block comparisons against the production endpoint are cancelled when the process starts terminating, instead of draining the whole buffered blocks channel one remote fetch (and its retry backoff) at a time. Comparisons are still completed when the termination comes from reaching `--reader-node-stop-block-num`. The comparator's gRPC connection is also closed on the way out.
 
