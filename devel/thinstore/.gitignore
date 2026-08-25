@@ -1,5 +1,0 @@
-firehose-data/
-logs/
-out/
-substreams/target/
-substreams/*.spkg
