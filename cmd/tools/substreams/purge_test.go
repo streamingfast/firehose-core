@@ -112,8 +112,12 @@ func TestParseRetentionDuration(t *testing.T) {
 		})
 	}
 
-	_, err := parseRetentionDuration("0s")
-	require.Error(t, err)
+	for _, in := range []string{"0s", "0d", "-1d", "NaNd", "1e-30d"} {
+		t.Run("reject "+in, func(t *testing.T) {
+			_, err := parseRetentionDuration(in)
+			require.Error(t, err)
+		})
+	}
 }
 
 func TestNetworkResultFailed(t *testing.T) {

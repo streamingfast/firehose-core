@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"path"
 	"regexp"
@@ -133,8 +134,8 @@ func NewToolsPurgeCmd(logger *zap.Logger) *cobra.Command {
 	cmd.Flags().StringSlice("network", nil, "Networks to purge, as folder names directly under <store-url> (ex: 'eth-mainnet'). Empty means every network found under the root")
 	cmd.Flags().StringSlice("retention", []string{defaultPlan + "=30d"}, "Per-plan retention as 'plan=duration' or 'plan:duration' (ex: 'default=30d,pro=30d,scaling=14d,free=3d'). A 'default' entry is required and covers every plan not listed")
 	cmd.Flags().StringSlice("keep", nil, "Glob patterns, matched against the file name, that are never deleted from a condemned folder. Empty means a condemned folder is emptied completely")
-	cmd.Flags().String("project", "", "Requester-pays project to bill the bucket operations to")
-	cmd.Flags().Bool("read-marker-contents", false, "Read the date stored inside every last_used marker instead of trusting the object's last-write time. Needed when the objects have been copied, migrated or rsynced, which resets that time. Costs one download per marker")
+
+	cmd.Flags().Bool("read-marker-contents", false, "Read the date stored inside every last_used marker instead of trusting the object's last-write time. Needed when the objects have been copied, migrated or rsynced, which resets that time. Costs one download per marker. WARNING: marker dates are day-granular; sub-day retention may purge early")
 	cmd.Flags().Int("scan-workers", 256, "Number of parallel listing operations during the scan phase. The scan is latency-bound, not CPU-bound, so this scales close to linearly")
 	cmd.Flags().Int("delete-workers", 250, "Number of parallel delete operations")
 	cmd.Flags().BoolP("dry-run", "n", false, "List what would be deleted without deleting anything")
@@ -149,10 +150,10 @@ func NewToolsPurgeCmd(logger *zap.Logger) *cobra.Command {
 }
 
 type purgeConfig struct {
-	networks             []string
-	retention            map[string]time.Duration
-	keepGlobs            []string
-	project              string
+	networks  []string
+	retention map[string]time.Duration
+	keepGlobs []string
+
 	readMarkerContents   bool
 	scanWorkers          int
 	deleteWorkers        int
@@ -242,10 +243,10 @@ func runPurge(cmd *cobra.Command, storeURL string, logger *zap.Logger) error {
 	}
 
 	cfg := &purgeConfig{
-		networks:             sflags.MustGetStringSlice(cmd, "network"),
-		retention:            retention,
-		keepGlobs:            sflags.MustGetStringSlice(cmd, "keep"),
-		project:              sflags.MustGetString(cmd, "project"),
+		networks:  sflags.MustGetStringSlice(cmd, "network"),
+		retention: retention,
+		keepGlobs: sflags.MustGetStringSlice(cmd, "keep"),
+
 		readMarkerContents:   sflags.MustGetBool(cmd, "read-marker-contents"),
 		scanWorkers:          sflags.MustGetInt(cmd, "scan-workers"),
 		deleteWorkers:        sflags.MustGetInt(cmd, "delete-workers"),
@@ -553,7 +554,15 @@ func parseRetentionDuration(in string) (time.Duration, error) {
 		if err != nil {
 			return 0, fmt.Errorf("parsing days in %q: %w", in, err)
 		}
-		return time.Duration(value * float64(24*time.Hour)), nil
+		if value <= 0 || math.IsNaN(value) || math.IsInf(value, 0) {
+			return 0, fmt.Errorf("duration %q must be greater than 0", in)
+		}
+
+		duration := time.Duration(value * float64(24*time.Hour))
+		if duration <= 0 {
+			return 0, fmt.Errorf("duration %q is too small", in)
+		}
+		return duration, nil
 	}
 
 	duration, err := time.ParseDuration(in)

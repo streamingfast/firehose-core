@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+
 	"path"
 	"strings"
 	"sync"
@@ -51,7 +52,8 @@ func boundsArePushedDown(scheme string) bool {
 }
 
 func newPurgeStore(ctx context.Context, storeURL string, cfg *purgeConfig, logger *zap.Logger) (*purgeStore, error) {
-	store, err := dstore.NewSimpleStore(strings.TrimSuffix(storeURL, "/"))
+	baseURL := strings.TrimSuffix(storeURL, "/")
+	store, err := dstore.NewSimpleStore(baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("creating store for %q: %w", storeURL, err)
 	}
@@ -70,7 +72,7 @@ func newPurgeStore(ctx context.Context, storeURL string, cfg *purgeConfig, logge
 
 	return &purgeStore{
 		store:         store,
-		baseURL:       strings.TrimSuffix(storeURL, "/"),
+		baseURL:       baseURL,
 		scanWorkers:   scanWorkers,
 		logger:        logger,
 		shardListings: shardListings,
