@@ -47,12 +47,14 @@ const maxMarkerSize = 4096
 
 func NewToolsPurgeCmd(logger *zap.Logger) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "purge <store-url>",
+		Use:   "purge <state-url>",
 		Short: "Delete substreams module caches that have not been used recently",
 		Long: cli.Dedent(`
-			Deletes the content of every module cache folder under
-			<store-url>/<network>/` + statesFolder + `/[<tag>/]<module-hash>/ whose last recorded
-			usage is older than the retention of the plan that used it.
+			Deletes the content of every module cache folder under <state-url> whose last recorded
+			usage is older than the retention of the plan that used it. The command matches the
+			exact tier1 layouts <state-url>/<module-hash>/ and
+			<state-url>/<tag>/<module-hash>/, plus shared roots using
+			<state-url>/<network>/` + statesFolder + `/<tag>/<module-hash>/.
 
 			Usage comes from the 'last_used*.zst' markers substreams-tier1 refreshes on every
 			request it serves: 'last_used.zst' belongs to the 'default' plan and
@@ -64,13 +66,14 @@ func NewToolsPurgeCmd(logger *zap.Logger) *cobra.Command {
 			A module folder carrying no marker at all is never touched unless
 			--purge-without-last-used is set.
 
-			Networks are processed one at a time and are fully isolated from each other: a
-			network that cannot be listed, or whose files refuse to be deleted, is reported and
-			the run moves on to the next one. Within a network, a folder that fails is skipped
-			rather than aborting its siblings. The command exits non-zero if anything failed.
+			Networks (or the exact state-store scope) are processed one at a time and fully
+			isolated from each other: a scope that cannot be listed, or whose files refuse to be
+			deleted, is reported and the run moves on to the next one. Within a scope, a folder
+			that fails is skipped rather than aborting its siblings. The command exits non-zero
+			if anything failed.
 
 			With --daemon it keeps running, starting a new pass every --interval (24h by default)
-			and rediscovering the networks each time. A pass that fails is logged and retried at
+			and rediscovering the scopes each time. A pass that fails is logged and retried at
 			the next interval rather than killing the daemon, and --force is then mandatory since
 			nobody is there to answer the confirmation prompt.
 
@@ -89,9 +92,10 @@ func NewToolsPurgeCmd(logger *zap.Logger) *cobra.Command {
 			The stored date is day-granular, so the object's last-write time stays the more
 			precise of the two for a retention counted in hours.
 
-			The scan lists <network>/substreams-states/ one folder level at a time, then asks each
-			module folder for its 'last_used*' objects with a narrow prefix. The millions of
-			state and output files under a network are only ever enumerated once a folder is
+			The scan lists the state-store root one folder level at a time, then asks each module
+			folder for its 'last_used*' objects with a narrow prefix. Shared network roots using the
+			network/` + statesFolder + `/ layout are detected automatically. The millions of
+			state and output files under a scope are only ever enumerated once a folder is
 			actually condemned, and a condemned folder is then emptied completely unless --keep
 			says otherwise.
 
@@ -106,23 +110,26 @@ func NewToolsPurgeCmd(logger *zap.Logger) *cobra.Command {
 			holding tens of thousands of module folders.
 		`),
 		Example: cli.Dedent(`
-			# Everything unused for 30 days, on two networks, without deleting anything
-			firecore tools substreams purge gs://dfuseio-global-substreams-uscentral \
+			# Everything unused for 30 days in an exact tier1 state store
+			firecore tools substreams purge gs://example-bucket/substreams --dry-run
+
+			# Everything unused for 30 days, on two networks in a shared network root
+			firecore tools substreams purge gs://example-bucket/substreams \
 			  --network eth-mainnet,sol-mainnet --dry-run
 
 			# Per-plan retention over every network found under the root
-			firecore tools substreams purge gs://dfuseio-global-substreams-uscentral \
+			firecore tools substreams purge gs://example-bucket/substreams \
 			  --retention default=30d,pro=30d,scaling=14d,free=3d
 
 			# Report what is past retention without listing or deleting anything
-			firecore tools substreams purge gs://dfuseio-global-substreams-uscentral \
+			firecore tools substreams purge gs://example-bucket/substreams \
 			  --network eth-mainnet --scan-only
 
 			# Any other store dstore supports
 			firecore tools substreams purge s3://a-bucket/substreams --network eth-mainnet --dry-run
 
 			# Unattended, one pass every 12 hours
-			firecore tools substreams purge gs://dfuseio-global-substreams-uscentral \
+			firecore tools substreams purge gs://example-bucket/substreams \
 			  --retention default=30d,free=3d --daemon --interval 12h --force
 		`),
 		Args: cobra.ExactArgs(1),
@@ -131,7 +138,7 @@ func NewToolsPurgeCmd(logger *zap.Logger) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringSlice("network", nil, "Networks to purge, as folder names directly under <store-url> (ex: 'eth-mainnet'). Empty means every network found under the root")
+	cmd.Flags().StringSlice("network", nil, "Networks to purge in a shared network root, as folder names directly under <state-url> (ex: 'eth-mainnet'). Empty means every network found; direct tier1 layouts are always scanned")
 	cmd.Flags().StringSlice("retention", []string{defaultPlan + "=30d"}, "Per-plan retention as 'plan=duration' or 'plan:duration' (ex: 'default=30d,pro=30d,scaling=14d,free=3d'). A 'default' entry is required and covers every plan not listed")
 	cmd.Flags().StringSlice("keep", nil, "Glob patterns, matched against the file name, that are never deleted from a condemned folder. Empty means a condemned folder is emptied completely")
 
@@ -195,6 +202,12 @@ type moduleFolder struct {
 }
 
 func (m moduleFolder) String() string {
+	if m.network == "" {
+		if m.tag == "" {
+			return m.hash
+		}
+		return fmt.Sprintf("%s/%s", m.tag, m.hash)
+	}
 	if m.tag == "" {
 		return fmt.Sprintf("%s/%s", m.network, m.hash)
 	}
@@ -313,45 +326,42 @@ func runPurge(cmd *cobra.Command, storeURL string, logger *zap.Logger) error {
 	}
 }
 
-// runPurgePass rediscovers the networks and purges them one at a time. It is the unit that
+// runPurgePass rediscovers the scopes and purges them one at a time. It is the unit that
 // --daemon repeats, so it must leave nothing behind between two calls.
 func runPurgePass(ctx context.Context, store *purgeStore, cfg *purgeConfig, deletedLog *deletedFilesLog, logger *zap.Logger) error {
 	cfg.now = time.Now()
 
-	networks := cfg.networks
-	if len(networks) == 0 {
-		var err error
-		if networks, err = store.Networks(ctx); err != nil {
-			return fmt.Errorf("discovering networks: %w", err)
-		}
-		logger.Info("discovered networks under root", zap.Strings("networks", networks))
+	scopes, err := store.Scopes(ctx, cfg.networks)
+	if err != nil {
+		return fmt.Errorf("discovering purge scopes: %w", err)
 	}
-	if len(networks) == 0 {
-		fmt.Println(stylex.Note("No network found, nothing to do"))
+	logger.Info("discovered purge scopes", zap.Int("count", len(scopes)))
+	if len(scopes) == 0 {
+		fmt.Println(stylex.Note("No module scope found, nothing to do"))
 		return nil
 	}
 
-	// One network at a time: a network that blows up must not take the others with it, and an
+	// One scope at a time: a scope that blows up must not take the others with it, and an
 	// operator watching the logs needs to know how far the run got.
-	results := make([]*networkResult, 0, len(networks))
-	for i, network := range networks {
+	results := make([]*networkResult, 0, len(scopes))
+	for i, scope := range scopes {
 		if ctx.Err() != nil {
-			logger.Warn("run cancelled, stopping before next network", zap.String("next_network", network))
+			logger.Warn("run cancelled, stopping before next scope", zap.String("next_scope", scope.name))
 			break
 		}
 
 		fmt.Println()
-		fmt.Println(stylex.Titlef("Network %s (%d/%d)", network, i+1, len(networks)))
+		fmt.Println(stylex.Titlef("Scope %s (%d/%d)", scope.name, i+1, len(scopes)))
 
-		result := purgeNetwork(ctx, store, cfg, network, deletedLog, logger)
+		result := purgeNetwork(ctx, store, cfg, scope, deletedLog, logger)
 		results = append(results, result)
 
 		if result.fatalErr != nil {
-			logger.Error("network could not be purged, moving on to the next one",
-				zap.String("network", network),
+			logger.Error("scope could not be purged, moving on to the next one",
+				zap.String("scope", result.network),
 				zap.Error(result.fatalErr),
 			)
-			fmt.Println(stylex.Errorf("Network %s failed: %v", network, result.fatalErr))
+			fmt.Println(stylex.Errorf("Scope %s failed: %v", result.network, result.fatalErr))
 		}
 	}
 
@@ -380,13 +390,13 @@ func waitNextPass(ctx context.Context, started time.Time, interval time.Duration
 	}
 }
 
-func purgeNetwork(ctx context.Context, store *purgeStore, cfg *purgeConfig, network string, deletedLog *deletedFilesLog, logger *zap.Logger) *networkResult {
-	result := &networkResult{network: network}
+func purgeNetwork(ctx context.Context, store *purgeStore, cfg *purgeConfig, purgeScope purgeScope, deletedLog *deletedFilesLog, logger *zap.Logger) *networkResult {
+	result := &networkResult{network: purgeScope.name}
 
 	scanStarted := time.Now()
 
 	discoverStarted := time.Now()
-	folders, skipped, err := store.ModuleFolders(ctx, network)
+	folders, skipped, err := store.moduleFoldersAt(ctx, purgeScope.prefix, purgeScope.network)
 	if err != nil {
 		result.fatalErr = err
 		return result
@@ -394,7 +404,7 @@ func purgeNetwork(ctx context.Context, store *purgeStore, cfg *purgeConfig, netw
 	result.listErrors += skipped
 	result.folders = len(folders)
 	logger.Info("module folders discovered",
-		zap.String("network", network),
+		zap.String("scope", purgeScope.name),
 		zap.Int("count", len(folders)),
 		zap.Duration("elapsed", time.Since(discoverStarted)),
 	)
@@ -402,7 +412,7 @@ func purgeNetwork(ctx context.Context, store *purgeStore, cfg *purgeConfig, netw
 	probeStarted := time.Now()
 	toPurge := scanModuleFolders(ctx, store, cfg, folders, result, logger)
 	logger.Info("module folders probed",
-		zap.String("network", network),
+		zap.String("scope", purgeScope.name),
 		zap.Int("count", len(folders)),
 		zap.Duration("elapsed", time.Since(probeStarted)),
 	)
@@ -410,7 +420,7 @@ func purgeNetwork(ctx context.Context, store *purgeStore, cfg *purgeConfig, netw
 	result.scanDuration = time.Since(scanStarted)
 	result.toPurge = len(toPurge)
 	logger.Info("scan phase complete",
-		zap.String("network", network),
+		zap.String("scope", purgeScope.name),
 		zap.Int("module_folders", result.folders),
 		zap.Int("to_purge", len(toPurge)),
 		zap.Duration("elapsed", result.scanDuration),
@@ -456,7 +466,7 @@ func purgeNetwork(ctx context.Context, store *purgeStore, cfg *purgeConfig, netw
 	fmt.Println()
 
 	if !cfg.force && !cfg.dryRun {
-		message := fmt.Sprintf("About to delete the content of %d module folder(s) of network %q. Continue?", len(toPurge), network)
+		message := fmt.Sprintf("About to delete the content of %d module folder(s) in scope %q. Continue?", len(toPurge), purgeScope.name)
 		if confirmed, _ := cli.PromptConfirm(message); !confirmed {
 			fmt.Println(stylex.Note("  Skipped by user"))
 			result.skipped = true

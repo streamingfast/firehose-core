@@ -85,8 +85,103 @@ func (s *purgeStore) ObjectURL(name string) string { return s.store.ObjectURL(na
 
 func (s *purgeStore) Close() error { return nil }
 
+type purgeScope struct {
+	name    string
+	prefix  string
+	network string
+}
+
+// Scopes discovers both supported layouts. Direct tier1 folders are represented by
+// one empty-network scope, while a shared network root gets one scope per selected network.
+func (s *purgeStore) Scopes(ctx context.Context, requestedNetworks []string) ([]purgeScope, error) {
+	children, err := s.childNames(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+
+	requested := make(map[string]struct{}, len(requestedNetworks))
+	for _, network := range requestedNetworks {
+		requested[network] = struct{}{}
+	}
+
+	var scopes []purgeScope
+	var direct bool
+	seenNetworks := make(map[string]struct{})
+
+	for _, child := range children {
+		if moduleHashRE.MatchString(child) {
+			direct = true
+			continue
+		}
+
+		grandchildren, err := s.childNames(ctx, child+"/")
+		if err != nil {
+			continue
+		}
+
+		hasModuleHash := false
+		hasStatesFolder := false
+		for _, grandchild := range grandchildren {
+			hasModuleHash = hasModuleHash || moduleHashRE.MatchString(grandchild)
+			hasStatesFolder = hasStatesFolder || grandchild == statesFolder
+		}
+
+		if hasModuleHash {
+			direct = true
+		}
+		if hasStatesFolder {
+			if len(requested) == 0 {
+				scopes = append(scopes, purgeScope{
+					name:    child,
+					prefix:  joinPrefix(child, statesFolder) + "/",
+					network: child,
+				})
+				seenNetworks[child] = struct{}{}
+			} else if _, ok := requested[child]; ok {
+				scopes = append(scopes, purgeScope{
+					name:    child,
+					prefix:  joinPrefix(child, statesFolder) + "/",
+					network: child,
+				})
+				seenNetworks[child] = struct{}{}
+			}
+		}
+	}
+
+	if len(requested) > 0 {
+		for _, network := range requestedNetworks {
+			if _, seen := seenNetworks[network]; seen {
+				continue
+			}
+			scopes = append(scopes, purgeScope{
+				name:    network,
+				prefix:  joinPrefix(network, statesFolder) + "/",
+				network: network,
+			})
+		}
+	}
+
+	if direct {
+		scopes = append([]purgeScope{{name: "state store"}}, scopes...)
+	}
+
+	return scopes, nil
+}
+
+// Networks retains the shared-network discovery view for callers that only need network names.
 func (s *purgeStore) Networks(ctx context.Context) ([]string, error) {
-	return s.childNames(ctx, "")
+	scopes, err := s.Scopes(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	networks := make([]string, 0, len(scopes))
+	for _, scope := range scopes {
+		if scope.network != "" {
+			networks = append(networks, scope.network)
+		}
+	}
+	return networks, nil
 }
 
 // childNames lists the immediate sub-folders of a prefix, keeping only their last segment.
@@ -205,13 +300,18 @@ func intPow(base, exponent int) int {
 	return out
 }
 
-// ModuleFolders walks <network>/substreams-states/ two levels deep: its children are either
-// module hashes or cache tags holding the module hashes. A tag that cannot be listed is
-// counted and skipped, only the network-level listing failing is fatal for the network.
+// ModuleFolders walks a shared network/substreams-states root. Direct state-store
+// scopes use moduleFoldersAt directly with an empty prefix.
 func (s *purgeStore) ModuleFolders(ctx context.Context, network string) ([]moduleFolder, int, error) {
 	statesPrefix := joinPrefix(network, statesFolder) + "/"
+	return s.moduleFoldersAt(ctx, statesPrefix, network)
+}
 
-	children, err := s.childNames(ctx, statesPrefix)
+// moduleFoldersAt finds module hashes directly below prefix and below one cache-tag
+// network is only populated for the shared network layout, where it is useful
+// in logs and summaries; direct-layout folder names are relative to the store root.
+func (s *purgeStore) moduleFoldersAt(ctx context.Context, prefix, network string) ([]moduleFolder, int, error) {
+	children, err := s.childNames(ctx, prefix)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -223,7 +323,7 @@ func (s *purgeStore) ModuleFolders(ctx context.Context, network string) ([]modul
 	var tags []string
 	for _, child := range children {
 		if moduleHashRE.MatchString(child) {
-			folders = append(folders, moduleFolder{prefix: statesPrefix + child + "/", network: network, hash: child})
+			folders = append(folders, moduleFolder{prefix: prefix + child + "/", network: network, hash: child})
 			continue
 		}
 		tags = append(tags, child)
@@ -237,7 +337,7 @@ func (s *purgeStore) ModuleFolders(ctx context.Context, network string) ([]modul
 
 	for _, tag := range tags {
 		group.Go(func() error {
-			tagPrefix := statesPrefix + tag + "/"
+			tagPrefix := prefix + tag + "/"
 			tagChildren, err := s.childNames(groupCtx, tagPrefix)
 			if err != nil {
 				if groupCtx.Err() != nil {

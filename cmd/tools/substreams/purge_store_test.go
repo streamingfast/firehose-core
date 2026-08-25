@@ -50,6 +50,17 @@ func TestPurgeStoreModuleFolders(t *testing.T) {
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"eth-mainnet", "sol-mainnet"}, networks)
 
+	scopes, err := backend.Scopes(ctx, nil)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []purgeScope{
+		{name: "eth-mainnet", prefix: "eth-mainnet/substreams-states/", network: "eth-mainnet"},
+		{name: "sol-mainnet", prefix: "sol-mainnet/substreams-states/", network: "sol-mainnet"},
+	}, scopes)
+
+	scopes, err = backend.Scopes(ctx, []string{"sol-mainnet"})
+	require.NoError(t, err)
+	assert.Equal(t, []purgeScope{{name: "sol-mainnet", prefix: "sol-mainnet/substreams-states/", network: "sol-mainnet"}}, scopes)
+
 	folders, skipped, err := backend.ModuleFolders(ctx, "eth-mainnet")
 	require.NoError(t, err)
 	assert.Zero(t, skipped)
@@ -84,6 +95,67 @@ func TestPurgeStoreModuleFolders(t *testing.T) {
 		return nil
 	}))
 	assert.Len(t, listed, 3)
+}
+
+func TestPurgeStoreDirectStateStore(t *testing.T) {
+	ctx := context.Background()
+	base := "file://" + t.TempDir()
+
+	store, err := dstore.NewSimpleStore(base)
+	require.NoError(t, err)
+
+	const untaggedHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	const taggedHash = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	require.NoError(t, store.WriteObject(ctx, untaggedHash+"/last_used.zst", emptyReader()))
+	require.NoError(t, store.WriteObject(ctx, "v1/"+taggedHash+"/last_used.zst", emptyReader()))
+
+	backend, err := newPurgeStore(ctx, base, &purgeConfig{}, zap.NewNop())
+	require.NoError(t, err)
+	defer backend.Close()
+
+	networks, err := backend.Networks(ctx)
+	require.NoError(t, err)
+	assert.Empty(t, networks)
+
+	scopes, err := backend.Scopes(ctx, nil)
+	require.NoError(t, err)
+	assert.Equal(t, []purgeScope{{name: "state store"}}, scopes)
+
+	folders, skipped, err := backend.moduleFoldersAt(ctx, "", "")
+	require.NoError(t, err)
+	assert.Zero(t, skipped)
+	assert.ElementsMatch(t, []moduleFolder{
+		{prefix: untaggedHash + "/", hash: untaggedHash},
+		{prefix: "v1/" + taggedHash + "/", tag: "v1", hash: taggedHash},
+	}, folders)
+}
+
+func TestPurgeStoreTaggedOnlyStateStore(t *testing.T) {
+	ctx := context.Background()
+	base := "file://" + t.TempDir()
+
+	store, err := dstore.NewSimpleStore(base)
+	require.NoError(t, err)
+
+	const hash = "cccccccccccccccccccccccccccccccccccccccc"
+	require.NoError(t, store.WriteObject(ctx, "v1/"+hash+"/last_used.zst", emptyReader()))
+
+	backend, err := newPurgeStore(ctx, base, &purgeConfig{}, zap.NewNop())
+	require.NoError(t, err)
+	defer backend.Close()
+
+	networks, err := backend.Networks(ctx)
+	require.NoError(t, err)
+	assert.Empty(t, networks)
+
+	scopes, err := backend.Scopes(ctx, nil)
+	require.NoError(t, err)
+	assert.Equal(t, []purgeScope{{name: "state store"}}, scopes)
+
+	folders, skipped, err := backend.moduleFoldersAt(ctx, "", "")
+	require.NoError(t, err)
+	assert.Zero(t, skipped)
+	assert.Equal(t, []moduleFolder{{prefix: "v1/" + hash + "/", tag: "v1", hash: hash}}, folders)
 }
 
 func emptyReader() *strings.Reader { return strings.NewReader("") }
