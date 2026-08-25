@@ -22,6 +22,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
   Scopes are processed one at a time and fully isolated: a shared network or direct state-store scope that cannot be listed, or whose files refuse to be deleted, is reported and the run moves on to the next one, the command exiting non-zero with a per-scope summary. Use `--dry-run` (`-n`) to see what would go, `--force` (`-f`) to skip the confirmation prompt, `--network` to restrict shared-root networks (direct tier1 layouts always scan all cache tags), and `--daemon --interval 12h` to keep purging unattended (a failed pass is retried at the next interval instead of killing the daemon).
 
+- Added `firecore tools substreams prune-states <store-url> --keep-every <blocks>` to delete intermediate store snapshots (`<end>-<start>.kv` files) and reclaim disk space on long-lived Substreams. Snapshots whose end block is a multiple of `--keep-every` are kept, as are the most recent one of each module and every snapshot within `--keep-recent` blocks of it. `substreams-tier1` rebuilds stores from the last remaining snapshot before the requested block, so pruning trades disk space for reprocessing time. Supports `--dry-run`.
+
 ## v1.18.0
 
 ### Added
