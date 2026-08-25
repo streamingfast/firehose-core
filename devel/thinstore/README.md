@@ -62,6 +62,13 @@ Terminal 2 — the scenarios:
 Outputs land in `out/<scenario>.jsonl` (+ `.err`). Knobs: `LAST` (baseline end block),
 `KEEP_EVERY`, `ENDPOINT`.
 
+## Whole campaign
+
+```bash
+./run-all.sh          # scenarios, fuzz seeds 1/2/4, chaos seeds 3/5/6 — ~1h, logs/run-all-<ts>/
+./run-all.sh chaos    # chaos seeds only
+```
+
 ## Fuzz
 
 ```bash
@@ -76,4 +83,7 @@ below a block, everything but a few, everything, boundaries chosen so stores sha
 common kept snapshot), then runs random production/dev queries with ranges biased
 towards the hole edges (±1, ±100 blocks), tiny ranges, long ranges and tail ranges.
 Every result is compared to the baseline and the tier1 log is scanned for pruned-file
-loads, panics and invalid transitions. A failure writes a replayable report.
+loads, panics and invalid transitions. A query still running after `--timeout` (600s) is
+reported as `HUNG`, with tier1's goroutine dump and the request's last progress lines in
+`out/<query>.hang.txt`. A failure writes a replayable report. In `--chaos` mode a request
+that lost a file it needed and failed cleanly is reported as a casualty (`~`), not a failure.

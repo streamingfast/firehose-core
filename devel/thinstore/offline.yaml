@@ -11,3 +11,7 @@ start:
     advertise-chain-name: "acme-dummy-blockchain"
     substreams-state-bundle-size: 100
     substreams-tier1-max-subrequests: 8
+    # Explicit loopback: tier1 opens one gRPC connection per job, and the default
+    # ":10017" goes through the gRPC DNS resolver, which can add seconds per job on
+    # some networks.
+    substreams-tier1-subrequests-endpoint: 127.0.0.1:10017

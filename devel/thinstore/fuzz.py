@@ -193,15 +193,45 @@ def random_range(rng, last, plan):
     return {"start": start, "stop": stop, "mode": mode}
 
 
-def run_query(q, name):
+def run_query(q, name, timeout):
     cmd = ["substreams", "run", str(SPKG), "map_out", "-e", "localhost:10016", "--plaintext",
            "--limit-processed-blocks", "0", "-o", "jsonl", "-s", str(q["start"]), "-t", str(q["stop"])]
     if q["mode"] == "prod":
         cmd.append("--production-mode")
     t0 = time.time()
     with open(OUT / f"{name}.jsonl", "w") as f, open(OUT / f"{name}.err", "w") as e:
-        rc = subprocess.run(cmd, stdout=f, stderr=e).returncode
+        proc = subprocess.Popen(cmd, stdout=f, stderr=e)
+        try:
+            rc = proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            # the request is still alive on tier1: capture its state before killing the client
+            capture_hang(name, q)
+            proc.kill()
+            proc.wait()
+            e.write(f"HUNG: no completion after {timeout}s (killed)\n")
+            rc = -1
     return rc, time.time() - t0
+
+
+def capture_hang(name, q):
+    """Saves tier1's goroutine dump and the hung request's last progress line to out/<name>.hang.txt."""
+    with open(OUT / f"{name}.hang.txt", "w") as h:
+        h.write(f"query: {q}\n\n== last progress lines for start_block {q['start']}\n")
+        try:
+            log = LOG.read_text(errors="replace")
+            m = re.findall(r'"trace_id": "([a-f0-9]+)".*"start_block": %d, "stop_block": %d' % (q["start"], q["stop"]), log)
+            if m:
+                trace = m[-1]
+                lines = [l for l in log.splitlines() if trace in l and ("request progress" in l or "resume point" in l)]
+                h.write("\n".join(lines[-3:]) + "\n")
+        except Exception as exc:  # diagnostics only
+            h.write(f"(log scan failed: {exc})\n")
+        h.write("\n== goroutines\n")
+        try:
+            h.write(subprocess.run(["curl", "-s", "-m", "10", "http://localhost:6060/debug/pprof/goroutine?debug=2"],
+                                   capture_output=True, text=True).stdout)
+        except Exception as exc:
+            h.write(f"(pprof failed: {exc})\n")
 
 
 def compare(name, q, baseline):
@@ -239,6 +269,8 @@ def main():
                     help="concurrent queries per iteration (tier1 allows 3 sessions per organization)")
     ap.add_argument("--last", type=int, default=30000)
     ap.add_argument("--keep-going", action="store_true")
+    ap.add_argument("--timeout", type=int, default=600,
+                    help="seconds a single query may take before it is reported as hung")
     ap.add_argument("--chaos", action="store_true",
                     help="keep deleting random cache files while the queries run")
     ap.add_argument("--replay", help="failure report to replay")
@@ -280,7 +312,7 @@ def main():
             chaos = threading.Thread(target=chaos_loop, args=(rng, hashes, stop_chaos, chaos_deleted), daemon=True)
             chaos.start()
         with ThreadPoolExecutor(max_workers=args.parallel) as pool:
-            results = list(pool.map(lambda nq: run_query(nq[1], nq[0]), zip(names, queries)))
+            results = list(pool.map(lambda nq: run_query(nq[1], nq[0], args.timeout), zip(names, queries)))
         stop_chaos.set()
         if chaos_deleted:
             print(f"    chaos deleted {len(chaos_deleted)} files while queries ran")
@@ -297,7 +329,7 @@ def main():
             if rc != 0:
                 err = open(OUT / f"{name}.err").read().strip().splitlines()
                 problem = "request failed: " + (err[-1] if err else "?")
-                casualty = args.chaos and bool(CHAOS_CASUALTY.search(problem))
+                casualty = args.chaos and rc != -1 and bool(CHAOS_CASUALTY.search(problem))
             else:
                 problem = compare(name, q, baseline)
             if casualty:
