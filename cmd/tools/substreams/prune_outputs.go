@@ -44,7 +44,7 @@ func isSpkgObject(name string) bool {
 
 func NewToolsPruneOutputsCmd(logger *zap.Logger) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "prune-outputs <state-url> --network <network> --truncate-below-block <block> --minimum-age <age>",
+		Use:   "prune-outputs <store-url> --network <network> --truncate-below-block <block> --minimum-age <age>",
 		Short: "Delete module output files below a block and older than an age",
 		Long: cli.Dedent(`
 			Deletes execution output files (the '<start>-<end>.output' files under a module's
@@ -54,7 +54,7 @@ func NewToolsPruneOutputsCmd(logger *zap.Logger) *cobra.Command {
 			than --minimum-age. Nothing outside 'outputs/' folders is ever touched.
 
 			Module folders are discovered the same way 'purge' does, under
-			<state-url>/<network>/` + statesFolder + `/, cache tags included.
+			<store-url>/<network>/` + statesFolder + `/, cache tags included.
 
 			A module folder carrying a package file ('substreams.spkg.zst' or
 			'substreams.partial.spkg.zst') was requested directly as an output module, not as an
@@ -101,7 +101,7 @@ func NewToolsPruneOutputsCmd(logger *zap.Logger) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().String("network", "", "Network to prune, as the folder name directly under <state-url> (ex: 'eth-mainnet') (required)")
+	cmd.Flags().String("network", "", "Network to prune, as the folder name directly under <store-url> (ex: 'eth-mainnet') (required)")
 	cmd.Flags().Uint64("truncate-below-block", 0, "Only delete output files whose block range ends at or below this block (required)")
 	cmd.Flags().String("minimum-age", "", "Only delete output files last modified longer than this ago, ex: '3d', '72h' (required)")
 	cmd.Flags().String("output-module-minimum-age", "", "If set, also prune modules carrying an spkg (directly-queried output modules), using this age instead of --minimum-age. Unset or '0' keeps them untouched")

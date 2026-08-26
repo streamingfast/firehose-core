@@ -43,8 +43,8 @@ block, so pruning trades disk space for reprocessing time on requests that start
 pruned range. Partial files are never touched.
 
 Module folders are discovered the same way 'purge' does: direct tier1 layouts
-(<url>/<hash> and <url>/<tag>/<hash>) and shared network roots
-(<url>/<network>/` + statesFolder + `/<tag>/<hash>) are all recognized, and only each
+(<store-url>/<hash> and <store-url>/<tag>/<hash>) and shared network roots
+(<store-url>/<network>/` + statesFolder + `/<tag>/<hash>) are all recognized, and only each
 module's 'states/' prefix is then listed. The URL can also point at a single module
 folder or directly at its 'states' folder, in which case the whole tree is walked.`,
 		Example: `  firecore tools substreams prune-states gs://my-bucket/substreams-states --keep-every 100000 --dry-run
