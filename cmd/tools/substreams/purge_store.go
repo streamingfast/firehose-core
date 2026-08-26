@@ -51,14 +51,13 @@ func boundsArePushedDown(scheme string) bool {
 	return false
 }
 
-func newPurgeStore(ctx context.Context, storeURL string, cfg *purgeConfig, logger *zap.Logger) (*purgeStore, error) {
+func newPurgeStore(ctx context.Context, storeURL string, scanWorkers int, logger *zap.Logger) (*purgeStore, error) {
 	baseURL := strings.TrimSuffix(storeURL, "/")
 	store, err := dstore.NewSimpleStore(baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("creating store for %q: %w", storeURL, err)
 	}
 
-	scanWorkers := cfg.scanWorkers
 	if scanWorkers < 1 {
 		scanWorkers = 1
 	}
@@ -383,6 +382,34 @@ func (s *purgeStore) Markers(ctx context.Context, folder moduleFolder) ([]marker
 	}
 
 	return objects, nil
+}
+
+// HasSpkg reports whether a module folder carries a package file at its root, which
+// substreams-tier1 writes only when the module was requested directly as the output
+// module. The prefix is narrow enough that the service answers from its index without
+// walking the state files next to it.
+func (s *purgeStore) HasSpkg(ctx context.Context, folder moduleFolder) (bool, error) {
+	found := false
+	err := s.store.Walk(ctx, folder.prefix+"substreams.", func(filename string) error {
+		if isSpkgObject(filename) {
+			found = true
+			return dstore.StopIteration
+		}
+		return nil
+	})
+	if err != nil {
+		return false, fmt.Errorf("listing spkg of %q: %w", folder.prefix, err)
+	}
+	return found, nil
+}
+
+// WalkOutputs lists the execution output files of a module folder, modification times
+// and sizes coming straight out of the listing.
+func (s *purgeStore) WalkOutputs(ctx context.Context, folder moduleFolder, f func(entry dstore.ObjectEntry) error) error {
+	if err := s.store.WalkAttributes(ctx, folder.prefix+"outputs/", f); err != nil {
+		return fmt.Errorf("walking outputs of %q: %w", folder.prefix, err)
+	}
+	return nil
 }
 
 func (s *purgeStore) ReadObject(ctx context.Context, name string) ([]byte, error) {

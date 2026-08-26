@@ -291,7 +291,7 @@ func runPurge(cmd *cobra.Command, storeURL string, logger *zap.Logger) error {
 
 	cmd.SilenceUsage = true
 
-	store, err := newPurgeStore(ctx, storeURL, cfg, logger)
+	store, err := newPurgeStore(ctx, storeURL, cfg.scanWorkers, logger)
 	if err != nil {
 		if strings.HasPrefix(storeURL, "gs://") {
 			fmt.Println(stylex.Warn("make sure you have Google authorization credentials (gcloud auth application-default login)"))
