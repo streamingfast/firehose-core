@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/cli/sflags"
@@ -27,16 +28,20 @@ var fullKVFileRegex = regexp.MustCompile(`^(\d{10})-(\d{10})\.kv(?:\.zst|\.gz)?$
 
 func NewToolsPruneStatesCmd(logger *zap.Logger) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "prune-states <store-url> --keep-every <blocks>",
+		Use:   "prune-states <store-url> --keep-every <blocks> --truncate-below-block <block>",
 		Short: "Delete intermediate store snapshots, keeping one every N blocks",
 		Long: `Walks every module folder found under the given store URL and deletes the full store
 snapshots (the '<end>-<start>.kv' files under 'states/'), keeping the first snapshot of
 each --keep-every-aligned window. Windows start on multiples of --keep-every regardless of
 the module's initial block (the first window is simply shorter), so a module snapshotting
 at 103000, 203000, ... with --keep-every 100000 keeps one snapshot per 100000-block window
-instead of losing everything to misalignment. The most recent snapshot of each module is
-always kept, as is every snapshot within --keep-recent blocks of it, so requests in flight
-and the live head keep their nearby resume points.
+instead of losing everything to misalignment.
+
+Only snapshots whose end block is at or below --truncate-below-block are thinned:
+everything above that block is kept untouched, so requests in flight and the live head
+keep their nearby resume points. The most recent snapshot of each module is always kept.
+--minimum-age, if set, additionally spares any snapshot last modified more recently than
+that (the modification time comes straight out of the listing, nothing is downloaded).
 
 substreams-tier1 rebuilds a store from the last remaining snapshot before the requested
 block, so pruning trades disk space for reprocessing time on requests that start in a
@@ -47,39 +52,57 @@ Module folders are discovered the same way 'purge' does: direct tier1 layouts
 (<store-url>/<network>/` + statesFolder + `/<tag>/<hash>) are all recognized, and only each
 module's 'states/' prefix is then listed. The URL can also point at a single module
 folder or directly at its 'states' folder, in which case the whole tree is walked.`,
-		Example: `  firecore tools substreams prune-states gs://my-bucket/substreams-states --keep-every 100000 --dry-run
-  firecore tools substreams prune-states /data/states/mainnet/substreams-states/<hash> --keep-every 50000 --keep-recent 200000`,
+		Example: `  firecore tools substreams prune-states gs://my-bucket/substreams-states --keep-every 100000 --truncate-below-block 12000000 --dry-run
+  firecore tools substreams prune-states /data/states/mainnet/substreams-states/<hash> --keep-every 50000 --truncate-below-block 12000000 --minimum-age 3d`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg := pruneConfig{
-				keepEvery:   sflags.MustGetUint64(cmd, "keep-every"),
-				keepRecent:  sflags.MustGetUint64(cmd, "keep-recent"),
-				dryRun:      sflags.MustGetBool(cmd, "dry-run"),
-				parallelism: sflags.MustGetInt(cmd, "parallelism"),
+			var minimumAge time.Duration
+			if raw := sflags.MustGetString(cmd, "minimum-age"); raw != "" && raw != "0" {
+				var err error
+				if minimumAge, err = parseRetentionDuration(raw); err != nil {
+					return fmt.Errorf("invalid --minimum-age: %w", err)
+				}
 			}
+
+			cfg := pruneConfig{
+				keepEvery:          sflags.MustGetUint64(cmd, "keep-every"),
+				truncateBelowBlock: sflags.MustGetUint64(cmd, "truncate-below-block"),
+				minimumAge:         minimumAge,
+				dryRun:             sflags.MustGetBool(cmd, "dry-run"),
+				parallelism:        sflags.MustGetInt(cmd, "parallelism"),
+				now:                time.Now(),
+			}
+			cmd.SilenceUsage = true
 			return runPruneStates(cmd.Context(), args[0], cfg, logger)
 		},
 	}
 
 	cmd.Flags().Uint64("keep-every", 0, "Keep the first snapshot of each window of this many blocks, windows aligned on multiples of it (required)")
-	cmd.Flags().Uint64("keep-recent", 0, "Also keep every snapshot within this many blocks of a module's most recent one (defaults to --keep-every)")
+	cmd.Flags().Uint64("truncate-below-block", 0, "Only thin snapshots whose end block is at or below this block, everything above is kept untouched (required)")
+	cmd.Flags().String("minimum-age", "", "Only delete snapshots last modified longer than this ago, ex: '3d', '72h'. Unset deletes whatever the age")
 	cmd.Flags().Bool("dry-run", false, "Only report what would be deleted")
 	cmd.Flags().Int("parallelism", 16, "Number of concurrent deletions")
 	cmd.MarkFlagRequired("keep-every")
+	cmd.MarkFlagRequired("truncate-below-block")
 
 	return cmd
 }
 
 type pruneConfig struct {
-	keepEvery   uint64
-	keepRecent  uint64
+	keepEvery          uint64
+	truncateBelowBlock uint64
+	// minimumAge additionally spares snapshots modified more recently than this; zero
+	// disables the age check.
+	minimumAge  time.Duration
 	dryRun      bool
 	parallelism int
+	now         time.Time
 }
 
 type snapshotFile struct {
 	name     string
 	endBlock uint64
+	modified time.Time
 }
 
 // moduleSnapshots is every full snapshot of one module folder, sorted by end block.
@@ -92,8 +115,8 @@ func runPruneStates(ctx context.Context, storeURL string, cfg pruneConfig, logge
 	if cfg.keepEvery == 0 {
 		return errors.New("--keep-every must be greater than 0")
 	}
-	if cfg.keepRecent == 0 {
-		cfg.keepRecent = cfg.keepEvery
+	if cfg.truncateBelowBlock == 0 {
+		return errors.New("--truncate-below-block must be greater than 0")
 	}
 	if cfg.parallelism < 1 {
 		cfg.parallelism = 1
@@ -107,9 +130,12 @@ func runPruneStates(ctx context.Context, storeURL string, cfg pruneConfig, logge
 
 	fmt.Println(stylex.Title("Substreams Store Snapshots Pruning"))
 	fmt.Println(stylex.Dim(stylex.Separator(80)))
-	fmt.Println(stylex.Labelf("Store:       %s", storeURL))
-	fmt.Println(stylex.Labelf("Keep every:  %d blocks", cfg.keepEvery))
-	fmt.Println(stylex.Labelf("Keep recent: %d blocks", cfg.keepRecent))
+	fmt.Println(stylex.Labelf("Store:                %s", storeURL))
+	fmt.Println(stylex.Labelf("Keep every:           %d blocks", cfg.keepEvery))
+	fmt.Println(stylex.Labelf("Truncate below block: %d", cfg.truncateBelowBlock))
+	if cfg.minimumAge > 0 {
+		fmt.Println(stylex.Labelf("Minimum age:          %s", cfg.minimumAge))
+	}
 	if cfg.dryRun {
 		fmt.Println(stylex.Warn("Dry run: nothing will be deleted"))
 	}
@@ -123,9 +149,11 @@ func runPruneStates(ctx context.Context, storeURL string, cfg pruneConfig, logge
 	}
 	fmt.Println(stylex.Successf("✓ %d module folder(s)", len(modules)))
 
+	cutoff := cfg.now.Add(-cfg.minimumAge)
+
 	var toDelete []string
 	for _, module := range modules {
-		condemned := snapshotsToPrune(module.files, cfg.keepEvery, cfg.keepRecent)
+		condemned := snapshotsToPrune(module.files, cfg.keepEvery, cfg.truncateBelowBlock, cutoff)
 		if len(condemned) == 0 {
 			continue
 		}
@@ -181,8 +209,9 @@ func listModuleSnapshots(ctx context.Context, store *purgeStore, parallelism int
 		group.Go(func() error {
 			statesPrefix := folder.prefix + "states/"
 			var files []snapshotFile
-			err := store.store.Walk(groupCtx, statesPrefix, func(filename string) error {
-				if file, ok := parseFullKVFilename(filename); ok {
+			err := store.store.WalkAttributes(groupCtx, statesPrefix, func(entry dstore.ObjectEntry) error {
+				if file, ok := parseFullKVFilename(entry.Name); ok {
+					file.modified = entry.LastModified
 					files = append(files, file)
 				}
 				return nil
@@ -232,12 +261,13 @@ func discoverModuleFolders(ctx context.Context, store *purgeStore) ([]moduleFold
 func walkAllSnapshots(ctx context.Context, store dstore.Store) ([]moduleSnapshots, error) {
 	byFolder := map[string]*moduleSnapshots{}
 
-	err := store.Walk(ctx, "", func(filename string) error {
-		file, ok := parseFullKVFilename(filename)
+	err := store.WalkAttributes(ctx, "", func(entry dstore.ObjectEntry) error {
+		file, ok := parseFullKVFilename(entry.Name)
 		if !ok {
 			return nil
 		}
-		folder := path.Dir(filename)
+		file.modified = entry.LastModified
+		folder := path.Dir(entry.Name)
 		module := byFolder[folder]
 		if module == nil {
 			module = &moduleSnapshots{folder: folder}
@@ -275,32 +305,31 @@ func parseFullKVFilename(filename string) (snapshotFile, bool) {
 	return snapshotFile{name: filename, endBlock: endBlock}, true
 }
 
-// snapshotsToPrune returns the files of one module to delete: all but the first snapshot of
-// each keepEvery-aligned window ([N*keepEvery, (N+1)*keepEvery)), the most recent one and
-// any within keepRecent blocks of it. Windows align on multiples of keepEvery whatever the
-// module's initial block is, the first window simply covering fewer blocks, so a module
-// snapshotting at 103000, 203000, ... with keepEvery=100000 keeps them all instead of
-// requiring exact multiples. `files` must be sorted by end block.
-func snapshotsToPrune(files []snapshotFile, keepEvery, keepRecent uint64) []snapshotFile {
+// snapshotsToPrune returns the files of one module to delete: all but the first snapshot
+// of each keepEvery-aligned window ([N*keepEvery, (N+1)*keepEvery)), the most recent one,
+// anything past truncateBelowBlock and anything modified at or after cutoff. Windows align
+// on multiples of keepEvery whatever the module's initial block is, the first window
+// simply covering fewer blocks, so a module snapshotting at 103000, 203000, ... with
+// keepEvery=100000 keeps them all instead of requiring exact multiples. `files` must be
+// sorted by end block.
+func snapshotsToPrune(files []snapshotFile, keepEvery, truncateBelowBlock uint64, cutoff time.Time) []snapshotFile {
 	if len(files) == 0 {
 		return nil
-	}
-	latest := files[len(files)-1].endBlock
-	var recentFloor uint64
-	if latest > keepRecent {
-		recentFloor = latest - keepRecent
 	}
 
 	var out []snapshotFile
 	prevWindow := uint64(math.MaxUint64)
 	for _, file := range files[:len(files)-1] {
+		if file.endBlock > truncateBelowBlock {
+			break // sorted, so everything from here on is past the bound
+		}
 		window := file.endBlock / keepEvery
 		firstInWindow := window != prevWindow
 		prevWindow = window
 		if firstInWindow {
 			continue
 		}
-		if file.endBlock >= recentFloor {
+		if !file.modified.Before(cutoff) {
 			continue
 		}
 		out = append(out, file)

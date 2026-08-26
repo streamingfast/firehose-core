@@ -3,6 +3,7 @@ package substreams
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/streamingfast/dstore"
 	"github.com/stretchr/testify/assert"
@@ -11,10 +12,13 @@ import (
 )
 
 func TestSnapshotsToPrune(t *testing.T) {
+	cutoff := time.Date(2026, 8, 23, 0, 0, 0, 0, time.UTC)
+	old := cutoff.Add(-time.Hour)
+
 	files := func(ends ...uint64) []snapshotFile {
 		out := make([]snapshotFile, len(ends))
 		for i, end := range ends {
-			out[i] = snapshotFile{name: "x", endBlock: end}
+			out[i] = snapshotFile{name: "x", endBlock: end, modified: old}
 		}
 		return out
 	}
@@ -27,59 +31,78 @@ func TestSnapshotsToPrune(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		files      []snapshotFile
-		keepEvery  uint64
-		keepRecent uint64
-		want       []uint64
+		name          string
+		files         []snapshotFile
+		keepEvery     uint64
+		truncateBelow uint64
+		want          []uint64
 	}{
 		{
-			name:       "keeps first of each window, latest and recent ones",
-			files:      files(1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000, 13000),
-			keepEvery:  5000,
-			keepRecent: 2000,
-			want:       []uint64{2000, 3000, 4000, 6000, 7000, 8000, 9000},
+			name:          "keeps first of each window, latest and everything past the bound",
+			files:         files(1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000, 13000),
+			keepEvery:     5000,
+			truncateBelow: 11000,
+			want:          []uint64{2000, 3000, 4000, 6000, 7000, 8000, 9000, 11000},
 		},
 		{
-			name:       "latest always kept even when in same window as first",
-			files:      files(1000, 2000, 3000),
-			keepEvery:  5000,
-			keepRecent: 0,
-			want:       []uint64{2000},
+			name:          "latest always kept even when in same window as first",
+			files:         files(1000, 2000, 3000),
+			keepEvery:     5000,
+			truncateBelow: 10000,
+			want:          []uint64{2000},
 		},
 		{
-			name:       "recent floor below zero keeps everything",
-			files:      files(1000, 2000, 3000),
-			keepEvery:  5000,
-			keepRecent: 10000,
-			want:       nil,
+			name:          "bound below every snapshot keeps everything",
+			files:         files(11000, 12000, 13000),
+			keepEvery:     5000,
+			truncateBelow: 10000,
+			want:          nil,
 		},
 		{
 			name:  "no files",
-			files: nil, keepEvery: 5000, keepRecent: 0,
+			files: nil, keepEvery: 5000, truncateBelow: 10000,
 			want: nil,
 		},
 		{
-			name:       "misaligned initial block snapshots align to windows",
-			files:      files(1000, 2000, 5000, 6000, 10000),
-			keepEvery:  5000,
-			keepRecent: 0,
-			want:       []uint64{2000, 6000},
+			name:          "misaligned initial block snapshots align to windows",
+			files:         files(1000, 2000, 5000, 6000, 10000),
+			keepEvery:     5000,
+			truncateBelow: 10000,
+			want:          []uint64{2000, 6000},
 		},
 		{
-			name:       "misaligned coarse snapshots keep one per window",
-			files:      files(3000, 103000, 203000, 303000),
-			keepEvery:  100000,
-			keepRecent: 0,
-			want:       nil,
+			name:          "misaligned coarse snapshots keep one per window",
+			files:         files(3000, 103000, 203000, 303000),
+			keepEvery:     100000,
+			truncateBelow: 400000,
+			want:          nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, ends(snapshotsToPrune(tt.files, tt.keepEvery, tt.keepRecent)))
+			assert.Equal(t, tt.want, ends(snapshotsToPrune(tt.files, tt.keepEvery, tt.truncateBelow, cutoff)))
 		})
 	}
+}
+
+// A snapshot modified at or after the cutoff survives even when its window condemns it.
+func TestSnapshotsToPruneMinimumAge(t *testing.T) {
+	cutoff := time.Date(2026, 8, 23, 0, 0, 0, 0, time.UTC)
+	old := cutoff.Add(-time.Hour)
+	fresh := cutoff.Add(time.Hour)
+
+	files := []snapshotFile{
+		{name: "a", endBlock: 1000, modified: old},
+		{name: "b", endBlock: 2000, modified: old},
+		{name: "c", endBlock: 3000, modified: fresh},
+		{name: "d", endBlock: 4000, modified: cutoff},
+		{name: "e", endBlock: 10000, modified: old},
+	}
+
+	pruned := snapshotsToPrune(files, 5000, 10000, cutoff)
+	require.Len(t, pruned, 1)
+	assert.Equal(t, uint64(2000), pruned[0].endBlock)
 }
 
 // Folder names here are not module hashes, so discovery finds nothing and the full-walk
@@ -142,14 +165,15 @@ func TestListModuleSnapshotsDiscovery(t *testing.T) {
 	require.Len(t, modules, 2)
 
 	assert.Equal(t, "eth-mainnet/substreams-states/"+h1+"/states", modules[0].folder)
-	assert.Equal(t, []snapshotFile{
-		{name: "eth-mainnet/substreams-states/" + h1 + "/states/0000002000-0000001000.kv", endBlock: 2000},
-	}, modules[0].files)
+	require.Len(t, modules[0].files, 1)
+	assert.Equal(t, "eth-mainnet/substreams-states/"+h1+"/states/0000002000-0000001000.kv", modules[0].files[0].name)
+	assert.Equal(t, uint64(2000), modules[0].files[0].endBlock)
+	assert.False(t, modules[0].files[0].modified.IsZero())
 
 	assert.Equal(t, "eth-mainnet/substreams-states/mmap-stores/"+h2+"/states", modules[1].folder)
-	assert.Equal(t, []snapshotFile{
-		{name: "eth-mainnet/substreams-states/mmap-stores/" + h2 + "/states/0000003000-0000001000.kv.zst", endBlock: 3000},
-	}, modules[1].files)
+	require.Len(t, modules[1].files, 1)
+	assert.Equal(t, "eth-mainnet/substreams-states/mmap-stores/"+h2+"/states/0000003000-0000001000.kv.zst", modules[1].files[0].name)
+	assert.Equal(t, uint64(3000), modules[1].files[0].endBlock)
 }
 
 func TestParseFullKVFilename(t *testing.T) {
