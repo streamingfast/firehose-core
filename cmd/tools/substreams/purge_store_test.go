@@ -42,7 +42,7 @@ func TestPurgeStoreModuleFolders(t *testing.T) {
 		require.NoError(t, store.WriteObject(ctx, name, emptyReader()))
 	}
 
-	backend, err := newPurgeStore(ctx, base, &purgeConfig{}, zap.NewNop())
+	backend, err := newPurgeStore(ctx, base, 1, zap.NewNop())
 	require.NoError(t, err)
 	defer backend.Close()
 
@@ -109,7 +109,7 @@ func TestPurgeStoreDirectStateStore(t *testing.T) {
 	require.NoError(t, store.WriteObject(ctx, untaggedHash+"/last_used.zst", emptyReader()))
 	require.NoError(t, store.WriteObject(ctx, "v1/"+taggedHash+"/last_used.zst", emptyReader()))
 
-	backend, err := newPurgeStore(ctx, base, &purgeConfig{}, zap.NewNop())
+	backend, err := newPurgeStore(ctx, base, 1, zap.NewNop())
 	require.NoError(t, err)
 	defer backend.Close()
 
@@ -140,7 +140,7 @@ func TestPurgeStoreTaggedOnlyStateStore(t *testing.T) {
 	const hash = "cccccccccccccccccccccccccccccccccccccccc"
 	require.NoError(t, store.WriteObject(ctx, "v1/"+hash+"/last_used.zst", emptyReader()))
 
-	backend, err := newPurgeStore(ctx, base, &purgeConfig{}, zap.NewNop())
+	backend, err := newPurgeStore(ctx, base, 1, zap.NewNop())
 	require.NoError(t, err)
 	defer backend.Close()
 
@@ -196,7 +196,7 @@ func TestPurgeStoreShardedListing(t *testing.T) {
 		require.NoError(t, store.WriteObject(ctx, "eth-mainnet/substreams-states/"+hash+"/last_used.zst", strings.NewReader("")))
 	}
 
-	backend, err := newPurgeStore(ctx, base, &purgeConfig{scanWorkers: 32}, zap.NewNop())
+	backend, err := newPurgeStore(ctx, base, 32, zap.NewNop())
 	require.NoError(t, err)
 	defer backend.Close()
 

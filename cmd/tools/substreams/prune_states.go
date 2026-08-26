@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"path"
 	"regexp"
 	"sort"
@@ -29,17 +30,23 @@ func NewToolsPruneStatesCmd(logger *zap.Logger) *cobra.Command {
 		Use:   "prune-states <store-url> --keep-every <blocks>",
 		Short: "Delete intermediate store snapshots, keeping one every N blocks",
 		Long: `Walks every module folder found under the given store URL and deletes the full store
-snapshots (the '<end>-<start>.kv' files under 'states/') whose end block is not a multiple
-of --keep-every. The most recent snapshot of each module is always kept, as is every
-snapshot within --keep-recent blocks of it, so requests in flight and the live head keep
-their nearby resume points.
+snapshots (the '<end>-<start>.kv' files under 'states/'), keeping the first snapshot of
+each --keep-every-aligned window. Windows start on multiples of --keep-every regardless of
+the module's initial block (the first window is simply shorter), so a module snapshotting
+at 103000, 203000, ... with --keep-every 100000 keeps one snapshot per 100000-block window
+instead of losing everything to misalignment. The most recent snapshot of each module is
+always kept, as is every snapshot within --keep-recent blocks of it, so requests in flight
+and the live head keep their nearby resume points.
 
 substreams-tier1 rebuilds a store from the last remaining snapshot before the requested
 block, so pruning trades disk space for reprocessing time on requests that start in a
 pruned range. Partial files are never touched.
 
-The URL can point at the root of the state store (every module under it is pruned), at a
-single module folder, or directly at its 'states' folder.`,
+Module folders are discovered the same way 'purge' does: direct tier1 layouts
+(<url>/<hash> and <url>/<tag>/<hash>) and shared network roots
+(<url>/<network>/` + statesFolder + `/<tag>/<hash>) are all recognized, and only each
+module's 'states/' prefix is then listed. The URL can also point at a single module
+folder or directly at its 'states' folder, in which case the whole tree is walked.`,
 		Example: `  firecore tools substreams prune-states gs://my-bucket/substreams-states --keep-every 100000 --dry-run
   firecore tools substreams prune-states /data/states/mainnet/substreams-states/<hash> --keep-every 50000 --keep-recent 200000`,
 		Args: cobra.ExactArgs(1),
@@ -54,7 +61,7 @@ single module folder, or directly at its 'states' folder.`,
 		},
 	}
 
-	cmd.Flags().Uint64("keep-every", 0, "Keep the snapshots whose end block is a multiple of this many blocks (required)")
+	cmd.Flags().Uint64("keep-every", 0, "Keep the first snapshot of each window of this many blocks, windows aligned on multiples of it (required)")
 	cmd.Flags().Uint64("keep-recent", 0, "Also keep every snapshot within this many blocks of a module's most recent one (defaults to --keep-every)")
 	cmd.Flags().Bool("dry-run", false, "Only report what would be deleted")
 	cmd.Flags().Int("parallelism", 16, "Number of concurrent deletions")
@@ -92,10 +99,11 @@ func runPruneStates(ctx context.Context, storeURL string, cfg pruneConfig, logge
 		cfg.parallelism = 1
 	}
 
-	store, err := dstore.NewSimpleStore(strings.TrimSuffix(storeURL, "/"))
+	store, err := newPurgeStore(ctx, storeURL, cfg.parallelism, logger)
 	if err != nil {
-		return fmt.Errorf("creating store for %q: %w", storeURL, err)
+		return err
 	}
+	defer store.Close()
 
 	fmt.Println(stylex.Title("Substreams Store Snapshots Pruning"))
 	fmt.Println(stylex.Dim(stylex.Separator(80)))
@@ -108,7 +116,7 @@ func runPruneStates(ctx context.Context, storeURL string, cfg pruneConfig, logge
 	fmt.Println()
 
 	fmt.Print(stylex.Label("Listing snapshots... "))
-	modules, err := listModuleSnapshots(ctx, store)
+	modules, err := listModuleSnapshots(ctx, store, cfg.parallelism)
 	if err != nil {
 		fmt.Println(stylex.Error("✗"))
 		return fmt.Errorf("listing snapshots: %w", err)
@@ -141,7 +149,7 @@ func runPruneStates(ctx context.Context, storeURL string, cfg pruneConfig, logge
 	}
 
 	fmt.Print(stylex.Labelf("Deleting %d snapshot(s)... ", len(toDelete)))
-	if err := deleteAll(ctx, store, toDelete, cfg.parallelism); err != nil {
+	if err := deleteAll(ctx, store.store, toDelete, cfg.parallelism); err != nil {
 		fmt.Println(stylex.Error("✗"))
 		return err
 	}
@@ -149,9 +157,79 @@ func runPruneStates(ctx context.Context, storeURL string, cfg pruneConfig, logge
 	return nil
 }
 
-// listModuleSnapshots walks the whole store and groups full snapshots by the folder holding
-// them, so the URL may point at any level of the state store tree.
-func listModuleSnapshots(ctx context.Context, store dstore.Store) ([]moduleSnapshots, error) {
+// listModuleSnapshots discovers module folders the way the purge does — direct tier1
+// layouts, cache tags and shared network/substreams-states/ roots alike — then lists only
+// each module's 'states/' prefix, never enumerating the output files next to it. A URL
+// pointing inside a single module folder (at the folder or at its 'states' one) exposes
+// no module hash to discover, and the whole tree is walked instead.
+func listModuleSnapshots(ctx context.Context, store *purgeStore, parallelism int) ([]moduleSnapshots, error) {
+	folders, err := discoverModuleFolders(ctx, store)
+	if err != nil {
+		return nil, err
+	}
+	if len(folders) == 0 {
+		return walkAllSnapshots(ctx, store.store)
+	}
+
+	var mu sync.Mutex
+	byFolder := map[string]*moduleSnapshots{}
+
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(parallelism)
+
+	for _, folder := range folders {
+		group.Go(func() error {
+			statesPrefix := folder.prefix + "states/"
+			var files []snapshotFile
+			err := store.store.Walk(groupCtx, statesPrefix, func(filename string) error {
+				if file, ok := parseFullKVFilename(filename); ok {
+					files = append(files, file)
+				}
+				return nil
+			})
+			if err != nil {
+				return fmt.Errorf("walking %q: %w", statesPrefix, err)
+			}
+			if len(files) == 0 {
+				return nil
+			}
+
+			mu.Lock()
+			defer mu.Unlock()
+			name := strings.TrimSuffix(statesPrefix, "/")
+			byFolder[name] = &moduleSnapshots{folder: name, files: files}
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
+
+	return sortedModuleSnapshots(byFolder), nil
+}
+
+// discoverModuleFolders finds every module folder of every scope, the same discovery the
+// purge runs: direct tier1 layouts, shared network roots and cache tags included.
+func discoverModuleFolders(ctx context.Context, store *purgeStore) ([]moduleFolder, error) {
+	scopes, err := store.Scopes(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var folders []moduleFolder
+	for _, scope := range scopes {
+		found, _, err := store.moduleFoldersAt(ctx, scope.prefix, scope.network)
+		if err != nil {
+			return nil, err
+		}
+		folders = append(folders, found...)
+	}
+	return folders, nil
+}
+
+// walkAllSnapshots walks the whole store and groups full snapshots by the folder holding
+// them, for URLs pointing inside a single module folder.
+func walkAllSnapshots(ctx context.Context, store dstore.Store) ([]moduleSnapshots, error) {
 	byFolder := map[string]*moduleSnapshots{}
 
 	err := store.Walk(ctx, "", func(filename string) error {
@@ -172,13 +250,17 @@ func listModuleSnapshots(ctx context.Context, store dstore.Store) ([]moduleSnaps
 		return nil, err
 	}
 
+	return sortedModuleSnapshots(byFolder), nil
+}
+
+func sortedModuleSnapshots(byFolder map[string]*moduleSnapshots) []moduleSnapshots {
 	out := make([]moduleSnapshots, 0, len(byFolder))
 	for _, module := range byFolder {
 		sort.Slice(module.files, func(i, j int) bool { return module.files[i].endBlock < module.files[j].endBlock })
 		out = append(out, *module)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].folder < out[j].folder })
-	return out, nil
+	return out
 }
 
 func parseFullKVFilename(filename string) (snapshotFile, bool) {
@@ -193,9 +275,12 @@ func parseFullKVFilename(filename string) (snapshotFile, bool) {
 	return snapshotFile{name: filename, endBlock: endBlock}, true
 }
 
-// snapshotsToPrune returns the files of one module to delete: those whose end block is not
-// a multiple of keepEvery, except the most recent one and any within keepRecent blocks of
-// it. `files` must be sorted by end block.
+// snapshotsToPrune returns the files of one module to delete: all but the first snapshot of
+// each keepEvery-aligned window ([N*keepEvery, (N+1)*keepEvery)), the most recent one and
+// any within keepRecent blocks of it. Windows align on multiples of keepEvery whatever the
+// module's initial block is, the first window simply covering fewer blocks, so a module
+// snapshotting at 103000, 203000, ... with keepEvery=100000 keeps them all instead of
+// requiring exact multiples. `files` must be sorted by end block.
 func snapshotsToPrune(files []snapshotFile, keepEvery, keepRecent uint64) []snapshotFile {
 	if len(files) == 0 {
 		return nil
@@ -207,8 +292,12 @@ func snapshotsToPrune(files []snapshotFile, keepEvery, keepRecent uint64) []snap
 	}
 
 	var out []snapshotFile
+	prevWindow := uint64(math.MaxUint64)
 	for _, file := range files[:len(files)-1] {
-		if file.endBlock%keepEvery == 0 {
+		window := file.endBlock / keepEvery
+		firstInWindow := window != prevWindow
+		prevWindow = window
+		if firstInWindow {
 			continue
 		}
 		if file.endBlock >= recentFloor {
