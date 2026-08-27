@@ -44,32 +44,36 @@ func isSpkgObject(name string) bool {
 
 func NewToolsPruneOutputsCmd(logger *zap.Logger) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "prune-outputs <store-url> --network <network> --truncate-below-block <block> --minimum-age <age>",
+		Use:   "prune-outputs <store-url> --truncate-below-block <block> --minimum-age <age>",
 		Short: "Delete module output files below a block and older than an age",
 		Long: cli.Dedent(`
 			Deletes execution output files (the '<start>-<end>.output' files under a module's
-			'outputs/' folder) of every module of one --network. A file is deleted only when BOTH
-			conditions hold: its block range ends at or below --truncate-below-block, AND its
-			last-modified time (read straight out of the listing, nothing is downloaded) is older
-			than --minimum-age. Nothing outside 'outputs/' folders is ever touched.
+			'outputs/' folder) of every module found under the store URL. A file is deleted only
+			when BOTH conditions hold: its block range ends at or below --truncate-below-block,
+			AND its last-modified time (read straight out of the listing, nothing is downloaded)
+			is older than --minimum-age. Nothing outside 'outputs/' folders is ever touched.
 
-			Module folders are discovered the same way 'purge' does, under
-			<store-url>/<network>/` + statesFolder + `/, cache tags included.
+			The URL may point at a network folder (<store>/<network>), at its ` + statesFolder + `
+			folder, at a cache tag under it (.../` + statesFolder + `/v1), or directly at a single
+			module folder; cache tags are discovered the same way 'purge' does.
 
 			A module folder carrying a package file ('substreams.spkg.zst' or
 			'substreams.partial.spkg.zst') was requested directly as an output module, not as an
 			intermediate dependency, and its outputs are skipped by default since they are what
 			serves those requests. --output-module-minimum-age, if set, prunes them too, using
 			that (typically longer) age instead of --minimum-age.
+
+			A module folder carrying a DO_NOT_PRUNE file at its root (next to the last_used
+			markers) is never touched at all.
 		`),
 		Example: cli.Dedent(`
 			# Outputs fully below block 12345678 and untouched for 3 days, on eth-mainnet
-			firecore tools substreams prune-outputs gs://example-bucket/substreams \
-			  --network eth-mainnet --truncate-below-block 12345678 --minimum-age 3d --dry-run
+			firecore tools substreams prune-outputs gs://example-bucket/substreams/eth-mainnet \
+			  --truncate-below-block 12345678 --minimum-age 3d --dry-run
 
 			# Also prune directly-queried output modules, with a longer safety age
-			firecore tools substreams prune-outputs gs://example-bucket/substreams \
-			  --network eth-mainnet --truncate-below-block 12345678 --minimum-age 3d \
+			firecore tools substreams prune-outputs gs://example-bucket/substreams/eth-mainnet \
+			  --truncate-below-block 12345678 --minimum-age 3d \
 			  --output-module-minimum-age 30d
 		`),
 		Args: cobra.ExactArgs(1),
@@ -87,7 +91,6 @@ func NewToolsPruneOutputsCmd(logger *zap.Logger) *cobra.Command {
 			}
 
 			cfg := pruneOutputsConfig{
-				network:                sflags.MustGetString(cmd, "network"),
 				truncateBelowBlock:     sflags.MustGetUint64(cmd, "truncate-below-block"),
 				minimumAge:             minimumAge,
 				outputModuleMinimumAge: outputModuleMinimumAge,
@@ -101,14 +104,12 @@ func NewToolsPruneOutputsCmd(logger *zap.Logger) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().String("network", "", "Network to prune, as the folder name directly under <store-url> (ex: 'eth-mainnet') (required)")
 	cmd.Flags().Uint64("truncate-below-block", 0, "Only delete output files whose block range ends at or below this block (required)")
 	cmd.Flags().String("minimum-age", "", "Only delete output files last modified longer than this ago, ex: '3d', '72h' (required)")
 	cmd.Flags().String("output-module-minimum-age", "", "If set, also prune modules carrying an spkg (directly-queried output modules), using this age instead of --minimum-age. Unset or '0' keeps them untouched")
 	cmd.Flags().BoolP("dry-run", "n", false, "Only report what would be deleted")
 	cmd.Flags().BoolP("force", "f", false, "Skip the confirmation prompt")
 	cmd.Flags().Int("parallelism", 64, "Number of concurrent listing and deletion operations")
-	cmd.MarkFlagRequired("network")
 	cmd.MarkFlagRequired("truncate-below-block")
 	cmd.MarkFlagRequired("minimum-age")
 
@@ -116,7 +117,6 @@ func NewToolsPruneOutputsCmd(logger *zap.Logger) *cobra.Command {
 }
 
 type pruneOutputsConfig struct {
-	network            string
 	truncateBelowBlock uint64
 	minimumAge         time.Duration
 	// outputModuleMinimumAge replaces minimumAge on modules carrying an spkg; zero keeps
@@ -156,7 +156,6 @@ func runPruneOutputs(ctx context.Context, storeURL string, cfg pruneOutputsConfi
 	fmt.Println(stylex.Title("Substreams Outputs Pruning"))
 	fmt.Println(stylex.Dim(stylex.Separator(80)))
 	fmt.Println(stylex.Labelf("Store:                %s", storeURL))
-	fmt.Println(stylex.Labelf("Network:              %s", cfg.network))
 	fmt.Println(stylex.Labelf("Truncate below block: %d", cfg.truncateBelowBlock))
 	fmt.Println(stylex.Labelf("Minimum age:          %s", cfg.minimumAge))
 	if cfg.outputModuleMinimumAge > 0 {
@@ -170,7 +169,7 @@ func runPruneOutputs(ctx context.Context, storeURL string, cfg pruneOutputsConfi
 	fmt.Println()
 
 	fmt.Print(stylex.Label("Discovering module folders... "))
-	folders, skippedListings, err := store.ModuleFolders(ctx, cfg.network)
+	folders, skippedListings, err := store.DiscoverModuleFolders(ctx)
 	if err != nil {
 		fmt.Println(stylex.Error("✗"))
 		return fmt.Errorf("discovering module folders: %w", err)
@@ -184,7 +183,7 @@ func runPruneOutputs(ctx context.Context, storeURL string, cfg pruneOutputsConfi
 		return nil
 	}
 
-	modules, outputModulesKept, scanErrors := scanOutputFolders(ctx, store, cfg, folders, logger)
+	modules, outputModulesKept, protected, scanErrors := scanOutputFolders(ctx, store, cfg, folders, logger)
 
 	var toDelete []string
 	var totalBytes int64
@@ -202,6 +201,9 @@ func runPruneOutputs(ctx context.Context, storeURL string, cfg pruneOutputsConfi
 	fmt.Println()
 	if outputModulesKept > 0 {
 		fmt.Println(stylex.Notef("%d output module(s) (spkg present) kept untouched", outputModulesKept))
+	}
+	if protected > 0 {
+		fmt.Println(stylex.Notef("%d module folder(s) protected by DO_NOT_PRUNE", protected))
 	}
 	if scanErrors > 0 {
 		fmt.Println(stylex.Warnf("%d module folder(s) could not be scanned and were kept", scanErrors))
@@ -244,15 +246,30 @@ func scanErrorsErr(scanErrors int) error {
 // scanOutputFolders lists each module's spkg marker and outputs, returning the modules
 // with files to delete, sorted by folder. A folder that cannot be scanned is kept and
 // counted: incomplete information must never condemn a file.
-func scanOutputFolders(ctx context.Context, store *purgeStore, cfg pruneOutputsConfig, folders []moduleFolder, logger *zap.Logger) (modules []prunedModule, outputModulesKept, scanErrors int) {
+func scanOutputFolders(ctx context.Context, store *purgeStore, cfg pruneOutputsConfig, folders []moduleFolder, logger *zap.Logger) (modules []prunedModule, outputModulesKept, protected, scanErrors int) {
 	var mu sync.Mutex
-	var keptCount, errorCount atomic.Int64
+	var keptCount, protectedCount, errorCount atomic.Int64
 
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(cfg.parallelism)
 
 	for _, folder := range folders {
 		group.Go(func() error {
+			isProtected, err := store.IsProtected(groupCtx, folder)
+			if err != nil {
+				if groupCtx.Err() != nil {
+					return err
+				}
+				errorCount.Add(1)
+				logger.Warn("keeping folder whose DO_NOT_PRUNE marker could not be checked", zap.String("folder", folder.String()), zap.Error(err))
+				return nil
+			}
+			if isProtected {
+				protectedCount.Add(1)
+				logger.Debug("folder protected by DO_NOT_PRUNE", zap.String("folder", folder.String()))
+				return nil
+			}
+
 			hasSpkg, err := store.HasSpkg(groupCtx, folder)
 			if err != nil {
 				if groupCtx.Err() != nil {
@@ -310,7 +327,7 @@ func scanOutputFolders(ctx context.Context, store *purgeStore, cfg pruneOutputsC
 	_ = group.Wait()
 
 	sort.Slice(modules, func(i, j int) bool { return modules[i].folder.prefix < modules[j].folder.prefix })
-	return modules, int(keptCount.Load()), int(errorCount.Load())
+	return modules, int(keptCount.Load()), int(protectedCount.Load()), int(errorCount.Load())
 }
 
 // outputsToPrune keeps a file as soon as its range reaches past truncateBelowBlock or it
