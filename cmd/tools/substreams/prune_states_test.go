@@ -209,9 +209,9 @@ func TestDeleteWithRetry(t *testing.T) {
 	defer func() { deleteBackoffBase = savedBackoff }()
 
 	attempts := 0
-	store := flakyDeleteStore{failures: 2, attempts: &attempts}
+	store := flakyDeleteStore{failures: deleteRetries - 1, attempts: &attempts}
 	require.NoError(t, deleteWithRetry(context.Background(), store, "x"))
-	assert.Equal(t, 3, attempts)
+	assert.Equal(t, deleteRetries, attempts)
 
 	attempts = 0
 	store = flakyDeleteStore{failures: deleteRetries + 1, attempts: &attempts}

@@ -483,13 +483,14 @@ func (s *purgeStore) DeleteObject(ctx context.Context, name string) error {
 }
 
 // timeboxedDeleter bounds each deletion attempt on its own, so a hung request burns one
-// retry instead of the whole call.
+// retry instead of the whole call. A deletion the store answers at all answers in well
+// under a second, so a stalled one is better abandoned and retried than waited on.
 type timeboxedDeleter struct {
 	dstore.Store
 }
 
 func (t timeboxedDeleter) DeleteObject(ctx context.Context, name string) error {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	return t.Store.DeleteObject(ctx, name)
 }

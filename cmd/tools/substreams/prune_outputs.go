@@ -97,6 +97,7 @@ func NewToolsPruneOutputsCmd(logger *zap.Logger) *cobra.Command {
 				dryRun:                 sflags.MustGetBool(cmd, "dry-run"),
 				force:                  sflags.MustGetBool(cmd, "force"),
 				parallelism:            sflags.MustGetInt(cmd, "parallelism"),
+				deleteParallelism:      sflags.MustGetInt(cmd, "delete-parallelism"),
 				now:                    time.Now(),
 			}
 			cmd.SilenceUsage = true
@@ -109,7 +110,8 @@ func NewToolsPruneOutputsCmd(logger *zap.Logger) *cobra.Command {
 	cmd.Flags().String("output-module-minimum-age", "", "If set, also prune modules carrying an spkg (directly-queried output modules), using this age instead of --minimum-age. Unset or '0' keeps them untouched")
 	cmd.Flags().BoolP("dry-run", "n", false, "Only report what would be deleted")
 	cmd.Flags().BoolP("force", "f", false, "Skip the confirmation prompt")
-	cmd.Flags().Int("parallelism", 64, "Number of concurrent listing and deletion operations")
+	cmd.Flags().Int("parallelism", 64, "Number of concurrent listing operations")
+	cmd.Flags().Int("delete-parallelism", 250, "Number of concurrent deletions")
 	cmd.MarkFlagRequired("truncate-below-block")
 	cmd.MarkFlagRequired("minimum-age")
 
@@ -124,8 +126,11 @@ type pruneOutputsConfig struct {
 	outputModuleMinimumAge time.Duration
 	dryRun                 bool
 	force                  bool
-	parallelism            int
-	now                    time.Time
+	// parallelism bounds the listing, deleteParallelism the deletions. Deletions are
+	// round-trip bound and cost nothing locally, so they run far wider than the listing.
+	parallelism       int
+	deleteParallelism int
+	now               time.Time
 }
 
 type outputFile struct {
@@ -145,6 +150,9 @@ type prunedModule struct {
 func runPruneOutputs(ctx context.Context, storeURL string, cfg pruneOutputsConfig, logger *zap.Logger) error {
 	if cfg.parallelism < 1 {
 		cfg.parallelism = 1
+	}
+	if cfg.deleteParallelism < 1 {
+		cfg.deleteParallelism = 1
 	}
 
 	store, err := newPurgeStore(ctx, storeURL, cfg.parallelism, logger)
@@ -228,7 +236,7 @@ func runPruneOutputs(ctx context.Context, storeURL string, cfg pruneOutputsConfi
 	}
 
 	fmt.Print(stylex.Labelf("Deleting %d output file(s) (%s)... ", len(toDelete), formatBytes(totalBytes)))
-	if err := deleteAll(ctx, store.store, toDelete, cfg.parallelism); err != nil {
+	if err := deleteAll(ctx, store.store, toDelete, cfg.deleteParallelism); err != nil {
 		fmt.Println(stylex.Error("✗"))
 		return err
 	}
