@@ -378,6 +378,35 @@ func snapshotsToPrune(files []snapshotFile, keepEvery, truncateBelowBlock uint64
 	return out
 }
 
+// deleteRetries is how many times a failed deletion is attempted before giving up: object
+// stores throw transient 503s under sustained delete load.
+const deleteRetries = 5
+
+// deleteBackoffBase is the delay before the first retry, doubled on each further one. A
+// variable so tests can shrink it.
+var deleteBackoffBase = 500 * time.Millisecond
+
+// deleteWithRetry retries a deletion with exponential backoff, treating a missing object
+// as success. It returns the last error once the attempts are exhausted.
+func deleteWithRetry(ctx context.Context, store dstore.Store, file string) error {
+	backoff := deleteBackoffBase
+	var err error
+	for attempt := 0; attempt < deleteRetries; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-time.After(backoff):
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+			backoff *= 2
+		}
+		if err = store.DeleteObject(ctx, file); err == nil || errors.Is(err, dstore.ErrNotFound) {
+			return nil
+		}
+	}
+	return err
+}
+
 func deleteAll(ctx context.Context, store dstore.Store, files []string, parallelism int) error {
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(parallelism)
@@ -386,7 +415,7 @@ func deleteAll(ctx context.Context, store dstore.Store, files []string, parallel
 	var failed []string
 	for _, file := range files {
 		group.Go(func() error {
-			if err := store.DeleteObject(groupCtx, file); err != nil && !errors.Is(err, dstore.ErrNotFound) {
+			if err := deleteWithRetry(groupCtx, store, file); err != nil {
 				if groupCtx.Err() != nil {
 					return groupCtx.Err()
 				}

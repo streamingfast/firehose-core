@@ -2,6 +2,7 @@ package substreams
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -200,4 +201,35 @@ func TestParseFullKVFilename(t *testing.T) {
 
 	_, ok = parseFullKVFilename("a/states/0000012000-0000011000.abc.kv")
 	assert.False(t, ok)
+}
+
+func TestDeleteWithRetry(t *testing.T) {
+	savedBackoff := deleteBackoffBase
+	deleteBackoffBase = time.Millisecond
+	defer func() { deleteBackoffBase = savedBackoff }()
+
+	attempts := 0
+	store := flakyDeleteStore{failures: 2, attempts: &attempts}
+	require.NoError(t, deleteWithRetry(context.Background(), store, "x"))
+	assert.Equal(t, 3, attempts)
+
+	attempts = 0
+	store = flakyDeleteStore{failures: deleteRetries + 1, attempts: &attempts}
+	require.Error(t, deleteWithRetry(context.Background(), store, "x"))
+	assert.Equal(t, deleteRetries, attempts)
+}
+
+// flakyDeleteStore fails the first `failures` deletions, then succeeds.
+type flakyDeleteStore struct {
+	dstore.Store
+	failures int
+	attempts *int
+}
+
+func (s flakyDeleteStore) DeleteObject(ctx context.Context, name string) error {
+	*s.attempts++
+	if *s.attempts <= s.failures {
+		return errors.New("googleapi: Error 503: We encountered an internal error")
+	}
+	return nil
 }
