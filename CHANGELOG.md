@@ -10,6 +10,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Changed
+
+- `firecore tools substreams prune-states` and `prune-outputs` delete much faster: deletions now run on their own `--delete-parallelism` (250 by default) instead of sharing the listing's `--parallelism` (16 and 64), each attempt is bounded at 5s instead of 30s, and a failed deletion is retried once after 50ms instead of four times over 7.5s. A deletion that still fails is reported as before and picked up by the next run.
+
 ### Added
 
 - `firecore tools substreams purge`, `prune-states` and `prune-outputs` all skip any module folder carrying a `DO_NOT_PRUNE` file at its root, next to the `last_used*.zst` markers, and report how many folders that spared.

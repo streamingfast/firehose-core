@@ -74,6 +74,7 @@ folder or directly at its 'states' folder, in which case the whole tree is walke
 				dryRun:             sflags.MustGetBool(cmd, "dry-run"),
 				force:              sflags.MustGetBool(cmd, "force"),
 				parallelism:        sflags.MustGetInt(cmd, "parallelism"),
+				deleteParallelism:  sflags.MustGetInt(cmd, "delete-parallelism"),
 				now:                time.Now(),
 			}
 			cmd.SilenceUsage = true
@@ -86,7 +87,8 @@ folder or directly at its 'states' folder, in which case the whole tree is walke
 	cmd.Flags().String("minimum-age", "", "Only delete snapshots last modified longer than this ago, ex: '3d', '72h'. Unset deletes whatever the age")
 	cmd.Flags().BoolP("dry-run", "n", false, "Only report what would be deleted")
 	cmd.Flags().BoolP("force", "f", false, "Skip the confirmation prompt")
-	cmd.Flags().Int("parallelism", 16, "Number of concurrent deletions")
+	cmd.Flags().Int("parallelism", 16, "Number of concurrent listing operations")
+	cmd.Flags().Int("delete-parallelism", 250, "Number of concurrent deletions")
 	cmd.MarkFlagRequired("keep-every")
 	cmd.MarkFlagRequired("truncate-below-block")
 
@@ -98,11 +100,14 @@ type pruneConfig struct {
 	truncateBelowBlock uint64
 	// minimumAge additionally spares snapshots modified more recently than this; zero
 	// disables the age check.
-	minimumAge  time.Duration
-	dryRun      bool
-	force       bool
-	parallelism int
-	now         time.Time
+	minimumAge time.Duration
+	dryRun     bool
+	force      bool
+	// parallelism bounds the listing, deleteParallelism the deletions. Deletions are
+	// round-trip bound and cost nothing locally, so they run far wider than the listing.
+	parallelism       int
+	deleteParallelism int
+	now               time.Time
 }
 
 type snapshotFile struct {
@@ -126,6 +131,9 @@ func runPruneStates(ctx context.Context, storeURL string, cfg pruneConfig, logge
 	}
 	if cfg.parallelism < 1 {
 		cfg.parallelism = 1
+	}
+	if cfg.deleteParallelism < 1 {
+		cfg.deleteParallelism = 1
 	}
 
 	store, err := newPurgeStore(ctx, storeURL, cfg.parallelism, logger)
@@ -194,7 +202,7 @@ func runPruneStates(ctx context.Context, storeURL string, cfg pruneConfig, logge
 	}
 
 	fmt.Print(stylex.Labelf("Deleting %d snapshot(s)... ", len(toDelete)))
-	if err := deleteAll(ctx, store.store, toDelete, cfg.parallelism); err != nil {
+	if err := deleteAll(ctx, store.store, toDelete, cfg.deleteParallelism); err != nil {
 		fmt.Println(stylex.Error("✗"))
 		return err
 	}
@@ -379,12 +387,14 @@ func snapshotsToPrune(files []snapshotFile, keepEvery, truncateBelowBlock uint64
 }
 
 // deleteRetries is how many times a failed deletion is attempted before giving up: object
-// stores throw transient 503s under sustained delete load.
-const deleteRetries = 5
+// stores throw transient 503s under sustained delete load. An attempt holds its worker slot
+// for its whole duration, so a long retry chain costs throughput on every other file; what
+// this leaves behind is reported and picked up by the next run.
+const deleteRetries = 2
 
 // deleteBackoffBase is the delay before the first retry, doubled on each further one. A
 // variable so tests can shrink it.
-var deleteBackoffBase = 500 * time.Millisecond
+var deleteBackoffBase = 50 * time.Millisecond
 
 // deleteWithRetry retries a deletion with exponential backoff, treating a missing object
 // as success. It returns the last error once the attempts are exhausted.
