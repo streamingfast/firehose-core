@@ -306,6 +306,27 @@ func (s *purgeStore) ModuleFolders(ctx context.Context, network string) ([]modul
 	return s.moduleFoldersAt(ctx, statesPrefix, network)
 }
 
+// DiscoverModuleFolders resolves the store URL itself to module folders, accepting a URL
+// pointing at a network folder (holding a 'substreams-states' child), at the
+// 'substreams-states' folder itself, at a cache tag under it, or directly at one module
+// folder. Everything is relative to the URL, so no network name is involved.
+func (s *purgeStore) DiscoverModuleFolders(ctx context.Context) ([]moduleFolder, int, error) {
+	if base := path.Base(s.baseURL); moduleHashRE.MatchString(base) {
+		return []moduleFolder{{prefix: "", hash: base}}, 0, nil
+	}
+
+	children, err := s.childNames(ctx, "")
+	if err != nil {
+		return nil, 0, err
+	}
+	for _, child := range children {
+		if child == statesFolder {
+			return s.moduleFoldersAt(ctx, statesFolder+"/", "")
+		}
+	}
+	return s.moduleFoldersAt(ctx, "", "")
+}
+
 // moduleFoldersAt finds module hashes directly below prefix and below one cache-tag
 // network is only populated for the shared network layout, where it is useful
 // in logs and summaries; direct-layout folder names are relative to the store root.
@@ -399,6 +420,21 @@ func (s *purgeStore) HasSpkg(ctx context.Context, folder moduleFolder) (bool, er
 	})
 	if err != nil {
 		return false, fmt.Errorf("listing spkg of %q: %w", folder.prefix, err)
+	}
+	return found, nil
+}
+
+// IsProtected reports whether a module folder carries a DO_NOT_PRUNE marker at its root,
+// next to the last_used markers. The prefix is narrow enough that the service answers
+// from its index without walking the state files next to it.
+func (s *purgeStore) IsProtected(ctx context.Context, folder moduleFolder) (bool, error) {
+	found := false
+	err := s.store.Walk(ctx, folder.prefix+doNotPruneMarker, func(string) error {
+		found = true
+		return dstore.StopIteration
+	})
+	if err != nil {
+		return false, fmt.Errorf("listing DO_NOT_PRUNE marker of %q: %w", folder.prefix, err)
 	}
 	return found, nil
 }

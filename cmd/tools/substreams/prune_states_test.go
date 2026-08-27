@@ -116,11 +116,14 @@ func TestListModuleSnapshots(t *testing.T) {
 		"mainnet/substreams-states/aaaa/outputs/0000001000-0000002000.output": nil,
 		"mainnet/substreams-states/aaaa/last_used":                            nil,
 		"mainnet/substreams-states/bbbb/states/0000001000-0000000500.kv":      nil,
+		"mainnet/substreams-states/cccc/DO_NOT_PRUNE":                         nil,
+		"mainnet/substreams-states/cccc/states/0000001000-0000000000.kv":      nil,
 	}
 
 	backend := &purgeStore{store: store, scanWorkers: 4, logger: zap.NewNop()}
-	modules, err := listModuleSnapshots(context.Background(), backend, 4)
+	modules, protected, err := listModuleSnapshots(context.Background(), backend, 4)
 	require.NoError(t, err)
+	assert.Equal(t, 1, protected)
 	require.Len(t, modules, 2)
 
 	assert.Equal(t, "mainnet/substreams-states/aaaa/states", modules[0].folder)
@@ -140,6 +143,7 @@ func TestListModuleSnapshots(t *testing.T) {
 func TestListModuleSnapshotsDiscovery(t *testing.T) {
 	const h1 = "ddc9230698a79b25c443c73753c9a94e038373c1"
 	const h2 = "a119f43d8c72fbd2254fa21aab74cfc5e2f14c2f"
+	const h3 = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
 
 	ctx := context.Background()
 	base := "file://" + t.TempDir()
@@ -152,6 +156,8 @@ func TestListModuleSnapshotsDiscovery(t *testing.T) {
 		"eth-mainnet/substreams-states/" + h1 + "/outputs/0000001000-0000002000.output",
 		"eth-mainnet/substreams-states/" + h1 + "/last_used.zst",
 		"eth-mainnet/substreams-states/mmap-stores/" + h2 + "/states/0000003000-0000001000.kv.zst",
+		"eth-mainnet/substreams-states/" + h3 + "/DO_NOT_PRUNE",
+		"eth-mainnet/substreams-states/" + h3 + "/states/0000002000-0000001000.kv",
 	} {
 		require.NoError(t, store.WriteObject(ctx, name, emptyReader()))
 	}
@@ -160,8 +166,9 @@ func TestListModuleSnapshotsDiscovery(t *testing.T) {
 	require.NoError(t, err)
 	defer backend.Close()
 
-	modules, err := listModuleSnapshots(ctx, backend, 4)
+	modules, protected, err := listModuleSnapshots(ctx, backend, 4)
 	require.NoError(t, err)
+	assert.Equal(t, 1, protected)
 	require.Len(t, modules, 2)
 
 	assert.Equal(t, "eth-mainnet/substreams-states/"+h1+"/states", modules[0].folder)

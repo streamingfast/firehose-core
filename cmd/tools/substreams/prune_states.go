@@ -11,9 +11,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose-core/cmd/tools/stylex"
@@ -45,7 +47,8 @@ that (the modification time comes straight out of the listing, nothing is downlo
 
 substreams-tier1 rebuilds a store from the last remaining snapshot before the requested
 block, so pruning trades disk space for reprocessing time on requests that start in a
-pruned range. Partial files are never touched.
+pruned range. Partial files are never touched, and a module folder carrying a
+DO_NOT_PRUNE file at its root (next to the last_used markers) is never touched at all.
 
 Module folders are discovered the same way 'purge' does: direct tier1 layouts
 (<store-url>/<hash> and <store-url>/<tag>/<hash>) and shared network roots
@@ -69,6 +72,7 @@ folder or directly at its 'states' folder, in which case the whole tree is walke
 				truncateBelowBlock: sflags.MustGetUint64(cmd, "truncate-below-block"),
 				minimumAge:         minimumAge,
 				dryRun:             sflags.MustGetBool(cmd, "dry-run"),
+				force:              sflags.MustGetBool(cmd, "force"),
 				parallelism:        sflags.MustGetInt(cmd, "parallelism"),
 				now:                time.Now(),
 			}
@@ -80,7 +84,8 @@ folder or directly at its 'states' folder, in which case the whole tree is walke
 	cmd.Flags().Uint64("keep-every", 0, "Keep the first snapshot of each window of this many blocks, windows aligned on multiples of it (required)")
 	cmd.Flags().Uint64("truncate-below-block", 0, "Only thin snapshots whose end block is at or below this block, everything above is kept untouched (required)")
 	cmd.Flags().String("minimum-age", "", "Only delete snapshots last modified longer than this ago, ex: '3d', '72h'. Unset deletes whatever the age")
-	cmd.Flags().Bool("dry-run", false, "Only report what would be deleted")
+	cmd.Flags().BoolP("dry-run", "n", false, "Only report what would be deleted")
+	cmd.Flags().BoolP("force", "f", false, "Skip the confirmation prompt")
 	cmd.Flags().Int("parallelism", 16, "Number of concurrent deletions")
 	cmd.MarkFlagRequired("keep-every")
 	cmd.MarkFlagRequired("truncate-below-block")
@@ -95,6 +100,7 @@ type pruneConfig struct {
 	// disables the age check.
 	minimumAge  time.Duration
 	dryRun      bool
+	force       bool
 	parallelism int
 	now         time.Time
 }
@@ -142,12 +148,15 @@ func runPruneStates(ctx context.Context, storeURL string, cfg pruneConfig, logge
 	fmt.Println()
 
 	fmt.Print(stylex.Label("Listing snapshots... "))
-	modules, err := listModuleSnapshots(ctx, store, cfg.parallelism)
+	modules, protected, err := listModuleSnapshots(ctx, store, cfg.parallelism)
 	if err != nil {
 		fmt.Println(stylex.Error("✗"))
 		return fmt.Errorf("listing snapshots: %w", err)
 	}
 	fmt.Println(stylex.Successf("✓ %d module folder(s)", len(modules)))
+	if protected > 0 {
+		fmt.Println(stylex.Notef("%d module folder(s) protected by DO_NOT_PRUNE", protected))
+	}
 
 	cutoff := cfg.now.Add(-cfg.minimumAge)
 
@@ -176,6 +185,14 @@ func runPruneStates(ctx context.Context, storeURL string, cfg pruneConfig, logge
 		return nil
 	}
 
+	if !cfg.force {
+		message := fmt.Sprintf("About to delete %d snapshot(s). Continue?", len(toDelete))
+		if confirmed, _ := cli.PromptConfirm(message); !confirmed {
+			fmt.Println(stylex.Note("Skipped by user"))
+			return nil
+		}
+	}
+
 	fmt.Print(stylex.Labelf("Deleting %d snapshot(s)... ", len(toDelete)))
 	if err := deleteAll(ctx, store.store, toDelete, cfg.parallelism); err != nil {
 		fmt.Println(stylex.Error("✗"))
@@ -190,16 +207,17 @@ func runPruneStates(ctx context.Context, storeURL string, cfg pruneConfig, logge
 // each module's 'states/' prefix, never enumerating the output files next to it. A URL
 // pointing inside a single module folder (at the folder or at its 'states' one) exposes
 // no module hash to discover, and the whole tree is walked instead.
-func listModuleSnapshots(ctx context.Context, store *purgeStore, parallelism int) ([]moduleSnapshots, error) {
+func listModuleSnapshots(ctx context.Context, store *purgeStore, parallelism int) ([]moduleSnapshots, int, error) {
 	folders, err := discoverModuleFolders(ctx, store)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if len(folders) == 0 {
 		return walkAllSnapshots(ctx, store.store)
 	}
 
 	var mu sync.Mutex
+	var protectedCount atomic.Int64
 	byFolder := map[string]*moduleSnapshots{}
 
 	group, groupCtx := errgroup.WithContext(ctx)
@@ -207,9 +225,18 @@ func listModuleSnapshots(ctx context.Context, store *purgeStore, parallelism int
 
 	for _, folder := range folders {
 		group.Go(func() error {
+			protected, err := store.IsProtected(groupCtx, folder)
+			if err != nil {
+				return err
+			}
+			if protected {
+				protectedCount.Add(1)
+				return nil
+			}
+
 			statesPrefix := folder.prefix + "states/"
 			var files []snapshotFile
-			err := store.store.WalkAttributes(groupCtx, statesPrefix, func(entry dstore.ObjectEntry) error {
+			err = store.store.WalkAttributes(groupCtx, statesPrefix, func(entry dstore.ObjectEntry) error {
 				if file, ok := parseFullKVFilename(entry.Name); ok {
 					file.modified = entry.LastModified
 					files = append(files, file)
@@ -231,10 +258,10 @@ func listModuleSnapshots(ctx context.Context, store *purgeStore, parallelism int
 		})
 	}
 	if err := group.Wait(); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return sortedModuleSnapshots(byFolder), nil
+	return sortedModuleSnapshots(byFolder), int(protectedCount.Load()), nil
 }
 
 // discoverModuleFolders finds every module folder of every scope, the same discovery the
@@ -257,11 +284,17 @@ func discoverModuleFolders(ctx context.Context, store *purgeStore) ([]moduleFold
 }
 
 // walkAllSnapshots walks the whole store and groups full snapshots by the folder holding
-// them, for URLs pointing inside a single module folder.
-func walkAllSnapshots(ctx context.Context, store dstore.Store) ([]moduleSnapshots, error) {
+// them, for URLs pointing inside a single module folder. A DO_NOT_PRUNE marker seen during
+// the walk protects the snapshots of its 'states' sibling folder.
+func walkAllSnapshots(ctx context.Context, store dstore.Store) ([]moduleSnapshots, int, error) {
 	byFolder := map[string]*moduleSnapshots{}
+	protectedDirs := map[string]bool{}
 
 	err := store.WalkAttributes(ctx, "", func(entry dstore.ObjectEntry) error {
+		if strings.HasPrefix(path.Base(entry.Name), doNotPruneMarker) {
+			protectedDirs[path.Dir(entry.Name)] = true
+			return nil
+		}
 		file, ok := parseFullKVFilename(entry.Name)
 		if !ok {
 			return nil
@@ -277,10 +310,18 @@ func walkAllSnapshots(ctx context.Context, store dstore.Store) ([]moduleSnapshot
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return sortedModuleSnapshots(byFolder), nil
+	protected := 0
+	for folder := range byFolder {
+		if protectedDirs[path.Dir(folder)] {
+			delete(byFolder, folder)
+			protected++
+		}
+	}
+
+	return sortedModuleSnapshots(byFolder), protected, nil
 }
 
 func sortedModuleSnapshots(byFolder map[string]*moduleSnapshots) []moduleSnapshots {

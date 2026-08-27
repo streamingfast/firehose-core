@@ -35,6 +35,10 @@ const statesFolder = "substreams-states"
 // folder, zstd-compressed by dstore. The plan-suffixed variants (last_used_pro.zst, ...)
 // track the same thing per billing plan.
 const lastUsedPrefix = "last_used"
+
+// doNotPruneMarker, dropped by an operator at the root of a module folder next to the
+// last_used markers, makes purge, prune-states and prune-outputs all skip that folder.
+const doNotPruneMarker = "DO_NOT_PRUNE"
 const lastUsedDateLayout = "2006-01-02"
 const defaultPlan = "default"
 
@@ -64,7 +68,8 @@ func NewToolsPurgeCmd(logger *zap.Logger) *cobra.Command {
 			explicit retention fall back to the 'default' one.
 
 			A module folder carrying no marker at all is never touched unless
-			--purge-without-last-used is set.
+			--purge-without-last-used is set, and a folder carrying a DO_NOT_PRUNE file at its
+			root (next to the last_used markers) is never touched at all.
 
 			Networks (or the exact state-store scope) are processed one at a time and fully
 			isolated from each other: a scope that cannot be listed, or whose files refuse to be
@@ -230,6 +235,7 @@ type networkResult struct {
 	network       string
 	folders       int
 	kept          int
+	protected     int
 	unmarked      int
 	scanErrors    int
 	scanDuration  time.Duration
@@ -434,6 +440,9 @@ func purgeNetwork(ctx context.Context, store *purgeStore, cfg *purgeConfig, purg
 	fmt.Printf("  %s %s\n", stylex.Label("Module folders:           "), stylex.Value(strconv.Itoa(result.folders)))
 	fmt.Printf("  %s %s\n", stylex.Label("Still in use:             "), stylex.Value(strconv.Itoa(result.kept)))
 	fmt.Printf("  %s %s\n", stylex.Label("No last_used marker:      "), stylex.Value(strconv.Itoa(result.unmarked)))
+	if result.protected > 0 {
+		fmt.Printf("  %s %s\n", stylex.Label("Protected (DO_NOT_PRUNE): "), stylex.Value(strconv.Itoa(result.protected)))
+	}
 	fmt.Printf("  %s %s\n", stylex.Label("To purge:                 "), stylex.Value(strconv.Itoa(len(toPurge))))
 	if result.scanErrors > 0 {
 		fmt.Printf("  %s %s\n", stylex.Label("Kept because unreadable:  "), stylex.Error(strconv.Itoa(result.scanErrors)))
@@ -592,7 +601,7 @@ func parseRetentionDuration(in string) (time.Duration, error) {
 func scanModuleFolders(ctx context.Context, store *purgeStore, cfg *purgeConfig, folders []moduleFolder, result *networkResult, logger *zap.Logger) []condemned {
 	var mu sync.Mutex
 	var toPurge []condemned
-	var scanned, keptCount, unmarkedCount, errorCount atomic.Int64
+	var scanned, keptCount, protectedCount, unmarkedCount, errorCount atomic.Int64
 
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(cfg.scanWorkers)
@@ -641,6 +650,25 @@ func scanModuleFolders(ctx context.Context, store *purgeStore, cfg *purgeConfig,
 				return nil
 			}
 
+			// Only folders past their retention pay this extra listing: the marker is rare,
+			// checking it on every folder would double the scan's requests.
+			protected, err := store.IsProtected(groupCtx, folder)
+			if err != nil {
+				if groupCtx.Err() != nil {
+					return err
+				}
+				errorCount.Add(1)
+				keptCount.Add(1)
+				logger.Warn("keeping folder whose DO_NOT_PRUNE marker could not be checked",
+					zap.String("folder", folder.String()), zap.Error(err))
+				return nil
+			}
+			if protected {
+				protectedCount.Add(1)
+				logger.Debug("folder protected by DO_NOT_PRUNE", zap.String("folder", folder.String()))
+				return nil
+			}
+
 			mu.Lock()
 			toPurge = append(toPurge, condemned{folder: folder, markers: markers})
 			mu.Unlock()
@@ -653,6 +681,7 @@ func scanModuleFolders(ctx context.Context, store *purgeStore, cfg *purgeConfig,
 	_ = group.Wait()
 
 	result.kept += int(keptCount.Load())
+	result.protected += int(protectedCount.Load())
 	result.unmarked += int(unmarkedCount.Load())
 	result.scanErrors += int(errorCount.Load())
 

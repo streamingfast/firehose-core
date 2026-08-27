@@ -12,6 +12,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
+- `firecore tools substreams purge`, `prune-states` and `prune-outputs` all skip any module folder carrying a `DO_NOT_PRUNE` file at its root, next to the `last_used*.zst` markers, and report how many folders that spared.
+
 - Added `firecore tools last-oneblock <oneblocks-store>` which prints the highest block number found among the store's one-block files, as a bare number on stdout, exiting non-zero when the store cannot be listed, holds no one-block file, or a filename does not parse as one.
 
 - Added `firecore tools substreams purge <state-url>` which deletes substreams module caches that have not been used recently, reading the `last_used*.zst` markers that `substreams-tier1` refreshes on every request it serves. The required state URL matches direct tier1 layouts (`<state-url>/<hash>` and `<state-url>/<tag>/<hash>`) and shared network roots (`<state-url>/<network>/substreams-states/<tag>/<hash>`); `--network` is optional for restricting shared network roots. No database involved, the store is the only source of truth.
