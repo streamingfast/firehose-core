@@ -153,6 +153,14 @@ func (s *syncer) Run() error {
 				Payload:   response.Block,
 			}
 
+			if s.config.StartBlockTimestamp != nil && pbBlock.Time().Before(*s.config.StartBlockTimestamp) {
+				lastCursor = response.Cursor
+				if err := s.writeCursor(lastCursor); err != nil {
+					return fmt.Errorf("writing cursor: %w", err)
+				}
+				continue
+			}
+
 			// In test mode, compare blocks instead of writing them
 			if s.testModeComparator != nil {
 				if err := s.testModeComparator.CompareBlock(s.appCtx, pbBlock); err != nil {

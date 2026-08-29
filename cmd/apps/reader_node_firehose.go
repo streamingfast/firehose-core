@@ -48,6 +48,10 @@ func RegisterReaderNodeFirehoseApp[B firecore.Block](chain *firecore.Chain[B], r
 		},
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
 			sfDataDir := runtime.AbsDataDir
+			startBlockTimestamp, err := parseReaderNodeStartBlockTimestamp(viper.GetString("reader-node-start-block-timestamp"))
+			if err != nil {
+				return nil, err
+			}
 
 			// Initialize test mode comparator if enabled
 			testModeComparator, err := createTestModeComparator(chain, appLogger)
@@ -70,6 +74,7 @@ func RegisterReaderNodeFirehoseApp[B firecore.Block](chain *firecore.Chain[B], r
 				OneBlocksStoreURL:   oneBlockStoreURL,
 				OneBlockSuffix:      viper.GetString("reader-node-one-block-suffix"),
 				StartBlockNum:       viper.GetUint64("reader-node-start-block-num"),
+				StartBlockTimestamp: startBlockTimestamp,
 				StopBlockNum:        viper.GetUint64("reader-node-stop-block-num"),
 				StateFile:           stateFile,
 				ReadinessMaxLatency: viper.GetDuration("reader-node-readiness-max-latency"),

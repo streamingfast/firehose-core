@@ -39,6 +39,7 @@ type Config struct {
 	OneBlocksStoreURL   string
 	OneBlockSuffix      string
 	StartBlockNum       uint64
+	StartBlockTimestamp *time.Time
 	StopBlockNum        uint64
 	ReadinessMaxLatency time.Duration
 	StateFile           string

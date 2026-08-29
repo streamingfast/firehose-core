@@ -65,6 +65,7 @@ type MindReaderPlugin struct {
 
 	archiver                 *Archiver // transformed blocks are sent to Archiver
 	consoleReaderFactory     ConsolerReaderFactory
+	startBlockTimestamp      *time.Time
 	stopBlock                uint64 // if set, call shutdownFunc(nil) when we hit this number
 	channelCapacity          int    // transformed blocks are buffered in a channel
 	forceFinalityAfterBlocks *uint64
@@ -101,6 +102,7 @@ func NewMindReaderPlugin(
 	workingDirectory string,
 	consoleReaderFactory ConsolerReaderFactory,
 	startBlockNum uint64,
+	startBlockTimestamp *time.Time,
 	stopBlockNum uint64,
 	channelCapacity int,
 	headBlockUpdater nodeManager.HeadBlockUpdater,
@@ -123,6 +125,7 @@ func NewMindReaderPlugin(
 		zap.String("one_block_suffix", oneBlockSuffix),
 		zap.String("working_directory", workingDirectory),
 		zap.Uint64("start_block_num", startBlockNum),
+		zap.Timep("start_block_timestamp", startBlockTimestamp),
 		zap.Uint64("stop_block_num", stopBlockNum),
 		zap.Int("channel_capacity", channelCapacity),
 		zap.Bool("with_head_block_updater", headBlockUpdater != nil),
@@ -167,6 +170,7 @@ func NewMindReaderPlugin(
 		Shutter:                  shutter.New(),
 		archiver:                 archiver,
 		consoleReaderFactory:     consoleReaderFactory,
+		startBlockTimestamp:      startBlockTimestamp,
 		stopBlock:                stopBlockNum,
 		channelCapacity:          channelCapacity,
 		headBlockUpdater:         headBlockUpdater,
@@ -501,6 +505,10 @@ func (p *MindReaderPlugin) readOneMessage(blocks chan<- *pbbstream.Block) error 
 	}
 
 	if block.Number < bstream.GetProtocolFirstStreamableBlock {
+		return nil
+	}
+
+	if p.startBlockTimestamp != nil && block.Time().Before(*p.startBlockTimestamp) {
 		return nil
 	}
 
