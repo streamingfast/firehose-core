@@ -79,6 +79,8 @@ func TestParseRelativeDuration(t *testing.T) {
 		{"1d", 24 * time.Hour, true},
 		{"2hr", 2 * time.Hour, true},
 		{"30m", 30 * time.Minute, true},
+		{"1w", 7 * 24 * time.Hour, true},
+		{"2w", 14 * 24 * time.Hour, true},
 		{"1 day ago", 24 * time.Hour, true},
 		{"2 hours ago", 2 * time.Hour, true},
 		{"0d", 0, false}, // zero is rejected

@@ -31,7 +31,10 @@ func ParseLogDateRange(args []string) (time.Time, time.Time, error) {
 
 var relDurationRegex = regexp.MustCompile(`(?i)^\s*(\d+)\s*([a-z]+?)(?:\s+ago)?\s*$`)
 
-// parseRelativeDuration parses strings like "1d", "2hr", "30m", "1 day ago".
+// parseRelativeDuration parses strings like "1d", "2hr", "30m", "1w", "1 day ago".
+//
+// To avoid calendar ambiguity (months/DST/etc.), units are fixed-length
+// shortcuts: d == 24h, w == 7d == 168h.
 func parseRelativeDuration(s string) (time.Duration, bool) {
 	m := relDurationRegex.FindStringSubmatch(strings.TrimSpace(s))
 	if m == nil {
@@ -43,6 +46,8 @@ func parseRelativeDuration(s string) (time.Duration, bool) {
 	}
 	unit := strings.ToLower(m[2])
 	switch {
+	case strings.HasPrefix(unit, "w"):
+		return time.Duration(n) * 7 * 24 * time.Hour, true
 	case strings.HasPrefix(unit, "d"):
 		return time.Duration(n) * 24 * time.Hour, true
 	case strings.HasPrefix(unit, "h"):

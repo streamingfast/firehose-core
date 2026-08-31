@@ -13,7 +13,7 @@ import (
 func TestNewToolsLogsConnectionCmd(t *testing.T) {
 	cmd := NewToolsLogsConnectionCmd(zlogTest)
 
-	assert.Equal(t, "connection <trace-id> [<date-range>]", cmd.Use)
+	assert.Equal(t, "connection <trace-id>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 	assert.NotEmpty(t, cmd.Long)
 	assert.NotEmpty(t, cmd.Example)
@@ -25,6 +25,9 @@ func TestNewToolsLogsConnectionCmd(t *testing.T) {
 
 	gcpProjectFlag := flags.Lookup("gcp-project")
 	require.NotNil(t, gcpProjectFlag, "gcp-project flag should exist")
+
+	sinceFlag := flags.Lookup("since")
+	require.NotNil(t, sinceFlag, "since flag should exist")
 
 	logsFlag := flags.Lookup("logs")
 	require.NotNil(t, logsFlag, "logs flag should exist")
@@ -100,7 +103,7 @@ func TestConnectionCommandRegistered(t *testing.T) {
 
 	connectionCmd, _, err := logsCmd.Find([]string{"connection"})
 	require.NoError(t, err)
-	assert.Equal(t, "connection <trace-id> [<date-range>]", connectionCmd.Use)
+	assert.Equal(t, "connection <trace-id>", connectionCmd.Use)
 }
 
 func TestConnectionCommandValidation(t *testing.T) {
@@ -109,6 +112,16 @@ func TestConnectionCommandValidation(t *testing.T) {
 		cmd.SilenceUsage = true
 		cmd.SilenceErrors = true
 		cmd.SetArgs([]string{})
+
+		err := cmd.Execute()
+		require.Error(t, err)
+	})
+
+	t.Run("extra positional argument rejected", func(t *testing.T) {
+		cmd := NewToolsLogsConnectionCmd(zlogTest)
+		cmd.SilenceUsage = true
+		cmd.SilenceErrors = true
+		cmd.SetArgs([]string{"abc123", "2h"})
 
 		err := cmd.Execute()
 		require.Error(t, err)
@@ -123,6 +136,17 @@ func TestConnectionCommandValidation(t *testing.T) {
 		err := cmd.Execute()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "gcp-project")
+	})
+
+	t.Run("invalid since value", func(t *testing.T) {
+		cmd := NewToolsLogsConnectionCmd(zlogTest)
+		cmd.SilenceUsage = true
+		cmd.SilenceErrors = true
+		cmd.SetArgs([]string{"abc123", "--since", "not-a-duration", "--gcp-project", "test"})
+
+		err := cmd.Execute()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "parsing time range")
 	})
 }
 

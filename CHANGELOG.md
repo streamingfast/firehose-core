@@ -97,6 +97,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Flags inherited from an intermediate command are now printed in their own help section instead of being mixed into `Global Flags`, so `fire{chain} tools ...` commands show a `Tools Flags` section with `--output`, `--bytes-encoding`, `--proto-paths` and `--merged-blocks-bundle-size`.
 
+- `firecore tools substreams logs connection` now takes its time range via a `--since` flag instead of a positional `[<date-range>]` argument, matching `logs connections`. Both commands' `--since` now accepts the same grammar as `logs reexec`'s date-range argument: a relative duration (`30m`, `2h`, `1d`, `1w`, `"1 day ago"`, …), a single timestamp, or a `<start>/<end>`/`<start>:<end>` range — replacing `connections`' separate `--since`/`--date-range` flag pair (Go's native duration format silently rejected `d`/`w` units) with one flag. `logs reexec` also gained the `1w` shortcut. A value can now be copied between `logs connections --since` and `logs connection --since` unchanged.
+
 ### Deprecated
 
 - `firecore.HideGlobalFlagsOnChildCmd` is now a no-op and prints a deprecation warning when called, remove the call from your chain. Global flags are all hidden behind `--gh` now, hiding a hand-picked subset of them is no longer useful.

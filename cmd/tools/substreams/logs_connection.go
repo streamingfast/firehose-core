@@ -20,7 +20,7 @@ import (
 // .spkg URL and the relevant Substreams request information for a single trace ID.
 func NewToolsLogsConnectionCmd(logger *zap.Logger) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "connection <trace-id> [<date-range>]",
+		Use:   "connection <trace-id>",
 		Short: "Show Substreams request details for a single trace ID",
 		Long: `Looks up the Substreams request matching the given trace ID in GCP Cloud Logging
 and prints the request details (output module, blocks, mode flags, namespace), the .spkg URL
@@ -28,20 +28,16 @@ on the state store, and the request stats (when available).
 
 The trace-id must be 0-32 characters.
 
-The date-range is optional; when omitted it defaults to the last 7 days.
-
-The date-range argument(s) accept various formats:
-
-  Relative:   1d  2hr  30m  "1 day ago"  "2 hours ago"  "30 minutes ago"
-  Timestamp:  2024-01-15T10:00:00Z  (past → search start to now)
-  Range:      "2024-01-15T10:00:00Z:2024-01-15T12:00:00Z"  (single arg with colon)
-              "2024-01-15T10:00:00Z/2024-01-15T12:00:00Z"  (single arg with slash)
-  Two args:   2024-01-15T10:00:00Z  2024-01-15T12:00:00Z`,
+When --since is not provided, defaults to the last 7 days.`,
 		Example: `  firecore tools substreams logs connection bfb0980c436f3fd6f5564a31311d583f \
     --gcp-project my-project
 
-  firecore tools substreams logs connection bfb0980c436f3fd6f5564a31311d583f 2h \
+  firecore tools substreams logs connection bfb0980c436f3fd6f5564a31311d583f --since 2h \
     --state-store gs://my-bucket/substreams-states \
+    --gcp-project my-project
+
+  firecore tools substreams logs connection bfb0980c436f3fd6f5564a31311d583f \
+    --since "2026-04-20T04:00:00Z:2026-04-20T06:00:00Z" \
     --gcp-project my-project
 
   # Print every log line of the request at the end of the report
@@ -51,14 +47,15 @@ The date-range argument(s) accept various formats:
   # Skip the 'Logs' section entirely, no question asked
   firecore tools substreams logs connection bfb0980c436f3fd6f5564a31311d583f \
     --gcp-project my-project --logs=false`,
-		Args: cobra.RangeArgs(1, 3),
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runConnection(cmd.Context(), args, cmd, logger)
+			return runConnection(cmd.Context(), args[0], cmd, logger)
 		},
 	}
 
 	cmd.Flags().String("state-store", "", "State store URL where spkg files are stored (supports file:// and gs://). When set, the spkg is loaded to display the package name and full URL")
 	cmd.Flags().String("gcp-project", "", "GCP project ID used for log querying")
+	cmd.Flags().String("since", "", sinceFlagHelp)
 	cmd.Flags().Bool("logs", false, "Print every log line of the request in a final 'Logs' section, explicitly passing --logs=false skips the section altogether")
 	cmd.Flags().Int("logs-limit", 500, "Maximum number of log lines to print with --logs, keeping the most recent ones (0 means no limit)")
 	cmd.MarkFlagRequired("gcp-project")
@@ -66,16 +63,14 @@ The date-range argument(s) accept various formats:
 	return cmd
 }
 
-func runConnection(ctx context.Context, args []string, cmd *cobra.Command, logger *zap.Logger) error {
-	traceID := args[0]
-	dateArgs := args[1:]
-
+func runConnection(ctx context.Context, traceID string, cmd *cobra.Command, logger *zap.Logger) error {
 	if len(traceID) > 32 {
 		return fmt.Errorf("trace-id must be at most 32 characters, got %d (%q)", len(traceID), traceID)
 	}
 
 	stateStore := sflags.MustGetString(cmd, "state-store")
 	gcpProject := sflags.MustGetString(cmd, "gcp-project")
+	since := sflags.MustGetString(cmd, "since")
 	showLogs, showLogsProvided := sflags.MustGetBoolProvided(cmd, "logs")
 	skipLogs := showLogsProvided && !showLogs
 	logsLimit := sflags.MustGetInt(cmd, "logs-limit")
@@ -84,16 +79,9 @@ func runConnection(ctx context.Context, args []string, cmd *cobra.Command, logge
 		return fmt.Errorf("--logs-limit must be greater than or equal to 0, got %d", logsLimit)
 	}
 
-	var startTime, endTime time.Time
-	if len(dateArgs) == 0 {
-		endTime = time.Now()
-		startTime = endTime.AddDate(0, 0, -7)
-	} else {
-		var err error
-		startTime, endTime, err = ParseLogDateRange(dateArgs)
-		if err != nil {
-			return fmt.Errorf("parsing date range: %w", err)
-		}
+	startTime, endTime, err := parseTimeRange(since, 7*24*time.Hour)
+	if err != nil {
+		return fmt.Errorf("parsing time range: %w", err)
 	}
 
 	logger.Debug("connection invoked",
