@@ -29,9 +29,6 @@ func TestNewToolsLogsConnectionCmd(t *testing.T) {
 	sinceFlag := flags.Lookup("since")
 	require.NotNil(t, sinceFlag, "since flag should exist")
 
-	dateRangeFlag := flags.Lookup("date-range")
-	require.NotNil(t, dateRangeFlag, "date-range flag should exist")
-
 	logsFlag := flags.Lookup("logs")
 	require.NotNil(t, logsFlag, "logs flag should exist")
 	assert.Equal(t, "false", logsFlag.DefValue)
@@ -141,15 +138,15 @@ func TestConnectionCommandValidation(t *testing.T) {
 		assert.Contains(t, err.Error(), "gcp-project")
 	})
 
-	t.Run("since and date-range are mutually exclusive", func(t *testing.T) {
+	t.Run("invalid since value", func(t *testing.T) {
 		cmd := NewToolsLogsConnectionCmd(zlogTest)
 		cmd.SilenceUsage = true
 		cmd.SilenceErrors = true
-		cmd.SetArgs([]string{"abc123", "--since", "1h", "--date-range", "2024-01-15T10:00:00Z", "--gcp-project", "test"})
+		cmd.SetArgs([]string{"abc123", "--since", "not-a-duration", "--gcp-project", "test"})
 
 		err := cmd.Execute()
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "mutually exclusive")
+		assert.Contains(t, err.Error(), "parsing time range")
 	})
 }
 

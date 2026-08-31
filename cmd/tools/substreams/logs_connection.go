@@ -28,12 +28,16 @@ on the state store, and the request stats (when available).
 
 The trace-id must be 0-32 characters.
 
-When neither --since nor --date-range is provided, defaults to the last 7 days.`,
+When --since is not provided, defaults to the last 7 days.`,
 		Example: `  firecore tools substreams logs connection bfb0980c436f3fd6f5564a31311d583f \
     --gcp-project my-project
 
   firecore tools substreams logs connection bfb0980c436f3fd6f5564a31311d583f --since 2h \
     --state-store gs://my-bucket/substreams-states \
+    --gcp-project my-project
+
+  firecore tools substreams logs connection bfb0980c436f3fd6f5564a31311d583f \
+    --since "2026-04-20T04:00:00Z:2026-04-20T06:00:00Z" \
     --gcp-project my-project
 
   # Print every log line of the request at the end of the report
@@ -52,7 +56,6 @@ When neither --since nor --date-range is provided, defaults to the last 7 days.`
 	cmd.Flags().String("state-store", "", "State store URL where spkg files are stored (supports file:// and gs://). When set, the spkg is loaded to display the package name and full URL")
 	cmd.Flags().String("gcp-project", "", "GCP project ID used for log querying")
 	cmd.Flags().String("since", "", sinceFlagHelp)
-	cmd.Flags().String("date-range", "", dateRangeFlagHelp)
 	cmd.Flags().Bool("logs", false, "Print every log line of the request in a final 'Logs' section, explicitly passing --logs=false skips the section altogether")
 	cmd.Flags().Int("logs-limit", 500, "Maximum number of log lines to print with --logs, keeping the most recent ones (0 means no limit)")
 	cmd.MarkFlagRequired("gcp-project")
@@ -68,7 +71,6 @@ func runConnection(ctx context.Context, traceID string, cmd *cobra.Command, logg
 	stateStore := sflags.MustGetString(cmd, "state-store")
 	gcpProject := sflags.MustGetString(cmd, "gcp-project")
 	since := sflags.MustGetString(cmd, "since")
-	dateRange := sflags.MustGetString(cmd, "date-range")
 	showLogs, showLogsProvided := sflags.MustGetBoolProvided(cmd, "logs")
 	skipLogs := showLogsProvided && !showLogs
 	logsLimit := sflags.MustGetInt(cmd, "logs-limit")
@@ -77,7 +79,7 @@ func runConnection(ctx context.Context, traceID string, cmd *cobra.Command, logg
 		return fmt.Errorf("--logs-limit must be greater than or equal to 0, got %d", logsLimit)
 	}
 
-	startTime, endTime, err := parseTimeRange(since, dateRange, 7*24*time.Hour)
+	startTime, endTime, err := parseTimeRange(since, 7*24*time.Hour)
 	if err != nil {
 		return fmt.Errorf("parsing time range: %w", err)
 	}
