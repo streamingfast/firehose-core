@@ -34,13 +34,13 @@ require (
 	github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97
 	github.com/streamingfast/dmetrics v0.0.0-20260819172634-28069dc8018a
 	github.com/streamingfast/dsession v0.0.0-20260414190543-79b9846e7c58
-	github.com/streamingfast/dstore v0.2.4-0.20260709193311-122163592902
+	github.com/streamingfast/dstore v0.2.4-0.20260825160629-56e87480522c
 	github.com/streamingfast/firehose-networks v0.2.3
 	github.com/streamingfast/logging v1.2.3-0.20260810132752-360563ac68a9
 	github.com/streamingfast/payment-gateway v0.0.0-20260527144655-d0576d2a4ee3
 	github.com/streamingfast/pbgo v0.0.6-0.20260206150405-2b95acf70437
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.21.1-0.20260820161654-1cffa6c10a8d
+	github.com/streamingfast/substreams v1.22.1-0.20260826153554-edb28d2ecdae
 	github.com/stretchr/testify v1.12.1
 	github.com/test-go/testify v1.1.4
 	github.com/testcontainers/testcontainers-go v0.44.0
@@ -246,7 +246,7 @@ require (
 	github.com/jhump/protoreflect v1.14.0
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.19.2 // indirect
+	github.com/klauspost/compress v1.19.2
 	github.com/lithammer/dedent v1.1.0 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/magiconair/properties v1.8.10 // indirect
@@ -288,7 +288,7 @@ require (
 	golang.org/x/mod v0.40.0 // indirect
 	golang.org/x/net v0.58.0
 	golang.org/x/oauth2 v0.36.0
-	golang.org/x/sync v0.22.0 // indirect
+	golang.org/x/sync v0.22.0
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/term v0.45.0 // indirect
 	golang.org/x/text v0.41.0 // indirect

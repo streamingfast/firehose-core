@@ -14,6 +14,9 @@ func NewToolsSubstreamsCmd[B firecore.Block](chain *firecore.Chain[B], logger *z
 
 	cmd.AddCommand(NewToolsStoreSizeCmd(logger))
 	cmd.AddCommand(NewToolsLogsCmd(logger))
+	cmd.AddCommand(NewToolsPurgeCmd(logger))
+	cmd.AddCommand(NewToolsPruneStatesCmd(logger))
+	cmd.AddCommand(NewToolsPruneOutputsCmd(logger))
 
 	return cmd
 }
