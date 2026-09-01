@@ -2,98 +2,161 @@ package mergeblock
 
 import (
 	"bytes"
+	"encoding/binary"
+	"errors"
+	"io"
 	"testing"
+	"time"
 
-	"github.com/klauspost/compress/zstd"
+	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/dbin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func TestParseGSURL(t *testing.T) {
+// writeMergedBlocksFile builds a dbin stream of blocks whose payloads are payloadSize bytes
+// each, one second apart starting at firstBlockTime.
+func writeMergedBlocksFile(t *testing.T, blockCount int, payloadSize int, firstBlockTime time.Time) []byte {
+	t.Helper()
+
+	var out bytes.Buffer
+	writer := dbin.NewWriter(&out)
+	require.NoError(t, writer.WriteHeader("type.googleapis.com/sf.test.type.v1.Block"))
+
+	for i := range blockCount {
+		block := &pbbstream.Block{
+			Number:    uint64(100 + i),
+			Id:        "00000000000000000000000000000000000000000000000000000000000000ff",
+			ParentId:  "00000000000000000000000000000000000000000000000000000000000000fe",
+			ParentNum: uint64(99 + i),
+			Timestamp: timestamppb.New(firstBlockTime.Add(time.Duration(i) * time.Second)),
+			Payload:   &anypb.Any{TypeUrl: "type.googleapis.com/sf.test.type.v1.Block", Value: bytes.Repeat([]byte("p"), payloadSize)},
+		}
+		message, err := proto.Marshal(block)
+		require.NoError(t, err)
+		require.NoError(t, writer.WriteMessage(message))
+	}
+
+	return out.Bytes()
+}
+
+func TestScanMergedBlocksFile(t *testing.T) {
+	firstBlockTime := time.Date(2025, 10, 12, 10, 23, 12, 0, time.UTC)
+
 	tests := []struct {
-		name      string
-		url       string
-		expect    gsTarget
-		expectErr string
+		name        string
+		blockCount  int
+		payloadSize int
 	}{
-		{name: "bucket and folder", url: "gs://example-bucket/eth-mainnet/merged", expect: gsTarget{bucket: "example-bucket", prefix: "eth-mainnet/merged/"}},
-		{name: "trailing slash", url: "gs://example-bucket/eth-mainnet/merged/", expect: gsTarget{bucket: "example-bucket", prefix: "eth-mainnet/merged/"}},
-		{name: "bucket root", url: "gs://example-bucket", expect: gsTarget{bucket: "example-bucket"}},
-		{name: "requester pays project", url: "gs://example-bucket/merged?project=my-project", expect: gsTarget{bucket: "example-bucket", prefix: "merged/", userProject: "my-project"}},
-		{name: "grpc client protocol", url: "gs://example-bucket/merged?client_protocol=grpc", expect: gsTarget{bucket: "example-bucket", prefix: "merged/", grpc: true}},
-		{name: "http client protocol", url: "gs://example-bucket/merged?client_protocol=http", expect: gsTarget{bucket: "example-bucket", prefix: "merged/"}},
-		{name: "both parameters", url: "gs://example-bucket/merged?project=my-project&client_protocol=grpc", expect: gsTarget{bucket: "example-bucket", prefix: "merged/", userProject: "my-project", grpc: true}},
-		{name: "local path refused", url: "/data/merged", expectErr: "must be a Google Cloud Storage url"},
-		{name: "s3 refused", url: "s3://example-bucket/merged", expectErr: "must be a Google Cloud Storage url"},
-		{name: "no bucket", url: "gs:///merged", expectErr: "has no bucket"},
+		{name: "single small block", blockCount: 1, payloadSize: 16},
+		{name: "many small blocks", blockCount: 100, payloadSize: 128},
+		// Blocks far larger than the scratch buffer must still be walked without being held.
+		{name: "blocks larger than the scratch buffer", blockCount: 3, payloadSize: 3 * scanScratchBufferSize},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			target, err := parseGSURL(test.url)
-			if test.expectErr != "" {
-				require.ErrorContains(t, err, test.expectErr)
-				return
-			}
+			file := writeMergedBlocksFile(t, test.blockCount, test.payloadSize, firstBlockTime)
+
+			scratch := make([]byte, scanScratchBufferSize)
+			scan, err := scanMergedBlocksFile(bytes.NewReader(file), scratch)
 			require.NoError(t, err)
-			assert.Equal(t, test.expect, target)
+
+			assert.Equal(t, int64(len(file)), scan.dataSize)
+			assert.Equal(t, int64(test.blockCount), scan.blockCount)
+			assert.Equal(t, firstBlockTime, scan.firstBlockTime)
 		})
 	}
 }
 
-func TestMergedBlocksFileRegex(t *testing.T) {
-	tests := []struct {
-		base      string
-		matches   bool
-		zstSuffix string
-	}{
-		{base: "0000012300.dbin.zst", matches: true, zstSuffix: ".zst"},
-		{base: "0000012300.dbin", matches: true, zstSuffix: ""},
-		{base: "0000012300.dbin.gz", matches: false},
-		{base: "123.dbin.zst", matches: false},
-		{base: "0000012300-0000012400.output.zst", matches: false},
-		{base: "substreams.spkg.zst", matches: false},
-	}
+// The scratch buffer is reused across files, so a scan must not depend on what the last one
+// left in it.
+func TestScanMergedBlocksFileReusesScratch(t *testing.T) {
+	scratch := make([]byte, scanScratchBufferSize)
 
-	for _, test := range tests {
-		t.Run(test.base, func(t *testing.T) {
-			match := mergedBlocksFileRE.FindStringSubmatch(test.base)
-			if !test.matches {
-				assert.Nil(t, match)
-				return
+	for i, blockTime := range []time.Time{
+		time.Date(2025, 10, 12, 10, 23, 12, 0, time.UTC),
+		time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC),
+	} {
+		file := writeMergedBlocksFile(t, 5+i, 64, blockTime)
+
+		scan, err := scanMergedBlocksFile(bytes.NewReader(file), scratch)
+		require.NoError(t, err)
+		assert.Equal(t, int64(len(file)), scan.dataSize)
+		assert.Equal(t, int64(5+i), scan.blockCount)
+		assert.Equal(t, blockTime, scan.firstBlockTime)
+	}
+}
+
+func TestScanMergedBlocksFileErrors(t *testing.T) {
+	scratch := make([]byte, scanScratchBufferSize)
+	firstBlockTime := time.Date(2025, 10, 12, 10, 23, 12, 0, time.UTC)
+
+	t.Run("not a dbin file", func(t *testing.T) {
+		_, err := scanMergedBlocksFile(bytes.NewReader([]byte("not a dbin file at all")), scratch)
+		require.ErrorContains(t, err, "reading dbin header")
+	})
+
+	t.Run("header without a block", func(t *testing.T) {
+		var out bytes.Buffer
+		writer := dbin.NewWriter(&out)
+		require.NoError(t, writer.WriteHeader("type.googleapis.com/sf.test.type.v1.Block"))
+
+		_, err := scanMergedBlocksFile(bytes.NewReader(out.Bytes()), scratch)
+		require.ErrorContains(t, err, "file holds no block")
+	})
+
+	t.Run("truncated block", func(t *testing.T) {
+		file := writeMergedBlocksFile(t, 4, 1024, firstBlockTime)
+
+		_, err := scanMergedBlocksFile(bytes.NewReader(file[:len(file)-512]), scratch)
+		require.ErrorContains(t, err, "reading block")
+	})
+
+	t.Run("length announcing more than is there", func(t *testing.T) {
+		file := writeMergedBlocksFile(t, 1, 64, firstBlockTime)
+		// Overstate the length of a second message that is not there at all.
+		file = binary.BigEndian.AppendUint32(file, 4096)
+
+		_, err := scanMergedBlocksFile(bytes.NewReader(file), scratch)
+		require.ErrorContains(t, err, "reading block 1")
+	})
+}
+
+func TestIsAnnotated(t *testing.T) {
+	complete := map[string]string{
+		dataSizeMetadataKey:  "1024",
+		itemCountMetadataKey: "100",
+		timestampMetadataKey: "2025-10-12 10:23:12",
+	}
+	assert.True(t, isAnnotated(complete))
+
+	for _, missing := range []string{dataSizeMetadataKey, itemCountMetadataKey, timestampMetadataKey} {
+		partial := map[string]string{}
+		for key, value := range complete {
+			if key != missing {
+				partial[key] = value
 			}
-			require.NotNil(t, match)
-			assert.Equal(t, test.zstSuffix, match[2])
-		})
+		}
+		assert.False(t, isAnnotated(partial), "should not be annotated without %q", missing)
 	}
+
+	assert.False(t, isAnnotated(nil))
 }
 
-func TestCountDecompressed(t *testing.T) {
-	decoder, err := zstd.NewReader(nil, zstd.WithDecoderConcurrency(1), zstd.WithDecoderLowmem(true))
-	require.NoError(t, err)
-	defer decoder.Close()
+func TestDiscard(t *testing.T) {
+	scratch := make([]byte, 8)
+	source := bytes.NewReader(bytes.Repeat([]byte("x"), 100))
 
-	// Reusing one decoder across files is what the workers do, so count twice.
-	for _, payloadSize := range []int{0, 1024, 5 * 1024 * 1024} {
-		payload := bytes.Repeat([]byte("firehose merged blocks payload "), payloadSize/31+1)[:payloadSize]
+	require.NoError(t, discard(source, 60, scratch))
+	assert.Equal(t, 40, source.Len())
 
-		var compressed bytes.Buffer
-		encoder, err := zstd.NewWriter(&compressed)
-		require.NoError(t, err)
-		_, err = encoder.Write(payload)
-		require.NoError(t, err)
-		require.NoError(t, encoder.Close())
-
-		size, err := countDecompressed(decoder, bytes.NewReader(compressed.Bytes()))
-		require.NoError(t, err)
-		assert.Equal(t, int64(payloadSize), size)
-	}
-}
-
-func TestGRPCConnectionPool(t *testing.T) {
-	assert.Equal(t, 7, grpcConnectionPool(annotateConfig{parallelism: 32, connPool: 7}))
-	assert.Equal(t, 1, grpcConnectionPool(annotateConfig{parallelism: 1}))
-	assert.Equal(t, 1, grpcConnectionPool(annotateConfig{parallelism: 32}))
-	assert.Equal(t, 2, grpcConnectionPool(annotateConfig{parallelism: 33}))
-	assert.Equal(t, 16, grpcConnectionPool(annotateConfig{parallelism: 4096}))
+	// Asking for more than remains reports the short stream rather than succeeding, whether the
+	// stream runs out on a chunk boundary (io.EOF) or inside one (io.ErrUnexpectedEOF).
+	err := discard(source, 60, scratch)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF), "got %v", err)
 }
