@@ -10,6 +10,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Fixed
+
+- The block poller no longer warns `no clients have been working for over 1 minute, still retrying` on slower chains like Bitcoin/Litecoin with block rate exceeding 1 minute. Instead it only warns if fetches have been actually failing for over a minute.
+
 ### Changed
 
 - `firecore tools substreams prune-states` and `prune-outputs` delete much faster: deletions now run on their own `--delete-parallelism` (250 by default) instead of sharing the listing's `--parallelism` (16 and 64), each attempt is bounded at 5s instead of 30s, and a failed deletion is retried once after 50ms instead of four times over 7.5s. A deletion that still fails is reported as before and picked up by the next run.
