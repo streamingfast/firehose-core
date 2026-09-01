@@ -16,6 +16,14 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
+- Added `firecore tools annotate-merged-blocks <gs-store-url>` which records the uncompressed size of every merged-blocks file as a `datasize` custom metadata entry on the object, so the size can be read from a listing instead of by downloading the file.
+
+  Google Cloud Storage only, since it writes object metadata without rewriting the file. Each file is streamed through a zstd decoder into a byte counter and dropped as it decodes, so memory stays flat whatever the file size, and `--parallelism` (32 by default) sets how many files are read at once. Files that a previous run already annotated are skipped straight from the listing, which carries their metadata, so a rerun over a mostly-done store costs one listing and nothing else; `--overwrite` recomputes them. A plain `.dbin` file is never read at all, its object size is already the answer. `--start-block` and `--stop-block` bound the listing service-side, `--dry-run` reports what would be annotated without reading anything.
+
+  Reads and metadata writes are both pinned to the generation and metageneration the listing returned, so a file the merger rewrites mid-run is reported as failed rather than annotated with the size of a version that is gone. `--grpc` switches to the Cloud Storage gRPC API, which on GKE takes the DirectPath route straight to the storage backend, spread over `--grpc-connection-pool` connections (one per 32 of `--parallelism` by default).
+
+  The store URL takes the same two query parameters `dstore` reads off a `gs://` URL: `?project=` bills the reads to that project on a requester-pays bucket, and `?client_protocol=grpc` selects the same transport as `--grpc`. Setting a project turns DirectPath off, since DirectPath does not carry the `x-goog-user-project` header requester-pays billing needs.
+
 - `firecore tools substreams purge`, `prune-states` and `prune-outputs` all skip any module folder carrying a `DO_NOT_PRUNE` file at its root, next to the `last_used*.zst` markers, and report how many folders that spared.
 
 - Added `firecore tools last-oneblock <oneblocks-store>` which prints the highest block number found among the store's one-block files, as a bare number on stdout, exiting non-zero when the store cannot be listed, holds no one-block file, or a filename does not parse as one.
