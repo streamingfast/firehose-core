@@ -68,6 +68,11 @@ func NewToolsCompareBlocksCmd[B firecore.Block](chain *firecore.Chain[B], zlog *
 			  --diff or --diff=inline  Print inline diffs using diffx (ANSI color, line numbers, character-level highlighting)
 			  --diff=editor            Open each differing block in $DIFF_EDITOR; falls back to 'diff -u' if not set
 			  --diff=<cmd>             Treat the value as an editor command (e.g. 'vimdiff', 'code --wait --diff')
+
+			Use --fields to print the protobuf field paths that differ (e.g. header.chain_id,
+			txs[2], unknown_field(12)). This is the way to see a difference that --diff does
+			not print: comparison uses proto.Equal (which includes unknown fields), while
+			--diff compares JSON with unknown fields stripped by default.
 		`),
 		Args: cobra.ExactArgs(3),
 		RunE: runCompareBlocksE(chain, zlog),
@@ -86,6 +91,9 @@ func NewToolsCompareBlocksCmd[B firecore.Block](chain *firecore.Chain[B], zlog *
 
 			# Run over specific block range, opening differences in vimdiff
 			--diff=vimdiff reference_store/ current_store/ 100:200
+
+			# Print protobuf field paths that differ (including unknown fields)
+			--fields reference_store/ current_store/ 100:200
 		`),
 	}
 
@@ -97,6 +105,7 @@ func NewToolsCompareBlocksCmd[B firecore.Block](chain *firecore.Chain[B], zlog *
 		  <command>               Use the given command as the diff editor (e.g. 'vimdiff', 'code --wait --diff')
 	`))
 	cmd.Flag("diff").NoOptDefVal = "inline"
+	flags.Bool("fields", false, "Print the protobuf field paths that differ for each mismatched block (e.g. header.chain_id, txs[2], unknown_field(12))")
 	flags.Bool("include-unknown-fields", false, "When activated, the 'unknown fields' in the protobuf message will also be compared. These would not generate any difference when unmarshalled with the current protobuf definition.")
 
 	return cmd
@@ -106,6 +115,7 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Log
 
 	return func(cmd *cobra.Command, args []string) error {
 		diffMode := sflags.MustGetString(cmd, "diff")
+		showFields := sflags.MustGetBool(cmd, "fields")
 		includeUnknownFields := sflags.MustGetBool(cmd, "include-unknown-fields")
 		protoPaths := sflags.MustGetStringSlice(cmd, "proto-paths")
 		bytesEncoding := sflags.MustGetString(cmd, "bytes-encoding")
@@ -278,9 +288,23 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Log
 									shortHash = shortHash[:8] + "..."
 								}
 								fmt.Printf("- Block %d (%s) is different\n", referenceBlockNum, shortHash)
+								if showFields {
+									paths := formatFieldDiffs(diffFieldPaths(referenceBlock, currentBlock))
+									if len(paths) == 0 {
+										fmt.Printf("  (difference not located in a named field)\n")
+									} else {
+										for _, p := range paths {
+											fmt.Printf("  %s\n", p)
+										}
+									}
+								}
 								switch diffMode {
 								case "inline":
-									if writeErr := diffx.WriteJSONDiff(os.Stdout, refJSON, curJSON); writeErr != nil && compareErr == nil {
+									if refJSON == curJSON {
+										if !showFields {
+											fmt.Printf("  JSON is identical; the protobufs still differ. Re-run with --fields to see which fields.\n")
+										}
+									} else if writeErr := diffx.WriteJSONDiff(os.Stdout, refJSON, curJSON); writeErr != nil && compareErr == nil {
 										compareErr = writeErr
 									}
 								case "editor":
@@ -313,9 +337,9 @@ func runCompareBlocksE[B firecore.Block](chain *firecore.Chain[B], zlog *zap.Log
 		}
 		processState.print()
 
-		if processState.totalDifferencesFound > 0 {
+		if processState.totalDifferencesFound > 0 && diffMode == "" && !showFields {
 			fmt.Println()
-			fmt.Println("Re-run with --diff to see inline differences, or --diff=editor to open $DIFF_EDITOR")
+			fmt.Println("Re-run with --diff to see inline differences, --fields to list differing protobuf fields, or --diff=editor to open $DIFF_EDITOR")
 		}
 
 		return nil

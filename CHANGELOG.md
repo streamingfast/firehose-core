@@ -12,9 +12,13 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Changed
 
+- Regenerated well-known protobuf descriptors from the Buf Schema Registry. The Cosmos block model (`sf.cosmos.type.v2.Block`) now includes CometBFT v1 consensus params (`abci`, `synchrony`, `feature`), a `bls12381` public-key variant, and a local `Int64Value` for feature heights, which were previously unknown fields.
+
 - `firecore tools substreams prune-states` and `prune-outputs` delete much faster: deletions now run on their own `--delete-parallelism` (250 by default) instead of sharing the listing's `--parallelism` (16 and 64), each attempt is bounded at 5s instead of 30s, and a failed deletion is retried once after 50ms instead of four times over 7.5s. A deletion that still fails is reported as before and picked up by the next run.
 
 ### Added
+
+- `tools compare-blocks`: `--fields` prints the protobuf field paths that differ for each mismatched block (e.g. `header.chain_id`, `txs[2]`, `unknown_field(12)`). Use it when `--diff` prints nothing: blocks are marked different by `proto.Equal` (which includes unknown fields), while `--diff` compares JSON with unknown fields stripped by default.
 
 - `firecore tools substreams purge`, `prune-states` and `prune-outputs` all skip any module folder carrying a `DO_NOT_PRUNE` file at its root, next to the `last_used*.zst` markers, and report how many folders that spared.
 
@@ -45,6 +49,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
   - Server: progress messages are sent far less often, the cadence widening with the age of the request — every second for the first minute, every 10 seconds up to 5 minutes, every 30 seconds up to 10 minutes, then every minute — including in the linear phase, which previously sent one every 200ms. Progress messages count as egress like any other response, so a long-running or live request paid for a steady stream of them. `Request.progress_messages_interval_ms` is now honoured (it was validated and then ignored): setting it pins the cadence for the whole request, the 500ms minimum unchanged.
 
   - Server: `substreams-tier1` now names the usage marker it writes in every module cache folder after the request's plan tier: `last_used_<plan>` (lowercase, e.g. `last_used_pro`), still plain `last_used` when unauthenticated. `firecore tools substreams purge` reads the plan back from that name to apply a retention per plan.
+
+### Fixed
+
+- `proto/generator`: FileDescriptorSet JSON from Buf is unmarshalled with unknown fields discarded, so `go generate` in `proto/` works against current BSR descriptor extensions.
 
 ## v1.18.0
 
