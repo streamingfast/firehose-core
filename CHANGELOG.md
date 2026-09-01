@@ -16,6 +16,24 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
+- The merger now records what a merged-blocks file holds on the object itself, as three custom metadata entries written as it uploads each bundle: `datasize`, the file's size once decompressed, `itemcount`, the number of blocks it holds, and `timestamp`, the time of its first block written as `2025-10-12 10:23:12` in UTC. A listing then tells what a file holds without reading it.
+
+  Google Cloud Storage only: no other backend keeps custom object metadata a listing reads back, so elsewhere nothing is written and nothing changes. The size is counted as the bundle streams to the store, and the first block's time is read from the head of the first one-block file, far enough to reach the timestamp field and no further, so a chain with large blocks costs no more than one with small blocks. An annotation that cannot be written never fails the merge: the bundle is written and correct, only its description is missing, and `firecore tools annotate-merged-blocks` fills that back in.
+
+- Added `firecore tools annotate-merged-blocks <gs-store-url>`, which writes those same three entries on merged-blocks files written before the merger did it. Google Cloud Storage only, for the same reason.
+
+  Each file is streamed through a zstd decoder and dropped as it decodes, one block at a time into a scratch buffer reused from block to block and from file to file, so memory stays flat whatever the block size; of the first block only the head is looked at, far enough to reach its timestamp. Only the block's metadata fields are ever decoded, its chain-specific payload being skipped, so no chain block type is needed. `--parallelism` (32 by default) sets how many files are read at once.
+
+  Files a previous run already annotated with all three entries are skipped straight from the listing, which carries their metadata, so a rerun over a mostly-done store costs one listing and nothing else; `--overwrite` recomputes them. `--start-block` and `--stop-block` bound the listing service-side, `--dry-run` reports what would be annotated without reading anything.
+
+  Reads and metadata writes are both pinned to the generation and metageneration the listing returned, so a file the merger rewrites mid-run is reported as failed rather than annotated with values from a version that is gone. `--grpc` switches to the Cloud Storage gRPC API, which on GKE takes the DirectPath route straight to the storage backend, spread over `--grpc-connection-pool` connections (one per 32 of `--parallelism` by default).
+
+  The store URL takes the same two query parameters `dstore` reads off a `gs://` URL: `?project=` bills the reads to that project on a requester-pays bucket, and `?client_protocol=grpc` selects the same transport as `--grpc`. Setting a project turns DirectPath off, since DirectPath does not carry the `x-goog-user-project` header requester-pays billing needs.
+
+- Added `firecore tools stats-merged-blocks <gs-store-url>`, which reports a merged-blocks store's total compressed and uncompressed size, block count, compression ratio and bytes per block, broken down by month and totalled over `--start-block` to `--stop-block`.
+
+  Nothing is downloaded: every number comes from the three metadata entries above, which come back with the listing, so the whole report costs one listing however large the range is. Files missing any of the three are counted and reported, and contribute to nothing. Google Cloud Storage only, where the annotation lives.
+
 - `firecore tools substreams purge`, `prune-states` and `prune-outputs` all skip any module folder carrying a `DO_NOT_PRUNE` file at its root, next to the `last_used*.zst` markers, and report how many folders that spared.
 
 - Added `firecore tools last-oneblock <oneblocks-store>` which prints the highest block number found among the store's one-block files, as a bare number on stdout, exiting non-zero when the store cannot be listed, holds no one-block file, or a filename does not parse as one.
