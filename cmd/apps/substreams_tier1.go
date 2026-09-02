@@ -106,6 +106,13 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().Duration("substreams-tier1-cpu-eviction-drain-delay", 8*time.Second, "Delay between advertising the tier1 as unready and cancelling the first request, covering the time the load balancer takes to stop routing to it")
 			cmd.Flags().Duration("substreams-tier1-cpu-eviction-min-age", 90*time.Second, "Requests younger than this are never cancelled, a request being at its most expensive while it loads its stores")
 			cmd.Flags().Float64("substreams-tier1-cpu-eviction-min-burn-cores", 0.05, "Requests burning less CPU than this, in cores, are never cancelled: cancelling them frees nothing and costs a reconnect")
+			cmd.Flags().Float64("substreams-tier1-cpu-eviction-quota-cores-override", 0, cli.FlagDescription(`
+				CPU budget, in cores, to measure usage against instead of the cgroup's own 'cpu.max'. Set it where the cgroup
+				accounts CPU but carries no limit, 'cpu.max' reading 'max', which otherwise leaves the eviction off for want
+				of anything to compare usage to. Usage itself still comes from the cgroup, so this does not make the eviction
+				work without cgroup v2. Keep it at or under the limit the kernel actually enforces, if there is one:
+				set higher, the instance is throttled before the eviction ever fires. 0 uses 'cpu.max'.
+			`))
 			cmd.Flags().Float64("substreams-tier1-cpu-eviction-nominal-capacity", 0, cli.FlagDescription(`
 				How many requests a tier1 carries when it is full, used only to scale the 'substreams_tier1_effective_active_requests'
 				metric. Set it to the per-instance request target of the horizontal autoscaler, so that an instance held at
@@ -205,18 +212,19 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				return nil, fmt.Errorf("substreams-tier1-cpu-eviction-mode: %w", err)
 			}
 			config.CPUEviction = active_requests.EvictorConfig{
-				Mode:             evictionMode,
-				Threshold:        viper.GetFloat64("substreams-tier1-cpu-eviction-threshold"),
-				RecoverThreshold: viper.GetFloat64("substreams-tier1-cpu-eviction-recover-threshold"),
-				TargetRatio:      viper.GetFloat64("substreams-tier1-cpu-eviction-target-ratio"),
-				Sustain:          viper.GetDuration("substreams-tier1-cpu-eviction-sustain"),
-				RecoverSustain:   viper.GetDuration("substreams-tier1-cpu-eviction-recover-sustain"),
-				Interval:         viper.GetDuration("substreams-tier1-cpu-eviction-interval"),
-				Cooldown:         viper.GetDuration("substreams-tier1-cpu-eviction-cooldown"),
-				DrainDelay:       viper.GetDuration("substreams-tier1-cpu-eviction-drain-delay"),
-				MinAge:           viper.GetDuration("substreams-tier1-cpu-eviction-min-age"),
-				MinBurnCores:     viper.GetFloat64("substreams-tier1-cpu-eviction-min-burn-cores"),
-				NominalCapacity:  viper.GetFloat64("substreams-tier1-cpu-eviction-nominal-capacity"),
+				Mode:               evictionMode,
+				Threshold:          viper.GetFloat64("substreams-tier1-cpu-eviction-threshold"),
+				RecoverThreshold:   viper.GetFloat64("substreams-tier1-cpu-eviction-recover-threshold"),
+				TargetRatio:        viper.GetFloat64("substreams-tier1-cpu-eviction-target-ratio"),
+				Sustain:            viper.GetDuration("substreams-tier1-cpu-eviction-sustain"),
+				RecoverSustain:     viper.GetDuration("substreams-tier1-cpu-eviction-recover-sustain"),
+				Interval:           viper.GetDuration("substreams-tier1-cpu-eviction-interval"),
+				Cooldown:           viper.GetDuration("substreams-tier1-cpu-eviction-cooldown"),
+				DrainDelay:         viper.GetDuration("substreams-tier1-cpu-eviction-drain-delay"),
+				MinAge:             viper.GetDuration("substreams-tier1-cpu-eviction-min-age"),
+				MinBurnCores:       viper.GetFloat64("substreams-tier1-cpu-eviction-min-burn-cores"),
+				QuotaCoresOverride: viper.GetFloat64("substreams-tier1-cpu-eviction-quota-cores-override"),
+				NominalCapacity:    viper.GetFloat64("substreams-tier1-cpu-eviction-nominal-capacity"),
 			}
 
 			sessionPlugin := viper.GetString("common-session-plugin")
