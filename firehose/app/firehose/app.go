@@ -212,7 +212,9 @@ func (a *App) Run() error {
 
 		a.logger.Info("launching gRPC firehoseServer", zap.Bool("live_support", withLive))
 		a.isReady.CAS(false, true)
-		metrics.AppReadiness.SetReady()
+		if withLive {
+			metrics.AppReadiness.SetReady()
+		}
 		firehoseServer.Launch()
 	}()
 
