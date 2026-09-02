@@ -14,6 +14,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - `firecore tools substreams prune-states` and `prune-outputs` delete much faster: deletions now run on their own `--delete-parallelism` (250 by default) instead of sharing the listing's `--parallelism` (16 and 64), each attempt is bounded at 5s instead of 30s, and a failed deletion is retried once after 50ms instead of four times over 7.5s. A deletion that still fails is reported as before and picked up by the next run.
 
+### Fixed
+
+- The `ready{app="firehose"}` Prometheus metric now remains `0` while the firehose waits to read the first streamable block and only changes to `1` after initialization succeeds. A firehose configured without a live source remains not ready.
+
 ### Added
 
 - The merger now records what a merged-blocks file holds on the object itself, as three custom metadata entries written as it uploads each bundle: `datasize`, the file's size once decompressed, `itemcount`, the number of blocks it holds, and `timestamp`, the time of its first block written as `2025-10-12 10:23:12` in UTC. A listing then tells what a file holds without reading it.
