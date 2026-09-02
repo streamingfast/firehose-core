@@ -10,6 +10,12 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Fixed
+
+- Bumped substreams: `substreams_tier1_effective_active_requests` could read below `substreams_active_requests`, the
+  metric it is meant to replace as the horizontal autoscaler input. Requests still setting up were counted by one and
+  not the other, so a tier1 pod with requests queued in setup looked emptier to the autoscaler than it was.
+
 ### Changed
 
 - Bumped `golang.org/x/crypto` to `v0.56.0`, clearing CVE-2026-78662 and CVE-2026-56855 (both HIGH), which the Docker Scout scan of the published image fails on.
