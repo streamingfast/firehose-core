@@ -10,6 +10,12 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Fixed
+
+- Bumped substreams: `substreams_tier1_effective_active_requests` could read below `substreams_active_requests`, the
+  metric it is meant to replace as the horizontal autoscaler input. Requests still setting up were counted by one and
+  not the other, so a tier1 pod with requests queued in setup looked emptier to the autoscaler than it was.
+
 ### Changed
 
 - `firecore tools substreams prune-states` and `prune-outputs` delete much faster: deletions now run on their own `--delete-parallelism` (250 by default) instead of sharing the listing's `--parallelism` (16 and 64), each attempt is bounded at 5s instead of 30s, and a failed deletion is retried once after 50ms instead of four times over 7.5s. A deletion that still fails is reported as before and picked up by the next run.
