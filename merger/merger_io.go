@@ -15,6 +15,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
+	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/merger/metrics"
 	"go.uber.org/zap"
 )
@@ -59,6 +60,11 @@ type DStoreIO struct {
 	oneBlocksStore    dstore.Store
 	mergedBlocksStore dstore.Store
 
+	// annotateMergedBlocks is set when the merged-blocks store keeps custom object metadata a
+	// listing can read back, which today means Google Cloud Storage. Elsewhere the annotation
+	// would cost a write per bundle and be readable by nothing.
+	annotateMergedBlocks bool
+
 	retryAttempts int
 	retryCooldown time.Duration
 
@@ -83,13 +89,14 @@ func NewDStoreIO(
 	od := &oneBlockFilesDeleter{store: oneBlocksStore, logger: logger}
 	od.Start(numDeleteThreads, DefaultFilesDeleteBatchSize*2)
 	dstoreIO := &DStoreIO{
-		oneBlocksStore:    oneBlocksStore,
-		mergedBlocksStore: mergedBlocksStore,
-		retryAttempts:     retryAttempts,
-		retryCooldown:     retryCooldown,
-		bundleSize:        bundleSize,
-		logger:            logger,
-		od:                od,
+		oneBlocksStore:       oneBlocksStore,
+		mergedBlocksStore:    mergedBlocksStore,
+		annotateMergedBlocks: firecore.MergedBlocksMetadataSupported(mergedBlocksStore),
+		retryAttempts:        retryAttempts,
+		retryCooldown:        retryCooldown,
+		bundleSize:           bundleSize,
+		logger:               logger,
+		od:                   od,
 	}
 
 	forkAware := forkedBlocksStore != nil
@@ -136,6 +143,9 @@ func (s *DStoreIO) MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64
 
 	s.logger.Info("about to write merged blocks to storage location", zapFields...)
 
+	// The bundle is streamed, so its uncompressed size is only known once it is written: count
+	// it on the way through rather than reading the file back to find out.
+	var dataSize int64
 	err = Retry(s.logger, s.retryAttempts, s.retryCooldown, func() error {
 		inCtx, cancel := context.WithTimeout(ctx, WriteObjectTimeout)
 		defer cancel()
@@ -147,15 +157,67 @@ func (s *DStoreIO) MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64
 		// feeding goroutine would block forever on the pipe, holding an open one-block
 		// reader on every retry. Closing the read end unblocks it so it can exit.
 		defer streamReader.Close()
-		return s.mergedBlocksStore.WriteObject(inCtx, bundleFilename, streamReader)
+
+		counter := &countingReader{ReadCloser: streamReader}
+		if err := s.mergedBlocksStore.WriteObject(inCtx, bundleFilename, counter); err != nil {
+			return err
+		}
+		dataSize = counter.count
+		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("write object error: %s", err)
 	}
 
+	s.annotate(ctx, bundleFilename, dataSize, filteredOBF)
+
 	s.logger.Info("merged and uploaded", zap.String("filename", fileNameForBlocksBundle(inclusiveLowerBlock)), zap.Duration("merge_time", time.Since(t0)))
 
 	return
+}
+
+// annotate records the bundle's uncompressed size, block count and first block time on the
+// object it was just written to, so a listing tells what a file holds without reading it.
+//
+// A failure here never fails the merge: the bundle is written and correct, only its description
+// is missing, and `firecore tools annotate-merged-blocks` fills that back in.
+func (s *DStoreIO) annotate(ctx context.Context, bundleFilename string, dataSize int64, oneBlockFiles []*bstream.OneBlockFile) {
+	if !s.annotateMergedBlocks || len(oneBlockFiles) == 0 {
+		return
+	}
+
+	// Reads only as far as the timestamp field of the first block, so a chain with large blocks
+	// costs no more here than a chain with small ones.
+	firstBlockTime, err := readBlockTimestamp(ctx, oneBlockFiles[0], s.OpenOneBlockFile)
+	if err != nil {
+		s.logger.Warn("cannot read first block time, leaving merged blocks file unannotated",
+			zap.String("filename", bundleFilename),
+			zap.Uint64("block_num", oneBlockFiles[0].Num),
+			zap.Error(err),
+		)
+		return
+	}
+
+	metadata := firecore.MergedBlocksMetadata(dataSize, int64(len(oneBlockFiles)), firstBlockTime)
+	if err := s.mergedBlocksStore.SetMetadata(ctx, bundleFilename, metadata); err != nil {
+		s.logger.Warn("cannot annotate merged blocks file",
+			zap.String("filename", bundleFilename),
+			zap.Error(err),
+		)
+	}
+}
+
+// countingReader counts what is read through it, which for the bundle reader is the bundle's
+// size before the store compresses it.
+type countingReader struct {
+	io.ReadCloser
+	count int64
+}
+
+func (r *countingReader) Read(p []byte) (int, error) {
+	n, err := r.ReadCloser.Read(p)
+	r.count += int64(n)
+	return n, err
 }
 
 func (s *DStoreIO) WalkOneBlockFiles(ctx context.Context, lowestBlock uint64, callback func(*bstream.OneBlockFile) error) error {

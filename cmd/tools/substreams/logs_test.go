@@ -47,9 +47,6 @@ func TestNewToolsLogsConnectionsCmd(t *testing.T) {
 	sinceFlag := flags.Lookup("since")
 	require.NotNil(t, sinceFlag, "since flag should exist")
 
-	dateRangeFlag := flags.Lookup("date-range")
-	require.NotNil(t, dateRangeFlag, "date-range flag should exist")
-
 	namespaceFlag := flags.Lookup("k8s-namespace")
 	require.NotNil(t, namespaceFlag, "k8s-namespace flag should exist")
 	assert.Equal(t, "n", namespaceFlag.Shorthand)
@@ -73,7 +70,6 @@ func TestConnectionsCommandHelp(t *testing.T) {
 	assert.Contains(t, output, "connections <user_id>")
 	assert.Contains(t, output, "--backend")
 	assert.Contains(t, output, "--since")
-	assert.Contains(t, output, "--date-range")
 	assert.Contains(t, output, "--k8s-namespace")
 	assert.Contains(t, output, "--gcp-project")
 }
@@ -88,16 +84,16 @@ func TestConnectionsCommandValidation(t *testing.T) {
 		assert.Contains(t, err.Error(), "accepts 1 arg(s)")
 	})
 
-	t.Run("mutually exclusive since and date-range", func(t *testing.T) {
+	t.Run("invalid since value", func(t *testing.T) {
 		cmd := NewToolsLogsConnectionsCmd(zlogTest)
 		// Silence usage/errors for cleaner test output
 		cmd.SilenceUsage = true
 		cmd.SilenceErrors = true
-		cmd.SetArgs([]string{"sfinfra", "--since", "1h", "--date-range", "2024-01-15T10:00:00Z", "--gcp-project", "test"})
+		cmd.SetArgs([]string{"sfinfra", "--since", "not-a-duration", "--gcp-project", "test"})
 
 		err := cmd.Execute()
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "mutually exclusive")
+		assert.Contains(t, err.Error(), "parsing time range")
 	})
 
 	t.Run("missing gcp-project for gcp backend", func(t *testing.T) {
@@ -133,91 +129,77 @@ func TestLogsCommandStructure(t *testing.T) {
 func TestParseTimeRange(t *testing.T) {
 	now := time.Now()
 
-	t.Run("default is 1 hour", func(t *testing.T) {
-		start, end, err := parseTimeRange(time.Duration(0), "")
+	t.Run("default lookback", func(t *testing.T) {
+		start, end, err := parseTimeRange("", time.Hour)
 		require.NoError(t, err)
 		assert.WithinDuration(t, now, end, time.Second)
 		assert.WithinDuration(t, now.Add(-time.Hour), start, time.Second)
 	})
 
+	t.Run("default lookback, different value", func(t *testing.T) {
+		start, end, err := parseTimeRange("", 7*24*time.Hour)
+		require.NoError(t, err)
+		assert.WithinDuration(t, now, end, time.Second)
+		assert.WithinDuration(t, now.Add(-7*24*time.Hour), start, time.Second)
+	})
+
 	t.Run("since 30m", func(t *testing.T) {
-		start, end, err := parseTimeRange(30*time.Minute, "")
+		start, end, err := parseTimeRange("30m", time.Hour)
 		require.NoError(t, err)
 		assert.WithinDuration(t, now, end, time.Second)
 		assert.WithinDuration(t, now.Add(-30*time.Minute), start, time.Second)
 	})
 
 	t.Run("since 2d", func(t *testing.T) {
-		start, end, err := parseTimeRange(48*time.Hour, "")
+		start, end, err := parseTimeRange("2d", time.Hour)
 		require.NoError(t, err)
 		assert.WithinDuration(t, now, end, time.Second)
 		assert.WithinDuration(t, now.Add(-48*time.Hour), start, time.Second)
 	})
-}
 
-func TestParseDateRange(t *testing.T) {
-	tests := []struct {
-		name      string
-		input     string
-		wantStart string
-		wantEnd   string
-		wantErr   bool
-	}{
-		{
-			name:      "full range RFC3339",
-			input:     "2024-01-15T10:00:00Z/2024-01-15T12:00:00Z",
-			wantStart: "2024-01-15T10:00:00Z",
-			wantEnd:   "2024-01-15T12:00:00Z",
-			wantErr:   false,
-		},
-		{
-			name:      "start only with trailing slash",
-			input:     "2024-01-15T10:00:00Z/",
-			wantStart: "2024-01-15T10:00:00Z",
-			wantEnd:   "", // Will be "now"
-			wantErr:   false,
-		},
-		{
-			name:      "start only no trailing slash",
-			input:     "2024-01-15T10:00:00Z",
-			wantStart: "2024-01-15T10:00:00Z",
-			wantEnd:   "", // Will be "now"
-			wantErr:   false,
-		},
-		{
-			name:    "empty string",
-			input:   "",
-			wantErr: true,
-		},
-		{
-			name:    "end before start",
-			input:   "2024-01-15T12:00:00Z/2024-01-15T10:00:00Z",
-			wantErr: true,
-		},
-	}
+	t.Run("since 1w", func(t *testing.T) {
+		start, end, err := parseTimeRange("1w", time.Hour)
+		require.NoError(t, err)
+		assert.WithinDuration(t, now, end, time.Second)
+		assert.WithinDuration(t, now.Add(-7*24*time.Hour), start, time.Second)
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			start, end, err := parseDateRange(tt.input)
-			if tt.wantErr {
-				assert.Error(t, err)
-				return
-			}
+	t.Run("invalid since", func(t *testing.T) {
+		_, _, err := parseTimeRange("not-a-duration", time.Hour)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unrecognized date-range format")
+	})
 
-			require.NoError(t, err)
+	t.Run("since full range RFC3339", func(t *testing.T) {
+		start, end, err := parseTimeRange("2024-01-15T10:00:00Z/2024-01-15T12:00:00Z", time.Hour)
+		require.NoError(t, err)
+		expectedStart, _ := time.Parse(time.RFC3339, "2024-01-15T10:00:00Z")
+		expectedEnd, _ := time.Parse(time.RFC3339, "2024-01-15T12:00:00Z")
+		assert.Equal(t, expectedStart, start)
+		assert.Equal(t, expectedEnd, end)
+	})
 
-			expectedStart, _ := time.Parse(time.RFC3339, tt.wantStart)
-			assert.Equal(t, expectedStart, start)
+	t.Run("since colon-separated range", func(t *testing.T) {
+		start, end, err := parseTimeRange("2024-01-15T10:00:00Z:2024-01-15T12:00:00Z", time.Hour)
+		require.NoError(t, err)
+		expectedStart, _ := time.Parse(time.RFC3339, "2024-01-15T10:00:00Z")
+		expectedEnd, _ := time.Parse(time.RFC3339, "2024-01-15T12:00:00Z")
+		assert.Equal(t, expectedStart, start)
+		assert.Equal(t, expectedEnd, end)
+	})
 
-			if tt.wantEnd != "" {
-				expectedEnd, _ := time.Parse(time.RFC3339, tt.wantEnd)
-				assert.Equal(t, expectedEnd, end)
-			} else {
-				// End should be close to now
-				assert.WithinDuration(t, time.Now(), end, time.Second)
-			}
-		})
-	}
+	t.Run("since single timestamp", func(t *testing.T) {
+		start, end, err := parseTimeRange("2024-01-15T10:00:00Z", time.Hour)
+		require.NoError(t, err)
+		expectedStart, _ := time.Parse(time.RFC3339, "2024-01-15T10:00:00Z")
+		assert.Equal(t, expectedStart, start)
+		assert.WithinDuration(t, time.Now(), end, time.Second)
+	})
+
+	t.Run("since range end before start fails", func(t *testing.T) {
+		_, _, err := parseTimeRange("2024-01-15T12:00:00Z/2024-01-15T10:00:00Z", time.Hour)
+		require.Error(t, err)
+	})
 }
 
 func TestParseDateTime(t *testing.T) {

@@ -31,7 +31,7 @@ require (
 	github.com/streamingfast/dgrpc v0.0.0-20260801042045-4c4ac6a8e41a
 	github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4
 	github.com/streamingfast/diffx v0.0.0-20260428032925-db795b0d8333
-	github.com/streamingfast/dmetering v0.0.0-20251027175535-4fd530934b97
+	github.com/streamingfast/dmetering v0.0.0-20260901152443-1ff4cd0d617d
 	github.com/streamingfast/dmetrics v0.0.0-20260819172634-28069dc8018a
 	github.com/streamingfast/dsession v0.0.0-20260414190543-79b9846e7c58
 	github.com/streamingfast/dstore v0.2.4-0.20260825160629-56e87480522c
@@ -40,7 +40,7 @@ require (
 	github.com/streamingfast/payment-gateway v0.0.0-20260527144655-d0576d2a4ee3
 	github.com/streamingfast/pbgo v0.0.6-0.20260206150405-2b95acf70437
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.22.1-0.20260826153554-edb28d2ecdae
+	github.com/streamingfast/substreams v1.22.1-0.20260902153244-5658911b40ce
 	github.com/stretchr/testify v1.12.1
 	github.com/test-go/testify v1.1.4
 	github.com/testcontainers/testcontainers-go v0.44.0
@@ -48,7 +48,7 @@ require (
 	go.uber.org/multierr v1.11.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/exp v0.0.0-20250813145105-42675adae3e6
-	google.golang.org/grpc v1.83.0
+	google.golang.org/grpc v1.83.1
 	google.golang.org/protobuf v1.36.12
 )
 
