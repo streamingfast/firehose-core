@@ -12,9 +12,13 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Changed
 
+- Regenerated well-known protobuf descriptors from the Buf Schema Registry. The Cosmos block model (`sf.cosmos.type.v2.Block`) now includes CometBFT v1 consensus params (`abci`, `synchrony`, `feature`), a `bls12381` public-key variant, and a local `Int64Value` for feature heights, which were previously unknown fields.
+
 - `firecore tools substreams prune-states` and `prune-outputs` delete much faster: deletions now run on their own `--delete-parallelism` (250 by default) instead of sharing the listing's `--parallelism` (16 and 64), each attempt is bounded at 5s instead of 30s, and a failed deletion is retried once after 50ms instead of four times over 7.5s. A deletion that still fails is reported as before and picked up by the next run.
 
 ### Added
+
+- `tools compare-blocks`: `--fields` prints the protobuf field paths that differ for each mismatched block (e.g. `header.chain_id`, `txs[2]`, `unknown_field(12)`). Use it when `--diff` prints nothing: blocks are marked different by `proto.Equal` (which includes unknown fields), while `--diff` compares JSON with unknown fields stripped by default.
 
 - The merger now records what a merged-blocks file holds on the object itself, as three custom metadata entries written as it uploads each bundle: `datasize`, the file's size once decompressed, `itemcount`, the number of blocks it holds, and `timestamp`, the time of its first block written as `2025-10-12 10:23:12` in UTC. A listing then tells what a file holds without reading it.
 
@@ -96,6 +100,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
   - Server: jobs are now scheduled up to twice the request's worker count ahead of the blocks the client is reading, instead of 1.5 times, so a client that reads slowly still keeps the workers busy.
 
   - Server: `substreams-tier2` logs far less per segment. A large backfill fans out into tens of thousands of `ProcessRange` calls, each of which was writing about ten `Info` lines with no steady-state diagnostic value, enough to raise an instance's log volume by an order of magnitude. The duplicate auth-info log in the response handler is gone (the incoming request already logs it once per segment), the store-size and exec-output-file-open logs are now `Debug`, and so are the four shutdown-lifecycle logs of the per-request `dmetering` event emitter, which is opened and torn down on every `ProcessRange` call. The benign `http2: server: error reading preface ...: connection reset by peer` logged whenever a client drops a connection mid-handshake against the plaintext/h2c tier2 port is suppressed, like the existing TLS-handshake ones.
+
+### Fixed
+
+- `proto/generator`: FileDescriptorSet JSON from Buf is unmarshalled with unknown fields discarded, so `go generate` in `proto/` works against current BSR descriptor extensions.
 
 ## v1.18.0
 

@@ -226,7 +226,7 @@ func fetchFileDescriptorSet(host, owner, moduleName, revision, authToken string)
 	cli.NoError(json.Unmarshal(body, &connectResp), "Failed to parse Connect response for %s/%s", owner, moduleName)
 
 	fds := &descriptorpb.FileDescriptorSet{}
-	cli.NoError(protojson.Unmarshal(connectResp.FileDescriptorSet, fds), "Failed to unmarshal FileDescriptorSet for %s/%s", owner, moduleName)
+	cli.NoError((protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(connectResp.FileDescriptorSet, fds), "Failed to unmarshal FileDescriptorSet for %s/%s", owner, moduleName)
 
 	return fds, connectResp.Commit.ID
 }
