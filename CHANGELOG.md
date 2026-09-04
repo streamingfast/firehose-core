@@ -12,6 +12,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Changed
 
+- Bumped `golang.org/x/crypto` to `v0.56.0`, clearing CVE-2026-78662 and CVE-2026-56855 (both HIGH), which the Docker Scout scan of the published image fails on.
+
 - `firecore tools substreams prune-states` and `prune-outputs` delete much faster: deletions now run on their own `--delete-parallelism` (250 by default) instead of sharing the listing's `--parallelism` (16 and 64), each attempt is bounded at 5s instead of 30s, and a failed deletion is retried once after 50ms instead of four times over 7.5s. A deletion that still fails is reported as before and picked up by the next run.
 
 ### Added
@@ -75,7 +77,15 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
   Thresholds and ratios are fractions of the CPU budget. That budget is the CPU limit the cgroup carries, so an instance running under cgroup v2 with no limit set — `cpu.max` reading `max` — has nothing to compare usage to and logs a warning at startup, leaving the eviction off; `--substreams-tier1-cpu-eviction-quota-cores-override` names the budget yourself in that case, and should stay at or under whatever limit the kernel does enforce, since above it the instance is throttled before the eviction ever fires. Reading the cgroup CPU files failing outright, cgroup v1 included, also logs a warning and leaves the eviction off. Every one of these warnings is only emitted when the mode is not `off`.
 
-- Bumped `substreams` to [v1.22.1-0.20260902153244-5658911b40ce](https://github.com/streamingfast/substreams/compare/1cffa6c10a8d...5658911b40ce):
+- Bumped `substreams` to [v1.22.1-0.20260903162505-4035f21109ec](https://github.com/streamingfast/substreams/compare/1cffa6c10a8d...4035f21109ec):
+
+  - Server: `substreams-tier1` scheduling no longer slows down as a large backprocessing range progresses. Picking the next tier2 job walked every segment between the squasher and the job frontier on every call, re-checking dependencies that could not have changed, so a run over N segments cost O(N²) in scheduling. The scheduler now keeps, per stage, the lowest segment that may still be pending and the highest segment completed so far, and only looks at the handful of segments those point at. On a 3-stage graph with 4 workers and a squasher three times slower than the jobs, scheduling 8000 segments went from 1.18s to 2.7ms, and now grows linearly with the range. Job order is unchanged.
+
+  - Server: `substreams-tier1` now downloads the next cached execution output files while it streams the current one to a production-mode client. Before, each segment was opened, decompressed and sent before the next one was even requested from the object store, so every segment paid a full store round trip on the critical path. Prefetching is bounded per request, with no flag to set: at most 4 segments ahead, holding at most 64 MiB of decompressed data. No size is ever asked of the store, the decompressed size of the last downloaded segment being the estimate for the next ones, and a file bigger than the whole budget turns prefetching off for the rest of the request. Missing files are left to the existing retry loop.
+
+  - Server: `substreams-tier1` now sends each batch of cached execution output on its own goroutine, so decoding the next batch overlaps with compressing and writing the current one. At most one batch is being built while one is sent, and a segment is only reported done once every batch is out, so message order is unchanged. Decoding a batch also copies one less time, the item now aliasing the buffer it was read into.
+
+  - Server: `substreams-tier1` writes the `substreams.spkg` and `last_used` cache markers in the background instead of before the pipeline starts, so those object store round trips no longer delay the first block sent. They run detached from the request with a 30 second timeout: the request neither starts nor exits waiting for them, and a client that disconnects early still leaves its usage marker behind.
 
   - Server: store snapshots (fullKV files) can now be pruned to save disk space — which is what `firecore tools substreams prune-states` does: `substreams-tier1` no longer assumes that a fullKV at block `x` implies that every earlier fullKV still exists. At request start it walks backwards from the first segment needing work, in growing listing windows, until it finds the last block where every store module still has a snapshot, and rebuilds the stores from there. Only snapshots actually seen are reused, and a job is only scheduled once the previous segment of every lower stage is done, so a pruned file is never read.
 
