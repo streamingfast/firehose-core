@@ -107,11 +107,11 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 	)
 
 	var (
-		firstDataSent      bool
-		timeToFirstData    time.Duration
-		resolvedStartBlock uint64
-		streamRan          bool
-		runErr             error
+		firstDataSent   bool
+		timeToFirstData time.Duration
+		firstSentBlock  uint64
+		streamRan       bool
+		runErr          error
 	)
 
 	defer func() {
@@ -120,7 +120,14 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 			logErr = runErr
 		}
 		if errors.Is(logErr, context.Canceled) {
-			logErr = context.Canceled
+			// A context canceled by the server itself (e.g. a session revoked mid-stream)
+			// carries its real cause via context.Cause; only fall back to the bare
+			// sentinel when the cancellation truly came from the client disconnecting.
+			if cause := context.Cause(ctx); cause != nil && cause != context.Canceled {
+				logErr = cause
+			} else {
+				logErr = context.Canceled
+			}
 		}
 
 		meter := getRequestMeter(ctx)
@@ -128,18 +135,14 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 			zap.Uint64("block_sent", meter.blocks),
 			zap.Int("egress_bytes", meter.egressBytes),
 			zap.Duration("duration", time.Since(requestStart)),
+			zap.Duration("time_to_first_data", timeToFirstData),
+			zap.Uint64("first_sent_block", firstSentBlock),
 			zap.Error(logErr),
-		}
-		if firstDataSent {
-			fields = append(fields,
-				zap.Duration("time_to_first_data", timeToFirstData),
-				zap.Uint64("resolved_start_block", resolvedStartBlock),
-			)
 		}
 		if auth != nil {
 			fields = append(fields,
 				zap.String("api_key_id", apiKeyID),
-				zap.String("user_id", organizationID),
+				zap.String("organization_id", organizationID),
 				zap.String("real_ip", realIP),
 			)
 		}
@@ -164,9 +167,9 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 				errors.Is(err, dsession.ErrPermissionDenied),
 				errors.Is(err, dsession.ErrQuotaExceeded):
 				incrementFirehoseSessionDeniedCounter(err)
-				logger.Debug("session denied to user", zap.String("user_id", organizationID), zap.String("api_key_id", apiKeyID), zap.Error(err))
+				logger.Debug("session denied to user", zap.String("organization_id", organizationID), zap.String("api_key_id", apiKeyID), zap.Error(err))
 			default:
-				logger.Error("failed to acquire session", zap.Error(err), zap.String("service", service), zap.String("user_id", organizationID), zap.String("api_key_id", apiKeyID))
+				logger.Error("failed to acquire session", zap.Error(err), zap.String("service", service), zap.String("organization_id", organizationID), zap.String("api_key_id", apiKeyID))
 			}
 			return err
 		}
@@ -281,7 +284,7 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 		if !firstDataSent {
 			firstDataSent = true
 			timeToFirstData = time.Since(requestStart)
-			resolvedStartBlock = block.Number
+			firstSentBlock = block.Number
 		}
 
 		level := zap.DebugLevel
@@ -402,6 +405,7 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 	}
 
 	logger.Error("source is not expected to terminate gracefully, should stop at block or continue forever")
+	runErr = errors.New("source terminated without error, which is not expected to happen")
 	return status.Error(codes.Internal, "unexpected stream completion")
 
 }
