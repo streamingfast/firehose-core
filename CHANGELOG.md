@@ -38,6 +38,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
   Nothing is downloaded: every number comes from the three metadata entries above, which come back with the listing, so the whole report costs one listing however large the range is. Files missing any of the three are counted and reported, and contribute to nothing. Google Cloud Storage only, where the annotation lives.
 
+  The report is labelled with a chain name, which defaults to the second-to-last part of the store path, the bucket excluded (`eth-mainnet` for both `gs://mybucket/something/eth-mainnet/v1` and `gs://mybucket/eth-mainnet`); `--chain-name` overrides it.
+
+  Pass `--json` to get the same report as a single JSON object on stdout instead of the table: the chain name, the requested range, the first and last block seen, one entry per month, the total, and the count of files carrying no complete annotation.
+
 - `firecore tools substreams purge`, `prune-states` and `prune-outputs` all skip any module folder carrying a `DO_NOT_PRUNE` file at its root, next to the `last_used*.zst` markers, and report how many folders that spared.
 
 - Added `firecore tools last-oneblock <oneblocks-store>` which prints the highest block number found among the store's one-block files, as a bare number on stdout, exiting non-zero when the store cannot be listed, holds no one-block file, or a filename does not parse as one.

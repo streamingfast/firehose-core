@@ -1,7 +1,9 @@
 package mergeblock
 
 import (
+	"encoding/json"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/stretchr/testify/assert"
@@ -78,4 +80,74 @@ func TestDescribeBlockRange(t *testing.T) {
 	assert.Equal(t, "whole store", describeBlockRange(0, 0))
 	assert.Equal(t, "1,000,000 and up", describeBlockRange(1000000, 0))
 	assert.Equal(t, "1,000,000 to 2,000,000 (exclusive)", describeBlockRange(1000000, 2000000))
+}
+
+func TestNewStatsReport(t *testing.T) {
+	months := map[string]*mergedBlocksTally{
+		"2025-11": {files: 1, blocks: 100, compressed: 1000, uncompressed: 2000},
+		"2025-10": {files: 2, blocks: 200, compressed: 2000, uncompressed: 6000},
+	}
+	total := mergedBlocksTally{files: 3, blocks: 300, compressed: 3000, uncompressed: 8000}
+	cfg := statsConfig{startBlock: 1000, stopBlock: 2000, chainName: "eth-mainnet"}
+
+	report := newStatsReport(cfg, months, total, false, 1000, 1900, 4, 1500*time.Millisecond)
+
+	assert.Equal(t, "eth-mainnet", report.ChainName)
+	assert.Equal(t, uint64(1000), report.StartBlock)
+	assert.Equal(t, uint64(2000), report.StopBlock)
+	require.NotNil(t, report.FirstBlockSeen)
+	assert.Equal(t, uint64(1000), *report.FirstBlockSeen)
+	require.NotNil(t, report.LastBlockSeen)
+	assert.Equal(t, uint64(1900), *report.LastBlockSeen)
+	assert.Equal(t, uint64(4), report.UnannotatedFiles)
+	assert.Equal(t, 1.5, report.ListedInSeconds)
+
+	// Months come out sorted.
+	require.Len(t, report.Months, 2)
+	assert.Equal(t, "2025-10", report.Months[0].Month)
+	assert.Equal(t, "2025-11", report.Months[1].Month)
+	assert.Equal(t, statsBucket{
+		Month:                     "2025-10",
+		Files:                     2,
+		Blocks:                    200,
+		CompressedBytes:           2000,
+		UncompressedBytes:         6000,
+		CompressionRatio:          3,
+		CompressedBytesPerBlock:   10,
+		UncompressedBytesPerBlock: 30,
+	}, report.Months[0])
+
+	// The total carries no month.
+	assert.Equal(t, "", report.Total.Month)
+	assert.Equal(t, int64(3), report.Total.Files)
+
+	out, err := json.Marshal(report)
+	require.NoError(t, err)
+	assert.Contains(t, string(out), `"months":[{"month":"2025-10"`)
+}
+
+func TestNewStatsReportEmpty(t *testing.T) {
+	report := newStatsReport(statsConfig{}, nil, mergedBlocksTally{}, true, 0, 0, 0, 0)
+
+	assert.Nil(t, report.FirstBlockSeen)
+	assert.Nil(t, report.LastBlockSeen)
+
+	// An empty report still marshals to an empty months array, not null.
+	out, err := json.Marshal(report)
+	require.NoError(t, err)
+	assert.Contains(t, string(out), `"months":[]`)
+	assert.Contains(t, string(out), `"first_block_seen":null`)
+}
+
+func TestDefaultChainName(t *testing.T) {
+	assert.Equal(t, "eth-mainnet", defaultChainName("gs://mybucket/something/eth-mainnet/v1"))
+	assert.Equal(t, "eth-mainnet", defaultChainName("gs://mybucket/something/eth-mainnet/v1/"))
+	assert.Equal(t, "eth-mainnet", defaultChainName("gs://mybucket/eth-mainnet/v1?project=some-project"))
+	// A one-element path is that element, the bucket is never the guess.
+	assert.Equal(t, "eth-mainnet", defaultChainName("gs://mybucket/eth-mainnet"))
+	assert.Equal(t, "eth-mainnet", defaultChainName("gs://mybucket/eth-mainnet/"))
+
+	// A url with nothing but a bucket has no path to guess from.
+	assert.Equal(t, "", defaultChainName("gs://mybucket"))
+	assert.Equal(t, "", defaultChainName("gs://mybucket/"))
 }
