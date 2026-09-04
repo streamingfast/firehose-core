@@ -10,6 +10,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Fixed
+
+- The block poller no longer warns `no clients have been working for over 1 minute, still retrying` on slower chains like Bitcoin/Litecoin with block rate exceeding 1 minute. Instead it only warns if fetches have been actually failing for over a minute.
+
 ### Changed
 
 - Bumped `golang.org/x/crypto` to `v0.56.0`, clearing CVE-2026-78662 and CVE-2026-56855 (both HIGH), which the Docker Scout scan of the published image fails on.
