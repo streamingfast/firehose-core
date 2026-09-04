@@ -3,6 +3,7 @@ package blockpoller
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -10,7 +11,7 @@ import (
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/logging"
 	"github.com/stretchr/testify/assert"
-	"github.com/test-go/testify/require"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -32,8 +33,12 @@ var _ BlockFetcher[any] = &TestBlockFetcher[any]{}
 type TestBlockFetcher[C any] struct {
 	t         *testing.T
 	blocks    []*TestBlock
-	idx       uint64
 	completed bool
+
+	// mu guards idx: fetches run on the nailer's worker goroutines, not on the
+	// run loop.
+	mu  sync.Mutex
+	idx uint64
 }
 
 func newTestBlockFetcher[C any](t *testing.T, blocks []*TestBlock) *TestBlockFetcher[C] {
@@ -52,6 +57,9 @@ func (b *TestBlockFetcher[C]) IsBlockAvailable(requestedSlot uint64) bool {
 }
 
 func (b *TestBlockFetcher[C]) Fetch(ctx context.Context, c C, blkNum uint64) (*pbbstream.Block, bool, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	if len(b.blocks) == 0 {
 		assert.Fail(b.t, fmt.Sprintf("should not have fetched block %d", blkNum))
 	}
@@ -71,6 +79,10 @@ func (b *TestBlockFetcher[C]) Fetch(ctx context.Context, c C, blkNum uint64) (*p
 
 func (b *TestBlockFetcher[C]) check(t *testing.T) {
 	t.Helper()
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	require.Equal(b.t, uint64(len(b.blocks)), b.idx, "we should have fetched all %d blocks, only fired %d blocks", len(b.blocks), b.idx)
 }
 

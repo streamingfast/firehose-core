@@ -58,19 +58,32 @@ func (c *Clients[C]) Add(client C) {
 	c.clients = append(c.clients, client)
 }
 
-func (c *Clients[C]) DuplicateAndStartAt(start int) *Clients[C]{
+// DuplicateAndStartAt returns an independent copy of the clients list, rotated so
+// that `c.clients[start]` sits in first position. Callers get their own lock and
+// their own rolling strategy, so several duplicates can be used concurrently
+// without contending on (or corrupting) the shared list.
+//
+// `start` is taken modulo the number of clients, so any value is accepted. A
+// duplicate of an empty list is empty, and using it yields `ErrorNoMoreClient`.
+func (c *Clients[C]) DuplicateAndStartAt(start int) *Clients[C] {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	size := len(c.clients)
-	clients := Clients[C]{
-		clients: make([]C, size),
+	clients := make([]C, size)
+	if size > 0 {
+		start = ((start % size) + size) % size
+		for i := range clients {
+			clients[i] = c.clients[(start+i)%size]
+		}
+	}
+
+	return &Clients[C]{
+		clients:               clients,
 		maxBlockFetchDuration: c.maxBlockFetchDuration,
-		rollingStrategy: c.rollingStrategy,
-		lock: sync.Mutex{},
-		logger: c.logger,
+		rollingStrategy:       c.rollingStrategy.clone(),
+		logger:                c.logger,
 	}
-	for i, v := range c.clients {
-		clients.clients[(start + i) % size] = v
-	}
-	return &clients
 }
 
 func WithClientsContext[C any, V any](clients *Clients[C], ctx context.Context, f func(context.Context, C) (v V, err error)) (v V, err error) {
@@ -95,7 +108,7 @@ func WithClientsContext[C any, V any](clients *Clients[C], ctx context.Context, 
 			clientDetails := ""
 
 			rpc, ok := any(client).(*rpc.Client)
-			if (ok) {
+			if ok {
 				clientDetails = rpc.String()
 			}
 

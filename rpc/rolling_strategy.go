@@ -3,6 +3,11 @@ package rpc
 type RollingStrategy[C any] interface {
 	reset()
 	next(clients *Clients[C]) (C, error)
+
+	// clone returns a brand new strategy, in its initial state. Every duplicated
+	// `Clients` must own its strategy: the rolling position is mutable state and
+	// sharing it across concurrent users corrupts it (and races on it).
+	clone() RollingStrategy[C]
 }
 
 type StickyRollingStrategy[C any] struct {
@@ -15,6 +20,10 @@ func NewStickyRollingStrategy[C any]() *StickyRollingStrategy[C] {
 	return &StickyRollingStrategy[C]{
 		firstCallToNewClient: true,
 	}
+}
+
+func (s *StickyRollingStrategy[C]) clone() RollingStrategy[C] {
+	return NewStickyRollingStrategy[C]()
 }
 
 func (s *StickyRollingStrategy[C]) reset() {
@@ -71,6 +80,10 @@ type RollingStrategyAlwaysUseFirst[C any] struct {
 
 func NewRollingStrategyAlwaysUseFirst[C any]() *RollingStrategyAlwaysUseFirst[C] {
 	return &RollingStrategyAlwaysUseFirst[C]{}
+}
+
+func (s *RollingStrategyAlwaysUseFirst[C]) clone() RollingStrategy[C] {
+	return NewRollingStrategyAlwaysUseFirst[C]()
 }
 
 func (s *RollingStrategyAlwaysUseFirst[C]) reset() {

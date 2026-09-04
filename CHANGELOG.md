@@ -18,6 +18,20 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 * Remove alpha partial blocks support in firehose service (only exposed via substreams)
 
+### Fixed
+
+* Fix data race in `blockpoller` when polling blocks in parallel: duplicated RPC client lists shared a single rolling strategy, so concurrent polls corrupted each other's position and could spuriously fail with "no more clients".
+
+* Fix `blockpoller` starting several block batches at once, fetching the same blocks twice, when two goroutines raced on the "already fetching" flag.
+
+* Fix `blockpoller` serving a stale block after a reorg: a batch already in flight could write blocks from the abandoned chain back into the optimistic cache after it had been cleared.
+
+* Fix `blockpoller` shutting down when an *optimistic* block fetch fails. Reading ahead is best effort — the block is simply fetched again on demand when the poller gets there. A failure on the demand path remains fatal.
+
+* Fix `blockpoller` no longer respecting `blockpoller.WithDelayBetweenFetch` when the block fetch batch size is 1: optimistic read-ahead is now restricted to batched polling.
+
+* Fix `blockpoller` panicking when the block fetch batch size is 0 or negative, it is now clamped to 1.
+
 ## v1.12.8
 
 * Substreams: Improved 'partial blocks': support new pbbstream's "LastPartial" field, fix 'undo' scenarios for stores

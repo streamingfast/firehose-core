@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -17,6 +18,10 @@ import (
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
 )
+
+// optimisticPollInterval is how often `requestBlock` re-checks the optimistic cache
+// while it waits for a block to be fetched.
+const optimisticPollInterval = 20 * time.Millisecond
 
 type block struct {
 	*pbbstream.Block
@@ -45,8 +50,16 @@ type BlockPoller[C any] struct {
 	logger *zap.Logger
 
 	optimisticallyPolledBlocks map[uint64]*BlockItem
+	// optimisticEpoch is bumped every time the optimistic cache is dropped. A batch
+	// fetch captures it when it starts and discards its results if it changed in the
+	// meantime, so blocks fetched from a chain state we have since abandoned (a
+	// reorg) can never land back in the cache.
+	optimisticEpoch uint64
 
-	fetching                       bool
+	// fetching is `true` while a `loadNextBlocks` call is in flight. It doubles as
+	// the single-flight guard: only the goroutine that manages to swap it from
+	// `false` to `true` is allowed to start a batch.
+	fetching                       atomic.Bool
 	optimisticallyPolledBlocksLock sync.Mutex
 }
 
@@ -76,7 +89,11 @@ func New[C any](
 
 func (p *BlockPoller[C]) Run(firstStreamableBlockNum uint64, stopBlock *uint64, blockFetchBatchSize int) error {
 	p.startBlockNumGate = firstStreamableBlockNum
-	p.optimisticallyPolledBlocks = map[uint64]*BlockItem{}
+	p.resetOptimisticallyPolledBlocks()
+
+	if blockFetchBatchSize < 1 {
+		blockFetchBatchSize = 1
+	}
 
 	p.logger.Info("starting poller",
 		zap.Uint64("first_streamable_block", firstStreamableBlockNum),
@@ -222,8 +239,50 @@ type BlockItem struct {
 	skipped     bool
 }
 
+// triggerLoadNextBlocks starts a background batch fetch, unless one is already in
+// flight. The flag is claimed synchronously, before the goroutine is spawned, so
+// two callers racing here cannot both start a batch (which would fetch the same
+// blocks twice, from two different clients).
+//
+// When `speculative` is set, nothing is waiting on the batch: the run loop has not
+// reached those blocks yet. A failure there is expected (the block may simply not
+// be produced yet) and is ignored — the blocks get fetched on demand if the run
+// loop ever gets to them. On the demand path a failure is fatal, otherwise
+// `requestBlock` would wait for a block that nobody is fetching anymore.
+func (p *BlockPoller[C]) triggerLoadNextBlocks(requestedBlock uint64, numberOfBlockToFetch int, speculative bool) {
+	if !p.fetching.CompareAndSwap(false, true) {
+		return
+	}
+
+	go func() {
+		defer p.fetching.Store(false)
+
+		if err := p.loadNextBlocks(requestedBlock, numberOfBlockToFetch); err != nil {
+			if speculative {
+				p.logger.Debug("optimistic block fetch failed, ignoring",
+					zap.Uint64("block_num", requestedBlock), zap.Error(err))
+				return
+			}
+
+			p.Shutdown(err)
+		}
+	}()
+}
+
+// resetOptimisticallyPolledBlocks drops every optimistically fetched block and
+// invalidates the batches currently in flight.
+func (p *BlockPoller[C]) resetOptimisticallyPolledBlocks() {
+	p.optimisticallyPolledBlocksLock.Lock()
+	defer p.optimisticallyPolledBlocksLock.Unlock()
+
+	p.optimisticallyPolledBlocks = map[uint64]*BlockItem{}
+	p.optimisticEpoch++
+}
+
 func (p *BlockPoller[C]) loadNextBlocks(requestedBlock uint64, numberOfBlockToFetch int) error {
-	p.fetching = true
+	p.optimisticallyPolledBlocksLock.Lock()
+	epoch := p.optimisticEpoch
+	p.optimisticallyPolledBlocksLock.Unlock()
 
 	nailer := dhammer.NewNailer(numberOfBlockToFetch, func(ctx context.Context, blockToFetch uint64) (*BlockItem, error) {
 		var blockItem *BlockItem
@@ -273,7 +332,9 @@ func (p *BlockPoller[C]) loadNextBlocks(requestedBlock uint64, numberOfBlockToFe
 	go func() {
 		for blockItem := range nailer.Out {
 			p.optimisticallyPolledBlocksLock.Lock()
-			p.optimisticallyPolledBlocks[blockItem.blockNumber] = blockItem
+			if p.optimisticEpoch == epoch {
+				p.optimisticallyPolledBlocks[blockItem.blockNumber] = blockItem
+			}
 			p.optimisticallyPolledBlocksLock.Unlock()
 		}
 		close(done)
@@ -304,8 +365,6 @@ func (p *BlockPoller[C]) loadNextBlocks(requestedBlock uint64, numberOfBlockToFe
 
 	<-done
 
-	p.fetching = false
-
 	if nailer.Err() != nil {
 		return fmt.Errorf("failed optimistically fetch blocks starting at %d: %w", requestedBlock, nailer.Err())
 	}
@@ -326,30 +385,29 @@ func (p *BlockPoller[C]) requestBlock(blockNumber uint64, numberOfBlockToFetch i
 		blockItem, found := p.optimisticallyPolledBlocks[blockNumber]
 		p.optimisticallyPolledBlocksLock.Unlock()
 		if !found {
-			if !p.fetching {
-				go func() {
-					err := p.loadNextBlocks(blockNumber, numberOfBlockToFetch)
-					if err != nil {
-						p.Shutdown(err)
-						return
-					}
-				}()
-			}
+			p.triggerLoadNextBlocks(blockNumber, numberOfBlockToFetch, false)
+
 			if time.Since(lastLog) > 2*time.Second {
 				p.logger.Debug("waiting for block to be fetched", zap.Uint64("block_num", blockNumber))
 				lastLog = time.Now()
 			}
 
-			time.Sleep(20 * time.Millisecond)
+			time.Sleep(optimisticPollInterval)
 			continue
-		} else if !p.fetching {
-			// Optimistically anticipate next iterations
-			max := blockNumber
+		} else if numberOfBlockToFetch > 1 && !p.fetching.Load() {
+			// Optimistically anticipate the next iterations.
+			//
+			// This only applies to batched polling. With a batch size of 1 the poller is
+			// explicitly configured to fetch one block at a time, and that is also the
+			// only mode where `delayBetweenFetch` is honoured, so reading ahead there
+			// would both defeat the setting and waste RPC quota on a block the run loop
+			// may never ask for.
+			highestPolled := blockNumber
 
 			p.optimisticallyPolledBlocksLock.Lock()
 			for key := range p.optimisticallyPolledBlocks {
-				if key > max {
-					max = key
+				if key > highestPolled {
+					highestPolled = key
 				}
 				// Cleanup old blocks
 				if key < blockNumber {
@@ -358,15 +416,9 @@ func (p *BlockPoller[C]) requestBlock(blockNumber uint64, numberOfBlockToFetch i
 			}
 			p.optimisticallyPolledBlocksLock.Unlock()
 
-			if (max < blockNumber + uint64(numberOfBlockToFetch)) {
-				go func() {
-					p.logger.Info("anticipating future block polls", zap.Uint64("block_num", blockNumber), zap.Uint64("max", max))
-					err := p.loadNextBlocks(max + 1, numberOfBlockToFetch)
-					if err != nil {
-						p.Shutdown(err)
-						return
-					}
-				}()
+			if highestPolled < blockNumber+uint64(numberOfBlockToFetch) {
+				p.logger.Info("anticipating future block polls", zap.Uint64("block_num", blockNumber), zap.Uint64("max", highestPolled))
+				p.triggerLoadNextBlocks(highestPolled+1, numberOfBlockToFetch, true)
 			}
 		}
 
@@ -384,7 +436,7 @@ func (p *BlockPoller[C]) fetchBlockWithHash(blkNum uint64, hash string) (*pbbstr
 	p.logger.Info("fetching block with hash", zap.Uint64("block_num", blkNum), zap.String("hash", hash))
 	_ = hash //todo: hash will be used to fetch block from  cache
 
-	p.optimisticallyPolledBlocks = map[uint64]*BlockItem{}
+	p.resetOptimisticallyPolledBlocks()
 
 	var out *pbbstream.Block
 	var skipped bool
