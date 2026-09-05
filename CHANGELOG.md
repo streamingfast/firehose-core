@@ -16,6 +16,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - `firecore tools substreams prune-states` and `prune-outputs` delete much faster: deletions now run on their own `--delete-parallelism` (250 by default) instead of sharing the listing's `--parallelism` (16 and 64), each attempt is bounded at 5s instead of 30s, and a failed deletion is retried once after 50ms instead of four times over 7.5s. A deletion that still fails is reported as before and picked up by the next run.
 
+### Fixed
+
+- The `ready{app="firehose"}` Prometheus metric now remains `0` while the firehose waits to read the first streamable block and only changes to `1` after initialization succeeds. A firehose configured without a live source remains not ready.
+
 ### Added
 
 - The `Blocks` request handler now logs an `"incoming firehose Blocks request"` line as soon as a request starts, carrying `trace_id`, `organization_id`, `api_key_id`, `real_ip`, `start_block`, `stop_block`, `final_blocks_only` and `cursor`. The existing `"firehose process completed"` line gains `duration` (total request time), `time_to_first_data` and `first_sent_block` (zero-valued if no block was ever sent). Both lines are now emitted for every request outcome, including early rejections (session denied, rate limited, unimplemented transforms) and client disconnects, so every request can be paired up downstream by `trace_id`. A client-initiated cancellation is logged with `error: "context canceled"`; a server-initiated one (e.g. a revoked session) logs its real cause instead of collapsing into the same bucket.

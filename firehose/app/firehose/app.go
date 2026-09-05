@@ -199,7 +199,6 @@ func (a *App) Run() error {
 			a.logger.Info("waiting until hub is real-time synced")
 			select {
 			case <-forkableHub.Ready:
-				metrics.AppReadiness.SetReady()
 			case <-a.Terminating():
 				return
 			}
@@ -213,6 +212,9 @@ func (a *App) Run() error {
 
 		a.logger.Info("launching gRPC firehoseServer", zap.Bool("live_support", withLive))
 		a.isReady.CAS(false, true)
+		if withLive {
+			metrics.AppReadiness.SetReady()
+		}
 		firehoseServer.Launch()
 	}()
 
