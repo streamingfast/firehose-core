@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/firehose-core/internal/utils"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
 )
@@ -227,6 +228,9 @@ func (m *Merger) run() error {
 
 		unlinkableCount := 0
 		maxUnlinkableBlocks := int(m.bundler.bundleSize * 4)
+		if override := utils.GetEnvMergerMaxUnlinkableBlocks(); override != nil {
+			maxUnlinkableBlocks = *override
+		}
 		lastBase := m.bundler.baseBlockNum
 
 		err = m.io.WalkOneBlockFiles(ctx, base, func(obf *bstream.OneBlockFile) error {
