@@ -18,6 +18,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
+- The merger's `maxUnlinkableBlocks` circuit breaker (`bundleSize*4`) can now be overridden with the `MERGER_MAX_UNLINKABLE_BLOCKS` env var, for deployments where the default is too tight (e.g. several one-block-file writers per chain) to tolerate an ordinary reorg or brief writer hiccup. Unset or invalid values keep the existing `bundleSize*4` default.
+
 - The `Blocks` request handler now logs an `"incoming firehose Blocks request"` line as soon as a request starts, carrying `trace_id`, `organization_id`, `api_key_id`, `real_ip`, `start_block`, `stop_block`, `final_blocks_only` and `cursor`. The existing `"firehose process completed"` line gains `duration` (total request time), `time_to_first_data` and `first_sent_block` (zero-valued if no block was ever sent). Both lines are now emitted for every request outcome, including early rejections (session denied, rate limited, unimplemented transforms) and client disconnects, so every request can be paired up downstream by `trace_id`. A client-initiated cancellation is logged with `error: "context canceled"`; a server-initiated one (e.g. a revoked session) logs its real cause instead of collapsing into the same bucket.
 
 - The merger now records what a merged-blocks file holds on the object itself, as three custom metadata entries written as it uploads each bundle: `datasize`, the file's size once decompressed, `itemcount`, the number of blocks it holds, and `timestamp`, the time of its first block written as `2025-10-12 10:23:12` in UTC. A listing then tells what a file holds without reading it.
