@@ -16,6 +16,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - Bumped substreams: `substreams_tier1_effective_active_requests` could read below `substreams_active_requests`, the
   metric it is meant to replace as the horizontal autoscaler input. Requests still setting up were counted by one and
   not the other, so a tier1 pod with requests queued in setup looked emptier to the autoscaler than it was.
+- Bumped substreams: fixed handling of partial-blocks (flashblocks) streams on a tier1 that is shutting down. The
+  stream now ends with `Unavailable` like a full-block stream does, so the client reconnects elsewhere. It used to
+  stay open but silent, then send an undo signal at each block boundary naming a block the client had never
+  received. An undo signal is also no longer sent for partial-block state whose outputs were never sent.
 
 ### Changed
 
