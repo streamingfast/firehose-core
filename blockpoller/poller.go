@@ -45,8 +45,9 @@ type BlockPoller[C any] struct {
 
 	logger *zap.Logger
 
-	lastSuccessfulClientCall     time.Time
-	lastSuccessfulClientCallLock sync.Mutex
+	lastSuccessfulClientCall time.Time
+	firstFailedClientCall    time.Time
+	clientCallLock           sync.Mutex
 
 	optimisticallyPolledBlocks map[uint64]*BlockItem
 
@@ -105,15 +106,24 @@ func (p *BlockPoller[C]) Run(firstStreamableBlockNum uint64, stopBlock *uint64, 
 }
 
 func (p *BlockPoller[C]) markClientSuccess() {
-	p.lastSuccessfulClientCallLock.Lock()
+	p.clientCallLock.Lock()
 	p.lastSuccessfulClientCall = time.Now()
-	p.lastSuccessfulClientCallLock.Unlock()
+	p.firstFailedClientCall = time.Time{}
+	p.clientCallLock.Unlock()
+}
+
+func (p *BlockPoller[C]) markClientFailure() {
+	p.clientCallLock.Lock()
+	if p.firstFailedClientCall.IsZero() {
+		p.firstFailedClientCall = time.Now()
+	}
+	p.clientCallLock.Unlock()
 }
 
 func (p *BlockPoller[C]) run(resolvedStartBlock bstream.BlockRef, stopBlock uint64, blockFetchBatchSize int) (err error) {
-	p.lastSuccessfulClientCallLock.Lock()
+	p.clientCallLock.Lock()
 	p.lastSuccessfulClientCall = time.Now()
-	p.lastSuccessfulClientCallLock.Unlock()
+	p.clientCallLock.Unlock()
 
 	go func() {
 		ticker := time.NewTicker(15 * time.Second)
@@ -121,11 +131,18 @@ func (p *BlockPoller[C]) run(resolvedStartBlock bstream.BlockRef, stopBlock uint
 		for {
 			select {
 			case <-ticker.C:
-				p.lastSuccessfulClientCallLock.Lock()
+				p.clientCallLock.Lock()
+				firstFailure := p.firstFailedClientCall
 				since := time.Since(p.lastSuccessfulClientCall)
-				p.lastSuccessfulClientCallLock.Unlock()
-				if since > time.Minute {
-					p.logger.Warn("no clients have been working for over 1 minute, still retrying", zap.Duration("elapsed_since_last_success", since))
+				p.clientCallLock.Unlock()
+				if firstFailure.IsZero() {
+					continue
+				}
+				if failingFor := time.Since(firstFailure); failingFor > time.Minute {
+					p.logger.Warn("no clients have been working for over 1 minute, still retrying",
+						zap.Duration("failing_for", failingFor),
+						zap.Duration("elapsed_since_last_success", since),
+					)
 				}
 			case <-p.Terminating():
 				return
@@ -280,6 +297,7 @@ func (p *BlockPoller[C]) loadNextBlocks(requestedBlock uint64, numberOfBlockToFe
 			})
 
 			if err != nil {
+				p.markClientFailure()
 				return fmt.Errorf("fetching block %d with retry : %w", blockToFetch, err)
 			}
 			blockItem = bi
@@ -412,6 +430,7 @@ func (p *BlockPoller[C]) fetchBlockWithHash(blkNum uint64, hash string) (*pbbstr
 		})
 
 		if err != nil {
+			p.markClientFailure()
 			return fmt.Errorf("fetching block with retry %d: %w", blkNum, err)
 		}
 
