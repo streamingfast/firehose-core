@@ -8,12 +8,16 @@ type ErrSendBlock struct {
 	inner error
 }
 
-func NewErrSendBlock(inner error) ErrSendBlock {
-	return ErrSendBlock{
+func NewErrSendBlock(inner error) *ErrSendBlock {
+	return &ErrSendBlock{
 		inner: inner,
 	}
 }
 
-func (e ErrSendBlock) Error() string {
+func (e *ErrSendBlock) Error() string {
 	return fmt.Sprintf("send error: %s", e.inner)
+}
+
+func (e *ErrSendBlock) Unwrap() error {
+	return e.inner
 }
