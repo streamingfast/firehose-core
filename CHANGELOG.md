@@ -27,6 +27,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - `firecore tools substreams prune-states` and `prune-outputs` delete much faster: deletions now run on their own `--delete-parallelism` (250 by default) instead of sharing the listing's `--parallelism` (16 and 64), each attempt is bounded at 5s instead of 30s, and a failed deletion is retried once after 50ms instead of four times over 7.5s. A deletion that still fails is reported as before and picked up by the next run.
 
+- Updated the embedded Solana block protobuf definitions to the latest ones published on the Buf registry: `Message.version`, `Message.transaction_config` (with the new `TransactionConfig` message holding `priority_fee`, `compute_unit_limit`, `loaded_accounts_data_size_limit` and `heap_size`) and the `DeactivatedStake` reward type are now decoded by `firecore tools print` and friends.
+
 ### Added
 
 - The merger's `maxUnlinkableBlocks` circuit breaker (`bundleSize*4`) can now be overridden with the `MERGER_MAX_UNLINKABLE_BLOCKS` env var, for deployments where the default is too tight (e.g. several one-block-file writers per chain) to tolerate an ordinary reorg or brief writer hiccup. Unset or invalid values keep the existing `bundleSize*4` default.
