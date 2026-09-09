@@ -52,7 +52,6 @@ type FirehoseConfig struct {
 	ApiKey        string
 	ApiToken      string
 	Endpoint      string
-	Compression   string
 	PlaintextConn bool
 	InsecureConn  bool
 }

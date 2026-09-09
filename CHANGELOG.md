@@ -13,6 +13,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### Fixed
 
 - Bumped `google.golang.org/grpc` to v1.83.2, which fixes CVE-2026-84445.
+- `reader-node-firehose` no longer acts on undo signals from its upstream endpoint. It treated a `STEP_UNDO` response like a new block and re-emitted it, now it just logs and skips them. (a reader does not take decisions on reorgs)
 - The block poller no longer warns `no clients have been working for over 1 minute, still retrying` on slower chains like Bitcoin/Litecoin with block rate exceeding 1 minute. Instead it only warns if fetches have been actually failing for over a minute.
 - Bumped substreams: `substreams_tier1_effective_active_requests` could read below `substreams_active_requests`, the
   metric it is meant to replace as the horizontal autoscaler input. Requests still setting up were counted by one and
@@ -23,6 +24,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
   received. An undo signal is also no longer sent for partial-block state whose outputs were never sent.
 
 ### Changed
+
+- Removed the `--reader-node-firehose-compression` flag. It has never had any effect: the connection to the upstream endpoint always uses zstd. Operators setting it must drop it, as an unknown flag stops the process from starting.
 
 - Bumped `golang.org/x/crypto` to `v0.56.0`, clearing CVE-2026-78662 and CVE-2026-56855 (both HIGH), which the Docker Scout scan of the published image fails on.
 
