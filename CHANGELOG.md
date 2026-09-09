@@ -12,6 +12,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Fixed
 
+- Bumped `google.golang.org/grpc` to v1.83.2, which fixes CVE-2026-84445.
 - The block poller no longer warns `no clients have been working for over 1 minute, still retrying` on slower chains like Bitcoin/Litecoin with block rate exceeding 1 minute. Instead it only warns if fetches have been actually failing for over a minute.
 - Bumped substreams: `substreams_tier1_effective_active_requests` could read below `substreams_active_requests`, the
   metric it is meant to replace as the horizontal autoscaler input. Requests still setting up were counted by one and
@@ -26,6 +27,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - Bumped `golang.org/x/crypto` to `v0.56.0`, clearing CVE-2026-78662 and CVE-2026-56855 (both HIGH), which the Docker Scout scan of the published image fails on.
 
 - `firecore tools substreams prune-states` and `prune-outputs` delete much faster: deletions now run on their own `--delete-parallelism` (250 by default) instead of sharing the listing's `--parallelism` (16 and 64), each attempt is bounded at 5s instead of 30s, and a failed deletion is retried once after 50ms instead of four times over 7.5s. A deletion that still fails is reported as before and picked up by the next run.
+
+- Updated the embedded Solana block protobuf definitions to the latest ones published on the Buf registry: `Message.version`, `Message.transaction_config` (with the new `TransactionConfig` message holding `priority_fee`, `compute_unit_limit`, `loaded_accounts_data_size_limit` and `heap_size`) and the `DeactivatedStake` reward type are now decoded by `firecore tools print` and friends.
 
 ### Added
 
