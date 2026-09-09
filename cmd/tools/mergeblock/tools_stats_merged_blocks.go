@@ -375,11 +375,11 @@ func printMergedBlocksRow(table *tabwriter.Writer, name string, tally mergedBloc
 		humanize.Comma(int64(tally.startBlock)),
 		humanize.Comma(tally.files),
 		humanize.Comma(tally.blocks),
-		humanize.Bytes(uint64(tally.compressed)),
-		humanize.Bytes(uint64(tally.uncompressed)),
+		humanize.IBytes(uint64(tally.compressed)),
+		humanize.IBytes(uint64(tally.uncompressed)),
 		tally.compressionRatio(),
-		humanize.Bytes(uint64(tally.compressedPerBlock())),
-		humanize.Bytes(uint64(tally.uncompressedPerBlock())),
+		humanize.IBytes(uint64(tally.compressedPerBlock())),
+		humanize.IBytes(uint64(tally.uncompressedPerBlock())),
 	)
 }
 
