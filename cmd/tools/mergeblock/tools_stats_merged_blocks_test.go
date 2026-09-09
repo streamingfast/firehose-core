@@ -12,19 +12,21 @@ import (
 
 func TestReadAnnotation(t *testing.T) {
 	tests := []struct {
-		name     string
-		size     int64
-		metadata map[string]string
-		expect   annotatedFile
-		expectOK bool
+		name        string
+		size        int64
+		lowBlockNum uint64
+		metadata    map[string]string
+		expect      annotatedFile
+		expectOK    bool
 	}{
 		{
-			name:     "complete",
-			size:     1000,
-			metadata: map[string]string{dataSizeMetadataKey: "4096", itemCountMetadataKey: "100", timestampMetadataKey: "2025-10-12 10:23:12"},
+			name:        "complete",
+			size:        1000,
+			lowBlockNum: 10123000,
+			metadata:    map[string]string{dataSizeMetadataKey: "4096", itemCountMetadataKey: "100", timestampMetadataKey: "2025-10-12 10:23:12"},
 			expect: annotatedFile{
 				month: "2025-10",
-				tally: mergedBlocksTally{files: 1, blocks: 100, compressed: 1000, uncompressed: 4096},
+				tally: mergedBlocksTally{files: 1, blocks: 100, compressed: 1000, uncompressed: 4096, startBlock: 10123000},
 			},
 			expectOK: true,
 		},
@@ -48,7 +50,7 @@ func TestReadAnnotation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			object := mergedBlocksObject{attrs: &storage.ObjectAttrs{Size: test.size, Metadata: test.metadata}}
+			object := mergedBlocksObject{attrs: &storage.ObjectAttrs{Size: test.size, Metadata: test.metadata}, lowBlockNum: test.lowBlockNum}
 
 			file, ok := readAnnotation(object)
 			require.Equal(t, test.expectOK, ok)
@@ -61,10 +63,11 @@ func TestReadAnnotation(t *testing.T) {
 
 func TestMergedBlocksTally(t *testing.T) {
 	var tally mergedBlocksTally
-	tally.add(mergedBlocksTally{files: 1, blocks: 100, compressed: 1000, uncompressed: 4000})
-	tally.add(mergedBlocksTally{files: 1, blocks: 100, compressed: 1000, uncompressed: 2000})
+	tally.add(mergedBlocksTally{files: 1, blocks: 100, compressed: 1000, uncompressed: 4000, startBlock: 200})
+	tally.add(mergedBlocksTally{files: 1, blocks: 100, compressed: 1000, uncompressed: 2000, startBlock: 100})
 
-	assert.Equal(t, mergedBlocksTally{files: 2, blocks: 200, compressed: 2000, uncompressed: 6000}, tally)
+	// The bucket takes the lowest first-block of the files added to it, whatever the order.
+	assert.Equal(t, mergedBlocksTally{files: 2, blocks: 200, compressed: 2000, uncompressed: 6000, startBlock: 100}, tally)
 	assert.Equal(t, 3.0, tally.compressionRatio())
 	assert.Equal(t, 30.0, tally.uncompressedPerBlock())
 	assert.Equal(t, 10.0, tally.compressedPerBlock())
@@ -84,10 +87,10 @@ func TestDescribeBlockRange(t *testing.T) {
 
 func TestNewStatsReport(t *testing.T) {
 	months := map[string]*mergedBlocksTally{
-		"2025-11": {files: 1, blocks: 100, compressed: 1000, uncompressed: 2000},
-		"2025-10": {files: 2, blocks: 200, compressed: 2000, uncompressed: 6000},
+		"2025-11": {files: 1, blocks: 100, compressed: 1000, uncompressed: 2000, startBlock: 1800},
+		"2025-10": {files: 2, blocks: 200, compressed: 2000, uncompressed: 6000, startBlock: 1000},
 	}
-	total := mergedBlocksTally{files: 3, blocks: 300, compressed: 3000, uncompressed: 8000}
+	total := mergedBlocksTally{files: 3, blocks: 300, compressed: 3000, uncompressed: 8000, startBlock: 1000}
 	cfg := statsConfig{startBlock: 1000, stopBlock: 2000, chainName: "eth-mainnet"}
 
 	report := newStatsReport(cfg, months, total, false, 1000, 1900, 4, 1500*time.Millisecond)
@@ -108,6 +111,7 @@ func TestNewStatsReport(t *testing.T) {
 	assert.Equal(t, "2025-11", report.Months[1].Month)
 	assert.Equal(t, statsBucket{
 		Month:                     "2025-10",
+		StartBlock:                1000,
 		Files:                     2,
 		Blocks:                    200,
 		CompressedBytes:           2000,

@@ -125,9 +125,15 @@ type mergedBlocksTally struct {
 	blocks       int64
 	compressed   int64
 	uncompressed int64
+	// startBlock is the lowest first-block of the files in the bucket, meaningless while
+	// files is 0.
+	startBlock uint64
 }
 
 func (t *mergedBlocksTally) add(other mergedBlocksTally) {
+	if other.files > 0 && (t.files == 0 || other.startBlock < t.startBlock) {
+		t.startBlock = other.startBlock
+	}
 	t.files += other.files
 	t.blocks += other.blocks
 	t.compressed += other.compressed
@@ -259,6 +265,7 @@ type statsReport struct {
 
 type statsBucket struct {
 	Month                     string  `json:"month,omitempty"`
+	StartBlock                uint64  `json:"start_block"`
 	Files                     int64   `json:"files"`
 	Blocks                    int64   `json:"blocks"`
 	CompressedBytes           int64   `json:"compressed_bytes"`
@@ -271,6 +278,7 @@ type statsBucket struct {
 func newStatsBucket(month string, tally mergedBlocksTally) statsBucket {
 	return statsBucket{
 		Month:                     month,
+		StartBlock:                tally.startBlock,
 		Files:                     tally.files,
 		Blocks:                    tally.blocks,
 		CompressedBytes:           tally.compressed,
@@ -337,6 +345,7 @@ func readAnnotation(object mergedBlocksObject) (annotatedFile, bool) {
 			blocks:       blocks,
 			compressed:   object.attrs.Size,
 			uncompressed: dataSize,
+			startBlock:   object.lowBlockNum,
 		},
 	}, true
 }
@@ -349,20 +358,21 @@ func printMergedBlocksTable(months map[string]*mergedBlocksTally, total mergedBl
 	sort.Strings(names)
 
 	table := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', tabwriter.AlignRight)
-	fmt.Fprintln(table, "MONTH\tFILES\tBLOCKS\tCOMPRESSED\tUNCOMPRESSED\tRATIO\tCOMP./BLOCK\tUNCOMP./BLOCK\t")
+	fmt.Fprintln(table, "MONTH\tSTART_BLOCK\tFILES\tBLOCKS\tCOMPRESSED\tUNCOMPRESSED\tRATIO\tCOMP./BLOCK\tUNCOMP./BLOCK\t")
 	for _, name := range names {
 		printMergedBlocksRow(table, name, *months[name])
 	}
 	if len(names) > 1 {
-		fmt.Fprintln(table, "\t\t\t\t\t\t\t\t")
+		fmt.Fprintln(table, "\t\t\t\t\t\t\t\t\t")
 		printMergedBlocksRow(table, "TOTAL", total)
 	}
 	table.Flush()
 }
 
 func printMergedBlocksRow(table *tabwriter.Writer, name string, tally mergedBlocksTally) {
-	fmt.Fprintf(table, "%s\t%s\t%s\t%s\t%s\t%.2fx\t%s\t%s\t\n",
+	fmt.Fprintf(table, "%s\t%s\t%s\t%s\t%s\t%s\t%.2fx\t%s\t%s\t\n",
 		name,
+		humanize.Comma(int64(tally.startBlock)),
 		humanize.Comma(tally.files),
 		humanize.Comma(tally.blocks),
 		humanize.Bytes(uint64(tally.compressed)),
