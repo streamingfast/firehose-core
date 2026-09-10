@@ -12,6 +12,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Fixed
 
+- The merger no longer spins when a walk over one-block files keeps hitting the unlinkable-blocks limit: that path skipped the `merger-time-between-store-lookups` delay, so a merger stuck behind a gap in one-block files re-walked and logged `too many unlinkable blocks, continuing to next loop` about ten times per second. It now waits like any other iteration, the line is logged at `Warn` instead of `Info`, and the wait is interrupted by shutdown.
 - Bumped `google.golang.org/grpc` to v1.83.2, which fixes CVE-2026-84445.
 - `reader-node-firehose` no longer acts on undo signals from its upstream endpoint. It treated a `STEP_UNDO` response like a new block and re-emitted it, now it just logs and skips them. (a reader does not take decisions on reorgs)
 - The block poller no longer warns `no clients have been working for over 1 minute, still retrying` on slower chains like Bitcoin/Litecoin with block rate exceeding 1 minute. Instead it only warns if fetches have been actually failing for over a minute.
