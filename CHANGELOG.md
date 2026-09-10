@@ -25,6 +25,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Changed
 
+- Bumped `bstream` to enable parallel one-blocks downloading upon bootstrap or reconnect (very useful on fast chains)
+
 - Removed the `--reader-node-firehose-compression` flag. It has never had any effect: the connection to the upstream endpoint always uses zstd. Operators setting it must drop it, as an unknown flag stops the process from starting.
 
 - Bumped `golang.org/x/crypto` to `v0.56.0`, clearing CVE-2026-78662 and CVE-2026-56855 (both HIGH), which the Docker Scout scan of the published image fails on.
