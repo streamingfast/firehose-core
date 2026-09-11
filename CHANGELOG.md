@@ -16,7 +16,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Fixed
 
-- The `ready{app="firehose"}` Prometheus metric now remains `0` while the firehose waits to read the first streamable block and only changes to `1` after initialization succeeds. A firehose configured without a live source remains not ready.
+- The `ready{app="firehose"}` Prometheus metric now remains `0` while the firehose waits to read the first streamable block and only changes to `1` after initialization succeeds, including when serving from merged blocks without a live source.
 
 ### Added
 

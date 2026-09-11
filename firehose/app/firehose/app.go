@@ -208,13 +208,12 @@ func (a *App) Run() error {
 		defer cancel()
 		if err := a.modules.InfoServer.Init(ctx, forkableHub, mergedBlocksStore, oneBlocksStore, a.logger); err != nil {
 			a.Shutdown(fmt.Errorf("cannot initialize info server: %w", err))
+			return
 		}
 
 		a.logger.Info("launching gRPC firehoseServer", zap.Bool("live_support", withLive))
 		a.isReady.CAS(false, true)
-		if withLive {
-			metrics.AppReadiness.SetReady()
-		}
+		metrics.AppReadiness.SetReady()
 		firehoseServer.Launch()
 	}()
 
