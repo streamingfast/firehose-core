@@ -8,47 +8,7 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
-
-### Fixed
-
-- The merger no longer spins when a walk over one-block files keeps hitting the unlinkable-blocks limit: that path skipped the `merger-time-between-store-lookups` delay, so a merger stuck behind a gap in one-block files re-walked and logged `too many unlinkable blocks, continuing to next loop` about ten times per second. It now waits like any other iteration, the line is logged at `Warn` instead of `Info`, and the wait is interrupted by shutdown.
-- Bumped `google.golang.org/grpc` to v1.83.2, which fixes CVE-2026-84445.
-- `reader-node-firehose` no longer acts on undo signals from its upstream endpoint. It treated a `STEP_UNDO` response like a new block and re-emitted it, now it just logs and skips them. (a reader does not take decisions on reorgs)
-- The block poller no longer warns `no clients have been working for over 1 minute, still retrying` on slower chains like Bitcoin/Litecoin with block rate exceeding 1 minute. Instead it only warns if fetches have been actually failing for over a minute.
-- Bumped substreams: `substreams_tier1_effective_active_requests` could read below `substreams_active_requests`, the
-  metric it is meant to replace as the horizontal autoscaler input. Requests still setting up were counted by one and
-  not the other, so a tier1 pod with requests queued in setup looked emptier to the autoscaler than it was.
-- Bumped substreams: fixed handling of partial-blocks (flashblocks) streams on a tier1 that is shutting down. The
-  stream now ends with `Unavailable` like a full-block stream does, so the client reconnects elsewhere. It used to
-  stay open but silent, then send an undo signal at each block boundary naming a block the client had never
-  received. An undo signal is also no longer sent for partial-block state whose outputs were never sent.
-- Bumped substreams: `substreams-tier1` no longer closes the squasher's cached stores while a squash is still
-  running. When the scheduler stopped early (a tier2 job failed, or the pod was shutting down), the in-flight merge
-  could panic the process or write an empty full store to storage.
-
-### Changed
-
-- Regenerated well-known protobuf descriptors from the Buf Schema Registry. The Cosmos block model (`sf.cosmos.type.v2.Block`) now includes CometBFT v1 consensus params (`abci`, `synchrony`, `feature`), a `bls12381` public-key variant, and a local `Int64Value` for feature heights, which were previously unknown fields.
-- Bumped `bstream` to enable parallel one-blocks downloading upon bootstrap or reconnect (very useful on fast chains)
-- Bumped substreams: `substreams-tier1` squashes store partials in runs of up to 1000 segments or 30 s of work per
-  command instead of one segment per command, which capped squashing at about 15 segments per minute on busy
-  backprocessing requests. Segments whose partials are all empty get a copy of the previous full store instead of a
-  merge, server-side on object stores that support it.
-- Bumped substreams: `substreams-tier1` asks the relayer for every block from its own LIB when it connects or
-  reconnects, instead of the last 2 blocks, so a gap left by a disconnect is filled from the relayer's memory rather
-  than from the one-block store.
-- Bumped `dstore`: S3 `CopyObject` is done server-side (multipart above 5 GiB) instead of downloading and uploading
-  the object back, falling back to the old behaviour on backends answering `NotImplemented` or `MethodNotAllowed`.
-
-- Block poller per-block lines (`about to fetch block`, `requesting block`, `optimistically fetching block`, `block was optimistically polled`, `fetching block with hash`, `processing block`, `saved cursor`) are now logged at `Debug`; they fired several times per block at `Info`.
-- Removed the `--reader-node-firehose-compression` flag. It has never had any effect: the connection to the upstream endpoint always uses zstd. Operators setting it must drop it, as an unknown flag stops the process from starting.
-
-- Bumped `golang.org/x/crypto` to `v0.56.0`, clearing CVE-2026-78662 and CVE-2026-56855 (both HIGH), which the Docker Scout scan of the published image fails on.
-
-- `firecore tools substreams prune-states` and `prune-outputs` delete much faster: deletions now run on their own `--delete-parallelism` (250 by default) instead of sharing the listing's `--parallelism` (16 and 64), each attempt is bounded at 5s instead of 30s, and a failed deletion is retried once after 50ms instead of four times over 7.5s. A deletion that still fails is reported as before and picked up by the next run.
-
-- Updated the embedded Solana block protobuf definitions to the latest ones published on the Buf registry: `Message.version`, `Message.transaction_config` (with the new `TransactionConfig` message holding `priority_fee`, `compute_unit_limit`, `loaded_accounts_data_size_limit` and `heap_size`) and the `DeactivatedStake` reward type are now decoded by `firecore tools print` and friends.
+## v1.19.0
 
 ### Added
 
@@ -118,6 +78,28 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
   Thresholds and ratios are fractions of the CPU budget. That budget is the CPU limit the cgroup carries, so an instance running under cgroup v2 with no limit set — `cpu.max` reading `max` — has nothing to compare usage to and logs a warning at startup, leaving the eviction off; `--substreams-tier1-cpu-eviction-quota-cores-override` names the budget yourself in that case, and should stay at or under whatever limit the kernel does enforce, since above it the instance is throttled before the eviction ever fires. Reading the cgroup CPU files failing outright, cgroup v1 included, also logs a warning and leaves the eviction off. Every one of these warnings is only emitted when the mode is not `off`.
 
+### Changed
+
+- Regenerated well-known protobuf descriptors from the Buf Schema Registry. The Cosmos block model (`sf.cosmos.type.v2.Block`) now includes CometBFT v1 consensus params (`abci`, `synchrony`, `feature`), a `bls12381` public-key variant, and a local `Int64Value` for feature heights, which were previously unknown fields.
+- Bumped `bstream` to enable parallel one-blocks downloading upon bootstrap or reconnect (very useful on fast chains)
+- Bumped substreams: `substreams-tier1` squashes store partials in runs of up to 1000 segments or 30 s of work per
+  command instead of one segment per command, which capped squashing at about 15 segments per minute on busy
+  backprocessing requests. Segments whose partials are all empty get a copy of the previous full store instead of a
+  merge, server-side on object stores that support it.
+- Bumped substreams: `substreams-tier1` asks the relayer for every block from its own LIB when it connects or
+  reconnects, instead of the last 2 blocks, so a gap left by a disconnect is filled from the relayer's memory rather
+  than from the one-block store.
+- Bumped `dstore`: S3 `CopyObject` is done server-side (multipart above 5 GiB) instead of downloading and uploading
+  the object back, falling back to the old behaviour on backends answering `NotImplemented` or `MethodNotAllowed`.
+
+- Block poller per-block lines (`about to fetch block`, `requesting block`, `optimistically fetching block`, `block was optimistically polled`, `fetching block with hash`, `processing block`, `saved cursor`) are now logged at `Debug`; they fired several times per block at `Info`.
+
+- Bumped `golang.org/x/crypto` to `v0.56.0`, clearing CVE-2026-78662 and CVE-2026-56855 (both HIGH), which the Docker Scout scan of the published image fails on.
+
+- `firecore tools substreams prune-states` and `prune-outputs` delete much faster: deletions now run on their own `--delete-parallelism` (250 by default) instead of sharing the listing's `--parallelism` (16 and 64), each attempt is bounded at 5s instead of 30s, and a failed deletion is retried once after 50ms instead of four times over 7.5s. A deletion that still fails is reported as before and picked up by the next run.
+
+- Updated the embedded Solana block protobuf definitions to the latest ones published on the Buf registry: `Message.version`, `Message.transaction_config` (with the new `TransactionConfig` message holding `priority_fee`, `compute_unit_limit`, `loaded_accounts_data_size_limit` and `heap_size`) and the `DeactivatedStake` reward type are now decoded by `firecore tools print` and friends.
+
 - Bumped `substreams` to [v1.22.1-0.20260903162505-4035f21109ec](https://github.com/streamingfast/substreams/compare/1cffa6c10a8d...4035f21109ec):
 
   - Server: `substreams-tier1` scheduling no longer slows down as a large backprocessing range progresses. Picking the next tier2 job walked every segment between the squasher and the job frontier on every call, re-checking dependencies that could not have changed, so a run over N segments cost O(N²) in scheduling. The scheduler now keeps, per stage, the lowest segment that may still be pending and the highest segment completed so far, and only looks at the handful of segments those point at. On a 3-stage graph with 4 workers and a squasher three times slower than the jobs, scheduling 8000 segments went from 1.18s to 2.7ms, and now grows linearly with the range. Job order is unchanged.
@@ -150,7 +132,26 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
   - Server: `substreams-tier2` logs far less per segment. A large backfill fans out into tens of thousands of `ProcessRange` calls, each of which was writing about ten `Info` lines with no steady-state diagnostic value, enough to raise an instance's log volume by an order of magnitude. The duplicate auth-info log in the response handler is gone (the incoming request already logs it once per segment), the store-size and exec-output-file-open logs are now `Debug`, and so are the four shutdown-lifecycle logs of the per-request `dmetering` event emitter, which is opened and torn down on every `ProcessRange` call. The benign `http2: server: error reading preface ...: connection reset by peer` logged whenever a client drops a connection mid-handshake against the plaintext/h2c tier2 port is suppressed, like the existing TLS-handshake ones.
 
+### Removed
+
+- Removed the `--reader-node-firehose-compression` flag. It has never had any effect: the connection to the upstream endpoint always uses zstd. Operators setting it must drop it, as an unknown flag stops the process from starting.
+
 ### Fixed
+
+- The merger no longer spins when a walk over one-block files keeps hitting the unlinkable-blocks limit: that path skipped the `merger-time-between-store-lookups` delay, so a merger stuck behind a gap in one-block files re-walked and logged `too many unlinkable blocks, continuing to next loop` about ten times per second. It now waits like any other iteration, the line is logged at `Warn` instead of `Info`, and the wait is interrupted by shutdown.
+- Bumped `google.golang.org/grpc` to v1.83.2, which fixes CVE-2026-84445.
+- `reader-node-firehose` no longer acts on undo signals from its upstream endpoint. It treated a `STEP_UNDO` response like a new block and re-emitted it, now it just logs and skips them. (a reader does not take decisions on reorgs)
+- The block poller no longer warns `no clients have been working for over 1 minute, still retrying` on slower chains like Bitcoin/Litecoin with block rate exceeding 1 minute. Instead it only warns if fetches have been actually failing for over a minute.
+- Bumped substreams: `substreams_tier1_effective_active_requests` could read below `substreams_active_requests`, the
+  metric it is meant to replace as the horizontal autoscaler input. Requests still setting up were counted by one and
+  not the other, so a tier1 pod with requests queued in setup looked emptier to the autoscaler than it was.
+- Bumped substreams: fixed handling of partial-blocks (flashblocks) streams on a tier1 that is shutting down. The
+  stream now ends with `Unavailable` like a full-block stream does, so the client reconnects elsewhere. It used to
+  stay open but silent, then send an undo signal at each block boundary naming a block the client had never
+  received. An undo signal is also no longer sent for partial-block state whose outputs were never sent.
+- Bumped substreams: `substreams-tier1` no longer closes the squasher's cached stores while a squash is still
+  running. When the scheduler stopped early (a tier2 job failed, or the pod was shutting down), the in-flight merge
+  could panic the process or write an empty full store to storage.
 
 - `proto/generator`: FileDescriptorSet JSON from Buf is unmarshalled with unknown fields discarded, so `go generate` in `proto/` works against current BSR descriptor extensions.
 
