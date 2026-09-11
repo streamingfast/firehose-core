@@ -244,7 +244,7 @@ func (m *Merger) run() error {
 			if obf.Num > m.bundler.baseBlockNum && !m.bundler.forkable.Linkable(obf.ToBstreamBlock()) {
 				unlinkableCount++
 				if unlinkableCount > maxUnlinkableBlocks {
-					m.logger.Info("too many unlinkable blocks, continuing to next loop", zap.Uint64("base", obf.Num), zap.Int("unlinkable_count", unlinkableCount), zap.Stringer("last_seen_block", obf))
+					m.logger.Warn("too many unlinkable blocks, continuing to next loop", zap.Uint64("base", obf.Num), zap.Int("unlinkable_count", unlinkableCount), zap.Stringer("last_seen_block", obf))
 					return errCheckLoop // we have too many unlinkable blocks, continue to next loop in case
 				}
 			}
@@ -255,7 +255,7 @@ func (m *Merger) run() error {
 		case nil:
 			consecutiveErrors = 0
 		case errCheckLoop:
-			continue
+			// not an error, the walk was cut short on purpose; still subject to the polling delay below
 		case errTerminating:
 			return nil
 		case ErrStopBlockReached:
@@ -270,7 +270,11 @@ func (m *Merger) run() error {
 		}
 
 		if spentTime := time.Since(now); spentTime < m.timeBetweenPolling {
-			time.Sleep(m.timeBetweenPolling - spentTime)
+			select {
+			case <-m.Terminating():
+				return nil
+			case <-time.After(m.timeBetweenPolling - spentTime):
+			}
 		}
 	}
 }
