@@ -23,11 +23,23 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
   stream now ends with `Unavailable` like a full-block stream does, so the client reconnects elsewhere. It used to
   stay open but silent, then send an undo signal at each block boundary naming a block the client had never
   received. An undo signal is also no longer sent for partial-block state whose outputs were never sent.
+- Bumped substreams: `substreams-tier1` no longer closes the squasher's cached stores while a squash is still
+  running. When the scheduler stopped early (a tier2 job failed, or the pod was shutting down), the in-flight merge
+  could panic the process or write an empty full store to storage.
 
 ### Changed
 
 - Regenerated well-known protobuf descriptors from the Buf Schema Registry. The Cosmos block model (`sf.cosmos.type.v2.Block`) now includes CometBFT v1 consensus params (`abci`, `synchrony`, `feature`), a `bls12381` public-key variant, and a local `Int64Value` for feature heights, which were previously unknown fields.
 - Bumped `bstream` to enable parallel one-blocks downloading upon bootstrap or reconnect (very useful on fast chains)
+- Bumped substreams: `substreams-tier1` squashes store partials in runs of up to 1000 segments or 30 s of work per
+  command instead of one segment per command, which capped squashing at about 15 segments per minute on busy
+  backprocessing requests. Segments whose partials are all empty get a copy of the previous full store instead of a
+  merge, server-side on object stores that support it.
+- Bumped substreams: `substreams-tier1` asks the relayer for every block from its own LIB when it connects or
+  reconnects, instead of the last 2 blocks, so a gap left by a disconnect is filled from the relayer's memory rather
+  than from the one-block store.
+- Bumped `dstore`: S3 `CopyObject` is done server-side (multipart above 5 GiB) instead of downloading and uploading
+  the object back, falling back to the old behaviour on backends answering `NotImplemented` or `MethodNotAllowed`.
 
 - Block poller per-block lines (`about to fetch block`, `requesting block`, `optimistically fetching block`, `block was optimistically polled`, `fetching block with hash`, `processing block`, `saved cursor`) are now logged at `Debug`; they fired several times per block at `Info`.
 - Removed the `--reader-node-firehose-compression` flag. It has never had any effect: the connection to the upstream endpoint always uses zstd. Operators setting it must drop it, as an unknown flag stops the process from starting.

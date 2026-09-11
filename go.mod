@@ -23,7 +23,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
-	github.com/streamingfast/bstream v0.0.2-0.20260910200824-037a10c6149b
+	github.com/streamingfast/bstream v0.0.2-0.20260910212213-07a378ae0f74
 	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b
 	github.com/streamingfast/dauth v0.0.0-20260318230957-4ab1e1d2ebc3
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
@@ -34,13 +34,13 @@ require (
 	github.com/streamingfast/dmetering v0.0.0-20260901152443-1ff4cd0d617d
 	github.com/streamingfast/dmetrics v0.0.0-20260819172634-28069dc8018a
 	github.com/streamingfast/dsession v0.0.0-20260414190543-79b9846e7c58
-	github.com/streamingfast/dstore v0.2.4-0.20260825160629-56e87480522c
+	github.com/streamingfast/dstore v0.2.4-0.20260911133316-3b0685e87595
 	github.com/streamingfast/firehose-networks v0.2.3
 	github.com/streamingfast/logging v1.2.3-0.20260810132752-360563ac68a9
 	github.com/streamingfast/payment-gateway v0.0.0-20260527144655-d0576d2a4ee3
 	github.com/streamingfast/pbgo v0.0.6-0.20260206150405-2b95acf70437
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.22.1-0.20260908190533-360e41fbc42f
+	github.com/streamingfast/substreams v1.22.1-0.20260911133942-1b7d09c2de7b
 	github.com/stretchr/testify v1.12.1
 	github.com/test-go/testify v1.1.4
 	github.com/testcontainers/testcontainers-go v0.44.0
