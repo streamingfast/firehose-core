@@ -26,6 +26,24 @@ func TestGetEnvForceFinalityAfterBlocks(t *testing.T) {
 		t.Errorf("Expected %d, got %d", expected, *result)
 	}
 }
+func TestGetEnvMergerMaxUnlinkableBlocks(t *testing.T) {
+	// unset: caller should get nil and fall back to its own default
+	os.Unsetenv("MERGER_MAX_UNLINKABLE_BLOCKS")
+	assert.Nil(t, GetEnvMergerMaxUnlinkableBlocks())
+
+	// set: caller should get the override
+	expected := 4000
+	os.Setenv("MERGER_MAX_UNLINKABLE_BLOCKS", strconv.Itoa(expected))
+	defer os.Unsetenv("MERGER_MAX_UNLINKABLE_BLOCKS")
+
+	result := GetEnvMergerMaxUnlinkableBlocks()
+	if result == nil {
+		t.Errorf("Expected non-nil result, got nil")
+	} else if *result != expected {
+		t.Errorf("Expected %d, got %d", expected, *result)
+	}
+}
+
 func TestTweakBlockFinality(t *testing.T) {
 	// Define test cases
 	testCases := []struct {

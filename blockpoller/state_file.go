@@ -104,7 +104,7 @@ func (p *BlockPoller[C]) saveState(blocks []*forkable.Block) error {
 		return fmt.Errorf("unable to open cursor file %s: %w", fpath, err)
 	}
 
-	p.logger.Info("saved cursor",
+	p.logger.Debug("saved cursor",
 		zap.Reflect("filepath", fpath),
 		zap.Stringer("last_fired_block", sf.LastFiredBlock),
 		zap.Stringer("lib", sf.Lib),

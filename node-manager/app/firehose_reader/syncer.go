@@ -143,6 +143,14 @@ func (s *syncer) Run() error {
 				break
 			}
 
+			if response.Step == pbfirehose.ForkStep_STEP_UNDO {
+				s.logger.Info("skipping undo block, the one-block file for it was already written and the reorg is resolved downstream",
+					zap.Uint64("block_num", response.Metadata.Num),
+					zap.String("block_id", response.Metadata.Id),
+				)
+				continue
+			}
+
 			pbBlock := &pbbstream.Block{
 				Number:    response.Metadata.Num,
 				Id:        response.Metadata.Id,

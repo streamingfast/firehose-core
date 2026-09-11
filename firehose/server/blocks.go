@@ -79,18 +79,80 @@ func (s *Server) Block(ctx context.Context, request *connect.Request[pbfirehose.
 }
 
 // Blocks(context.Context, *connect.Request[v2.Request], *connect.ServerStream[v2.Response]) error
-func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose.Request], streamSrv *connect.ServerStream[pbfirehose.Response]) error {
+func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose.Request], streamSrv *connect.ServerStream[pbfirehose.Response]) (err error) {
 	metrics.RequestCounter.Inc()
 
 	ctx, cancelRunning := context.WithCancelCause(ctx)
 	defer cancelRunning(nil)
 
+	requestStart := time.Now()
+	logger := logging.LoggerFromContext(ctx, s.logger)
+
+	auth := dauth.FromContext(ctx)
+	var organizationID, apiKeyID, realIP string
+	if auth != nil {
+		organizationID = auth.OrganizationID()
+		apiKeyID = auth.APIKeyID()
+		realIP = auth.RealIP()
+	}
+
+	logger.Info("incoming firehose Blocks request",
+		zap.String("organization_id", organizationID),
+		zap.String("api_key_id", apiKeyID),
+		zap.String("real_ip", realIP),
+		zap.Int64("start_block", request.Msg.StartBlockNum),
+		zap.Uint64("stop_block", request.Msg.StopBlockNum),
+		zap.Bool("final_blocks_only", request.Msg.FinalBlocksOnly),
+		zap.String("cursor", request.Msg.Cursor),
+	)
+
+	var (
+		firstDataSent   bool
+		timeToFirstData time.Duration
+		firstSentBlock  uint64
+		streamRan       bool
+		runErr          error
+	)
+
+	defer func() {
+		logErr := err
+		if streamRan {
+			logErr = runErr
+		}
+		if errors.Is(logErr, context.Canceled) {
+			// A context canceled by the server itself (e.g. a session revoked mid-stream)
+			// carries its real cause via context.Cause; only fall back to the bare
+			// sentinel when the cancellation truly came from the client disconnecting.
+			if cause := context.Cause(ctx); cause != nil && cause != context.Canceled {
+				logErr = cause
+			} else {
+				logErr = context.Canceled
+			}
+		}
+
+		meter := getRequestMeter(ctx)
+		fields := []zap.Field{
+			zap.Uint64("block_sent", meter.blocks),
+			zap.Int("egress_bytes", meter.egressBytes),
+			zap.Duration("duration", time.Since(requestStart)),
+			zap.Duration("time_to_first_data", timeToFirstData),
+			zap.Uint64("first_sent_block", firstSentBlock),
+			zap.Error(logErr),
+		}
+		if auth != nil {
+			fields = append(fields,
+				zap.String("api_key_id", apiKeyID),
+				zap.String("organization_id", organizationID),
+				zap.String("real_ip", realIP),
+			)
+		}
+
+		logger.Info("firehose process completed", fields...)
+	}()
+
 	if s.sessionPool != nil {
-		auth := dauth.FromContext(ctx)
-		organizationID := auth.OrganizationID()
-		apiKeyID := auth.APIKeyID()
-		traceID := tracing.GetTraceID(ctx).String()
 		service := "t1r"
+		traceID := tracing.GetTraceID(ctx).String()
 
 		sessionID, err := s.sessionPool.Get(ctx, service, organizationID, apiKeyID, traceID, func(err error) {
 			if cancelRunning != nil { // in tests, this might be nil
@@ -105,22 +167,20 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 				errors.Is(err, dsession.ErrPermissionDenied),
 				errors.Is(err, dsession.ErrQuotaExceeded):
 				incrementFirehoseSessionDeniedCounter(err)
-				s.logger.Debug("session denied to user", zap.String("user_id", organizationID), zap.String("api_key_id", apiKeyID), zap.String("trace_id", traceID), zap.Error(err))
+				logger.Debug("session denied to user", zap.String("organization_id", organizationID), zap.String("api_key_id", apiKeyID), zap.Error(err))
 			default:
-				s.logger.Error("failed to acquire session", zap.Error(err), zap.String("service", service), zap.String("user_id", organizationID), zap.String("api_key_id", apiKeyID), zap.String("trace_id", traceID))
+				logger.Error("failed to acquire session", zap.Error(err), zap.String("service", service), zap.String("organization_id", organizationID), zap.String("api_key_id", apiKeyID))
 			}
 			return err
 		}
 
-		s.logger.Debug("acquired session", zap.String("session_id", sessionID))
+		logger.Debug("acquired session", zap.String("session_id", sessionID))
 
 		defer func() {
-			s.logger.Debug("releasing session", zap.String("session_id", sessionID))
+			logger.Debug("releasing session", zap.String("session_id", sessionID))
 			s.sessionPool.Release(sessionID)
 		}()
 	}
-
-	logger := logging.Logger(ctx, s.logger)
 
 	if !matchHeader(request.Header()) {
 		if s.enforceCompression {
@@ -221,6 +281,12 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 			return NewErrSendBlock(err)
 		}
 
+		if !firstDataSent {
+			firstDataSent = true
+			timeToFirstData = time.Since(requestStart)
+			firstSentBlock = block.Number
+		}
+
 		level := zap.DebugLevel
 		if block.Number%200 == 0 {
 			level = zap.InfoLevel
@@ -294,69 +360,52 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 		return err
 	}
 
-	err = str.Run(ctx)
-	meter := getRequestMeter(ctx)
+	runErr = str.Run(ctx)
+	streamRan = true
 
-	fields := []zap.Field{
-		zap.Uint64("block_sent", meter.blocks),
-		zap.Int("egress_bytes", meter.egressBytes),
-		zap.Error(err),
-	}
-
-	auth := dauth.FromContext(ctx)
-	if auth != nil {
-		fields = append(fields,
-			zap.String("api_key_id", auth.APIKeyID()),
-			zap.String("user_id", auth.UserID()),
-			zap.String("real_ip", auth.RealIP()),
-		)
-	}
-
-	logger.Info("firehose process completed", fields...)
-	if err != nil {
-		if errors.Is(err, stream.ErrStopBlockReached) {
+	if runErr != nil {
+		if errors.Is(runErr, stream.ErrStopBlockReached) {
 			logger.Info("stream of blocks reached end block")
+			runErr = nil // successful completion, not an error worth surfacing in the completion log
 			return nil
 		}
 
-		if errors.Is(err, context.Canceled) {
+		if errors.Is(runErr, context.Canceled) {
 			if ctx.Err() != context.Canceled {
-				logger.Debug("stream of blocks ended with context canceled, but our own context was not canceled", zap.Error(err))
+				logger.Debug("stream of blocks ended with context canceled, but our own context was not canceled", zap.Error(runErr))
 			}
-			if err, ok := context.Cause(ctx).(*connect.Error); ok {
-				return err
+			if causeErr, ok := context.Cause(ctx).(*connect.Error); ok {
+				return causeErr
 			}
 			return status.Error(codes.Canceled, "source canceled")
 		}
 
-		if errors.Is(err, context.DeadlineExceeded) {
-			logger.Info("stream of blocks ended with context deadline exceeded", zap.Error(err))
+		if errors.Is(runErr, context.DeadlineExceeded) {
+			logger.Info("stream of blocks ended with context deadline exceeded", zap.Error(runErr))
 			return status.Error(codes.DeadlineExceeded, "source deadline exceeded")
 		}
 
-		var errUnavailable *stream.ErrUnavailable
-		if errors.As(err, &errUnavailable) {
+		if errUnavailable, ok := errors.AsType[*stream.ErrUnavailable](runErr); ok {
 			// The request is fine, this instance cannot serve it: the client should
 			// retry, here or on another instance, keeping its cursor.
 			return status.Error(codes.Unavailable, errUnavailable.Error())
 		}
 
-		var errInvalidArg *stream.ErrInvalidArg
-		if errors.As(err, &errInvalidArg) {
+		if errInvalidArg, ok := errors.AsType[*stream.ErrInvalidArg](runErr); ok {
 			return status.Error(codes.InvalidArgument, errInvalidArg.Error())
 		}
 
-		var errSendBlock *ErrSendBlock
-		if errors.As(err, &errSendBlock) {
+		if errSendBlock, ok := errors.AsType[*ErrSendBlock](runErr); ok {
 			logger.Info("unable to send block probably due to client disconnecting", zap.Error(errSendBlock.inner))
 			return status.Error(codes.Unavailable, errSendBlock.inner.Error())
 		}
 
-		logger.Info("unexpected stream of blocks termination", zap.Error(err))
+		logger.Info("unexpected stream of blocks termination", zap.Error(runErr))
 		return status.Errorf(codes.Internal, "unexpected stream termination")
 	}
 
 	logger.Error("source is not expected to terminate gracefully, should stop at block or continue forever")
+	runErr = errors.New("source terminated without error, which is not expected to happen")
 	return status.Error(codes.Internal, "unexpected stream completion")
 
 }
