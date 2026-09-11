@@ -45,8 +45,9 @@ type BlockPoller[C any] struct {
 
 	logger *zap.Logger
 
-	lastSuccessfulClientCall     time.Time
-	lastSuccessfulClientCallLock sync.Mutex
+	lastSuccessfulClientCall time.Time
+	firstFailedClientCall    time.Time
+	clientCallLock           sync.Mutex
 
 	optimisticallyPolledBlocks map[uint64]*BlockItem
 
@@ -105,15 +106,24 @@ func (p *BlockPoller[C]) Run(firstStreamableBlockNum uint64, stopBlock *uint64, 
 }
 
 func (p *BlockPoller[C]) markClientSuccess() {
-	p.lastSuccessfulClientCallLock.Lock()
+	p.clientCallLock.Lock()
 	p.lastSuccessfulClientCall = time.Now()
-	p.lastSuccessfulClientCallLock.Unlock()
+	p.firstFailedClientCall = time.Time{}
+	p.clientCallLock.Unlock()
+}
+
+func (p *BlockPoller[C]) markClientFailure() {
+	p.clientCallLock.Lock()
+	if p.firstFailedClientCall.IsZero() {
+		p.firstFailedClientCall = time.Now()
+	}
+	p.clientCallLock.Unlock()
 }
 
 func (p *BlockPoller[C]) run(resolvedStartBlock bstream.BlockRef, stopBlock uint64, blockFetchBatchSize int) (err error) {
-	p.lastSuccessfulClientCallLock.Lock()
+	p.clientCallLock.Lock()
 	p.lastSuccessfulClientCall = time.Now()
-	p.lastSuccessfulClientCallLock.Unlock()
+	p.clientCallLock.Unlock()
 
 	go func() {
 		ticker := time.NewTicker(15 * time.Second)
@@ -121,11 +131,18 @@ func (p *BlockPoller[C]) run(resolvedStartBlock bstream.BlockRef, stopBlock uint
 		for {
 			select {
 			case <-ticker.C:
-				p.lastSuccessfulClientCallLock.Lock()
+				p.clientCallLock.Lock()
+				firstFailure := p.firstFailedClientCall
 				since := time.Since(p.lastSuccessfulClientCall)
-				p.lastSuccessfulClientCallLock.Unlock()
-				if since > time.Minute {
-					p.logger.Warn("no clients have been working for over 1 minute, still retrying", zap.Duration("elapsed_since_last_success", since))
+				p.clientCallLock.Unlock()
+				if firstFailure.IsZero() {
+					continue
+				}
+				if failingFor := time.Since(firstFailure); failingFor > time.Minute {
+					p.logger.Warn("no clients have been working for over 1 minute, still retrying",
+						zap.Duration("failing_for", failingFor),
+						zap.Duration("elapsed_since_last_success", since),
+					)
 				}
 			case <-p.Terminating():
 				return
@@ -158,7 +175,7 @@ func (p *BlockPoller[C]) run(resolvedStartBlock bstream.BlockRef, stopBlock uint
 			}
 		}
 
-		p.logger.Info("about to fetch block", zap.Uint64("block_to_fetch", blockToFetch), zap.Duration("delay", delay), zap.Bool("keep", false))
+		p.logger.Debug("about to fetch block", zap.Uint64("block_to_fetch", blockToFetch), zap.Duration("delay", delay), zap.Bool("keep", false))
 		if delay != 0 {
 			time.Sleep(delay)
 		}
@@ -196,7 +213,7 @@ func (p *BlockPoller[C]) run(resolvedStartBlock bstream.BlockRef, stopBlock uint
 }
 
 func (p *BlockPoller[C]) processBlock(currentState *cursor, block *pbbstream.Block) (uint64, *string, error) {
-	p.logger.Info("processing block", zap.Stringer("block", block.AsRef()), zap.Uint64("lib_num", block.LibNum), zap.Bool("keep", false))
+	p.logger.Debug("processing block", zap.Stringer("block", block.AsRef()), zap.Uint64("lib_num", block.LibNum), zap.Bool("keep", false))
 	if block.Number < p.forkDB.LIBNum() {
 		panic(fmt.Errorf("unexpected error block %d is below the current LIB num %d. There should be no re-org above the current LIB num", block.Number, p.forkDB.LIBNum()))
 	}
@@ -280,6 +297,7 @@ func (p *BlockPoller[C]) loadNextBlocks(requestedBlock uint64, numberOfBlockToFe
 			})
 
 			if err != nil {
+				p.markClientFailure()
 				return fmt.Errorf("fetching block %d with retry : %w", blockToFetch, err)
 			}
 			blockItem = bi
@@ -315,7 +333,7 @@ func (p *BlockPoller[C]) loadNextBlocks(requestedBlock uint64, numberOfBlockToFe
 
 		//only fetch block if it is available on chain
 		if p.blockFetcher.IsBlockAvailable(b) {
-			p.logger.Info("optimistically fetching block", zap.Uint64("block_num", b))
+			p.logger.Debug("optimistically fetching block", zap.Uint64("block_num", b))
 			didTriggerFetch = true
 			nailer.Push(ctx, b)
 		} else {
@@ -344,7 +362,7 @@ func (p *BlockPoller[C]) loadNextBlocks(requestedBlock uint64, numberOfBlockToFe
 }
 
 func (p *BlockPoller[C]) requestBlock(blockNumber uint64, numberOfBlockToFetch int) (*BlockItem, error) {
-	p.logger.Info("requesting block", zap.Uint64("block_num", blockNumber), zap.Bool("keep", false))
+	p.logger.Debug("requesting block", zap.Uint64("block_num", blockNumber), zap.Bool("keep", false))
 
 	lastLog := time.Time{}
 	for {
@@ -377,7 +395,7 @@ func (p *BlockPoller[C]) requestBlock(blockNumber uint64, numberOfBlockToFetch i
 			continue
 		}
 
-		p.logger.Info("block was optimistically polled", zap.Uint64("block_num", blockNumber), zap.Bool("keep", false))
+		p.logger.Debug("block was optimistically polled", zap.Uint64("block_num", blockNumber), zap.Bool("keep", false))
 		return blockItem, nil
 	}
 
@@ -389,7 +407,7 @@ type FetchResponse struct {
 }
 
 func (p *BlockPoller[C]) fetchBlockWithHash(blkNum uint64, hash string) (*pbbstream.Block, error) {
-	p.logger.Info("fetching block with hash", zap.Uint64("block_num", blkNum), zap.String("hash", hash))
+	p.logger.Debug("fetching block with hash", zap.Uint64("block_num", blkNum), zap.String("hash", hash))
 	_ = hash //todo: hash will be used to fetch block from  cache
 
 	p.optimisticallyPolledBlocksLock.Lock()
@@ -412,6 +430,7 @@ func (p *BlockPoller[C]) fetchBlockWithHash(blkNum uint64, hash string) (*pbbstr
 		})
 
 		if err != nil {
+			p.markClientFailure()
 			return fmt.Errorf("fetching block with retry %d: %w", blkNum, err)
 		}
 

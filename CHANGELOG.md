@@ -10,15 +10,56 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Fixed
+
+- The merger no longer spins when a walk over one-block files keeps hitting the unlinkable-blocks limit: that path skipped the `merger-time-between-store-lookups` delay, so a merger stuck behind a gap in one-block files re-walked and logged `too many unlinkable blocks, continuing to next loop` about ten times per second. It now waits like any other iteration, the line is logged at `Warn` instead of `Info`, and the wait is interrupted by shutdown.
+- Bumped `google.golang.org/grpc` to v1.83.2, which fixes CVE-2026-84445.
+- `reader-node-firehose` no longer acts on undo signals from its upstream endpoint. It treated a `STEP_UNDO` response like a new block and re-emitted it, now it just logs and skips them. (a reader does not take decisions on reorgs)
+- The block poller no longer warns `no clients have been working for over 1 minute, still retrying` on slower chains like Bitcoin/Litecoin with block rate exceeding 1 minute. Instead it only warns if fetches have been actually failing for over a minute.
+- Bumped substreams: `substreams_tier1_effective_active_requests` could read below `substreams_active_requests`, the
+  metric it is meant to replace as the horizontal autoscaler input. Requests still setting up were counted by one and
+  not the other, so a tier1 pod with requests queued in setup looked emptier to the autoscaler than it was.
+- Bumped substreams: fixed handling of partial-blocks (flashblocks) streams on a tier1 that is shutting down. The
+  stream now ends with `Unavailable` like a full-block stream does, so the client reconnects elsewhere. It used to
+  stay open but silent, then send an undo signal at each block boundary naming a block the client had never
+  received. An undo signal is also no longer sent for partial-block state whose outputs were never sent.
+- Bumped substreams: `substreams-tier1` no longer closes the squasher's cached stores while a squash is still
+  running. When the scheduler stopped early (a tier2 job failed, or the pod was shutting down), the in-flight merge
+  could panic the process or write an empty full store to storage.
+
 ### Changed
 
+- Regenerated well-known protobuf descriptors from the Buf Schema Registry. The Cosmos block model (`sf.cosmos.type.v2.Block`) now includes CometBFT v1 consensus params (`abci`, `synchrony`, `feature`), a `bls12381` public-key variant, and a local `Int64Value` for feature heights, which were previously unknown fields.
+- Bumped `bstream` to enable parallel one-blocks downloading upon bootstrap or reconnect (very useful on fast chains)
+- Bumped substreams: `substreams-tier1` squashes store partials in runs of up to 1000 segments or 30 s of work per
+  command instead of one segment per command, which capped squashing at about 15 segments per minute on busy
+  backprocessing requests. Segments whose partials are all empty get a copy of the previous full store instead of a
+  merge, server-side on object stores that support it.
+- Bumped substreams: `substreams-tier1` asks the relayer for every block from its own LIB when it connects or
+  reconnects, instead of the last 2 blocks, so a gap left by a disconnect is filled from the relayer's memory rather
+  than from the one-block store.
+- Bumped `dstore`: S3 `CopyObject` is done server-side (multipart above 5 GiB) instead of downloading and uploading
+  the object back, falling back to the old behaviour on backends answering `NotImplemented` or `MethodNotAllowed`.
+
+- Block poller per-block lines (`about to fetch block`, `requesting block`, `optimistically fetching block`, `block was optimistically polled`, `fetching block with hash`, `processing block`, `saved cursor`) are now logged at `Debug`; they fired several times per block at `Info`.
+- Removed the `--reader-node-firehose-compression` flag. It has never had any effect: the connection to the upstream endpoint always uses zstd. Operators setting it must drop it, as an unknown flag stops the process from starting.
+
+- Bumped `golang.org/x/crypto` to `v0.56.0`, clearing CVE-2026-78662 and CVE-2026-56855 (both HIGH), which the Docker Scout scan of the published image fails on.
+
 - `firecore tools substreams prune-states` and `prune-outputs` delete much faster: deletions now run on their own `--delete-parallelism` (250 by default) instead of sharing the listing's `--parallelism` (16 and 64), each attempt is bounded at 5s instead of 30s, and a failed deletion is retried once after 50ms instead of four times over 7.5s. A deletion that still fails is reported as before and picked up by the next run.
+
+- Updated the embedded Solana block protobuf definitions to the latest ones published on the Buf registry: `Message.version`, `Message.transaction_config` (with the new `TransactionConfig` message holding `priority_fee`, `compute_unit_limit`, `loaded_accounts_data_size_limit` and `heap_size`) and the `DeactivatedStake` reward type are now decoded by `firecore tools print` and friends.
 
 ### Fixed
 
 - The `ready{app="firehose"}` Prometheus metric now remains `0` while the firehose waits to read the first streamable block and only changes to `1` after initialization succeeds, including when serving from merged blocks without a live source.
 
 ### Added
+
+- `tools compare-blocks`: `--fields` prints the protobuf field paths that differ for each mismatched block (e.g. `header.chain_id`, `txs[2]`, `unknown_field(12)`). Use it when `--diff` prints nothing: blocks are marked different by `proto.Equal` (which includes unknown fields), while `--diff` compares JSON with unknown fields stripped by default.
+- The merger's `maxUnlinkableBlocks` circuit breaker (`bundleSize*4`) can now be overridden with the `MERGER_MAX_UNLINKABLE_BLOCKS` env var, for deployments where the default is too tight (e.g. several one-block-file writers per chain) to tolerate an ordinary reorg or brief writer hiccup. Unset or invalid values keep the existing `bundleSize*4` default.
+
+- The `Blocks` request handler now logs an `"incoming firehose Blocks request"` line as soon as a request starts, carrying `trace_id`, `organization_id`, `api_key_id`, `real_ip`, `start_block`, `stop_block`, `final_blocks_only` and `cursor`. The existing `"firehose process completed"` line gains `duration` (total request time), `time_to_first_data` and `first_sent_block` (zero-valued if no block was ever sent). Both lines are now emitted for every request outcome, including early rejections (session denied, rate limited, unimplemented transforms) and client disconnects, so every request can be paired up downstream by `trace_id`. A client-initiated cancellation is logged with `error: "context canceled"`; a server-initiated one (e.g. a revoked session) logs its real cause instead of collapsing into the same bucket.
 
 - The merger now records what a merged-blocks file holds on the object itself, as three custom metadata entries written as it uploads each bundle: `datasize`, the file's size once decompressed, `itemcount`, the number of blocks it holds, and `timestamp`, the time of its first block written as `2025-10-12 10:23:12` in UTC. A listing then tells what a file holds without reading it.
 
@@ -38,6 +79,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
   Nothing is downloaded: every number comes from the three metadata entries above, which come back with the listing, so the whole report costs one listing however large the range is. Files missing any of the three are counted and reported, and contribute to nothing. Google Cloud Storage only, where the annotation lives.
 
+  The report is labelled with a chain name, which defaults to the second-to-last part of the store path, the bucket excluded (`eth-mainnet` for both `gs://mybucket/something/eth-mainnet/v1` and `gs://mybucket/eth-mainnet`); `--chain-name` overrides it.
+
+  Pass `--json` to get the same report as a single JSON object on stdout instead of the table: the chain name, the requested range, the first and last block seen, one entry per month, the total, and the count of files carrying no complete annotation.
+
 - `firecore tools substreams purge`, `prune-states` and `prune-outputs` all skip any module folder carrying a `DO_NOT_PRUNE` file at its root, next to the `last_used*.zst` markers, and report how many folders that spared.
 
 - Added `firecore tools last-oneblock <oneblocks-store>` which prints the highest block number found among the store's one-block files, as a bare number on stdout, exiting non-zero when the store cannot be listed, holds no one-block file, or a filename does not parse as one.
@@ -56,7 +101,36 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Added `firecore tools substreams prune-outputs <store-url> --truncate-below-block <block> --minimum-age <age>` to delete execution output files (`<start>-<end>.output` under a module's `outputs/` folder) that are BOTH fully below `--truncate-below-block` AND last modified longer than `--minimum-age` ago (the modification time comes straight out of the listing, nothing is downloaded). The URL may point at a network folder, at its `substreams-states` folder, at a cache tag under it, or directly at a single module folder; cache tags are discovered the same way `purge` does, and nothing outside `outputs/` folders is ever touched. Folders carrying an spkg (`substreams.spkg.zst` or `substreams.partial.spkg.zst`), which marks a module requested directly rather than an intermediate dependency, are kept untouched by default; `--output-module-minimum-age`, if set, prunes them too using that (typically longer) age. Supports `--dry-run` and `--force`.
 
-- Bumped `substreams` to [v1.22.1-0.20260826153554-edb28d2ecdae](https://github.com/streamingfast/substreams/compare/1cffa6c10a8d...edb28d2ecdae):
+- New `--substreams-tier1-cpu-eviction-*` flags letting `substreams-tier1` shed requests when its own cgroup reports the CPU saturated. `--substreams-tier1-cpu-eviction-mode` (default `off`, so nothing changes until you set it) selects what it does: `observe` logs the requests it would cancel without cancelling any, `dev-only` cancels development-mode requests, `full` cancels production ones as well. See the `substreams` bump below for what a round of eviction does.
+
+  The rest are tunables, each defaulting to the value the eviction was designed around:
+
+  | Flag | Default | Meaning |
+  | --- | --- | --- |
+  | `--substreams-tier1-cpu-eviction-threshold` | `0.90` | CPU usage above which the instance counts as overloaded |
+  | `--substreams-tier1-cpu-eviction-sustain` | `15s` | how long that must hold before it acts |
+  | `--substreams-tier1-cpu-eviction-recover-threshold` | `0.75` | CPU usage under which it stops counting as overloaded |
+  | `--substreams-tier1-cpu-eviction-recover-sustain` | `30s` | how long that must hold before it advertises itself as ready again |
+  | `--substreams-tier1-cpu-eviction-target-ratio` | `0.75` | CPU usage a round of eviction cuts down to, which sizes the round |
+  | `--substreams-tier1-cpu-eviction-interval` | `5s` | how often it looks at the CPU |
+  | `--substreams-tier1-cpu-eviction-cooldown` | `15s` | minimum delay between two rounds |
+  | `--substreams-tier1-cpu-eviction-drain-delay` | `8s` | wait between going unready and the first cancellation, covering the load balancer's routing lag |
+  | `--substreams-tier1-cpu-eviction-min-age` | `90s` | requests younger than this are never cancelled, a request being at its most expensive while it loads its stores |
+  | `--substreams-tier1-cpu-eviction-min-burn-cores` | `0.05` | requests burning less than this are never cancelled, since cancelling them frees nothing and costs a reconnect |
+  | `--substreams-tier1-cpu-eviction-quota-cores-override` | `0` | CPU budget to measure usage against instead of the cgroup's `cpu.max` |
+  | `--substreams-tier1-cpu-eviction-nominal-capacity` | `0` | requests a full instance carries; scales the new `substreams_tier1_effective_active_requests` metric and nothing else. `0` means default to `--substreams-tier1-active-requests-soft-limit` |
+
+  Thresholds and ratios are fractions of the CPU budget. That budget is the CPU limit the cgroup carries, so an instance running under cgroup v2 with no limit set — `cpu.max` reading `max` — has nothing to compare usage to and logs a warning at startup, leaving the eviction off; `--substreams-tier1-cpu-eviction-quota-cores-override` names the budget yourself in that case, and should stay at or under whatever limit the kernel does enforce, since above it the instance is throttled before the eviction ever fires. Reading the cgroup CPU files failing outright, cgroup v1 included, also logs a warning and leaves the eviction off. Every one of these warnings is only emitted when the mode is not `off`.
+
+- Bumped `substreams` to [v1.22.1-0.20260903162505-4035f21109ec](https://github.com/streamingfast/substreams/compare/1cffa6c10a8d...4035f21109ec):
+
+  - Server: `substreams-tier1` scheduling no longer slows down as a large backprocessing range progresses. Picking the next tier2 job walked every segment between the squasher and the job frontier on every call, re-checking dependencies that could not have changed, so a run over N segments cost O(N²) in scheduling. The scheduler now keeps, per stage, the lowest segment that may still be pending and the highest segment completed so far, and only looks at the handful of segments those point at. On a 3-stage graph with 4 workers and a squasher three times slower than the jobs, scheduling 8000 segments went from 1.18s to 2.7ms, and now grows linearly with the range. Job order is unchanged.
+
+  - Server: `substreams-tier1` now downloads the next cached execution output files while it streams the current one to a production-mode client. Before, each segment was opened, decompressed and sent before the next one was even requested from the object store, so every segment paid a full store round trip on the critical path. Prefetching is bounded per request, with no flag to set: at most 4 segments ahead, holding at most 64 MiB of decompressed data. No size is ever asked of the store, the decompressed size of the last downloaded segment being the estimate for the next ones, and a file bigger than the whole budget turns prefetching off for the rest of the request. Missing files are left to the existing retry loop.
+
+  - Server: `substreams-tier1` now sends each batch of cached execution output on its own goroutine, so decoding the next batch overlaps with compressing and writing the current one. At most one batch is being built while one is sent, and a segment is only reported done once every batch is out, so message order is unchanged. Decoding a batch also copies one less time, the item now aliasing the buffer it was read into.
+
+  - Server: `substreams-tier1` writes the `substreams.spkg` and `last_used` cache markers in the background instead of before the pipeline starts, so those object store round trips no longer delay the first block sent. They run detached from the request with a 30 second timeout: the request neither starts nor exits waiting for them, and a client that disconnects early still leaves its usage marker behind.
 
   - Server: store snapshots (fullKV files) can now be pruned to save disk space — which is what `firecore tools substreams prune-states` does: `substreams-tier1` no longer assumes that a fullKV at block `x` implies that every earlier fullKV still exists. At request start it walks backwards from the first segment needing work, in growing listing windows, until it finds the last block where every store module still has a snapshot, and rebuilds the stores from there. Only snapshots actually seen are reused, and a job is only scheduled once the previous segment of every lower stage is done, so a pruned file is never read.
 
@@ -67,6 +141,22 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
   - Server: progress messages are sent far less often, the cadence widening with the age of the request — every second for the first minute, every 10 seconds up to 5 minutes, every 30 seconds up to 10 minutes, then every minute — including in the linear phase, which previously sent one every 200ms. Progress messages count as egress like any other response, so a long-running or live request paid for a steady stream of them. `Request.progress_messages_interval_ms` is now honoured (it was validated and then ignored): setting it pins the cadence for the whole request, the 500ms minimum unchanged.
 
   - Server: `substreams-tier1` now names the usage marker it writes in every module cache folder after the request's plan tier: `last_used_<plan>` (lowercase, e.g. `last_used_pro`), still plain `last_used` when unauthenticated. `firecore tools substreams purge` reads the plan back from that name to apply a retention per plan.
+
+  - Server: `substreams-tier1` can now evict requests when its CPU is saturated, which the new `--substreams-tier1-cpu-eviction-*` flags above turn on. When its own cgroup reports CPU usage above 90% of quota for 15 seconds, the instance advertises itself as unready to the load balancer, refuses new requests, waits 8 seconds for the balancer to stop routing to it, then cancels enough of the heaviest requests with `Unavailable` to bring usage back under 75% of quota, so their clients reconnect elsewhere. Development-mode requests are cancelled first, then production requests on live blocks, then production requests still catching up from files — a live request burning two cores keeps burning them for as long as it stays connected, while a catching-up one is spending them on work that ends, and cancelling it throws away the segment progress it would have to redo. New `substreams_tier1_cpu_*` gauges and a `substreams_tier1_evicted_requests_counter` report what it sees and does, in `observe` mode included. It needs cgroup v2 CPU accounting, and a CPU budget to measure usage against — the cgroup's own limit, or `--substreams-tier1-cpu-eviction-quota-cores-override` where the cgroup carries none.
+
+  - Server: new `substreams_tier1_effective_active_requests` gauge, meant to replace `substreams_active_requests` as the horizontal autoscaler input on tier1: the higher of the plain active-request count and the number of requests the CPU budget is being spent at (`nominal_capacity * cpu_usage_ratio / cpu_eviction_target_ratio`). An instance full of expensive requests, or one holding its CPU down by cancelling requests, then reports itself at capacity and the autoscaler adds instances instead of leaving the count looking healthy.
+
+  - Server: the jobs of a tier1 request now reach the tier2 fleet in the order the client will read their output, instead of racing each other for whatever instance has room. A job asks a per-request launch queue for its turn before every request it sends to a tier2, first attempt and retries alike, and leaves the queue as soon as a tier2 takes it. The queue is ordered by lowest segment first and, within a segment, by highest stage, and only its first 20% may dial at all — at least two jobs, at most 15 — the ones behind sending nothing until a job ahead gets in and moves the window up. A job with nothing queued ahead of it dials immediately, so a fleet with room is paced no differently than before. Without this, the segment the client reads first was no more likely to land than one it would only read minutes later, and a whole request could idle behind a single unlucky low segment. Tunable with `SUBSTREAMS_WORKER_LAUNCH_WINDOW_PERCENT` (default `20`) and `SUBSTREAMS_WORKER_LAUNCH_WINDOW_MAX` (default `15`).
+
+  - Server: a tier2 job that fails is no longer retried on a growing 1s-to-5s backoff of its own; every reason to dial again goes through that same queue, so retries keep the request's reading order. A job that could not get in at all (`ResourceExhausted: service currently overloaded`, a refused connection, `Unavailable: no healthy upstream`) waits 100ms, and a job that got in and then failed waits 5 seconds once — if a tier2 then turns it away for capacity, it is back on the 100ms delay with its failure already counted. The counters that end a hopeless request are unchanged: five failures, or two execution timeouts, and neither is charged for a job that never got in. Tunable with `SUBSTREAMS_WORKER_OVERLOADED_RETRY_DELAY` (default `100ms`, was `300ms`), `SUBSTREAMS_WORKER_FAILED_RETRY_DELAY` (default `5s`) and `SUBSTREAMS_WORKER_OVERLOADED_RETRY_JITTER` (default `100ms`, added to a wait so jobs turned away at the same instant do not redial in lockstep).
+
+  - Server: jobs are now scheduled up to twice the request's worker count ahead of the blocks the client is reading, instead of 1.5 times, so a client that reads slowly still keeps the workers busy.
+
+  - Server: `substreams-tier2` logs far less per segment. A large backfill fans out into tens of thousands of `ProcessRange` calls, each of which was writing about ten `Info` lines with no steady-state diagnostic value, enough to raise an instance's log volume by an order of magnitude. The duplicate auth-info log in the response handler is gone (the incoming request already logs it once per segment), the store-size and exec-output-file-open logs are now `Debug`, and so are the four shutdown-lifecycle logs of the per-request `dmetering` event emitter, which is opened and torn down on every `ProcessRange` call. The benign `http2: server: error reading preface ...: connection reset by peer` logged whenever a client drops a connection mid-handshake against the plaintext/h2c tier2 port is suppressed, like the existing TLS-handshake ones.
+
+### Fixed
+
+- `proto/generator`: FileDescriptorSet JSON from Buf is unmarshalled with unknown fields discarded, so `go generate` in `proto/` works against current BSR descriptor extensions.
 
 ## v1.18.0
 

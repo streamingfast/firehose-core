@@ -205,7 +205,7 @@ func runAnnotateMergedBlocks(ctx context.Context, storeURL string, cfg annotateC
 	}
 	fmt.Println(stylex.Valuef("%s %d file(s), %s block(s)", annotatedLabel, stats.annotated.Load(), humanize.Comma(stats.blocks.Load())))
 	fmt.Println(stylex.Valuef("Skipped:     %d file(s) already carrying all three entries", stats.skipped.Load()))
-	fmt.Println(stylex.Valuef("Read:        %s compressed, %s uncompressed", humanize.Bytes(uint64(stats.compressed.Load())), humanize.Bytes(uint64(stats.uncompressed.Load()))))
+	fmt.Println(stylex.Valuef("Read:        %s compressed, %s uncompressed", humanize.IBytes(uint64(stats.compressed.Load())), humanize.IBytes(uint64(stats.uncompressed.Load()))))
 	fmt.Println(stylex.Valuef("Elapsed:     %s", time.Since(started).Round(time.Second)))
 
 	if listErr != nil {
@@ -433,7 +433,7 @@ func startAnnotateProgress(ctx context.Context, stats *annotateStats, started ti
 					zap.Int64("annotated", annotated),
 					zap.Int64("skipped", stats.skipped.Load()),
 					zap.Int64("failed", stats.failed.Load()),
-					zap.String("uncompressed", humanize.Bytes(uint64(stats.uncompressed.Load()))),
+					zap.String("uncompressed", humanize.IBytes(uint64(stats.uncompressed.Load()))),
 					zap.Float64("files_per_second", float64(annotated)/time.Since(started).Seconds()),
 				)
 			}

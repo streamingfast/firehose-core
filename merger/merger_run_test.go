@@ -212,6 +212,125 @@ func TestMergerRun_HoleInOneBlockFiles_TriggersCheckLoop(t *testing.T) {
 	assert.GreaterOrEqual(t, walkCallCount, 2, "expected multiple walk calls: errCheckLoop should cause retries, not shutdown")
 }
 
+// TestMergerRun_CheckLoopRespectsPollingDelay verifies that a walk cut short by
+// errCheckLoop waits timeBetweenPolling before the next walk, like any other
+// iteration, instead of re-walking immediately.
+func TestMergerRun_CheckLoopRespectsPollingDelay(t *testing.T) {
+	const bundleSize = uint64(10) // maxUnlinkableBlocks = 40
+	const delay = 20 * time.Millisecond
+
+	var allBlocks []*bstream.OneBlockFile
+	allBlocks = append(allBlocks, buildChain(10, 19, nil)...)
+	allBlocks = append(allBlocks, buildChain(61, 120, nil)...) // 41+ unlinkable, trips errCheckLoop
+
+	walkCallCount := 0
+	checkLoopCount := 0
+	var merger *Merger
+
+	testIO := &TestMergerIO{
+		NextBundleFunc: func(_ context.Context, lowestBaseBlock uint64) (uint64, bstream.BlockRef, error) {
+			if lowestBaseBlock < 10 {
+				return 10, libRef(9), nil
+			}
+			return lowestBaseBlock, nil, nil
+		},
+		WalkOneBlockFilesFunc: func(_ context.Context, inclusiveLowerBlock uint64, callback func(*bstream.OneBlockFile) error) error {
+			walkCallCount++
+			if walkCallCount > 3 {
+				merger.Shutdown(nil)
+				return nil
+			}
+			for _, blk := range allBlocks {
+				if blk.Num < inclusiveLowerBlock {
+					continue
+				}
+				if err := callback(blk); err != nil {
+					if errors.Is(err, errCheckLoop) {
+						checkLoopCount++
+					}
+					return err
+				}
+			}
+			return nil
+		},
+		MergeAndStoreFunc: func(_ context.Context, _ uint64, _ []*bstream.OneBlockFile) error {
+			return nil
+		},
+	}
+
+	merger = newRunTestMerger(testIO, 0, bundleSize, 1)
+	merger.timeBetweenPolling = delay
+
+	start := time.Now()
+	err := merger.run()
+	require.NoError(t, err)
+	merger.bundler.WaitForMerges()
+
+	// walks 1 to 3 each end with errCheckLoop, so at least 3 delays must have elapsed
+	assert.GreaterOrEqual(t, walkCallCount, 4)
+	assert.Equal(t, 3, checkLoopCount, "fixture must trip errCheckLoop on every full walk")
+	assert.GreaterOrEqual(t, time.Since(start), 3*delay, "errCheckLoop must not skip the polling delay")
+}
+
+// TestMergerRun_MaxUnlinkableBlocksEnvOverride verifies that MERGER_MAX_UNLINKABLE_BLOCKS
+// raises the maxUnlinkableBlocks circuit breaker above its bundleSize*4 default, letting the
+// merger walk through a gap that would otherwise trip errCheckLoop — same gap as
+// TestMergerRun_HoleInOneBlockFiles_TriggersCheckLoop, just with the override set.
+func TestMergerRun_MaxUnlinkableBlocksEnvOverride(t *testing.T) {
+	const bundleSize = uint64(10) // default maxUnlinkableBlocks = 40, overridden to 100 below
+
+	t.Setenv("MERGER_MAX_UNLINKABLE_BLOCKS", "100")
+
+	// same gap as TestMergerRun_HoleInOneBlockFiles_TriggersCheckLoop: bundle 10-19 complete,
+	// then a 40+ block gap before 61-120 — enough to trip the default 40 limit, not the
+	// overridden 100.
+	var allBlocks []*bstream.OneBlockFile
+	allBlocks = append(allBlocks, buildChain(10, 19, nil)...)
+	allBlocks = append(allBlocks, buildChain(61, 120, nil)...)
+
+	checkLoopTriggered := false
+	walkCallCount := 0
+	var merger *Merger
+
+	testIO := &TestMergerIO{
+		NextBundleFunc: func(_ context.Context, lowestBaseBlock uint64) (uint64, bstream.BlockRef, error) {
+			if lowestBaseBlock < 10 {
+				return 10, libRef(9), nil
+			}
+			return lowestBaseBlock, nil, nil
+		},
+		WalkOneBlockFilesFunc: func(_ context.Context, inclusiveLowerBlock uint64, callback func(*bstream.OneBlockFile) error) error {
+			walkCallCount++
+			if walkCallCount >= 3 {
+				merger.Shutdown(nil)
+				return nil
+			}
+			for _, blk := range allBlocks {
+				if blk.Num < inclusiveLowerBlock {
+					continue
+				}
+				if err := callback(blk); err != nil {
+					if errors.Is(err, errCheckLoop) {
+						checkLoopTriggered = true
+					}
+					return err
+				}
+			}
+			return nil
+		},
+		MergeAndStoreFunc: func(_ context.Context, _ uint64, _ []*bstream.OneBlockFile) error {
+			return nil
+		},
+	}
+
+	merger = newRunTestMerger(testIO, 0, bundleSize, 1)
+	err := merger.run()
+	require.NoError(t, err)
+	merger.bundler.WaitForMerges()
+
+	assert.False(t, checkLoopTriggered, "errCheckLoop must not trigger once the override raises maxUnlinkableBlocks above the gap size")
+}
+
 // TestMergerRun_LargeLibJumpDoesNotTriggerCheckLoop verifies that a LIB jump much larger
 // than bundleSize*4 (590 >> 40) firing many bundles at once does NOT trigger errCheckLoop.
 //

@@ -38,7 +38,6 @@ func RegisterReaderNodeFirehoseApp[B firecore.Block](chain *firecore.Chain[B], r
 		RegisterFlags: func(cmd *cobra.Command) error {
 			cmd.Flags().String("reader-node-firehose-endpoint", "", "Firehose endpoint to connect to.")
 			cmd.Flags().String("reader-node-firehose-state", "{data-dir}/reader/state", "State file to store the cursor from the Firehose connection in.")
-			cmd.Flags().String("reader-node-firehose-compression", "zstd", "Firehose compression, one of 'gzip', 'zstd' or 'none'.")
 			cmd.Flags().Bool("reader-node-firehose-insecure", false, "Skip TLS validation when connecting to a Firehose endpoint.")
 			cmd.Flags().Bool("reader-node-firehose-plaintext", false, "Connect to a Firehose endpoint using a non-encrypted, plaintext connection.")
 			cmd.Flags().String("reader-node-firehose-api-key-env-var", "FIREHOSE_API_KEY", "Look for an API key directly in this environment variable to authenticate against endpoint (alternative to api-token-env-var)")
@@ -81,7 +80,6 @@ func RegisterReaderNodeFirehoseApp[B firecore.Block](chain *firecore.Chain[B], r
 					Endpoint:      viper.GetString("reader-node-firehose-endpoint"),
 					InsecureConn:  viper.GetBool("reader-node-firehose-insecure"),
 					PlaintextConn: viper.GetBool("reader-node-firehose-plaintext"),
-					Compression:   viper.GetString("reader-node-firehose-compression"),
 				},
 			}, testModeComparator, appLogger, appTracer), nil
 		},
