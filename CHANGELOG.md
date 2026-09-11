@@ -26,6 +26,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Changed
 
+- Regenerated well-known protobuf descriptors from the Buf Schema Registry. The Cosmos block model (`sf.cosmos.type.v2.Block`) now includes CometBFT v1 consensus params (`abci`, `synchrony`, `feature`), a `bls12381` public-key variant, and a local `Int64Value` for feature heights, which were previously unknown fields.
 - Bumped `bstream` to enable parallel one-blocks downloading upon bootstrap or reconnect (very useful on fast chains)
 
 - Block poller per-block lines (`about to fetch block`, `requesting block`, `optimistically fetching block`, `block was optimistically polled`, `fetching block with hash`, `processing block`, `saved cursor`) are now logged at `Debug`; they fired several times per block at `Info`.
@@ -39,6 +40,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
+- `tools compare-blocks`: `--fields` prints the protobuf field paths that differ for each mismatched block (e.g. `header.chain_id`, `txs[2]`, `unknown_field(12)`). Use it when `--diff` prints nothing: blocks are marked different by `proto.Equal` (which includes unknown fields), while `--diff` compares JSON with unknown fields stripped by default.
 - The merger's `maxUnlinkableBlocks` circuit breaker (`bundleSize*4`) can now be overridden with the `MERGER_MAX_UNLINKABLE_BLOCKS` env var, for deployments where the default is too tight (e.g. several one-block-file writers per chain) to tolerate an ordinary reorg or brief writer hiccup. Unset or invalid values keep the existing `bundleSize*4` default.
 
 - The `Blocks` request handler now logs an `"incoming firehose Blocks request"` line as soon as a request starts, carrying `trace_id`, `organization_id`, `api_key_id`, `real_ip`, `start_block`, `stop_block`, `final_blocks_only` and `cursor`. The existing `"firehose process completed"` line gains `duration` (total request time), `time_to_first_data` and `first_sent_block` (zero-valued if no block was ever sent). Both lines are now emitted for every request outcome, including early rejections (session denied, rate limited, unimplemented transforms) and client disconnects, so every request can be paired up downstream by `trace_id`. A client-initiated cancellation is logged with `error: "context canceled"`; a server-initiated one (e.g. a revoked session) logs its real cause instead of collapsing into the same bucket.
@@ -135,6 +137,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
   - Server: jobs are now scheduled up to twice the request's worker count ahead of the blocks the client is reading, instead of 1.5 times, so a client that reads slowly still keeps the workers busy.
 
   - Server: `substreams-tier2` logs far less per segment. A large backfill fans out into tens of thousands of `ProcessRange` calls, each of which was writing about ten `Info` lines with no steady-state diagnostic value, enough to raise an instance's log volume by an order of magnitude. The duplicate auth-info log in the response handler is gone (the incoming request already logs it once per segment), the store-size and exec-output-file-open logs are now `Debug`, and so are the four shutdown-lifecycle logs of the per-request `dmetering` event emitter, which is opened and torn down on every `ProcessRange` call. The benign `http2: server: error reading preface ...: connection reset by peer` logged whenever a client drops a connection mid-handshake against the plaintext/h2c tier2 port is suppressed, like the existing TLS-handshake ones.
+
+### Fixed
+
+- `proto/generator`: FileDescriptorSet JSON from Buf is unmarshalled with unknown fields discarded, so `go generate` in `proto/` works against current BSR descriptor extensions.
 
 ## v1.18.0
 
