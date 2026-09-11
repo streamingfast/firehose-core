@@ -55,7 +55,7 @@ func SetAutoMemoryLimit(limit uint64, logger *zap.Logger) error {
 			return fmt.Errorf("cannot set common-auto-mem-limit-percent above 100")
 		}
 		logger.Info("setting GOMEMLIMIT relative to available memory", zap.Uint64("percent", limit))
-		memlimit.SetGoMemLimit(float64(limit) / 100)
+		memlimit.Set(memlimit.WithRatio(float64(limit) / 100))
 	}
 	return nil
 }
