@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -32,7 +31,6 @@ import (
 	"github.com/streamingfast/firehose-core/launcher"
 	"github.com/streamingfast/logging"
 	app "github.com/streamingfast/substreams/app"
-	"github.com/streamingfast/substreams/service/active_requests"
 	"github.com/streamingfast/substreams/wasm"
 	"go.uber.org/zap"
 )
@@ -54,6 +52,18 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().String("substreams-tier1-discovery-service-url", "", "URL to configure the grpc discovery service, used for communication with tier2") //traffic-director://xds?vpc_network=vpc-global&use_xds_reds=true
 			cmd.Flags().Bool("substreams-tier1-subrequests-insecure", false, "Connect to tier2 without checking certificate validity")
 			cmd.Flags().Bool("substreams-tier1-subrequests-plaintext", true, "Connect to tier2 without client in plaintext mode")
+			cmd.Flags().String("substreams-tier1-squasher-plugin", "", cli.FlagDescription(`
+				DSN selecting the store-merge implementation, same shape as --common-auth-plugin.
+				Empty or local:// keeps in-process squashing.
+
+				Production (OHV tier1 → GCloud squasher, same path as
+				--substreams-tier1-subrequests-endpoint=https://tier2.ovh2gcp.streamingfast.io):
+				grpcs://squasher.ovh2gcp.streamingfast.io?secret=<token>
+				TLS, port defaults to 443, secret is sent as the authorization header.
+
+				Plaintext local/dev uses grpc://host:port (port required). Extra TLS/plaintext
+				toggles stay on the DSN query string (insecure=true, plaintext=false).
+			`))
 			cmd.Flags().Bool("substreams-tier1-enforce-compression", true, "Reject any request that does not accept gzip or zstd encoding in their GRPC/Connect header")
 			cmd.Flags().Int("substreams-tier1-max-subrequests", 4, "default number of parallel subrequests that the tier1 makes to the tier2 per request")
 			cmd.Flags().String("substreams-tier1-block-type", "", "Block type to use for the substreams tier1 (Ex: sf.ethereum.type.v2.Block)")
@@ -205,6 +215,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			config.SubrequestsInsecure = viper.GetBool("substreams-tier1-subrequests-insecure")
 			config.SubrequestsPlaintext = viper.GetBool("substreams-tier1-subrequests-plaintext")
 			config.SubrequestsSecret = os.Expand(viper.GetString("substreams-tier1-subrequests-secret-key"), os.Getenv)
+			config.SquasherPlugin = viper.GetString("substreams-tier1-squasher-plugin")
 			config.BlockType = blockType
 			config.WASMExtensions = wasmExtensions
 			config.BlockExecutionTimeout = viper.GetDuration("substreams-block-execution-timeout")
@@ -219,31 +230,6 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			config.StoresScratchSpace = firecore.MustReplaceDataDir(sfDataDir, viper.GetString("substreams-stores-scratch-space"))
 			config.StoresBackend = viper.GetString("substreams-stores-backend")
 			config.StoreSizeLimit = viper.GetUint64("substreams-tier1-store-size-limit")
-
-			evictionMode, err := active_requests.ParseEvictionMode(viper.GetString("substreams-tier1-cpu-eviction-mode"))
-			if err != nil {
-				return nil, fmt.Errorf("substreams-tier1-cpu-eviction-mode: %w", err)
-			}
-			evictionOrder, err := active_requests.ParseEvictionOrder(strings.Join(viper.GetStringSlice("substreams-tier1-cpu-eviction-order"), ","))
-			if err != nil {
-				return nil, fmt.Errorf("substreams-tier1-cpu-eviction-order: %w", err)
-			}
-			config.CPUEviction = active_requests.EvictorConfig{
-				Mode:               evictionMode,
-				Order:              evictionOrder,
-				Threshold:          viper.GetFloat64("substreams-tier1-cpu-eviction-threshold"),
-				RecoverThreshold:   viper.GetFloat64("substreams-tier1-cpu-eviction-recover-threshold"),
-				TargetRatio:        viper.GetFloat64("substreams-tier1-cpu-eviction-target-ratio"),
-				Sustain:            viper.GetDuration("substreams-tier1-cpu-eviction-sustain"),
-				RecoverSustain:     viper.GetDuration("substreams-tier1-cpu-eviction-recover-sustain"),
-				Interval:           viper.GetDuration("substreams-tier1-cpu-eviction-interval"),
-				Cooldown:           viper.GetDuration("substreams-tier1-cpu-eviction-cooldown"),
-				DrainDelay:         viper.GetDuration("substreams-tier1-cpu-eviction-drain-delay"),
-				MinAge:             viper.GetDuration("substreams-tier1-cpu-eviction-min-age"),
-				MinBurnCores:       viper.GetFloat64("substreams-tier1-cpu-eviction-min-burn-cores"),
-				QuotaCoresOverride: viper.GetFloat64("substreams-tier1-cpu-eviction-quota-cores-override"),
-				NominalCapacity:    viper.GetFloat64("substreams-tier1-cpu-eviction-nominal-capacity"),
-			}
 
 			sessionPlugin := viper.GetString("common-session-plugin")
 			sessionPool, err := dsession.New(sessionPlugin, appLogger)
