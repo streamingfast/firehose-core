@@ -8,6 +8,16 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Added
+
+- Added `--substreams-tier1-squasher-plugin` so `fire{chain} start` can point `substreams-tier1` at a remote store-merge (squasher) process. Empty or `local://` keeps in-process squashing. Production (OHV tier1 → GCloud squasher, same path as `--substreams-tier1-subrequests-endpoint=https://tier2.ovh2gcp.streamingfast.io`): `grpcs://squasher.ovh2gcp.streamingfast.io?secret=<token>` — TLS, port defaults to 443, `secret` is sent as the `authorization` header. Plaintext local/dev uses `grpc://host:port`. Extra TLS/plaintext toggles stay on the DSN query string (`insecure=true`, `plaintext=false`).
+
+### Changed
+
+- Bumped `substreams` to `feature/squashing` so the squasher plugin DSN is available. That pin is behind `develop`: `--substreams-tier1-cpu-eviction-*` flags are still accepted so existing configs start, but they are no longer wired (CPU eviction is not on this substreams branch).
+
 ## v1.19.0
 
 ### Added

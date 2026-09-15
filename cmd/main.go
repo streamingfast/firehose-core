@@ -30,6 +30,7 @@ import (
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 
 	"github.com/streamingfast/logging"
+	"github.com/streamingfast/squasher"
 	"go.uber.org/zap"
 )
 
@@ -41,6 +42,7 @@ var rootTracer logging.Tracer
 // 'main' entrypoint directly.
 func Main[B firecore.Block](chain *firecore.Chain[B]) {
 	dauthgrpc.Register()
+	squasher.Register()
 	dauthnull.Register()
 	dauthsecret.Register()
 	dauthtrust.Register()
