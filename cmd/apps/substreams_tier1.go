@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -93,8 +94,20 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				When it does cancel, the tier1 first advertises itself as unready so the load balancer stops sending it
 				traffic, waits for --substreams-tier1-cpu-eviction-drain-delay, then cancels the heaviest requests with
 				'Unavailable' until the projected CPU usage fits under --substreams-tier1-cpu-eviction-target-ratio, so
-				their clients reconnect to a less busy instance. Development-mode requests go first, then production
-				requests on live blocks, then production requests still catching up from files.
+				their clients reconnect to a less busy instance, in the order set by --substreams-tier1-cpu-eviction-order.
+			`))
+			cmd.Flags().StringSlice("substreams-tier1-cpu-eviction-order", []string{"dev", "prod-cached", "prod-catchup"}, cli.FlagDescription(`
+				Request classes the eviction may cancel, least important first. A class left out is never
+				cancelled. Within a class, the request burning the most CPU goes first.
+
+				* 'dev' is a development-mode request
+				* 'prod-cached' is a production-mode request that has not processed a block on this instance yet, only
+				  streaming outputs cached by tier2. It runs no wasm here, so --substreams-tier1-cpu-eviction-min-burn-cores
+				  does not apply to it, and a round of eviction stops right after cancelling one
+				* 'prod-catchup' is a production-mode request processing blocks that has not reached live blocks
+				* 'prod-live' is a production-mode request that has received live blocks
+
+				The 'dev-only' mode cancels 'dev' requests only, whatever this order says.
 			`))
 			cmd.Flags().Float64("substreams-tier1-cpu-eviction-threshold", 0.90, "CPU usage, as a fraction of the cgroup quota, above which the tier1 is considered overloaded")
 			cmd.Flags().Duration("substreams-tier1-cpu-eviction-sustain", 15*time.Second, "How long the CPU usage must stay above --substreams-tier1-cpu-eviction-threshold before the tier1 acts on it")
@@ -211,8 +224,13 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			if err != nil {
 				return nil, fmt.Errorf("substreams-tier1-cpu-eviction-mode: %w", err)
 			}
+			evictionOrder, err := active_requests.ParseEvictionOrder(strings.Join(viper.GetStringSlice("substreams-tier1-cpu-eviction-order"), ","))
+			if err != nil {
+				return nil, fmt.Errorf("substreams-tier1-cpu-eviction-order: %w", err)
+			}
 			config.CPUEviction = active_requests.EvictorConfig{
 				Mode:               evictionMode,
+				Order:              evictionOrder,
 				Threshold:          viper.GetFloat64("substreams-tier1-cpu-eviction-threshold"),
 				RecoverThreshold:   viper.GetFloat64("substreams-tier1-cpu-eviction-recover-threshold"),
 				TargetRatio:        viper.GetFloat64("substreams-tier1-cpu-eviction-target-ratio"),
