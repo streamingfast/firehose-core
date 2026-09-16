@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -95,8 +96,8 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				'Unavailable' until the projected CPU usage fits under --substreams-tier1-cpu-eviction-target-ratio, so
 				their clients reconnect to a less busy instance, in the order set by --substreams-tier1-cpu-eviction-order.
 			`))
-			cmd.Flags().String("substreams-tier1-cpu-eviction-order", "dev,prod-cached,prod-catchup", cli.FlagDescription(`
-				Request classes the eviction may cancel, comma-separated, least important first. A class left out is never
+			cmd.Flags().StringSlice("substreams-tier1-cpu-eviction-order", []string{"dev", "prod-cached", "prod-catchup"}, cli.FlagDescription(`
+				Request classes the eviction may cancel, least important first. A class left out is never
 				cancelled. Within a class, the request burning the most CPU goes first.
 
 				* 'dev' is a development-mode request
@@ -223,7 +224,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			if err != nil {
 				return nil, fmt.Errorf("substreams-tier1-cpu-eviction-mode: %w", err)
 			}
-			evictionOrder, err := active_requests.ParseEvictionOrder(viper.GetString("substreams-tier1-cpu-eviction-order"))
+			evictionOrder, err := active_requests.ParseEvictionOrder(strings.Join(viper.GetStringSlice("substreams-tier1-cpu-eviction-order"), ","))
 			if err != nil {
 				return nil, fmt.Errorf("substreams-tier1-cpu-eviction-order: %w", err)
 			}
