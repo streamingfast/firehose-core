@@ -40,8 +40,8 @@ require (
 	github.com/streamingfast/payment-gateway v0.0.0-20260527144655-d0576d2a4ee3
 	github.com/streamingfast/pbgo v0.0.6-0.20260206150405-2b95acf70437
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/squasher v0.0.0-20260915154953-e44d728bbb0b
 	github.com/streamingfast/substreams v1.22.1-0.20260915181923-2446eeed288b // feature/squashing
+	github.com/streamingfast/substreams-squasher v0.0.0-20260916170352-151f72d1604b
 	github.com/stretchr/testify v1.12.1
 	github.com/test-go/testify v1.1.4
 	github.com/testcontainers/testcontainers-go v0.44.0

@@ -30,7 +30,7 @@ import (
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 
 	"github.com/streamingfast/logging"
-	"github.com/streamingfast/squasher"
+	"github.com/streamingfast/substreams-squasher"
 	"go.uber.org/zap"
 )
 
