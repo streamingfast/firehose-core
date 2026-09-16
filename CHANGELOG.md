@@ -16,7 +16,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Changed
 
-- Bumped `substreams` to `feature/squashing` so the squasher plugin DSN is available. That pin is behind `develop`: `--substreams-tier1-cpu-eviction-*` flags are still accepted so existing configs start, but they are no longer wired (CPU eviction is not on this substreams branch).
+- Bumped `substreams` to `feature/squashing` so the squasher plugin DSN is available. `grpc://` / `grpcs://` registration comes from public `github.com/streamingfast/substreams/squash/grpc` (no private `substreams-squasher` module). That pin is behind `develop`: `--substreams-tier1-cpu-eviction-*` flags are still accepted so existing configs start, but they are no longer wired (CPU eviction is not on this substreams branch).
 
 ## v1.19.0
 
