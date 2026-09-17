@@ -28,7 +28,7 @@ require (
 	github.com/streamingfast/dauth v0.0.0-20260318230957-4ab1e1d2ebc3
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7
-	github.com/streamingfast/dgrpc v0.0.0-20260917143118-8e1ac72142dd
+	github.com/streamingfast/dgrpc v0.0.0-20260917154456-85358c50e8f1
 	github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4
 	github.com/streamingfast/diffx v0.0.0-20260428032925-db795b0d8333
 	github.com/streamingfast/dmetering v0.0.0-20260901152443-1ff4cd0d617d
