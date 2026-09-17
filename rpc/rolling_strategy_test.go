@@ -55,3 +55,74 @@ func TestStickyRollingStrategy(t *testing.T) {
 	require.Equal(t, []string{"c.1", "c.2", "c.3", "c.3", "c.a", "c.b", "c.1", "c.2"}, clientNames)
 
 }
+
+func TestRollingStrategySequentialWithSpreadStart_startsOnDifferentClientEachCall(t *testing.T) {
+	rollingStrategy := NewRollingStrategySequential[*rollClient](WithSpreadStart())
+
+	clients := NewClients(2*time.Second, rollingStrategy, zlogTest)
+	clients.Add(&rollClient{name: "c.1"})
+	clients.Add(&rollClient{name: "c.2"})
+	clients.Add(&rollClient{name: "c.3"})
+
+	for _, want := range []string{"c.1", "c.2", "c.3", "c.1"} {
+		var got string
+		_, err := WithClients(clients, func(ctx context.Context, client *rollClient) (v any, err error) {
+			got = client.name
+			return nil, nil
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, want, got)
+	}
+}
+
+func TestRollingStrategySequentialWithSpreadStart_failoverWrapsFromStart(t *testing.T) {
+	rollingStrategy := NewRollingStrategySequential[*rollClient](WithSpreadStart())
+
+	clients := NewClients(2*time.Second, rollingStrategy, zlogTest)
+	clients.Add(&rollClient{name: "c.1"})
+	clients.Add(&rollClient{name: "c.2"})
+	clients.Add(&rollClient{name: "c.3"})
+
+	// consume the first call's start (c.1) so the next call starts at c.2
+	_, err := WithClients(clients, func(ctx context.Context, client *rollClient) (v any, err error) {
+		return nil, nil
+	})
+	require.NoError(t, err)
+
+	var clientNames []string
+	_, err = WithClients(clients, func(ctx context.Context, client *rollClient) (v any, err error) {
+		clientNames = append(clientNames, client.name)
+		if client.name == "c.1" {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("next please")
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"c.2", "c.3", "c.1"}, clientNames)
+}
+
+func TestRollingStrategySequentialWithSpreadStart_resetToDeclaredOrderRestartsAtFirstClient(t *testing.T) {
+	rollingStrategy := NewRollingStrategySequential[*rollClient](WithSpreadStart())
+
+	clients := NewClients(2*time.Second, rollingStrategy, zlogTest)
+	clients.Add(&rollClient{name: "c.1"})
+	clients.Add(&rollClient{name: "c.2"})
+
+	_, err := WithClients(clients, func(ctx context.Context, client *rollClient) (v any, err error) {
+		return nil, nil
+	})
+	require.NoError(t, err)
+
+	clients.Reset()
+
+	var got string
+	_, err = WithClients(clients, func(ctx context.Context, client *rollClient) (v any, err error) {
+		got = client.name
+		return nil, nil
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "c.1", got)
+}

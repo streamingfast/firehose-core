@@ -8,6 +8,16 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Added
+
+- `rpc.RollingStrategySequential`, a rolling strategy that walks the client pool in order from a configurable starting client, rolling forward through the rest for failover. `rpc.WithSpreadStart()` spreads that *starting* client round-robin across successive `WithClients`/`WithClientsContext` calls, so concurrent block fetches (e.g. `blockpoller`'s batched polling) don't all hammer the same provider first; failover order after the starting point is unchanged. Without the option, behavior matches the now-deprecated `RollingStrategyAlwaysUseFirst`. `StickyRollingStrategy` is unaffected either way.
+
+### Deprecated
+
+- `rpc.RollingStrategyAlwaysUseFirst` / `rpc.NewRollingStrategyAlwaysUseFirst`, use `rpc.RollingStrategySequential` / `rpc.NewRollingStrategySequential` instead. The old name is now a type alias with an unchanged, no-option constructor, so existing callers keep compiling as-is.
+
 ## v1.19.0
 
 ### Added
