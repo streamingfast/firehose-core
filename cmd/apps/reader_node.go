@@ -73,8 +73,9 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 			flags.Int("reader-node-blocks-chan-capacity", 100, "Capacity of the channel holding blocks read by the reader. Process will shutdown reader-node if the channel gets over 90% of that capacity to prevent horrible consequences. Raise this number when processing tiny blocks very quickly")
 			flags.Uint64("reader-node-line-buffer-size", consoleline.MaxLineLength, cli.FlagDescription(`
 				Maximum size in bytes the buffer reading a single line (block) out of the node can grow to, the reader fails on a longer line.
-				It cannot be above the default of 3 GiB, the Firehose stack cannot handle bigger blocks. The buffer starts at 100 MiB, grows
-				when a longer line comes in and shrinks back once 100 blocks in a row used less than half of it.
+				It cannot be above the default of about 2.67 GiB: a longer line decodes to a block that does not fit in the 2 GiB messages the
+				Firehose stack sends. The buffer starts at 100 MiB, grows when a longer line comes in and shrinks back once 100 blocks in a row
+				used less than half of it.
 			`))
 			flags.String("reader-node-one-block-suffix", "default", cli.FlagDescription(`
 				Unique identifier for reader, so that it can produce 'oneblock files' in the same store as another instance without competing
@@ -282,7 +283,7 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 func readerNodeLineBufferSize() (uint64, error) {
 	size := viper.GetUint64("reader-node-line-buffer-size")
 	if size > consoleline.MaxLineLength {
-		return 0, fmt.Errorf("--reader-node-line-buffer-size cannot be above %d bytes (3 GiB), the Firehose stack cannot handle bigger blocks (got %d)", consoleline.MaxLineLength, size)
+		return 0, fmt.Errorf("--reader-node-line-buffer-size cannot be above %d bytes, a longer line decodes to a block that does not fit in the 2 GiB messages the Firehose stack sends (got %d)", consoleline.MaxLineLength, size)
 	}
 
 	return size, nil

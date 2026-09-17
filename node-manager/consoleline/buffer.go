@@ -3,9 +3,10 @@ package consoleline
 import "strings"
 
 const (
-	// MaxLineLength is the largest line in bytes the Firehose stack can handle: the block of a
-	// longer line does not fit in a gRPC message, see dgrpc.MaxMessageSize.
-	MaxLineLength = 3 * 1024 * 1024 * 1024
+	// MaxLineLength is the largest line in bytes the Firehose stack can handle. Its base64
+	// payload decodes to at most 3/4 of it, which keeps the block and 1 MiB for the message
+	// around it within the 2 GiB responses of dgrpc.MaxResponseSize.
+	MaxLineLength = (2*1024*1024*1024 - 1024*1024) / 3 * 4
 
 	// InitialBufferSize is the size in bytes a Splitter buffer starts at, and grows by when a
 	// line does not fit.
