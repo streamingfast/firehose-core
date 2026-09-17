@@ -322,28 +322,13 @@ nodeProcessDone:
 		}
 	}
 
+	// The command waits for its stdout and stderr to be fully written to the splitters
+	// before reaching its final state, so there is nothing left to drain here.
 	s.Logger.Info("supervised process has been terminated")
-
-	s.Logger.Info("waiting for stdout and stderr to be drained", cmdOutputStatsLogFields(cmd)...)
-	for !cmdBufferEmpty(cmd) {
-		s.Logger.Debug("draining stdout and stderr", cmdOutputStatsLogFields(cmd)...)
-		time.Sleep(500 * time.Millisecond)
-	}
-
-	s.Logger.Info("stdout and stderr are now drained")
 
 	s.setCmd(nil)
 
 	return nil
-}
-
-func cmdOutputStatsLogFields(cmd *overseer.Cmd) []zap.Field {
-	var stdoutLineCount, stderrLineCount int
-	if cmd != nil {
-		stdoutLineCount, stderrLineCount = len(cmd.Stdout), len(cmd.Stderr)
-	}
-
-	return []zap.Field{zap.Int("stdout_len", stdoutLineCount), zap.Int("stderr_len", stderrLineCount)}
 }
 
 func (s *Superviser) IsRunning() bool {
@@ -371,46 +356,25 @@ func cmdIsStopping(cmd *overseer.Cmd) bool {
 	return !cmd.IsInitialState() && !cmd.IsRunningState() && !cmd.IsFinalState()
 }
 
-func cmdBufferEmpty(cmd *overseer.Cmd) bool {
-	if cmd == nil {
-		return true
+// start waits for the command to reach its final state. The command writes its stdout and
+// stderr straight into the splitters, which hand every completed line to the log plugins
+// before the status arrives, so there is no output left to read here.
+//
+// The splitters are deliberately not closed: what they hold at that point is a line the
+// node did not finish writing, and a truncated block is worse than a missing one.
+func (s *Superviser) start(cmd *overseer.Cmd, stdout, stderr *consoleline.Splitter) {
+	status := <-cmd.Start()
+
+	if status.Exit == 0 {
+		s.Logger.Info("command terminated with zero status", overseerStatusLogFields(status)...)
+	} else {
+		s.Logger.Error(fmt.Sprintf("command terminated with non-zero status, last log lines:\n%s\n", formatLogLines(s.LastLogLines())), overseerStatusLogFields(status)...)
 	}
 
-	return len(cmd.Stdout) == 0 && len(cmd.Stderr) == 0
-}
-
-func (s *Superviser) start(cmd *overseer.Cmd, stdout, stderr *consoleline.Splitter) {
-	statusChan := cmd.Start()
-
-	processTerminated := false
-	for {
-		select {
-		case status := <-statusChan:
-			processTerminated = true
-			if status.Exit == 0 {
-				s.Logger.Info("command terminated with zero status", cmdOutputStatsLogFields(cmd)...)
-			} else {
-				s.Logger.Error(fmt.Sprintf("command terminated with non-zero status, last log lines:\n%s\n", formatLogLines(s.LastLogLines())), overseerStatusLogFields(status)...)
-			}
-
-			// A failed write closes the pipe, the node then usually dies of a broken pipe
-			for name, splitter := range map[string]*consoleline.Splitter{"stdout": stdout, "stderr": stderr} {
-				if err := splitter.Err(); err != nil {
-					s.Logger.Error("reading command output failed", zap.String("stream", name), zap.Error(err))
-				}
-			}
-
-		case line := <-cmd.Stdout:
-			s.processLogLine(line)
-		case line := <-cmd.Stderr:
-			s.processLogLine(line)
-		}
-
-		if processTerminated {
-			s.Logger.Debug("command terminated but continue read loop to fully consume stdout/sdterr line channels", zap.Bool("buffer_empty", cmdBufferEmpty(cmd)))
-			if cmdBufferEmpty(cmd) {
-				return
-			}
+	// A failed write closes the pipe, the node then usually dies of a broken pipe
+	for name, splitter := range map[string]*consoleline.Splitter{"stdout": stdout, "stderr": stderr} {
+		if err := splitter.Err(); err != nil {
+			s.Logger.Error("reading command output failed", zap.String("stream", name), zap.Error(err))
 		}
 	}
 }
