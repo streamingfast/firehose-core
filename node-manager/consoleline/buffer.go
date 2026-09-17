@@ -11,16 +11,19 @@ const (
 	// DefaultBufferSize is the normal size in bytes of a Splitter buffer when none is given.
 	DefaultBufferSize = 100 * 1024 * 1024
 
+	// MinBufferSize is the smallest normal size in bytes of a Splitter buffer.
+	MinBufferSize = 32 * 1024
+
 	// shrinkAfterBlocks is how many blocks in a row must use less than half of a grown buffer
-	// before it goes back to its normal size.
-	shrinkAfterBlocks = 100
+	// before it shrinks by half.
+	shrinkAfterBlocks = 50
 )
 
 // buffer holds the line being read in pieces of pieceSize bytes, its normal size, allocated as
 // the line grows so that growing never copies what was already written. The content is copied
-// once into an exactly sized result when the line ends. Pieces are kept for the next lines,
-// and dropped back to a single one once shrinkAfterBlocks blocks in a row used less than half
-// of them.
+// once into an exactly sized result when the line ends. Pieces are kept for the next lines.
+// Once shrinkAfterBlocks blocks in a row used less than half of them, half of the pieces are
+// dropped, rounded down, never going below a single piece.
 type buffer struct {
 	pieceSize int
 	pieces    [][]byte
@@ -133,8 +136,9 @@ func (b *buffer) reset(isBlock bool) {
 
 	b.smallBlocks++
 	if b.smallBlocks >= shrinkAfterBlocks {
-		clear(b.pieces[1:])
-		b.pieces = b.pieces[:1]
+		keep := (len(b.pieces) + 1) / 2
+		clear(b.pieces[keep:])
+		b.pieces = b.pieces[:keep]
 		b.smallBlocks = 0
 	}
 }

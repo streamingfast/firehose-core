@@ -179,61 +179,55 @@ func TestSplitter_MaxLineLength(t *testing.T) {
 }
 
 func TestBuffer_GrowsAndShrinks(t *testing.T) {
-	b := buffer{pieceSize: 10}
-	line := func(size int) []byte {
-		data := make([]byte, size)
-		for i := range data {
-			data[i] = byte(i)
-		}
-		return data
+	b := buffer{pieceSize: 200}
+	block := func(size int) {
+		b.write(make([]byte, size))
+		b.reset(true)
 	}
 
-	data := line(25)
-	b.write(data)
-	assert.Equal(t, data, b.bytes())
-	assert.Equal(t, string(data), b.string())
-	assert.Len(t, b.pieces, 3)
-	b.reset(true)
+	block(1000)
+	assert.Len(t, b.pieces, 5)
 
 	// A grown buffer is reused as is
-	b.write(line(4))
-	assert.Equal(t, line(4), b.bytes())
-	assert.Len(t, b.pieces, 3)
+	b.write([]byte("abcd"))
+	assert.Equal(t, []byte("abcd"), b.bytes())
+	assert.Len(t, b.pieces, 5)
 	b.reset(true)
 
 	// Only blocks count, and a block using half of the buffer restarts the count
 	for i := 0; i < shrinkAfterBlocks-2; i++ {
-		b.write(line(4))
-		b.reset(true)
+		block(499)
 	}
 	for i := 0; i < 5; i++ {
-		b.write(line(4))
+		b.write(make([]byte, 10))
 		b.reset(false)
 	}
-	b.write(line(15))
-	b.reset(true)
-	assert.Len(t, b.pieces, 3)
+	block(500)
+	assert.Len(t, b.pieces, 5)
 
-	for i := 0; i < shrinkAfterBlocks-1; i++ {
-		b.write(line(14))
-		b.reset(true)
+	// 1000 -> 600 -> 400 -> 200, never below the normal size
+	for _, expected := range []int{3, 2, 1, 1} {
+		for i := 0; i < shrinkAfterBlocks; i++ {
+			block(10)
+		}
+		assert.Len(t, b.pieces, expected)
 	}
-	assert.Len(t, b.pieces, 3)
+	assert.Equal(t, 200, cap(b.pieces[0]))
 
-	b.write(line(14))
-	b.reset(true)
-	assert.Len(t, b.pieces, 1)
-	assert.Equal(t, 10, cap(b.pieces[0]))
-
-	assert.Equal(t, []byte{}, b.bytes())
-	b.write(line(12))
-	assert.Equal(t, line(12), b.bytes())
+	// A buffer that shrank still grows back
+	block(700)
+	assert.Len(t, b.pieces, 4)
+	for i := 0; i < shrinkAfterBlocks; i++ {
+		block(399)
+	}
+	assert.Len(t, b.pieces, 2)
 }
 
 func TestSplitter_BufferSize(t *testing.T) {
 	onLine := func(string) {}
 
 	assert.Equal(t, DefaultBufferSize, NewSplitter(0, onLine, nil).buffer.pieceSize)
-	assert.Equal(t, 1024, NewSplitter(1024, onLine, nil).buffer.pieceSize)
+	assert.Equal(t, MinBufferSize, NewSplitter(1024, onLine, nil).buffer.pieceSize)
+	assert.Equal(t, 64*1024, NewSplitter(64*1024, onLine, nil).buffer.pieceSize)
 	assert.Equal(t, MaxLineLength, NewSplitter(1024, onLine, nil).maxLineLength)
 }

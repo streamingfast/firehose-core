@@ -92,10 +92,14 @@ type Splitter struct {
 
 // NewSplitter returns a Splitter handing lines to onLine and, when onBlock is non-nil,
 // decoded "FIRE BLOCK" lines to onBlock. Its buffer has a normal size of bufferSize bytes
-// (DefaultBufferSize when 0), grows past it for longer lines and shrinks back to it once
-// enough blocks used less than half of it. Write fails with ErrLineTooLong on a line longer
+// (DefaultBufferSize when 0, at least MinBufferSize), grows past it for longer lines and
+// shrinks by half, down to it, each time enough blocks in a row used less than half of it. Write fails with ErrLineTooLong on a line longer
 // than MaxLineLength bytes.
 func NewSplitter(bufferSize int, onLine func(line string), onBlock func(block *Block)) *Splitter {
+	if bufferSize > 0 {
+		bufferSize = max(bufferSize, MinBufferSize)
+	}
+
 	return newSplitter(MaxLineLength, bufferSize, onLine, onBlock)
 }
 

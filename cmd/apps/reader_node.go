@@ -72,10 +72,11 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 			flags.Uint("reader-node-stop-block-num", 0, "Shutdown reader when we the following 'stop-block-num' has been reached, inclusively.")
 			flags.Int("reader-node-blocks-chan-capacity", 100, "Capacity of the channel holding blocks read by the reader. Process will shutdown reader-node if the channel gets over 90% of that capacity to prevent horrible consequences. Raise this number when processing tiny blocks very quickly")
 			flags.Uint64("reader-node-line-buffer-size", consoleline.DefaultBufferSize, cli.FlagDescription(fmt.Sprintf(`
-				Normal size in bytes of the buffer reading a single line (block) out of the node. The buffer grows past it for a longer line,
-				up to %d bytes (the longest line whose block fits in the 2 GiB messages the Firehose stack sends), and shrinks back to it
-				once 100 blocks in a row used less than half of it.
-			`, consoleline.MaxLineLength)))
+				Normal size in bytes of the buffer reading a single line (block) out of the node, at least %d. The buffer grows past it in
+				pieces of that size for a longer line, up to %d bytes (the longest line whose block fits in the 2 GiB messages the Firehose
+				stack sends). Each time 50 blocks in a row used less than half of it, it shrinks by half, keeping whole pieces and never
+				going below the normal size.
+			`, consoleline.MinBufferSize, consoleline.MaxLineLength)))
 			flags.String("reader-node-one-block-suffix", "default", cli.FlagDescription(`
 				Unique identifier for reader, so that it can produce 'oneblock files' in the same store as another instance without competing
 				for writes. You should set this flag if you have multiple reader running, each one should get a unique identifier, the
@@ -281,8 +282,8 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 
 func readerNodeLineBufferSize() (uint64, error) {
 	size := viper.GetUint64("reader-node-line-buffer-size")
-	if size == 0 || size > consoleline.MaxLineLength {
-		return 0, fmt.Errorf("--reader-node-line-buffer-size must be between 1 and %d bytes, the longest line the reader accepts (got %d)", consoleline.MaxLineLength, size)
+	if size < consoleline.MinBufferSize || size > consoleline.MaxLineLength {
+		return 0, fmt.Errorf("--reader-node-line-buffer-size must be between %d bytes and %d bytes, the longest line the reader accepts (got %d)", consoleline.MinBufferSize, consoleline.MaxLineLength, size)
 	}
 
 	return size, nil
