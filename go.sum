@@ -2297,8 +2297,8 @@ github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c h1:6WjE2yInE+
 github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c/go.mod h1:dbfiy9ORrL8c6ldSq+L0H9pg8TOqqu/FsghsgUEWK54=
 github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7 h1:KeyhmbdPhEzot+On1XrHSAOmRoeyIRiM0EkGQAqnVxI=
 github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7/go.mod h1:QSm/AfaDsE0k1xBYi0lW580YJ/WDV/FKZI628tkZR0Y=
-github.com/streamingfast/dgrpc v0.0.0-20260801042045-4c4ac6a8e41a h1:OAh7uS72Z4zBSd8zuR6HoNtFKhR+EaWbJEsVMOgu6VE=
-github.com/streamingfast/dgrpc v0.0.0-20260801042045-4c4ac6a8e41a/go.mod h1:bY6GwaM+J+IonNtsYFI9vY214hypoP/3JWI0YIgasOY=
+github.com/streamingfast/dgrpc v0.0.0-20260917141841-94ec4fe4037f h1:W0j/EIhwJfSAH0X73PvnS+jontMi2xZsg/k0qktLgKI=
+github.com/streamingfast/dgrpc v0.0.0-20260917141841-94ec4fe4037f/go.mod h1:bY6GwaM+J+IonNtsYFI9vY214hypoP/3JWI0YIgasOY=
 github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4 h1:HKi8AIkLBzxZWmbCRUo1RxoOLK33iXO6gZprfsE9rf4=
 github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4/go.mod h1:ehPytv7E4rI65iLcrwTes4rNGGqPPiugnH+20nDQyp4=
 github.com/streamingfast/diffx v0.0.0-20260428032925-db795b0d8333 h1:qVO2Khx3BTdLWJSK3XqQhBSzSCwLPJBbZkFFB2hziOU=
@@ -2332,8 +2332,8 @@ github.com/streamingfast/logging v1.2.3-0.20260810132752-360563ac68a9 h1:jXrqOWJ
 github.com/streamingfast/logging v1.2.3-0.20260810132752-360563ac68a9/go.mod h1:fJ5nP7ZSMB4MQQ6RM7cF+LiSQ43b5cVletcSUNL8z2M=
 github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308 h1:xlWSfi1BoPfsHtPb0VEHGUcAdBF208LUiFCwfaVPfLA=
 github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308/go.mod h1:K1p8Bj/wG34KJvYzPUqtzpndffmpkrVY11u2hkyxCWQ=
-github.com/streamingfast/overseer v0.2.1-0.20210326144022-ee491780e3ef h1:9IVFHRsqvI+vKJwgF1OMV6L55jHbaV/ZLoU4IAG/dME=
-github.com/streamingfast/overseer v0.2.1-0.20210326144022-ee491780e3ef/go.mod h1:cq8CvbZ3ioFmGrHokSAJalS0lC+pVXLKhITScItUGXY=
+github.com/streamingfast/overseer v0.2.1-0.20260917141911-0ad84907d6fe h1:4VBa1ZbYeLK2UsZ2cF9p7fH8R0jKo0BodijN5jSwqkk=
+github.com/streamingfast/overseer v0.2.1-0.20260917141911-0ad84907d6fe/go.mod h1:cq8CvbZ3ioFmGrHokSAJalS0lC+pVXLKhITScItUGXY=
 github.com/streamingfast/payment-gateway v0.0.0-20260527144655-d0576d2a4ee3 h1:20zjgp9CWze3hxhDTWG+0odmcqs8cYAUZE6qCdETDUU=
 github.com/streamingfast/payment-gateway v0.0.0-20260527144655-d0576d2a4ee3/go.mod h1:Ah/s80GSTMRWtxZrxC0xt37ZX4P0nlYpT94V36bTywM=
 github.com/streamingfast/pbgo v0.0.6-0.20260206150405-2b95acf70437 h1:BsGEgwjlIJke/B9PAvnMX9u8eXU5Hpb8s7C79n6BalM=

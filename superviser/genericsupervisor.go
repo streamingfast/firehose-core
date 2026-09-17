@@ -3,7 +3,6 @@ package superviser
 import (
 	"strings"
 
-	"github.com/ShinyTrinkets/overseer"
 	nodeManager "github.com/streamingfast/firehose-core/node-manager"
 	"github.com/streamingfast/firehose-core/node-manager/superviser"
 	"go.uber.org/zap"
@@ -24,12 +23,11 @@ type GenericSuperviser struct {
 // This is the default implementation of the Chain Supervisor. If you wish to override the implementation for
 // your given chain you can override the 'SupervisorFactory' variable
 func newGenericSupervisor(name, binary string, arguments []string, lineBufferSize uint64, appLogger *zap.Logger) nodeManager.ChainSuperviser {
-	if overseer.DEFAULT_LINE_BUFFER_SIZE < int(lineBufferSize) {
-		overseer.DEFAULT_LINE_BUFFER_SIZE = int(lineBufferSize)
-	}
+	s := superviser.New(appLogger, binary, arguments)
+	s.SetMaxLineLength(int(lineBufferSize))
 
 	return &GenericSuperviser{
-		Superviser: superviser.New(appLogger, binary, arguments),
+		Superviser: s,
 		name:       name,
 		binary:     binary,
 		arguments:  arguments,

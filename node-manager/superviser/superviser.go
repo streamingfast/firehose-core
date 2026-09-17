@@ -24,6 +24,7 @@ import (
 	"github.com/ShinyTrinkets/overseer"
 	"github.com/streamingfast/bstream"
 	nodeManager "github.com/streamingfast/firehose-core/node-manager"
+	"github.com/streamingfast/firehose-core/node-manager/consoleline"
 	logplugin "github.com/streamingfast/firehose-core/node-manager/log_plugin"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
@@ -68,6 +69,8 @@ type Superviser struct {
 	logPlugins     []logplugin.LogPlugin
 	logPluginsLock sync.RWMutex
 
+	maxLineLength int
+
 	enableDeepMind bool
 }
 
@@ -77,6 +80,8 @@ func New(logger *zap.Logger, binary string, arguments []string) *Superviser {
 		Binary:    binary,
 		Arguments: arguments,
 		Logger:    logger,
+
+		maxLineLength: consoleline.MaxLineLength,
 	}
 
 	s.Shutter.OnTerminating(func(_ error) {
@@ -91,6 +96,12 @@ func New(logger *zap.Logger, binary string, arguments []string) *Superviser {
 	})
 
 	return s
+}
+
+// SetMaxLineLength sets the maximum length in bytes of a line read out of the node process,
+// it applies from the next Start.
+func (s *Superviser) SetMaxLineLength(maxLineLength int) {
+	s.maxLineLength = maxLineLength
 }
 
 func (s *Superviser) RegisterLogPlugin(plugin logplugin.LogPlugin) {
@@ -247,10 +258,20 @@ func (s *Superviser) Start(options ...nodeManager.StartOption) error {
 		zap.Strings("arguments", s.Arguments),
 		zap.Any("env", explodeToMap(envToLog)))
 
-	cmd := overseer.NewCmd(s.Binary, s.Arguments, overseer.Options{Streaming: true, Env: env})
+	var onBlock func(block *consoleline.Block)
+	for _, plugin := range s.GetLogPlugins() {
+		if blockLinePlugin, ok := plugin.(logplugin.BlockLinePlugin); ok && blockLinePlugin.ReadsBlockLines() {
+			onBlock = s.processBlockLine
+		}
+	}
+
+	stdout := consoleline.NewSplitter(s.maxLineLength, s.processLogLine, onBlock)
+	stderr := consoleline.NewSplitter(s.maxLineLength, s.processLogLine, onBlock)
+
+	cmd := overseer.NewCmd(s.Binary, s.Arguments, overseer.Options{Env: env, StdoutWriter: stdout, StderrWriter: stderr})
 	s.setCmd(cmd)
 
-	go s.start(cmd)
+	go s.start(cmd, stdout, stderr)
 
 	return nil
 }
@@ -358,7 +379,7 @@ func cmdBufferEmpty(cmd *overseer.Cmd) bool {
 	return len(cmd.Stdout) == 0 && len(cmd.Stderr) == 0
 }
 
-func (s *Superviser) start(cmd *overseer.Cmd) {
+func (s *Superviser) start(cmd *overseer.Cmd, stdout, stderr *consoleline.Splitter) {
 	statusChan := cmd.Start()
 
 	processTerminated := false
@@ -370,6 +391,13 @@ func (s *Superviser) start(cmd *overseer.Cmd) {
 				s.Logger.Info("command terminated with zero status", cmdOutputStatsLogFields(cmd)...)
 			} else {
 				s.Logger.Error(fmt.Sprintf("command terminated with non-zero status, last log lines:\n%s\n", formatLogLines(s.LastLogLines())), overseerStatusLogFields(status)...)
+			}
+
+			// A failed write closes the pipe, the node then usually dies of a broken pipe
+			for name, splitter := range map[string]*consoleline.Splitter{"stdout": stdout, "stderr": stderr} {
+				if err := splitter.Err(); err != nil {
+					s.Logger.Error("reading command output failed", zap.String("stream", name), zap.Error(err))
+				}
 			}
 
 		case line := <-cmd.Stdout:
@@ -446,6 +474,24 @@ func (s *Superviser) processLogLine(line string) {
 
 	for _, plugin := range s.logPlugins {
 		plugin.LogLine(line)
+	}
+}
+
+func (s *Superviser) processBlockLine(block *consoleline.Block) {
+	s.logPluginsLock.Lock()
+	defer s.logPluginsLock.Unlock()
+
+	summary := ""
+	for _, plugin := range s.logPlugins {
+		if blockLinePlugin, ok := plugin.(logplugin.BlockLinePlugin); ok && blockLinePlugin.ReadsBlockLines() {
+			blockLinePlugin.LogBlockLine(block)
+			continue
+		}
+
+		if summary == "" {
+			summary = block.Summary()
+		}
+		plugin.LogLine(summary)
 	}
 }
 

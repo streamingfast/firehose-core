@@ -15,8 +15,8 @@
 package node_reader_stdin
 
 import (
-	"bufio"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/streamingfast/bstream/blockstream"
@@ -26,6 +26,7 @@ import (
 	dgrpcserver "github.com/streamingfast/dgrpc/server"
 	dgrpcfactory "github.com/streamingfast/dgrpc/server/factory"
 	nodeManager "github.com/streamingfast/firehose-core/node-manager"
+	"github.com/streamingfast/firehose-core/node-manager/consoleline"
 	logplugin "github.com/streamingfast/firehose-core/node-manager/log_plugin"
 	"github.com/streamingfast/firehose-core/node-manager/metrics"
 	"github.com/streamingfast/firehose-core/node-manager/mindreader"
@@ -48,7 +49,8 @@ type Config struct {
 	DebugDeepMind              bool
 
 	// MaxLineLengthInBytes configures the maximum bytes a single line consumed can be
-	// without any error. If left unspecified or 0, the default is 50 MiB (50 * 1024 * 1024).
+	// without any error, the line buffer starts at [consoleline.InitialBufferSize] and grows
+	// up to it. If left unspecified or 0, the default is 50 MiB (50 * 1024 * 1024).
 	MaxLineLengthInBytes int64
 
 	// GRPCSecretKey, when non-empty, requires every incoming gRPC call to present
@@ -168,22 +170,35 @@ func (a *App) Run() error {
 	}
 	metrics.LineBufferSize.SetUint64(uint64(maxLineLength))
 
-	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Buffer(make([]byte, int(maxLineLength)), int(maxLineLength))
+	onLine := func(line string) {
+		if logPlugin != nil {
+			logPlugin.LogLine(line)
+		}
+
+		mindreaderLogPlugin.LogLine(line)
+	}
+
+	var onBlock func(block *consoleline.Block)
+	if mindreaderLogPlugin.ReadsBlockLines() {
+		onBlock = func(block *consoleline.Block) {
+			if logPlugin != nil {
+				logPlugin.LogLine(block.Summary())
+			}
+
+			mindreaderLogPlugin.LogBlockLine(block)
+		}
+	}
 
 	go func() {
 		a.zlogger.Info("starting stdin consumption loop")
-		for scanner.Scan() {
-			line := scanner.Text()
+		splitter := consoleline.NewSplitter(int(maxLineLength), onLine, onBlock)
 
-			if logPlugin != nil {
-				logPlugin.LogLine(line)
-			}
-
-			mindreaderLogPlugin.LogLine(line)
+		_, err := io.Copy(splitter, os.Stdin)
+		if err == nil {
+			err = splitter.Close()
 		}
 
-		if err := scanner.Err(); err != nil {
+		if err != nil {
 			a.zlogger.Error("got an error from while trying to read a line", zap.Error(err))
 			mindreaderLogPlugin.Shutdown(err)
 			return

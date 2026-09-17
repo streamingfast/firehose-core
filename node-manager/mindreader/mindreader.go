@@ -32,6 +32,7 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose-core/internal/utils"
 	nodeManager "github.com/streamingfast/firehose-core/node-manager"
+	"github.com/streamingfast/firehose-core/node-manager/consoleline"
 	"github.com/streamingfast/firehose-core/node-manager/metrics"
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
@@ -58,6 +59,15 @@ type CloseableConsoleReader interface {
 	Close() error
 }
 
+// BlockLineConsoleReader is a ConsolerReader that reads "FIRE BLOCK" lines whose payload
+// was decoded while it was read out of the node, see [consoleline.Splitter]. Its lines then
+// come from the channel given to ReadLines instead of the one given to its factory.
+type BlockLineConsoleReader interface {
+	ConsolerReader
+
+	ReadLines(lines <-chan consoleline.Line)
+}
+
 type ConsolerReaderFactory func(lines chan string) (ConsolerReader, error)
 
 type MindReaderPlugin struct {
@@ -78,7 +88,8 @@ type MindReaderPlugin struct {
 	zlogger           *zap.Logger
 
 	lines               chan string
-	consoleReader       ConsolerReader // contains the 'reader' part of the pipe
+	consoleLines        chan consoleline.Line // replaces lines when the console reader is a BlockLineConsoleReader
+	consoleReader       ConsolerReader        // contains the 'reader' part of the pipe
 	consumeReadFlowDone chan interface{}
 
 	samplesMu             sync.Mutex
@@ -211,6 +222,11 @@ func (p *MindReaderPlugin) Launch() {
 		return
 	}
 
+	if blockLineReader, ok := consoleReader.(BlockLineConsoleReader); ok {
+		p.consoleLines = make(chan consoleline.Line, cap(lines))
+		blockLineReader.ReadLines(p.consoleLines)
+	}
+
 	p.consoleReader = consoleReader
 	if closer, ok := consoleReader.(CloseableConsoleReader); ok {
 		p.OnTerminating(func(_ error) { closer.Close() })
@@ -332,6 +348,9 @@ func (p *MindReaderPlugin) Stop() {
 	p.Shutdown(nil)
 
 	close(p.lines)
+	if p.consoleLines != nil {
+		close(p.consoleLines)
+	}
 	p.waitForReadFlowToComplete()
 }
 
@@ -483,8 +502,13 @@ func (p *MindReaderPlugin) consumeReadFlow(blocks <-chan *pbbstream.Block) {
 }
 
 func (p *MindReaderPlugin) drainMessages() {
-	for line := range p.lines {
-		_ = line
+	if p.consoleLines != nil {
+		for range p.consoleLines {
+		}
+		return
+	}
+
+	for range p.lines {
 	}
 }
 
@@ -548,7 +572,31 @@ func (p *MindReaderPlugin) LogLine(in string) {
 		metrics.MaxReadBlockSize.SetFloat64(size)
 	}
 
+	if p.consoleLines != nil {
+		p.consoleLines <- consoleline.Line{Text: in}
+		return
+	}
+
 	p.lines <- in
+}
+
+// ReadsBlockLines reports whether "FIRE BLOCK" lines must be given to LogBlockLine instead
+// of LogLine. It is only meaningful once the plugin is launched.
+func (p *MindReaderPlugin) ReadsBlockLines() bool {
+	return p.consoleLines != nil
+}
+
+// LogBlockLine receives a "FIRE BLOCK" line whose payload was decoded while it was read.
+func (p *MindReaderPlugin) LogBlockLine(block *consoleline.Block) {
+	if p.IsTerminating() {
+		return
+	}
+
+	if size := float64(block.LineLength); size > metrics.MaxReadBlockSize.Get() {
+		metrics.MaxReadBlockSize.SetFloat64(size)
+	}
+
+	p.consoleLines <- consoleline.Line{Block: block}
 }
 
 func (p *MindReaderPlugin) OnBlockWritten(callback nodeManager.OnBlockWritten) {

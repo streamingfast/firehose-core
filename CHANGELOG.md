@@ -12,10 +12,13 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
+- Reader: the base64 payload of a `FIRE BLOCK` line is decoded while the line is read, instead of after the whole line was copied into a string. A block no longer crashes the reader when it is bigger than the old 200 MiB line buffer, and reading a block needs about 1.5 times its line size in memory instead of about 3 times (measured on a 512 MiB block: 1.1 GiB peak instead of 2.2 GiB). This applies to chains using the default `firecore.NewConsoleReader`; chains with their own console reader keep receiving `FIRE BLOCK` lines as text.
+- gRPC clients and servers send and receive messages up to 3.5 GiB (bumped `dgrpc`), so blocks up to 3 GiB can go from the reader through the relayer to Firehose clients. Clients need their own receive limit raised to get blocks that big. Substreams modules still cannot take a block over 2 GiB (the largest allocation in wasm32).
 - New `--substreams-tier1-cpu-eviction-order` flag (default `dev,prod-cached,prod-catchup`) listing the request classes the CPU eviction may cancel, least important first. A class left out is never cancelled, so **live production requests are no longer cancelled** unless `prod-live` is added to the order. See the `substreams` bump below for the new `prod-cached` class.
 
 ### Changed
 
+- `--reader-node-line-buffer-size` is now the maximum size the line buffer grows to, and its default goes from 200 MiB to 3 GiB, which is also the highest accepted value since the Firehose stack cannot handle bigger blocks. The buffer starts at 100 MiB, grows when a longer line comes in and shrinks back once 100 blocks in a row used less than half of it. Reading a 3 GiB line takes up to 6 GiB of memory, and a grown buffer stays allocated until it shrinks back.
 - Bumped `substreams` to [v1.22.1-0.20260916134931-00f266e19542](https://github.com/streamingfast/substreams/compare/1b7d09c2de7b...00f266e19542):
 
   - Server: the CPU eviction order is configurable. Classes are cancelled in the configured order, highest burn first within a class and oldest first on a tie. A new `prod-cached` class covers production requests that have not processed a block on tier1 yet, only streaming outputs cached by tier2. They run no wasm on tier1, so `--substreams-tier1-cpu-eviction-min-burn-cores` does not apply to them (`--substreams-tier1-cpu-eviction-min-age` still does), and since their CPU cost is unknown, a round of eviction stops right after cancelling one; the next round, after `--substreams-tier1-cpu-eviction-cooldown`, measures what it freed. The `substreams_tier1_evicted_requests_counter` metric gains the `prod-cached` class.

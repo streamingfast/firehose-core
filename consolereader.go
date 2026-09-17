@@ -2,6 +2,7 @@ package firecore
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dmetrics"
+	"github.com/streamingfast/firehose-core/node-manager/consoleline"
 	"github.com/streamingfast/firehose-core/node-manager/mindreader"
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
@@ -30,11 +32,12 @@ type ParsingStats struct {
 }
 
 type ConsoleReader struct {
-	lines     chan string
-	done      chan interface{}
-	closeOnce sync.Once
-	logger    *zap.Logger
-	tracer    logging.Tracer
+	lines        chan string
+	consoleLines <-chan consoleline.Line
+	done         chan interface{}
+	closeOnce    sync.Once
+	logger       *zap.Logger
+	tracer       logging.Tracer
 
 	// Parsing context
 	readerProtocolVersion string
@@ -139,40 +142,67 @@ func (r *ConsoleReader) ReadBlock() (out *pbbstream.Block, err error) {
 	return out, nil
 }
 
+// ReadLines makes the reader read its lines from the given channel instead of the one
+// it was created with, "FIRE BLOCK" lines on it can have their payload already decoded.
+// It implements [mindreader.BlockLineConsoleReader].
+func (r *ConsoleReader) ReadLines(lines <-chan consoleline.Line) {
+	r.consoleLines = lines
+}
+
 func (r *ConsoleReader) next() (out *pbbstream.Block, err error) {
-	for line := range r.lines {
-		if !strings.HasPrefix(line, "FIRE ") {
-			continue
-		}
-
-		line = line[FirePrefixLen:]
-
-		switch {
-		case strings.HasPrefix(line, BlockLogPrefix):
-			out, err = r.readBlock(line[BlockLogPrefixLen:])
-
-		case strings.HasPrefix(line, InitLogPrefix):
-			err = r.readInit(line[InitLogPrefixLen:])
-		default:
-			if r.tracer.Enabled() {
-				r.logger.Debug("skipping unknown Firehose log line", zap.String("line", line))
+	if r.consoleLines != nil {
+		for line := range r.consoleLines {
+			if line.Block != nil {
+				out, err = r.readDecodedBlock(line.Block)
+			} else {
+				out, err = r.readLine(line.Text)
 			}
-			continue
-		}
 
-		if err != nil {
-			chunks := strings.SplitN(line, " ", 2)
-			return nil, fmt.Errorf("%s: %s (line %q)", chunks[0], err, line)
+			if err != nil || out != nil {
+				return out, err
+			}
 		}
-
-		if out != nil {
-			return out, nil
+	} else {
+		for line := range r.lines {
+			out, err = r.readLine(line)
+			if err != nil || out != nil {
+				return out, err
+			}
 		}
 	}
 
 	r.Close()
 
 	return nil, io.EOF
+}
+
+// readLine returns the block of a "FIRE BLOCK" line, or nil for any other line.
+func (r *ConsoleReader) readLine(line string) (out *pbbstream.Block, err error) {
+	if !strings.HasPrefix(line, "FIRE ") {
+		return nil, nil
+	}
+
+	line = line[FirePrefixLen:]
+
+	switch {
+	case strings.HasPrefix(line, BlockLogPrefix):
+		out, err = r.readBlock(line[BlockLogPrefixLen:])
+
+	case strings.HasPrefix(line, InitLogPrefix):
+		err = r.readInit(line[InitLogPrefixLen:])
+	default:
+		if r.tracer.Enabled() {
+			r.logger.Debug("skipping unknown Firehose log line", zap.String("line", line))
+		}
+		return nil, nil
+	}
+
+	if err != nil {
+		chunks := strings.SplitN(line, " ", 2)
+		return nil, fmt.Errorf("%s: %s (line %q)", chunks[0], err, line)
+	}
+
+	return out, nil
 }
 
 // Formats
@@ -219,18 +249,61 @@ func (r *ConsoleReader) readInit(line string) error {
 //	of a particular block and you must substract 1000 from it to get the actual index
 func (r *ConsoleReader) readBlock(line string) (out *pbbstream.Block, err error) {
 	if r.readerProtocolVersion == "" {
-		return nil, fmt.Errorf("reader protocol version not set, did you forget to send the 'FIRE INIT <reader_protocol_version> <protobuf_fully_qualified_type>' line?")
+		return nil, errReaderProtocolVersionNotSet
 	}
 
-	chunksCount := 7
-	if r.readPartialBlockIndex {
-		chunksCount++
-	}
-	chunks, err := splitInBoundedChunks(line, chunksCount)
+	chunks, err := splitInBoundedChunks(line, r.blockHeaderFieldCount()+1)
 	if err != nil {
 		return nil, fmt.Errorf("splitting block log line: %w", err)
 	}
 
+	encodedPayload := chunks[len(chunks)-1]
+	return r.buildBlock(chunks[:len(chunks)-1], func() ([]byte, error) {
+		payload, err := base64.StdEncoding.DecodeString(encodedPayload)
+		if err != nil {
+			return nil, fmt.Errorf("decoding payload %q: %w", encodedPayload, err)
+		}
+
+		return payload, nil
+	})
+}
+
+// readDecodedBlock is readBlock for a "FIRE BLOCK" line whose payload was decoded while it
+// was read.
+func (r *ConsoleReader) readDecodedBlock(line *consoleline.Block) (out *pbbstream.Block, err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("BLOCK: %s (line header %q)", err, line.Header)
+		}
+	}()
+
+	if r.readerProtocolVersion == "" {
+		return nil, errReaderProtocolVersionNotSet
+	}
+
+	fields, err := splitInBoundedChunks(line.Header, r.blockHeaderFieldCount())
+	if err != nil {
+		return nil, fmt.Errorf("splitting block log line: %w", err)
+	}
+
+	return r.buildBlock(fields, func() ([]byte, error) {
+		return line.Payload, line.Err
+	})
+}
+
+var errReaderProtocolVersionNotSet = errors.New("reader protocol version not set, did you forget to send the 'FIRE INIT <reader_protocol_version> <protobuf_fully_qualified_type>' line?")
+
+// blockHeaderFieldCount is the number of fields before the payload in a "FIRE BLOCK" line.
+func (r *ConsoleReader) blockHeaderFieldCount() int {
+	if r.readPartialBlockIndex {
+		return 7
+	}
+	return 6
+}
+
+// buildBlock builds the block out of the header fields of a "FIRE BLOCK" line, payload is
+// called once the fields are validated.
+func (r *ConsoleReader) buildBlock(chunks []string, payload func() ([]byte, error)) (out *pbbstream.Block, err error) {
 	i := 0
 	blockNum, err := strconv.ParseUint(chunks[i], 10, 64)
 	if err != nil {
@@ -278,14 +351,14 @@ func (r *ConsoleReader) readBlock(line string) (out *pbbstream.Block, err error)
 
 	timestamp := time.Unix(0, int64(timestampUnixNano))
 
-	payload, err := base64.StdEncoding.DecodeString(chunks[i])
+	payloadBytes, err := payload()
 	if err != nil {
-		return nil, fmt.Errorf("decoding payload %q: %w", chunks[i], err)
+		return nil, err
 	}
 
 	blockPayload := &anypb.Any{
 		TypeUrl: r.protoMessageType,
-		Value:   payload,
+		Value:   payloadBytes,
 	}
 
 	block := &pbbstream.Block{
