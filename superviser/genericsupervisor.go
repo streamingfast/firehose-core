@@ -24,7 +24,7 @@ type GenericSuperviser struct {
 // your given chain you can override the 'SupervisorFactory' variable
 func newGenericSupervisor(name, binary string, arguments []string, lineBufferSize uint64, appLogger *zap.Logger) nodeManager.ChainSuperviser {
 	s := superviser.New(appLogger, binary, arguments)
-	s.SetMaxLineLength(int(lineBufferSize))
+	s.SetLineBufferSize(int(lineBufferSize))
 
 	return &GenericSuperviser{
 		Superviser: s,

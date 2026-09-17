@@ -48,10 +48,10 @@ type Config struct {
 	LogToZap                   bool
 	DebugDeepMind              bool
 
-	// MaxLineLengthInBytes configures the maximum bytes a single line consumed can be
-	// without any error, the line buffer starts at [consoleline.InitialBufferSize] and grows
-	// up to it. If left unspecified or 0, the default is 50 MiB (50 * 1024 * 1024).
-	MaxLineLengthInBytes int64
+	// LineBufferSizeInBytes is the normal size of the buffer reading lines, see
+	// [consoleline.NewSplitter]. If left unspecified or 0, [consoleline.DefaultBufferSize]
+	// is used.
+	LineBufferSizeInBytes int64
 
 	// GRPCSecretKey, when non-empty, requires every incoming gRPC call to present
 	// the key as a Bearer token in the "authorization" metadata header.
@@ -164,11 +164,11 @@ func (a *App) Run() error {
 		logPlugin = logplugin.NewToZapLogPlugin(a.Config.DebugDeepMind, a.zlogger)
 	}
 
-	maxLineLength := a.Config.MaxLineLengthInBytes
-	if maxLineLength == 0 {
-		maxLineLength = 50 * 1024 * 1024
+	lineBufferSize := a.Config.LineBufferSizeInBytes
+	if lineBufferSize == 0 {
+		lineBufferSize = consoleline.DefaultBufferSize
 	}
-	metrics.LineBufferSize.SetUint64(uint64(maxLineLength))
+	metrics.LineBufferSize.SetUint64(uint64(lineBufferSize))
 
 	onLine := func(line string) {
 		if logPlugin != nil {
@@ -191,7 +191,7 @@ func (a *App) Run() error {
 
 	go func() {
 		a.zlogger.Info("starting stdin consumption loop")
-		splitter := consoleline.NewSplitter(int(maxLineLength), onLine, onBlock)
+		splitter := consoleline.NewSplitter(int(lineBufferSize), onLine, onBlock)
 
 		_, err := io.Copy(splitter, os.Stdin)
 		if err == nil {

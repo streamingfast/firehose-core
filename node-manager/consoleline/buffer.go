@@ -8,19 +8,19 @@ const (
 	// around it within the 2 GiB responses of dgrpc.MaxResponseSize.
 	MaxLineLength = (2*1024*1024*1024 - 1024*1024) / 3 * 4
 
-	// InitialBufferSize is the size in bytes a Splitter buffer starts at, and grows by when a
-	// line does not fit.
-	InitialBufferSize = 100 * 1024 * 1024
+	// DefaultBufferSize is the normal size in bytes of a Splitter buffer when none is given.
+	DefaultBufferSize = 100 * 1024 * 1024
 
 	// shrinkAfterBlocks is how many blocks in a row must use less than half of a grown buffer
-	// before it goes back to InitialBufferSize.
+	// before it goes back to its normal size.
 	shrinkAfterBlocks = 100
 )
 
-// buffer holds the line being read in pieces of pieceSize bytes, allocated as the line grows
-// so that growing never copies what was already written. The content is copied once into an
-// exactly sized result when the line ends. Pieces are kept for the next lines, and dropped
-// back to a single one once shrinkAfterBlocks blocks in a row used less than half of them.
+// buffer holds the line being read in pieces of pieceSize bytes, its normal size, allocated as
+// the line grows so that growing never copies what was already written. The content is copied
+// once into an exactly sized result when the line ends. Pieces are kept for the next lines,
+// and dropped back to a single one once shrinkAfterBlocks blocks in a row used less than half
+// of them.
 type buffer struct {
 	pieceSize int
 	pieces    [][]byte

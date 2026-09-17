@@ -229,3 +229,11 @@ func TestBuffer_GrowsAndShrinks(t *testing.T) {
 	b.write(line(12))
 	assert.Equal(t, line(12), b.bytes())
 }
+
+func TestSplitter_BufferSize(t *testing.T) {
+	onLine := func(string) {}
+
+	assert.Equal(t, DefaultBufferSize, NewSplitter(0, onLine, nil).buffer.pieceSize)
+	assert.Equal(t, 1024, NewSplitter(1024, onLine, nil).buffer.pieceSize)
+	assert.Equal(t, MaxLineLength, NewSplitter(1024, onLine, nil).maxLineLength)
+}

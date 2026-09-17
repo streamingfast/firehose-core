@@ -69,7 +69,7 @@ type Superviser struct {
 	logPlugins     []logplugin.LogPlugin
 	logPluginsLock sync.RWMutex
 
-	maxLineLength int
+	lineBufferSize int
 
 	enableDeepMind bool
 }
@@ -81,7 +81,7 @@ func New(logger *zap.Logger, binary string, arguments []string) *Superviser {
 		Arguments: arguments,
 		Logger:    logger,
 
-		maxLineLength: consoleline.MaxLineLength,
+		lineBufferSize: consoleline.DefaultBufferSize,
 	}
 
 	s.Shutter.OnTerminating(func(_ error) {
@@ -98,10 +98,10 @@ func New(logger *zap.Logger, binary string, arguments []string) *Superviser {
 	return s
 }
 
-// SetMaxLineLength sets the maximum length in bytes of a line read out of the node process,
-// it applies from the next Start.
-func (s *Superviser) SetMaxLineLength(maxLineLength int) {
-	s.maxLineLength = maxLineLength
+// SetLineBufferSize sets the normal size in bytes of the buffer reading lines out of the node
+// process, see [consoleline.NewSplitter]. It applies from the next Start.
+func (s *Superviser) SetLineBufferSize(size int) {
+	s.lineBufferSize = size
 }
 
 func (s *Superviser) RegisterLogPlugin(plugin logplugin.LogPlugin) {
@@ -265,8 +265,8 @@ func (s *Superviser) Start(options ...nodeManager.StartOption) error {
 		}
 	}
 
-	stdout := consoleline.NewSplitter(s.maxLineLength, s.processLogLine, onBlock)
-	stderr := consoleline.NewSplitter(s.maxLineLength, s.processLogLine, onBlock)
+	stdout := consoleline.NewSplitter(s.lineBufferSize, s.processLogLine, onBlock)
+	stderr := consoleline.NewSplitter(s.lineBufferSize, s.processLogLine, onBlock)
 
 	cmd := overseer.NewCmd(s.Binary, s.Arguments, overseer.Options{Env: env, StdoutWriter: stdout, StderrWriter: stderr})
 	s.setCmd(cmd)

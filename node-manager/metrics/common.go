@@ -21,13 +21,13 @@ import (
 var Metricset = dmetrics.NewSet()
 
 // MaxReadBlockSize tracks the largest single line (block) in bytes read out of the node
-// process so far. Compare it against LineBufferSize to know how close we are to the hard
-// 'reader-node-line-buffer-size' limit.
+// process so far. Compare it against LineBufferSize to know how often the line buffer has to
+// grow past its normal size.
 var MaxReadBlockSize = Metricset.NewGauge("reader_node_max_read_block_size_bytes", "Largest single line (block) in bytes read out of the node process so far")
 
-// LineBufferSize reports the configured 'reader-node-line-buffer-size', the hard limit in
-// bytes that a single line (block) read out of the node process is allowed to reach.
-var LineBufferSize = Metricset.NewGauge("reader_node_line_buffer_size_bytes", "Configured hard limit in bytes for a single line (block) read out of the node process ('reader-node-line-buffer-size')")
+// LineBufferSize reports the configured 'reader-node-line-buffer-size', the normal size in
+// bytes of the buffer reading lines (blocks) out of the node process.
+var LineBufferSize = Metricset.NewGauge("reader_node_line_buffer_size_bytes", "Configured normal size in bytes of the buffer reading a single line (block) out of the node process ('reader-node-line-buffer-size')")
 
 func NewHeadBlockTimeDrift(serviceName string) *dmetrics.HeadTimeDrift {
 	return Metricset.NewHeadTimeDrift(serviceName)
