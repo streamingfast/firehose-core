@@ -78,29 +78,87 @@ func (s *StickyRollingStrategy[C]) prevIndex(clients *Clients[C]) int {
 	return s.nextClientIndex - 1
 }
 
-type RollingStrategyAlwaysUseFirst[C any] struct {
-	nextIndex int
-}
+// RollingStrategyAlwaysUseFirst is a deprecated alias, use [RollingStrategySequential] instead.
+//
+// Deprecated: use [RollingStrategySequential] via [NewRollingStrategySequential] instead.
+type RollingStrategyAlwaysUseFirst[C any] = RollingStrategySequential[C]
 
+// NewRollingStrategyAlwaysUseFirst returns a [RollingStrategySequential] with no
+// options, matching this constructor's original (pre-[WithSpreadStart]) behavior:
+// every call starts at the pool's first client.
+//
+// Deprecated: use [NewRollingStrategySequential] instead.
 func NewRollingStrategyAlwaysUseFirst[C any]() *RollingStrategyAlwaysUseFirst[C] {
-	return &RollingStrategyAlwaysUseFirst[C]{}
+	return NewRollingStrategySequential[C]()
 }
 
-func (s *RollingStrategyAlwaysUseFirst[C]) reset() {
-	s.nextIndex = 0
+type rollingStrategySequentialOptions struct {
+	spreadStart bool
 }
 
-func (s *RollingStrategyAlwaysUseFirst[C]) resetToDeclaredOrder() {
-	s.nextIndex = 0
+// RollingStrategySequentialOption configures [NewRollingStrategySequential].
+type RollingStrategySequentialOption func(*rollingStrategySequentialOptions)
+
+// WithSpreadStart makes the strategy spread its *starting* client round-robin
+// across successive [WithClientsContext] calls instead of always starting at
+// the pool's first client, while preserving the pool's declared (or last
+// sorted) order for failover once a call has picked its start. It's for pools
+// used by batched/parallel polling, where concurrent calls would otherwise all
+// start on the same provider — unlike [StickyRollingStrategy], a call never
+// stays on the provider a previous call ended up rolling to, so this should
+// not be used where staying on a known-good provider matters more than
+// spreading load.
+func WithSpreadStart() RollingStrategySequentialOption {
+	return func(o *rollingStrategySequentialOptions) {
+		o.spreadStart = true
+	}
 }
 
-func (s *RollingStrategyAlwaysUseFirst[C]) next(c *Clients[C]) (client C, index int, err error) {
-	if len(c.clients) <= s.nextIndex {
+// RollingStrategySequential walks the pool in order (declared, or last sorted)
+// starting from a configurable client, rolling forward through the rest of the
+// pool for failover. Without options it always starts at the pool's first
+// client; see [WithSpreadStart] to spread the starting client across calls
+// instead.
+type RollingStrategySequential[C any] struct {
+	nextStartIndex  int
+	startIndex      int
+	usedClientCount int
+	spreadStart     bool
+}
+
+func NewRollingStrategySequential[C any](opts ...RollingStrategySequentialOption) *RollingStrategySequential[C] {
+	var cfg rollingStrategySequentialOptions
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
+	return &RollingStrategySequential[C]{spreadStart: cfg.spreadStart}
+}
+
+func (s *RollingStrategySequential[C]) reset() {
+	s.startIndex = s.nextStartIndex
+	s.usedClientCount = 0
+}
+
+func (s *RollingStrategySequential[C]) resetToDeclaredOrder() {
+	s.nextStartIndex = 0
+	s.startIndex = 0
+	s.usedClientCount = 0
+}
+
+func (s *RollingStrategySequential[C]) next(clients *Clients[C]) (client C, index int, err error) {
+	count := len(clients.clients)
+	if s.usedClientCount == count {
 		return client, 0, ErrorNoMoreClient
 	}
 
-	index = s.nextIndex
-	client = c.clients[index]
-	s.nextIndex++
+	index = (s.startIndex + s.usedClientCount) % count
+	client = clients.clients[index]
+	s.usedClientCount++
+
+	if s.spreadStart && s.usedClientCount == 1 {
+		s.nextStartIndex = (s.startIndex + 1) % count
+	}
+
 	return client, index, nil
 }

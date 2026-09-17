@@ -29,6 +29,11 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
   - Server: the CPU eviction order is configurable. Classes are cancelled in the configured order, highest burn first within a class and oldest first on a tie. A new `prod-cached` class covers production requests that have not processed a block on tier1 yet, only streaming outputs cached by tier2. They run no wasm on tier1, so `--substreams-tier1-cpu-eviction-min-burn-cores` does not apply to them (`--substreams-tier1-cpu-eviction-min-age` still does), and since their CPU cost is unknown, a round of eviction stops right after cancelling one; the next round, after `--substreams-tier1-cpu-eviction-cooldown`, measures what it freed. The `substreams_tier1_evicted_requests_counter` metric gains the `prod-cached` class.
 
   - Server: per-store lines are logged at `Debug` instead of `Info`: `using mmap KV store`, `using in-memory KV store`, `flushing store at boundary`, `merged partial into full store`, `deleting partial store`. `squashing time metrics` stays at `Info`.
+- `rpc.RollingStrategySequential`, a rolling strategy that walks the client pool in order from a configurable starting client, rolling forward through the rest for failover. `rpc.WithSpreadStart()` spreads that *starting* client round-robin across successive `WithClients`/`WithClientsContext` calls, so concurrent block fetches (e.g. `blockpoller`'s batched polling) don't all hammer the same provider first; failover order after the starting point is unchanged. Without the option, behavior matches the now-deprecated `RollingStrategyAlwaysUseFirst`. `StickyRollingStrategy` is unaffected either way.
+
+### Deprecated
+
+- `rpc.RollingStrategyAlwaysUseFirst` / `rpc.NewRollingStrategyAlwaysUseFirst`, use `rpc.RollingStrategySequential` / `rpc.NewRollingStrategySequential` instead. The old name is now a type alias with an unchanged, no-option constructor, so existing callers keep compiling as-is.
 
 ## v1.19.0
 
