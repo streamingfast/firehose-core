@@ -35,13 +35,17 @@ import (
 )
 
 // SourceAddr holds a parsed relayer source address, optionally carrying a
-// secret key extracted from the "?secret=<key>" query parameter.
+// secret key extracted from the "?secret=<key>" query parameter and a
+// reconnection interval extracted from the "?retry_interval=<duration>" query parameter.
 type SourceAddr struct {
 	// URL is the gRPC endpoint address (everything before the '?' separator).
 	URL string
 	// SecretKey is the value of the "secret" query parameter, or empty when
 	// no authentication is required.
 	SecretKey string
+	// RetryInterval is the minimum time between two connection attempts to
+	// the source, rounded up to the next 5s increment. Zero retries every 5s.
+	RetryInterval time.Duration
 }
 
 const (
@@ -101,6 +105,7 @@ func NewMultiplexedSource(handler bstream.Handler, sources []SourceAddr, maxSour
 	ctx := context.Background()
 
 	var sourceFactories []bstream.SourceFactory
+	var retryIntervals []time.Duration
 	for _, src := range sources {
 		src := src // capture loop variable
 		sourceName := urlToLoggerName(src.URL)
@@ -131,9 +136,15 @@ func NewMultiplexedSource(handler bstream.Handler, sources []SourceAddr, maxSour
 			return blockstream.NewSource(ctx, src.URL, int64(sourceRequestBurst), upstreamHandler, opts...)
 		}
 		sourceFactories = append(sourceFactories, sf)
+		retryIntervals = append(retryIntervals, src.RetryInterval)
 	}
 
-	return bstream.NewMultiplexedSource(sourceFactories, handler, bstream.MultiplexedSourceWithLogger(zlog))
+	return bstream.NewMultiplexedSource(
+		sourceFactories,
+		handler,
+		bstream.MultiplexedSourceWithLogger(zlog),
+		bstream.MultiplexedSourceWithRetryIntervals(retryIntervals),
+	)
 }
 
 func urlToLoggerName(url string) string {
