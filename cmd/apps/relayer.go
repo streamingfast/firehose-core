@@ -30,11 +30,15 @@ List of live sources (reader nodes) to connect to for live block feeds (repeat f
 Each address supports:
   - Environment variable interpolation using the syntax ${ENV_VAR_NAME}, e.g. ":${READER_PORT}"
   - An optional secret key appended as a query parameter: "<addr>?secret=<key>"
+  - An optional reconnection interval appended as a query parameter: "<addr>?retry_interval=<duration>".
+    It is the minimum time to wait after the source disconnects before connecting again.
+    Without it, or below 5s, the source is retried every 5s.
 
 Examples:
   :10010
   :10010?secret=mysecret
-  ${READER_HOST}:10010?secret=${READER_SECRET}
+  :10010?retry_interval=120s
+  ${READER_HOST}:10010?secret=${READER_SECRET}&retry_interval=2m
 `))
 			cmd.Flags().Duration("relayer-max-source-latency", 999999*time.Hour, "Max latency tolerated to connect to a source. A performance optimization for when you have redundant sources and some may not have caught up")
 			return nil
@@ -69,12 +73,15 @@ Examples:
 //  1. Environment variable interpolation: ${ENV_VAR_NAME} is replaced with os.Getenv("ENV_VAR_NAME").
 //  2. Secret key extraction: if the address contains "?secret=<key>", the key is stripped from the
 //     URL and stored separately in SourceAddr.SecretKey.
+//  3. Retry interval extraction: if the address contains "?retry_interval=<duration>", the duration is stripped
+//     from the URL and stored separately in SourceAddr.RetryInterval.
 //
 // Example inputs:
 //
 //	":10010"                          -> SourceAddr{URL: ":10010"}
 //	":10010?secret=abc"               -> SourceAddr{URL: ":10010", SecretKey: "abc"}
 //	"${HOST}:10010?secret=${SECRET}"  -> SourceAddr{URL: "<HOST>:10010", SecretKey: "<SECRET>"}
+//	":10010?retry_interval=120s"      -> SourceAddr{URL: ":10010", RetryInterval: 120 * time.Second}
 func parseSourceAddresses(raw []string) ([]relayer.SourceAddr, error) {
 	out := make([]relayer.SourceAddr, 0, len(raw))
 	for _, entry := range raw {
@@ -92,12 +99,22 @@ func parseSourceAddresses(raw []string) ([]relayer.SourceAddr, error) {
 		sa := relayer.SourceAddr{URL: addr}
 
 		if hasQuery {
-			// Parse only the query portion so we can extract "secret".
+			// Parse only the query portion so we can extract "secret" and "retry_interval".
 			vals, err := url.ParseQuery(query)
 			if err != nil {
 				return nil, fmt.Errorf("invalid query string in source %q: %w", expanded, err)
 			}
 			sa.SecretKey = vals.Get("secret")
+
+			if retryInterval := vals.Get("retry_interval"); retryInterval != "" {
+				sa.RetryInterval, err = time.ParseDuration(retryInterval)
+				if err != nil {
+					return nil, fmt.Errorf("invalid retry_interval in source %q: %w", expanded, err)
+				}
+				if sa.RetryInterval < 0 {
+					return nil, fmt.Errorf("negative retry_interval in source %q", expanded)
+				}
+			}
 		}
 
 		out = append(out, sa)

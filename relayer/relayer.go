@@ -17,6 +17,7 @@ package relayer
 import (
 	"context"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/streamingfast/dstore"
@@ -35,13 +36,18 @@ import (
 )
 
 // SourceAddr holds a parsed relayer source address, optionally carrying a
-// secret key extracted from the "?secret=<key>" query parameter.
+// secret key extracted from the "?secret=<key>" query parameter and a
+// reconnection interval extracted from the "?retry_interval=<duration>" query parameter.
 type SourceAddr struct {
 	// URL is the gRPC endpoint address (everything before the '?' separator).
 	URL string
 	// SecretKey is the value of the "secret" query parameter, or empty when
 	// no authentication is required.
 	SecretKey string
+	// RetryInterval is the minimum time to wait after the source disconnects
+	// before connecting to it again. Zero keeps the multiplexed source's own
+	// reconnect loop interval (5s), which is also the lower bound.
+	RetryInterval time.Duration
 }
 
 const (
@@ -105,6 +111,7 @@ func NewMultiplexedSource(handler bstream.Handler, sources []SourceAddr, maxSour
 		src := src // capture loop variable
 		sourceName := urlToLoggerName(src.URL)
 		logger := zlog.Named("src").Named(sourceName)
+		var lastTerminatedAt atomic.Int64
 		sf := func(subHandler bstream.Handler) bstream.Source {
 
 			gate := bstream.NewRealtimeGate(maxSourceLatency, subHandler, bstream.GateOptionWithLogger(logger))
@@ -128,12 +135,45 @@ func NewMultiplexedSource(handler bstream.Handler, sources []SourceAddr, maxSour
 			if src.SecretKey != "" {
 				opts = append(opts, blockstream.WithSecretKey(src.SecretKey))
 			}
-			return blockstream.NewSource(ctx, src.URL, int64(sourceRequestBurst), upstreamHandler, opts...)
+			source := blockstream.NewSource(ctx, src.URL, int64(sourceRequestBurst), upstreamHandler, opts...)
+			if src.RetryInterval <= 0 {
+				return source
+			}
+
+			source.OnTerminated(func(_ error) {
+				lastTerminatedAt.Store(time.Now().UnixNano())
+			})
+
+			var wait time.Duration
+			if last := lastTerminatedAt.Load(); last != 0 {
+				wait = src.RetryInterval - time.Since(time.Unix(0, last))
+			}
+			return &delayedSource{Source: source, wait: wait, logger: logger}
 		}
 		sourceFactories = append(sourceFactories, sf)
 	}
 
 	return bstream.NewMultiplexedSource(sourceFactories, handler, bstream.MultiplexedSourceWithLogger(zlog))
+}
+
+// delayedSource waits before running the wrapped source, so a source that
+// just disconnected is not reconnected before its RetryInterval has elapsed.
+type delayedSource struct {
+	*blockstream.Source
+	wait   time.Duration
+	logger *zap.Logger
+}
+
+func (s *delayedSource) Run() {
+	if s.wait > 0 {
+		s.logger.Info("waiting before reconnecting to source", zap.Duration("wait", s.wait))
+		select {
+		case <-time.After(s.wait):
+		case <-s.Terminating():
+			return
+		}
+	}
+	s.Source.Run()
 }
 
 func urlToLoggerName(url string) string {
