@@ -31,7 +31,7 @@ Each address supports:
   - Environment variable interpolation using the syntax ${ENV_VAR_NAME}, e.g. ":${READER_PORT}"
   - An optional secret key appended as a query parameter: "<addr>?secret=<key>"
   - An optional reconnection interval appended as a query parameter: "<addr>?retry_interval=<duration>".
-    It is the minimum time to wait after the source disconnects before connecting again.
+    It is the minimum time between two connection attempts to that source.
     Without it, or below 5s, the source is retried every 5s.
 
 Examples:
