@@ -26,6 +26,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## v1.19.0
 
+### Fixed
+
+- The `ready{app="firehose"}` Prometheus metric now remains `0` while the firehose waits to read the first streamable block and only changes to `1` after initialization succeeds, including when serving from merged blocks without a live source.
+
 ### Added
 
 - `tools compare-blocks`: `--fields` prints the protobuf field paths that differ for each mismatched block (e.g. `header.chain_id`, `txs[2]`, `unknown_field(12)`). Use it when `--diff` prints nothing: blocks are marked different by `proto.Equal` (which includes unknown fields), while `--diff` compares JSON with unknown fields stripped by default.
