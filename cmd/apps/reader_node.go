@@ -18,6 +18,7 @@ import (
 	coremetrics "github.com/streamingfast/firehose-core/metrics"
 	nodeManager "github.com/streamingfast/firehose-core/node-manager"
 	nodeManagerApp "github.com/streamingfast/firehose-core/node-manager/app/node_manager"
+	"github.com/streamingfast/firehose-core/node-manager/consoleline"
 	"github.com/streamingfast/firehose-core/node-manager/metrics"
 	reader "github.com/streamingfast/firehose-core/node-manager/mindreader"
 	"github.com/streamingfast/firehose-core/node-manager/operator"
@@ -70,7 +71,12 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 			flags.Uint("reader-node-start-block-num", 0, "Blocks that were produced with smaller block number then the given block num are skipped")
 			flags.Uint("reader-node-stop-block-num", 0, "Shutdown reader when we the following 'stop-block-num' has been reached, inclusively.")
 			flags.Int("reader-node-blocks-chan-capacity", 100, "Capacity of the channel holding blocks read by the reader. Process will shutdown reader-node if the channel gets over 90% of that capacity to prevent horrible consequences. Raise this number when processing tiny blocks very quickly")
-			flags.Uint64("reader-node-line-buffer-size", 209715200, "Capacity of the buffer for reading a single line out of the node, in bytes (This is a hard limit. Some future enormouse blocks may require raising this to process them).")
+			flags.Uint64("reader-node-line-buffer-size", consoleline.DefaultBufferSize, cli.FlagDescription(fmt.Sprintf(`
+				Normal size in bytes of the buffer reading a single line (block) out of the node, at least %d. The buffer grows past it in
+				pieces of that size for a longer line, up to %d bytes (the longest line whose block fits in the 2 GiB messages the Firehose
+				stack sends). Each time 50 blocks in a row used less than half of it, it shrinks by half, keeping whole pieces and never
+				going below the normal size.
+			`, consoleline.MinBufferSize, consoleline.MaxLineLength)))
 			flags.String("reader-node-one-block-suffix", "default", cli.FlagDescription(`
 				Unique identifier for reader, so that it can produce 'oneblock files' in the same store as another instance without competing
 				for writes. You should set this flag if you have multiple reader running, each one should get a unique identifier, the
@@ -173,7 +179,10 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 				nodeManager.WithFinalizedBlockNumberMetric(finalizedBlockNumber),
 			)
 
-			lineBufferSize := viper.GetUint64("reader-node-line-buffer-size")
+			lineBufferSize, err := readerNodeLineBufferSize()
+			if err != nil {
+				return nil, err
+			}
 			metrics.LineBufferSize.SetUint64(lineBufferSize)
 
 			superviser := sv.SupervisorFactory(chain.ExecutableName, nodePath, nodeArguments, lineBufferSize, appLogger)
@@ -269,6 +278,15 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 			}, testModeComparator, appLogger), nil
 		},
 	})
+}
+
+func readerNodeLineBufferSize() (uint64, error) {
+	size := viper.GetUint64("reader-node-line-buffer-size")
+	if size < consoleline.MinBufferSize || size > consoleline.MaxLineLength {
+		return 0, fmt.Errorf("--reader-node-line-buffer-size must be between %d bytes and %d bytes, the longest line the reader accepts (got %d)", consoleline.MinBufferSize, consoleline.MaxLineLength, size)
+	}
+
+	return size, nil
 }
 
 var variablesRegex = regexp.MustCompile(`\{(data-dir|node-data-dir|hostname|first-streamable-block|start-block-num|stop-block-num)\}`)

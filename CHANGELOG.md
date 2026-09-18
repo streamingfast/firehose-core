@@ -12,11 +12,17 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
+- Reader: the base64 payload of a `FIRE BLOCK` line is decoded while the line is read, instead of after the whole line was copied into a string. A block no longer crashes the reader when it is bigger than the old 200 MiB line buffer, and reading a block needs about 1.5 times its line size in memory instead of about 3 times (measured on a 512 MiB block: 1.1 GiB peak instead of 2.2 GiB). This applies to chains using the default `firecore.NewConsoleReader`; chains with their own console reader keep receiving `FIRE BLOCK` lines as text.
+- gRPC clients receive responses up to 2 GiB instead of 1 GiB, and servers send responses up to 2 GiB (bumped `dgrpc`), so a block up to 2 GiB goes from the reader through the relayer to Firehose and Substreams. Request limits are unchanged. External clients need their own receive limit raised to get blocks that big. Substreams modules cannot take a block that big: wasm32 has 4 GiB for the block, its decoded form and the output.
 - `--relayer-source` accepts a `retry_interval=<duration>` query parameter (e.g. `my.source:12345?retry_interval=120s`) setting the minimum time between two connection attempts to that source. Use it for a rescuer or fallback endpoint that is expected to be down most of the time, so the relayer does not dial it (and log the failure) every 5s. `retry_interval` must be at least `5s`, and since sources are checked every 5s it is rounded up to the next 5s increment (e.g. `12s` behaves as `15s`). Without it, a source is retried every 5s.
 - New `--substreams-tier1-cpu-eviction-order` flag (default `dev,prod-cached,prod-catchup`) listing the request classes the CPU eviction may cancel, least important first. A class left out is never cancelled, so **live production requests are no longer cancelled** unless `prod-live` is added to the order. See the `substreams` bump below for the new `prod-cached` class.
 
 ### Changed
 
+- `--reader-node-line-buffer-size` is now the normal size of the line buffer (default 100 MiB, at least 32 KiB). The buffer grows past it in pieces of that size for a longer line, up to `2861913428` bytes: the longest line whose block, with 1 MiB for the message around it, fits in a 2 GiB response. Each time 50 blocks in a row used less than half of it, it shrinks by half, keeping whole pieces and never going below the normal size. Reading the longest line takes up to 5.4 GiB of memory, and a grown buffer stays allocated until it shrinks back.
+- `--reader-node-line-buffer-size` outside of `32768` to `2861913428` bytes is now refused at startup instead of being used as is. A reader configured above that range does not start until the value is lowered.
+- The reader now reads the node output directly, instead of through a channel of lines holding up to 1000 of them. A reader that falls behind stops reading the node's stdout sooner, which blocks the node instead of buffering more lines in the reader.
+- With `--reader-node-debug-firehose-logs`, a `FIRE BLOCK` line is logged as `FIRE BLOCK <header> <payload: N bytes decoded>` instead of its full base64 text, so a big block no longer writes hundreds of megabytes into the logs.
 - Bumped `bstream` for `MultiplexedSourceWithRetryIntervals`, the option backing the new `retry_interval` on `--relayer-source`.
 - Bumped `substreams` to [v1.22.1-0.20260916134931-00f266e19542](https://github.com/streamingfast/substreams/compare/1b7d09c2de7b...00f266e19542):
 

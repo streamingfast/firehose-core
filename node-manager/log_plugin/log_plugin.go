@@ -18,6 +18,7 @@ import (
 	"regexp"
 
 	"github.com/streamingfast/bstream/blockstream"
+	"github.com/streamingfast/firehose-core/node-manager/consoleline"
 )
 
 var readerInstrumentationPrefixRegex = regexp.MustCompile("^(DMLOG|FIRE) ")
@@ -30,6 +31,17 @@ type LogPlugin interface {
 	Shutdown(err error)
 	IsTerminating() bool
 	Stop()
+}
+
+// BlockLinePlugin is a LogPlugin that can receive "FIRE BLOCK" lines whose payload was
+// decoded while it was read out of the node.
+type BlockLinePlugin interface {
+	LogPlugin
+
+	// ReadsBlockLines reports whether "FIRE BLOCK" lines must be given to LogBlockLine
+	// instead of LogLine. It is only meaningful once the plugin is launched.
+	ReadsBlockLines() bool
+	LogBlockLine(block *consoleline.Block)
 }
 
 type Shutter interface {
