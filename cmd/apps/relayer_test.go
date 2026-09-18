@@ -24,6 +24,9 @@ func Test_parseSourceAddresses(t *testing.T) {
 		{"secret and retry", ":10010?secret=${TEST_RELAYER_SECRET}&retry_interval=2m", relayer.SourceAddr{URL: ":10010", SecretKey: "s3cr3t", RetryInterval: 2 * time.Minute}, false},
 		{"invalid retry", ":10010?retry_interval=soon", relayer.SourceAddr{}, true},
 		{"negative retry", ":10010?retry_interval=-5s", relayer.SourceAddr{}, true},
+		{"zero retry", ":10010?retry_interval=0s", relayer.SourceAddr{}, true},
+		{"retry below minimum", ":10010?retry_interval=4s", relayer.SourceAddr{}, true},
+		{"retry at minimum", ":10010?retry_interval=5s", relayer.SourceAddr{URL: ":10010", RetryInterval: 5 * time.Second}, false},
 	}
 
 	for _, tt := range tests {

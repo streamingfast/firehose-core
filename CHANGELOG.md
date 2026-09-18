@@ -12,7 +12,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
-- `--relayer-source` accepts a `retry_interval=<duration>` query parameter (e.g. `my.source:12345?retry_interval=120s`) setting the minimum time between two connection attempts to that source. Use it for a rescuer or fallback endpoint that is expected to be down most of the time, so the relayer does not dial it (and log the failure) every 5s. Sources are checked every 5s, so `retry_interval` is rounded up to the next 5s increment (e.g. `12s` behaves as `15s`). Without it, a source is retried every 5s.
+- `--relayer-source` accepts a `retry_interval=<duration>` query parameter (e.g. `my.source:12345?retry_interval=120s`) setting the minimum time between two connection attempts to that source. Use it for a rescuer or fallback endpoint that is expected to be down most of the time, so the relayer does not dial it (and log the failure) every 5s. `retry_interval` must be at least `5s`, and since sources are checked every 5s it is rounded up to the next 5s increment (e.g. `12s` behaves as `15s`). Without it, a source is retried every 5s.
 - New `--substreams-tier1-cpu-eviction-order` flag (default `dev,prod-cached,prod-catchup`) listing the request classes the CPU eviction may cancel, least important first. A class left out is never cancelled, so **live production requests are no longer cancelled** unless `prod-live` is added to the order. See the `substreams` bump below for the new `prod-cached` class.
 
 ### Changed

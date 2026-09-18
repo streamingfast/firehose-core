@@ -31,7 +31,7 @@ Each address supports:
   - Environment variable interpolation using the syntax ${ENV_VAR_NAME}, e.g. ":${READER_PORT}"
   - An optional secret key appended as a query parameter: "<addr>?secret=<key>"
   - An optional reconnection interval appended as a query parameter: "<addr>?retry_interval=<duration>".
-    It is the minimum time between two connection attempts to that source.
+    It is the minimum time between two connection attempts to that source, and must be at least 5s.
     Sources are checked every 5s, so the interval is rounded up to the next 5s increment
     (e.g. 12s behaves as 15s). Without it, the source is retried every 5s.
 
@@ -69,6 +69,9 @@ Examples:
 		},
 	})
 }
+
+// minRelayerSourceRetryInterval must match the reconnect loop delay of bstream's MultiplexedSource.
+const minRelayerSourceRetryInterval = 5 * time.Second
 
 // parseSourceAddresses processes a slice of raw source address strings, performing:
 //  1. Environment variable interpolation: ${ENV_VAR_NAME} is replaced with os.Getenv("ENV_VAR_NAME").
@@ -112,8 +115,8 @@ func parseSourceAddresses(raw []string) ([]relayer.SourceAddr, error) {
 				if err != nil {
 					return nil, fmt.Errorf("invalid retry_interval in source %q: %w", expanded, err)
 				}
-				if sa.RetryInterval < 0 {
-					return nil, fmt.Errorf("negative retry_interval in source %q", expanded)
+				if sa.RetryInterval < minRelayerSourceRetryInterval {
+					return nil, fmt.Errorf("retry_interval in source %q is below the %s minimum", expanded, minRelayerSourceRetryInterval)
 				}
 			}
 		}
