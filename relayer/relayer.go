@@ -166,7 +166,7 @@ type delayedSource struct {
 
 func (s *delayedSource) Run() {
 	if s.wait > 0 {
-		s.logger.Info("waiting before reconnecting to source", zap.Duration("wait", s.wait))
+		s.logger.Debug("waiting before reconnecting to source", zap.Duration("wait", s.wait))
 		select {
 		case <-time.After(s.wait):
 		case <-s.Terminating():
