@@ -44,7 +44,7 @@ type SourceAddr struct {
 	// no authentication is required.
 	SecretKey string
 	// RetryInterval is the minimum time between two connection attempts to
-	// the source. Zero retries every 5s, which is also the lower bound.
+	// the source, rounded up to the next 5s increment. Zero retries every 5s.
 	RetryInterval time.Duration
 }
 

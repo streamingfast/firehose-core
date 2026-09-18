@@ -32,7 +32,8 @@ Each address supports:
   - An optional secret key appended as a query parameter: "<addr>?secret=<key>"
   - An optional reconnection interval appended as a query parameter: "<addr>?retry_interval=<duration>".
     It is the minimum time between two connection attempts to that source.
-    Without it, or below 5s, the source is retried every 5s.
+    Sources are checked every 5s, so the interval is rounded up to the next 5s increment
+    (e.g. 12s behaves as 15s). Without it, the source is retried every 5s.
 
 Examples:
   :10010
