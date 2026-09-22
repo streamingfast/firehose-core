@@ -10,6 +10,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/docker/go-connections v0.8.1
 	github.com/dustin/go-humanize v1.1.0
+	github.com/emmansun/base64 v0.10.0
 	github.com/go-json-experiment/json v0.0.0-20231013223334-54c864be5b8d
 	github.com/graphprotocol/substreams-data-service v0.0.0-20260428173539-9a5b28a88fb5
 	github.com/hashicorp/go-multierror v1.1.1
