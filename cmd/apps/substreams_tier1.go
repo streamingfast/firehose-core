@@ -82,6 +82,13 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				This is useful to prevent the tier1 from being overwhelmed by too many requests, most client auto-reconnects on 'Unavailable' code
 				so they should end up on another tier1 instance, assuming you have proper auto-scaling of the number of instances available.
 			`))
+			cmd.Flags().Duration("substreams-tier1-max-request-duration", 0, cli.FlagDescription(`
+				If non-zero, a client request that has run for this long is ended gracefully: stores are quick-saved (see
+				--substreams-tier1-quicksave-store) and the client is told to reconnect with an 'Unavailable' code.
+
+				Set it a bit under the stream duration limit of the load balancer serving requests, so requests end cleanly
+				before the load balancer cuts them. 0 means no limit.
+			`))
 			cmd.Flags().String("substreams-tier1-quicksave-store", "", "If enabled, substreams will use this store to put 'quicksave' data when shutting down while running requests with 'stores'. Use this flag with a non-zero --common-system-shutdown-signal-delay")
 			cmd.Flags().String("substreams-tier1-global-worker-pool-address", "", "Address of the global worker pool to use for the substreams tier1. (disabled if empty)")
 			cmd.Flags().String("substreams-tier1-global-request-pool-address", "", "Address of the global worker pool to use for the substreams tier1. (disabled if empty)")
@@ -224,6 +231,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			config.GRPCShutdownGracePeriod = time.Second
 			config.ServiceDiscoveryURL = serviceDiscoveryURL
 			config.QuickSaveStoreURL = viper.GetString("substreams-tier1-quicksave-store")
+			config.MaxRequestDuration = viper.GetDuration("substreams-tier1-max-request-duration")
 			config.FoundationalStoresConfigPath = viper.GetString("substreams-tier1-foundational-stores-config-path")
 			config.HostedStoreRegistryAddress = viper.GetString("substreams-tier1-hosted-store-registry-address")
 			config.OutputBufferSize = viper.GetUint64("substreams-tier1-output-buffer-size")
