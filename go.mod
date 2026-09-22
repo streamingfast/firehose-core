@@ -4,12 +4,12 @@ go 1.26.0
 
 require (
 	cloud.google.com/go/logging v1.19.1
-	connectrpc.com/connect v1.20.0
+	connectrpc.com/connect v1.21.0
 	github.com/ShinyTrinkets/overseer v0.3.0
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/docker/go-connections v0.8.1
-	github.com/dustin/go-humanize v1.0.1
+	github.com/dustin/go-humanize v1.1.0
 	github.com/go-json-experiment/json v0.0.0-20231013223334-54c864be5b8d
 	github.com/graphprotocol/substreams-data-service v0.0.0-20260428173539-9a5b28a88fb5
 	github.com/hashicorp/go-multierror v1.1.1
@@ -48,7 +48,7 @@ require (
 	go.uber.org/multierr v1.11.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/exp v0.0.0-20250813145105-42675adae3e6
-	google.golang.org/grpc v1.83.2
+	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
 )
 
@@ -164,7 +164,7 @@ require (
 	github.com/shirou/gopsutil/v4 v4.26.6 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
-	github.com/spiffe/go-spiffe/v2 v2.7.0 // indirect
+	github.com/spiffe/go-spiffe/v2 v2.8.1 // indirect
 	github.com/streamingfast/dregistry v0.0.0-20260818204944-2fed3956d4e1 // indirect
 	github.com/streamingfast/dummy-blockchain v1.7.7 // indirect
 	github.com/streamingfast/eth-go v0.0.0-20260216202159-4e2b7501894a // indirect
@@ -206,11 +206,11 @@ require (
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	cloud.google.com/go/iam v1.12.0 // indirect
 	cloud.google.com/go/monitoring v1.30.0 // indirect
-	cloud.google.com/go/storage v1.67.0
+	cloud.google.com/go/storage v1.68.0
 	cloud.google.com/go/trace v1.16.0 // indirect
 	contrib.go.opencensus.io/exporter/stackdriver v0.13.15-0.20230702191903-2de6d2748484 // indirect
 	contrib.go.opencensus.io/exporter/zipkin v0.1.1 // indirect
-	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.33.0 // indirect
+	github.com/GoogleCloudPlatform/opentelemetry-operations-go/detectors/gcp v1.34.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.30.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.57.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/propagator v0.54.0 // indirect
@@ -282,18 +282,18 @@ require (
 	go.opencensus.io v0.24.0
 	go.opentelemetry.io/contrib/detectors/gcp v1.44.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.71.0
-	go.uber.org/atomic v1.11.0
+	go.uber.org/atomic v1.12.0
 	go.uber.org/automaxprocs v1.6.0
-	golang.org/x/crypto v0.56.0 // indirect
-	golang.org/x/mod v0.40.0 // indirect
-	golang.org/x/net v0.58.0
+	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/mod v0.41.0 // indirect
+	golang.org/x/net v0.59.0
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sync v0.23.0
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/term v0.45.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/term v0.46.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	google.golang.org/api v0.297.0
+	google.golang.org/api v0.298.0
 	google.golang.org/genproto v0.0.0-20260715232425-e75dac1f907d // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/olivere/elastic.v3 v3.0.75
