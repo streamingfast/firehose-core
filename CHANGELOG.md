@@ -16,6 +16,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - gRPC clients receive responses up to 2 GiB instead of 1 GiB, and servers send responses up to 2 GiB (bumped `dgrpc`), so a block up to 2 GiB goes from the reader through the relayer to Firehose and Substreams. Request limits are unchanged. External clients need their own receive limit raised to get blocks that big. Substreams modules cannot take a block that big: wasm32 has 4 GiB for the block, its decoded form and the output.
 - `--relayer-source` accepts a `retry_interval=<duration>` query parameter (e.g. `my.source:12345?retry_interval=120s`) setting the minimum time between two connection attempts to that source. Use it for a rescuer or fallback endpoint that is expected to be down most of the time, so the relayer does not dial it (and log the failure) every 5s. `retry_interval` must be at least `5s`, and since sources are checked every 5s it is rounded up to the next 5s increment (e.g. `12s` behaves as `15s`). Without it, a source is retried every 5s.
 - New `--substreams-tier1-cpu-eviction-order` flag (default `dev,prod-cached,prod-catchup`) listing the request classes the CPU eviction may cancel, least important first. A class left out is never cancelled, so **live production requests are no longer cancelled** unless `prod-live` is added to the order. See the `substreams` bump below for the new `prod-cached` class.
+- Added `--substreams-tier1-squasher-plugin` so `fire{chain} start` can point `substreams-tier1` at a remote store-merge (squasher) process. Empty or `local://` keeps in-process squashing. Production uses `grpcs://host?secret=<token>` — TLS, port defaults to 443, `secret` is sent as the `authorization` header. Plaintext local/dev uses `grpc://host:port`. Extra TLS/plaintext toggles stay on the DSN query string (`insecure=true`, `plaintext=false`).
 
 ### Changed
 
@@ -24,18 +25,24 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - The reader now reads the node output directly, instead of through a channel of lines holding up to 1000 of them. A reader that falls behind stops reading the node's stdout sooner, which blocks the node instead of buffering more lines in the reader.
 - With `--reader-node-debug-firehose-logs`, a `FIRE BLOCK` line is logged as `FIRE BLOCK <header> <payload: N bytes decoded>` instead of its full base64 text, so a big block no longer writes hundreds of megabytes into the logs.
 - Bumped `bstream` for `MultiplexedSourceWithRetryIntervals`, the option backing the new `retry_interval` on `--relayer-source`.
-- Bumped `substreams` to [v1.22.1-0.20260918202516-61fcf3e0651b](https://github.com/streamingfast/substreams/compare/1b7d09c2de7b...61fcf3e0651b):
+- Bumped `substreams` to [v1.22.1-0.20260922162109-3097748a3ffe](https://github.com/streamingfast/substreams/compare/1b7d09c2de7b...3097748a3ffe):
 
   - Server: production requests that fall far behind the chain are disconnected so they reconnect and back-process the gap in parallel. The main case is a long back-processing: when it finishes, the request would otherwise process everything the chain produced in the meantime linearly on tier1, which can take hours. A production request is disconnected when it is more than 2 segments behind the last final block (rounded down to a segment), checked when back-processing finishes and at every segment boundary while streaming final blocks. It gets the same `Unavailable` "endpoint is shutting down, please reconnect" error as a tier1 restart, so clients reconnecting from their cursor pick up where they left off. Set the `SUBSTREAMS_MAX_LINEAR_HANDOFF_LAG_SEGMENTS` environment variable on tier1 to change the number of segments.
 
   - Server: the CPU eviction order is configurable. Classes are cancelled in the configured order, highest burn first within a class and oldest first on a tie. A new `prod-cached` class covers production requests that have not processed a block on tier1 yet, only streaming outputs cached by tier2. They run no wasm on tier1, so `--substreams-tier1-cpu-eviction-min-burn-cores` does not apply to them (`--substreams-tier1-cpu-eviction-min-age` still does), and since their CPU cost is unknown, a round of eviction stops right after cancelling one; the next round, after `--substreams-tier1-cpu-eviction-cooldown`, measures what it freed. The `substreams_tier1_evicted_requests_counter` metric gains the `prod-cached` class.
 
   - Server: per-store lines are logged at `Debug` instead of `Info`: `using mmap KV store`, `using in-memory KV store`, `flushing store at boundary`, `merged partial into full store`, `deleting partial store`. `squashing time metrics` stays at `Info`.
+
+  - Server: tier1 can merge stores on a remote squasher selected by `--substreams-tier1-squasher-plugin`. Empty or `local://` stays in-process. `grpc://` / `grpcs://` are registered from `github.com/streamingfast/substreams/squash/grpc`. Each remote run is one RPC per store module; if the remote is unreachable that run is squashed locally and later runs stay local until one succeeds. A live remote that returns an application error still fails the request.
 - `rpc.RollingStrategySequential`, a rolling strategy that walks the client pool in order from a configurable starting client, rolling forward through the rest for failover. `rpc.WithSpreadStart()` spreads that *starting* client round-robin across successive `WithClients`/`WithClientsContext` calls, so concurrent block fetches (e.g. `blockpoller`'s batched polling) don't all hammer the same provider first; failover order after the starting point is unchanged. Without the option, behavior matches the now-deprecated `RollingStrategyAlwaysUseFirst`. `StickyRollingStrategy` is unaffected either way.
 
 ### Deprecated
 
 - `rpc.RollingStrategyAlwaysUseFirst` / `rpc.NewRollingStrategyAlwaysUseFirst`, use `rpc.RollingStrategySequential` / `rpc.NewRollingStrategySequential` instead. The old name is now a type alias with an unchanged, no-option constructor, so existing callers keep compiling as-is.
+
+### Security
+
+- Bumped `google.golang.org/grpc` to `v1.85.0-dev.0.20260825072537-93e31b48545e`, the commit that fixes CVE-2026-84445. `v1.84.0` is still in the affected range; this pin comes in with `substreams` `develop`.
 
 ## v1.19.0
 
