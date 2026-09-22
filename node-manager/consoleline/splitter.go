@@ -5,10 +5,11 @@ package consoleline
 
 import (
 	"bytes"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/emmansun/base64" // benchmarked 2.4x faster than standard encoding/base64
 )
 
 const (
