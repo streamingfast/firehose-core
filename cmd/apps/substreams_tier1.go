@@ -54,6 +54,16 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().String("substreams-tier1-discovery-service-url", "", "URL to configure the grpc discovery service, used for communication with tier2") //traffic-director://xds?vpc_network=vpc-global&use_xds_reds=true
 			cmd.Flags().Bool("substreams-tier1-subrequests-insecure", false, "Connect to tier2 without checking certificate validity")
 			cmd.Flags().Bool("substreams-tier1-subrequests-plaintext", true, "Connect to tier2 without client in plaintext mode")
+			cmd.Flags().String("substreams-tier1-squasher-plugin", "", cli.FlagDescription(`
+				DSN selecting the store-merge implementation, same shape as --common-auth-plugin.
+				Empty or local:// keeps in-process squashing.
+
+				Production uses grpcs://host?secret=<token>. TLS, port defaults to 443,
+				and secret is sent as the authorization header.
+
+				Plaintext local/dev uses grpc://host:port (port required). Extra TLS/plaintext
+				toggles stay on the DSN query string (insecure=true, plaintext=false).
+			`))
 			cmd.Flags().Bool("substreams-tier1-enforce-compression", true, "Reject any request that does not accept gzip or zstd encoding in their GRPC/Connect header")
 			cmd.Flags().Int("substreams-tier1-max-subrequests", 4, "default number of parallel subrequests that the tier1 makes to the tier2 per request")
 			cmd.Flags().String("substreams-tier1-block-type", "", "Block type to use for the substreams tier1 (Ex: sf.ethereum.type.v2.Block)")
@@ -205,6 +215,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			config.SubrequestsInsecure = viper.GetBool("substreams-tier1-subrequests-insecure")
 			config.SubrequestsPlaintext = viper.GetBool("substreams-tier1-subrequests-plaintext")
 			config.SubrequestsSecret = os.Expand(viper.GetString("substreams-tier1-subrequests-secret-key"), os.Getenv)
+			config.SquasherPlugin = viper.GetString("substreams-tier1-squasher-plugin")
 			config.BlockType = blockType
 			config.WASMExtensions = wasmExtensions
 			config.BlockExecutionTimeout = viper.GetDuration("substreams-block-execution-timeout")
