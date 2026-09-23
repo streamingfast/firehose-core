@@ -220,6 +220,16 @@ func registerCommonFlags[B firecore.Block](chain *firecore.Chain[B]) {
 		cmd.Flags().String("common-forked-blocks-store-url", firecore.ForkedBlocksStoreURL, "[COMMON] Store URL where to read/write forked block files that we want to keep.")
 		cmd.Flags().String("common-live-blocks-addr", firecore.RelayerServingAddr, "[COMMON] gRPC endpoint to get real-time blocks.")
 		cmd.Flags().String("common-tmp-dir", firecore.TmpDir, "[COMMON] Local directory to store temporary files")
+		cmd.Flags().Duration("common-live-subscriber-catch-up-timeout", 30*time.Second, cli.FlagDescription(`
+			[COMMON] How long a subscriber to live blocks can have blocks waiting without ever catching up before it is disconnected.
+			Catches a consumer that is stuck or slower than the chain, while one draining a burst of live blocks within the timeout is not affected.
+			Applies to relayer, firehose and substreams subscriptions to live blocks. 0 disables the check.
+		`))
+		cmd.Flags().Int("common-live-subscriber-max-buffered-blocks", 10000, cli.FlagDescription(`
+			[COMMON] Maximum number of live blocks waiting for a subscriber before it is disconnected, bounding the memory a slow subscriber can hold.
+			Waiting blocks are shared between subscribers, so the worst case is about this many blocks in total, not per subscriber.
+			Applies to relayer, firehose and substreams subscriptions to live blocks. Replaces the SOURCE_CHAN_SIZE environment variable.
+		`))
 
 		cmd.Flags().String("advertise-chain-name", "", "[firehose,substreams-tier1] Chain name to advertise in the Info Endpoint. Required but it may be inferred from the genesis blocks.")
 		cmd.Flags().StringSlice("advertise-chain-aliases", nil, "[firehose,substreams-tier1] List of chain name aliases to advertise in the Info Endpoint. If unset, it may be inferred from the genesis blocks.")

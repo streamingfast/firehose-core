@@ -17,11 +17,14 @@ package apps
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dmetering"
@@ -76,6 +79,21 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 		return err
 	}
 	bstream.DefaultMergedBlocksBundleSize = mergedBlocksBundleSize
+
+	hub.SubscriptionCatchUpTimeout = sflags.MustGetDuration(cmd, "common-live-subscriber-catch-up-timeout")
+	maxBufferedBlocks, maxBufferedBlocksProvided := sflags.MustGetIntProvided(cmd, "common-live-subscriber-max-buffered-blocks")
+	if envValue := os.Getenv("SOURCE_CHAN_SIZE"); envValue != "" && !maxBufferedBlocksProvided {
+		size, err := strconv.Atoi(envValue)
+		if err != nil {
+			return fmt.Errorf("invalid SOURCE_CHAN_SIZE %q: %w", envValue, err)
+		}
+		rootLog.Warn("SOURCE_CHAN_SIZE is deprecated, use --common-live-subscriber-max-buffered-blocks instead", zap.Int("value", size))
+		maxBufferedBlocks = size
+	}
+	if maxBufferedBlocks <= 0 {
+		return fmt.Errorf("--common-live-subscriber-max-buffered-blocks must be positive, got %d", maxBufferedBlocks)
+	}
+	hub.SubscriptionMaxBufferedBlocks = maxBufferedBlocks
 
 	err = bstream.ValidateRegistry()
 	if err != nil {
