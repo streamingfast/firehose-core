@@ -12,6 +12,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Fixed
 
+- Firehose and substreams-tier1 now return the sessions they still hold to the session server before exiting, whatever `--common-system-shutdown-signal-delay` is set to. Sessions of requests cut by the shutdown used to be released in the background while the process exited, so they stayed counted against the organization until they expired on the session server, and a client reconnecting right away could be refused with `Concurrent stream limit exceeded`. This applies to session plugins implementing `Close(ctx) error`, which the `tgm://` plugin does.
+
 - Substreams: Fix tier1 requests rejected before their body is read (authentication, compression enforcement) sometimes failing at a load balancer with HTTP 502 or `INTERNAL` instead of returning their error.
 
 ### Changed

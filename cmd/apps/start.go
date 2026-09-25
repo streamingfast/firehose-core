@@ -212,6 +212,7 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 	}
 
 	launch.WaitForTermination()
+	closeSessionPools(rootLog)
 
 	return
 }
