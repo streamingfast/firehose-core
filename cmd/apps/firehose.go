@@ -91,11 +91,7 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 				serverOptions = append(serverOptions, server.WithEnforceCompression(true))
 			}
 
-			sessionPool, err := newCommonSessionPool(appLogger)
-			if err != nil {
-				return nil, err
-			}
-			serverOptions = append(serverOptions, server.WithSessionPool(sessionPool))
+			serverOptions = append(serverOptions, server.WithSessionPool(runtime.SessionPool))
 
 			limiterSize := viper.GetInt("firehose-rate-limit-bucket-size")
 			limiterRefillRate := viper.GetDuration("firehose-rate-limit-bucket-fill-rate")
@@ -115,7 +111,7 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 				ServerOptions:           serverOptions,
 			}, &firehose.Modules{
 				Authenticator:              authenticator,
-				SessionPool:                sessionPool,
+				SessionPool:                runtime.SessionPool,
 				HeadTimeDriftMetric:        headTimeDriftmetric,
 				HeadBlockNumberMetric:      headBlockNumMetric,
 				FinalizedBlockNumberMetric: finalizedBlockNumMetric,

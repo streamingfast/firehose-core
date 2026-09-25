@@ -21,13 +21,16 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/hub"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dmetering"
+	"github.com/streamingfast/dsession"
 	firecore "github.com/streamingfast/firehose-core"
 	info "github.com/streamingfast/firehose-core/firehose/info"
 	"github.com/streamingfast/firehose-core/launcher"
@@ -109,6 +112,12 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 	}()
 	dmetering.SetDefaultEmitter(eventEmitter)
 
+	sessionPool, err := dsession.New(viper.GetString("common-session-plugin"), rootLog)
+	if err != nil {
+		return fmt.Errorf("unable to create session pool: %w", err)
+	}
+	defer closeSessionPool(sessionPool, rootLog)
+
 	chainName, chainNameProvided := sflags.MustGetStringProvided(cmd, "advertise-chain-name")
 	aliases, aliasesProvided := sflags.MustGetStringSliceProvided(cmd, "advertise-chain-aliases")
 	encoding, encodingProvided := sflags.MustGetStringProvided(cmd, "advertise-block-id-encoding")
@@ -158,7 +167,7 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 		rootLog,
 	)
 
-	launch := launcher.NewLauncher(rootLog, dataDirAbs, infoServer)
+	launch := launcher.NewLauncher(rootLog, dataDirAbs, infoServer, sessionPool)
 	rootLog.Debug("launcher created")
 
 	runByDefault := func(app string) bool {
@@ -212,7 +221,28 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 	}
 
 	launch.WaitForTermination()
-	closeSessionPools(rootLog)
 
 	return
+}
+
+// sessionPoolCloseTimeout has to fit in what is left of the pod's termination grace period after
+// the shutdown signal delay.
+const sessionPoolCloseTimeout = 5 * time.Second
+
+// closeSessionPool has the pool return the sessions it still holds. Requests cut by the shutdown
+// return theirs in the background, and a return the process exits before sending leaves the
+// session counted against the organization until it expires on the session server. Deferred in
+// start, it runs once every app has terminated, whatever the shutdown signal delay is.
+func closeSessionPool(sessionPool dsession.SessionPool, logger *zap.Logger) {
+	closer, ok := sessionPool.(interface{ Close(context.Context) error })
+	if !ok {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), sessionPoolCloseTimeout)
+	defer cancel()
+
+	if err := closer.Close(ctx); err != nil {
+		logger.Warn("session pool did not return all its sessions", zap.Error(err))
+	}
 }

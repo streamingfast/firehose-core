@@ -263,11 +263,6 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				NominalCapacity:    viper.GetFloat64("substreams-tier1-cpu-eviction-nominal-capacity"),
 			}
 
-			sessionPool, err := newCommonSessionPool(appLogger)
-			if err != nil {
-				return nil, err
-			}
-
 			return app.NewTier1(appLogger,
 				config, &app.Tier1Modules{
 					Authenticator:         authenticator,
@@ -275,7 +270,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 					HeadBlockNumberMetric: ss1HeadBlockNumMetric,
 					CheckPendingShutDown:  runtime.IsPendingShutdown,
 					InfoServer:            runtime.InfoServer,
-					SessionPool:           sessionPool,
+					SessionPool:           runtime.SessionPool,
 				}), nil
 		},
 	})
