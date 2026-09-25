@@ -12,9 +12,13 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Fixed
 
+- Firehose and substreams-tier1 now return the sessions they still hold to the session server before exiting, whatever `--common-system-shutdown-signal-delay` is set to. Sessions of requests cut by the shutdown used to be released in the background while the process exited, so they stayed counted against the organization until they expired on the session server, and a client reconnecting right away could be refused with `Concurrent stream limit exceeded`. This applies to session plugins implementing `Close(ctx) error`, which the `tgm://` plugin does.
+
 - Substreams: Fix tier1 requests rejected before their body is read (authentication, compression enforcement) sometimes failing at a load balancer with HTTP 502 or `INTERNAL` instead of returning their error.
 
 ### Changed
+
+- Apps running in the same process now share one session pool, created from `--common-session-plugin`, instead of each creating their own. With the `local://` plugin, firehose and substreams-tier1 running together now count against the same `max_sessions` and `max_sessions_per_organization` limits.
 
 - Subscribers to live blocks (relayer, firehose and substreams subscriptions to live) are no longer disconnected as soon as 100 blocks are waiting for them. On fast chains, a live source pausing for a few seconds and then sending its backlog at once filled those 100 slots before a subscriber could send the first block, disconnecting every subscriber at the same time. A subscriber is now disconnected when it has not caught up for `--common-live-subscriber-catch-up-timeout` (default `30s`), which catches one that is stuck or slower than the chain, or when `--common-live-subscriber-max-buffered-blocks` (default `10000`) blocks are waiting for it.
 
