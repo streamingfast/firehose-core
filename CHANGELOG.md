@@ -10,6 +10,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Fixed
+
+- Substreams: Fix tier1 requests rejected before their body is read (authentication, compression enforcement) sometimes failing at a load balancer with HTTP 502 or `INTERNAL` instead of returning their error.
+
 ### Changed
 
 - Subscribers to live blocks (relayer, firehose and substreams subscriptions to live) are no longer disconnected as soon as 100 blocks are waiting for them. On fast chains, a live source pausing for a few seconds and then sending its backlog at once filled those 100 slots before a subscriber could send the first block, disconnecting every subscriber at the same time. A subscriber is now disconnected when it has not caught up for `--common-live-subscriber-catch-up-timeout` (default `30s`), which catches one that is stuck or slower than the chain, or when `--common-live-subscriber-max-buffered-blocks` (default `10000`) blocks are waiting for it.
