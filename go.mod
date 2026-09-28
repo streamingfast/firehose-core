@@ -19,7 +19,7 @@ require (
 	github.com/mattn/go-isatty v0.0.24
 	github.com/moby/moby/api v1.56.0
 	github.com/mostynb/go-grpc-compression v1.2.3
-	github.com/pinax-network/graph-networks-libs/packages/golang v0.7.0
+	github.com/pinax-network/graph-networks-libs/packages/golang v0.8.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
@@ -36,7 +36,7 @@ require (
 	github.com/streamingfast/dmetrics v0.0.0-20260819172634-28069dc8018a
 	github.com/streamingfast/dsession v0.0.0-20260414190543-79b9846e7c58
 	github.com/streamingfast/dstore v0.2.4-0.20260911133316-3b0685e87595
-	github.com/streamingfast/firehose-networks v0.2.3
+	github.com/streamingfast/firehose-networks v0.3.0
 	github.com/streamingfast/logging v1.2.3-0.20260810132752-360563ac68a9
 	github.com/streamingfast/payment-gateway v0.0.0-20260527144655-d0576d2a4ee3
 	github.com/streamingfast/pbgo v0.0.6-0.20260206150405-2b95acf70437
