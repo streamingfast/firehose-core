@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/streamingfast/dsession"
 	"github.com/streamingfast/firehose-core/firehose/info"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/atomic"
@@ -43,7 +44,7 @@ type Launcher struct {
 	logger *zap.Logger
 }
 
-func NewLauncher(logger *zap.Logger, absDataDir string, infoServer *info.InfoServer) *Launcher {
+func NewLauncher(logger *zap.Logger, absDataDir string, infoServer *info.InfoServer, sessionPool dsession.SessionPool) *Launcher {
 	l := &Launcher{
 		shutter:         shutter.New(),
 		apps:            make(map[string]App),
@@ -53,8 +54,9 @@ func NewLauncher(logger *zap.Logger, absDataDir string, infoServer *info.InfoSer
 	}
 
 	l.runtime = &Runtime{
-		AbsDataDir: absDataDir,
-		InfoServer: infoServer,
+		AbsDataDir:  absDataDir,
+		InfoServer:  infoServer,
+		SessionPool: sessionPool,
 		IsPendingShutdown: func() bool {
 			return l.hasBeenSignaled.Load()
 		},

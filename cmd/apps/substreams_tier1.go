@@ -26,7 +26,6 @@ import (
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/dauth"
 	discoveryservice "github.com/streamingfast/dgrpc/server/discovery-service"
-	"github.com/streamingfast/dsession"
 	_ "github.com/streamingfast/dsession/local"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/launcher"
@@ -264,12 +263,6 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				NominalCapacity:    viper.GetFloat64("substreams-tier1-cpu-eviction-nominal-capacity"),
 			}
 
-			sessionPlugin := viper.GetString("common-session-plugin")
-			sessionPool, err := dsession.New(sessionPlugin, appLogger)
-			if err != nil {
-				return nil, fmt.Errorf("unable to create session pool: %w", err)
-			}
-
 			return app.NewTier1(appLogger,
 				config, &app.Tier1Modules{
 					Authenticator:         authenticator,
@@ -277,7 +270,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 					HeadBlockNumberMetric: ss1HeadBlockNumMetric,
 					CheckPendingShutDown:  runtime.IsPendingShutdown,
 					InfoServer:            runtime.InfoServer,
-					SessionPool:           sessionPool,
+					SessionPool:           runtime.SessionPool,
 				}), nil
 		},
 	})

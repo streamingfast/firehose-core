@@ -38,7 +38,7 @@ require (
 	github.com/streamingfast/dstore v0.2.4-0.20260911133316-3b0685e87595
 	github.com/streamingfast/firehose-networks v0.3.0
 	github.com/streamingfast/logging v1.2.3-0.20260810132752-360563ac68a9
-	github.com/streamingfast/payment-gateway v0.0.0-20260527144655-d0576d2a4ee3
+	github.com/streamingfast/payment-gateway v0.0.0-20260928153037-ec91d4feb67c
 	github.com/streamingfast/pbgo v0.0.6-0.20260206150405-2b95acf70437
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
 	github.com/streamingfast/substreams v1.23.1-0.20260925175558-9993cd94b53f

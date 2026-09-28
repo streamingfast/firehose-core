@@ -11,7 +11,6 @@ import (
 	"github.com/streamingfast/dauth"
 	discoveryservice "github.com/streamingfast/dgrpc/server/discovery-service"
 	"github.com/streamingfast/dmetrics"
-	"github.com/streamingfast/dsession"
 	_ "github.com/streamingfast/dsession/local"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/firehose/app/firehose"
@@ -92,12 +91,7 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 				serverOptions = append(serverOptions, server.WithEnforceCompression(true))
 			}
 
-			sessionPlugin := viper.GetString("common-session-plugin")
-			sessionPool, err := dsession.New(sessionPlugin, appLogger)
-			if err != nil {
-				return nil, fmt.Errorf("unable to create session pool: %w", err)
-			}
-			serverOptions = append(serverOptions, server.WithSessionPool(sessionPool))
+			serverOptions = append(serverOptions, server.WithSessionPool(runtime.SessionPool))
 
 			limiterSize := viper.GetInt("firehose-rate-limit-bucket-size")
 			limiterRefillRate := viper.GetDuration("firehose-rate-limit-bucket-fill-rate")
@@ -117,7 +111,7 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 				ServerOptions:           serverOptions,
 			}, &firehose.Modules{
 				Authenticator:              authenticator,
-				SessionPool:                sessionPool,
+				SessionPool:                runtime.SessionPool,
 				HeadTimeDriftMetric:        headTimeDriftmetric,
 				HeadBlockNumberMetric:      headBlockNumMetric,
 				FinalizedBlockNumberMetric: finalizedBlockNumMetric,
