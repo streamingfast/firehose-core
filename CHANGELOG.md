@@ -28,6 +28,24 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - The relayer, firehose and substreams-tier1 no longer look up one-block files, nor log `block not linkable after one-block lookup`, when a live source sends a block they already have below LIB. With several `--relayer-source`, this happened every few seconds.
 
+- Bumped `bstream`:
+
+  - Firehose, substreams-tier1 and the relayer no longer exit with `received 5 consecutive unlinkable blocks` or `cannot link block after reconnection` when they start while the merger is deleting the one-block files of a bundle it just merged.
+
+  - Merged blocks are read without copying their payload, which halves the memory allocated per merged-blocks file read (25.8 MiB instead of 50.8 MiB for 100 blocks of 256 KiB).
+
+- Bumped `substreams` to [24d98f5409d4](https://github.com/streamingfast/substreams/compare/9993cd94b53f...24d98f5409d4), which is `v1.24.0` plus two changes:
+
+  - Server: tier1 handles Ethereum partial blocks about 20x faster, with almost no allocations. It reads the transaction traces straight from the encoded block and drops the ones already sent by copying bytes, instead of decoding and re-encoding the whole block for every partial.
+
+  - Server: new `external_calls_<kind>` metering metrics (for example `external_calls_eth_call`), counting the calls made by WASM extensions. A batch counts for as many calls as it contains.
+
+  - Server: fixed a tier1 panic (`INTERNAL: runtime error: invalid memory address or nil pointer dereference`) on a production-mode request starting past the chain's final block, when that final block falls within the first segment of the request's stores.
+
+  - Server: tier2 logs `refusing Substreams ProcessRange request` and the gRPC `finished streaming call with code ResourceExhausted` line at `Debug` instead of `Info`. The `substreams_tier2_rejected_request_counter` metric still counts the refusals by reason.
+
+- Bumped `dgrpc` for `server.WithCodeLevelFunc`, and `google.golang.org/grpc` to `v1.86.0-dev`, which comes in with `substreams`.
+
 ### Deprecated
 
 - The `SOURCE_CHAN_SIZE` environment variable, replaced by `--common-live-subscriber-max-buffered-blocks`. It is still used when the flag is not set, with a warning at startup.
