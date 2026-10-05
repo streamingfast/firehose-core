@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/rand/v2"
 	"path"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,6 +23,7 @@ import (
 	"github.com/streamingfast/firehose-core/cmd/tools/stylex"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/time/rate"
 )
 
 // fullKVFileRegex matches a full store snapshot name, `<exclusive end block>-<initial block>.kv`,
@@ -75,6 +78,7 @@ folder or directly at its 'states' folder, in which case the whole tree is walke
 				force:              sflags.MustGetBool(cmd, "force"),
 				parallelism:        sflags.MustGetInt(cmd, "parallelism"),
 				deleteParallelism:  sflags.MustGetInt(cmd, "delete-parallelism"),
+				deleteRate:         sflags.MustGetInt(cmd, "delete-rate"),
 				now:                time.Now(),
 			}
 			cmd.SilenceUsage = true
@@ -89,6 +93,7 @@ folder or directly at its 'states' folder, in which case the whole tree is walke
 	cmd.Flags().BoolP("force", "f", false, "Skip the confirmation prompt")
 	cmd.Flags().Int("parallelism", 16, "Number of concurrent listing operations")
 	cmd.Flags().Int("delete-parallelism", 250, "Number of concurrent deletions")
+	cmd.Flags().Int("delete-rate", defaultDeleteRate, "Maximum deletions per second, 0 for no limit. GCS throttles a bucket whose write rate climbs past about 1000 per second too quickly")
 	cmd.MarkFlagRequired("keep-every")
 	cmd.MarkFlagRequired("truncate-below-block")
 
@@ -107,7 +112,9 @@ type pruneConfig struct {
 	// round-trip bound and cost nothing locally, so they run far wider than the listing.
 	parallelism       int
 	deleteParallelism int
-	now               time.Time
+	// deleteRate caps deletions per second, 0 or less leaves them unlimited.
+	deleteRate int
+	now        time.Time
 }
 
 type snapshotFile struct {
@@ -202,7 +209,7 @@ func runPruneStates(ctx context.Context, storeURL string, cfg pruneConfig, logge
 	}
 
 	fmt.Print(stylex.Labelf("Deleting %d snapshot(s)... ", len(toDelete)))
-	if err := deleteAll(ctx, store.store, toDelete, cfg.deleteParallelism); err != nil {
+	if err := deleteAll(ctx, store.store, newDeleteLimiter(cfg.deleteRate), toDelete, cfg.deleteParallelism); err != nil {
 		fmt.Println(stylex.Error("✗"))
 		return err
 	}
@@ -387,28 +394,47 @@ func snapshotsToPrune(files []snapshotFile, keepEvery, truncateBelowBlock uint64
 }
 
 // deleteRetries is how many times a failed deletion is attempted before giving up: object
-// stores throw transient 503s under sustained delete load. An attempt holds its worker slot
-// for its whole duration, so a long retry chain costs throughput on every other file; what
-// this leaves behind is reported and picked up by the next run.
-const deleteRetries = 2
+// stores throw transient 503s under sustained delete load, and GCS answers 429 until it has
+// split a hot key range, which takes seconds. What this leaves behind is reported and picked
+// up by the next run.
+const deleteRetries = 5
 
-// deleteBackoffBase is the delay before the first retry, doubled on each further one. A
-// variable so tests can shrink it.
-var deleteBackoffBase = 50 * time.Millisecond
+// deleteBackoffBase is the delay before the first retry, doubled on each further one and
+// stretched by up to as much again of random jitter. A variable so tests can shrink it.
+var deleteBackoffBase = 250 * time.Millisecond
+
+// defaultDeleteRate is the --delete-rate default. GCS starts throttling a bucket whose write
+// rate climbs past about 1000 requests per second faster than it can spread the load, and
+// deletions count as writes. Staying well under it leaves room for other deleters on the
+// same bucket.
+const defaultDeleteRate = 500
+
+// newDeleteLimiter caps deletions at perSecond, or does not limit them at all when perSecond
+// is 0 or less.
+func newDeleteLimiter(perSecond int) *rate.Limiter {
+	if perSecond <= 0 {
+		return rate.NewLimiter(rate.Inf, 0)
+	}
+	return rate.NewLimiter(rate.Limit(perSecond), 1)
+}
 
 // deleteWithRetry retries a deletion with exponential backoff, treating a missing object
-// as success. It returns the last error once the attempts are exhausted.
-func deleteWithRetry(ctx context.Context, store dstore.Store, file string) error {
+// as success. Every attempt, retries included, waits for its turn on limiter. It returns
+// the last error once the attempts are exhausted.
+func deleteWithRetry(ctx context.Context, store dstore.Store, limiter *rate.Limiter, file string) error {
 	backoff := deleteBackoffBase
 	var err error
 	for attempt := 0; attempt < deleteRetries; attempt++ {
 		if attempt > 0 {
 			select {
-			case <-time.After(backoff):
+			case <-time.After(backoff + rand.N(backoff)):
 			case <-ctx.Done():
 				return ctx.Err()
 			}
 			backoff *= 2
+		}
+		if waitErr := limiter.Wait(ctx); waitErr != nil {
+			return waitErr
 		}
 		if err = store.DeleteObject(ctx, file); err == nil || errors.Is(err, dstore.ErrNotFound) {
 			return nil
@@ -417,7 +443,14 @@ func deleteWithRetry(ctx context.Context, store dstore.Store, file string) error
 	return err
 }
 
-func deleteAll(ctx context.Context, store dstore.Store, files []string, parallelism int) error {
+// deleteAll deletes files in random order. Names listed next to each other sort next to each
+// other in the bucket, where a single server holds them: deleting them in listing order sends
+// every concurrent deletion to that server, and GCS answers 429 "request distribution is too
+// uneven across the key-ranges".
+func deleteAll(ctx context.Context, store dstore.Store, limiter *rate.Limiter, files []string, parallelism int) error {
+	files = slices.Clone(files)
+	rand.Shuffle(len(files), func(i, j int) { files[i], files[j] = files[j], files[i] })
+
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(parallelism)
 
@@ -425,7 +458,7 @@ func deleteAll(ctx context.Context, store dstore.Store, files []string, parallel
 	var failed []string
 	for _, file := range files {
 		group.Go(func() error {
-			if err := deleteWithRetry(groupCtx, store, file); err != nil {
+			if err := deleteWithRetry(groupCtx, store, limiter, file); err != nil {
 				if groupCtx.Err() != nil {
 					return groupCtx.Err()
 				}

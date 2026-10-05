@@ -98,6 +98,7 @@ func NewToolsPruneOutputsCmd(logger *zap.Logger) *cobra.Command {
 				force:                  sflags.MustGetBool(cmd, "force"),
 				parallelism:            sflags.MustGetInt(cmd, "parallelism"),
 				deleteParallelism:      sflags.MustGetInt(cmd, "delete-parallelism"),
+				deleteRate:             sflags.MustGetInt(cmd, "delete-rate"),
 				now:                    time.Now(),
 			}
 			cmd.SilenceUsage = true
@@ -112,6 +113,7 @@ func NewToolsPruneOutputsCmd(logger *zap.Logger) *cobra.Command {
 	cmd.Flags().BoolP("force", "f", false, "Skip the confirmation prompt")
 	cmd.Flags().Int("parallelism", 64, "Number of concurrent listing operations")
 	cmd.Flags().Int("delete-parallelism", 250, "Number of concurrent deletions")
+	cmd.Flags().Int("delete-rate", defaultDeleteRate, "Maximum deletions per second, 0 for no limit. GCS throttles a bucket whose write rate climbs past about 1000 per second too quickly")
 	cmd.MarkFlagRequired("truncate-below-block")
 	cmd.MarkFlagRequired("minimum-age")
 
@@ -130,7 +132,9 @@ type pruneOutputsConfig struct {
 	// round-trip bound and cost nothing locally, so they run far wider than the listing.
 	parallelism       int
 	deleteParallelism int
-	now               time.Time
+	// deleteRate caps deletions per second, 0 or less leaves them unlimited.
+	deleteRate int
+	now        time.Time
 }
 
 type outputFile struct {
@@ -236,7 +240,7 @@ func runPruneOutputs(ctx context.Context, storeURL string, cfg pruneOutputsConfi
 	}
 
 	fmt.Print(stylex.Labelf("Deleting %d output file(s) (%s)... ", len(toDelete), formatBytes(totalBytes)))
-	if err := deleteAll(ctx, store.store, toDelete, cfg.deleteParallelism); err != nil {
+	if err := deleteAll(ctx, store.store, newDeleteLimiter(cfg.deleteRate), toDelete, cfg.deleteParallelism); err != nil {
 		fmt.Println(stylex.Error("✗"))
 		return err
 	}

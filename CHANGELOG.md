@@ -20,7 +20,11 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Firehose, substreams-tier1 and the relayer no longer exit with `received 5 consecutive unlinkable blocks` or `cannot link block after reconnection` when they start while the merger is deleting the one-block files of a bundle it just merged.
 
+- `tools substreams prune-states`, `prune-outputs` and `purge` no longer fail deletions on GCS with `429 rateLimitExceeded` ("request distribution is too uneven across the key-ranges" or "request-rate on the bucket has ramped up too fast"). They now delete in random order instead of listing order, which sent every concurrent deletion to the same part of the bucket, are capped by the new `--delete-rate` flag, and retry a failed deletion 5 times over several seconds instead of twice over 50ms.
+
 ### Added
+
+- `tools substreams prune-states`, `prune-outputs` and `purge`: `--delete-rate` (default `500`) caps deletions per second, `0` removes the cap.
 
 - Substreams: `external_calls_<kind>` metering metrics (for example `external_calls_eth_call`), counting the calls made by WASM extensions. A batch counts for as many calls as it contains.
 
