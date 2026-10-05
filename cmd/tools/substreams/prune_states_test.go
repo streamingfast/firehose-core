@@ -3,6 +3,9 @@ package substreams
 import (
 	"context"
 	"errors"
+	"fmt"
+	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -210,13 +213,44 @@ func TestDeleteWithRetry(t *testing.T) {
 
 	attempts := 0
 	store := flakyDeleteStore{failures: deleteRetries - 1, attempts: &attempts}
-	require.NoError(t, deleteWithRetry(context.Background(), store, "x"))
+	require.NoError(t, deleteWithRetry(context.Background(), store, newDeleteLimiter(0), "x"))
 	assert.Equal(t, deleteRetries, attempts)
 
 	attempts = 0
 	store = flakyDeleteStore{failures: deleteRetries + 1, attempts: &attempts}
-	require.Error(t, deleteWithRetry(context.Background(), store, "x"))
+	require.Error(t, deleteWithRetry(context.Background(), store, newDeleteLimiter(0), "x"))
 	assert.Equal(t, deleteRetries, attempts)
+}
+
+func TestDeleteAllDeletesEveryFileOnce(t *testing.T) {
+	files := make([]string, 200)
+	for i := range files {
+		files[i] = fmt.Sprintf("module/outputs/%010d-%010d.output.zst", i*1000, (i+1)*1000)
+	}
+	listed := slices.Clone(files)
+
+	store := &recordingDeleteStore{deleted: map[string]int{}}
+	require.NoError(t, deleteAll(context.Background(), store, newDeleteLimiter(0), files, 8))
+
+	assert.Equal(t, listed, files, "the caller's slice is left untouched")
+	require.Len(t, store.deleted, len(files))
+	for _, file := range files {
+		assert.Equal(t, 1, store.deleted[file], file)
+	}
+}
+
+// recordingDeleteStore counts the deletions of each file.
+type recordingDeleteStore struct {
+	dstore.Store
+	mu      sync.Mutex
+	deleted map[string]int
+}
+
+func (s *recordingDeleteStore) DeleteObject(ctx context.Context, name string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.deleted[name]++
+	return nil
 }
 
 // flakyDeleteStore fails the first `failures` deletions, then succeeds.

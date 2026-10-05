@@ -26,6 +26,7 @@ import (
 	"github.com/streamingfast/firehose-core/cmd/tools/stylex"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/time/rate"
 )
 
 // substreams-tier1 writes a module's usage marker under this folder of every network.
@@ -150,6 +151,7 @@ func NewToolsPurgeCmd(logger *zap.Logger) *cobra.Command {
 	cmd.Flags().Bool("read-marker-contents", false, "Read the date stored inside every last_used marker instead of trusting the object's last-write time. Needed when the objects have been copied, migrated or rsynced, which resets that time. Costs one download per marker. WARNING: marker dates are day-granular; sub-day retention may purge early")
 	cmd.Flags().Int("scan-workers", 256, "Number of parallel listing operations during the scan phase. The scan is latency-bound, not CPU-bound, so this scales close to linearly")
 	cmd.Flags().Int("delete-workers", 250, "Number of parallel delete operations")
+	cmd.Flags().Int("delete-rate", defaultDeleteRate, "Maximum deletions per second, 0 for no limit. GCS throttles a bucket whose write rate climbs past about 1000 per second too quickly")
 	cmd.Flags().BoolP("dry-run", "n", false, "List what would be deleted without deleting anything")
 	cmd.Flags().Bool("scan-only", false, "Report which module folders are past their retention and stop there, without listing or deleting their content")
 	cmd.Flags().BoolP("force", "f", false, "Skip the confirmation prompt, required by --daemon")
@@ -169,6 +171,7 @@ type purgeConfig struct {
 	readMarkerContents   bool
 	scanWorkers          int
 	deleteWorkers        int
+	deleteLimiter        *rate.Limiter
 	dryRun               bool
 	scanOnly             bool
 	force                bool
@@ -269,6 +272,7 @@ func runPurge(cmd *cobra.Command, storeURL string, logger *zap.Logger) error {
 		readMarkerContents:   sflags.MustGetBool(cmd, "read-marker-contents"),
 		scanWorkers:          sflags.MustGetInt(cmd, "scan-workers"),
 		deleteWorkers:        sflags.MustGetInt(cmd, "delete-workers"),
+		deleteLimiter:        newDeleteLimiter(sflags.MustGetInt(cmd, "delete-rate")),
 		dryRun:               sflags.MustGetBool(cmd, "dry-run"),
 		scanOnly:             sflags.MustGetBool(cmd, "scan-only"),
 		force:                sflags.MustGetBool(cmd, "force"),
@@ -845,7 +849,7 @@ func purgeFolders(ctx context.Context, store *purgeStore, cfg *purgeConfig, toPu
 
 				if cfg.dryRun {
 					fmt.Printf("dry-run: would delete %s\n", store.ObjectURL(job.objectName))
-				} else if err := store.DeleteObject(ctx, job.objectName); err != nil {
+				} else if err := store.DeleteObject(ctx, cfg.deleteLimiter, job.objectName); err != nil {
 					failed.Add(1)
 					logger.Warn("skipping failed file", zap.String("file", job.objectName), zap.Error(err))
 					continue

@@ -13,6 +13,7 @@ import (
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/time/rate"
 )
 
 // unlimited is what dstore's ListFolders takes to mean "no limit".
@@ -474,8 +475,8 @@ func (s *purgeStore) ListObjects(ctx context.Context, folder moduleFolder, onObj
 	return nil
 }
 
-func (s *purgeStore) DeleteObject(ctx context.Context, name string) error {
-	err := deleteWithRetry(ctx, timeboxedDeleter{s.store}, name)
+func (s *purgeStore) DeleteObject(ctx context.Context, limiter *rate.Limiter, name string) error {
+	err := deleteWithRetry(ctx, timeboxedDeleter{s.store}, limiter, name)
 	if err != nil {
 		return fmt.Errorf("deleting %q: %w", name, err)
 	}

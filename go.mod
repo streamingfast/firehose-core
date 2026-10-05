@@ -292,7 +292,7 @@ require (
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
-	golang.org/x/time v0.16.0 // indirect
+	golang.org/x/time v0.16.0
 	google.golang.org/api v0.299.0
 	google.golang.org/genproto v0.0.0-20260715232425-e75dac1f907d // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
