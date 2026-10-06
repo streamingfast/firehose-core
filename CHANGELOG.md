@@ -24,6 +24,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
+- `DSTORE_ZSTD_CONFIG` environment variable sets the zstd compression level and window used to write merged blocks and every other zstd-compressed store, as `<level>` or `<level>/<window MiB>`, for example `best`, `better/32` or `best/64`. Levels are `fastest`, `default`, `better` and `best`. Unset, the library defaults are kept. Files written with any setting are read back without configuration. An invalid value makes opening a zstd store fail.
+
 - `tools substreams prune-states`, `prune-outputs` and `purge`: `--delete-rate` (default `500`) caps deletions per second, `0` removes the cap.
 
 - Substreams: `external_calls_<kind>` metering metrics (for example `external_calls_eth_call`), counting the calls made by WASM extensions. A batch counts for as many calls as it contains.
