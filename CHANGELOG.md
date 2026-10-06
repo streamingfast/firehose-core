@@ -24,7 +24,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
-- `DSTORE_ZSTD_CONFIG` environment variable sets the zstd compression level and window used to write merged blocks and every other zstd-compressed store, as `<level>` or `<level>/<window MiB>`, for example `best`, `better/32` or `best/64`. Levels are `fastest`, `default`, `better` and `best`. Unset, the library defaults are kept. Files written with any setting are read back without configuration. An invalid value makes opening a zstd store fail.
+- Store URLs accept the `compression` and `compression_config` query parameters (dstore). `compression_config` sets the zstd level and window used to write that store only, as `<level>` or `<level>/<window MiB>`, for example `--common-merged-blocks-store-url=gs://bucket/merged-blocks?compression_config=best/32`. Levels are `fastest`, `default`, `better` and `best`; files written with any setting are read back without configuration. `compression=zstd|gzip|none` overrides the compression of the store and changes the file extension to match (`.dbin.gz`, `.dbin`), so every reader of that store must use the same `compression`. An invalid value makes opening the store fail.
 
 - `tools substreams prune-states`, `prune-outputs` and `purge`: `--delete-rate` (default `500`) caps deletions per second, `0` removes the cap.
 
