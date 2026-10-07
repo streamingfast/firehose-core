@@ -26,6 +26,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - `tools substreams prune-states`, `prune-outputs` and `purge`: `--delete-rate` (default `500`) caps deletions per second, `0` removes the cap.
 
+- `reader-node` and `reader-node-stdin` (not `reader-node-firehose`, which doesn't parse console lines) now decode the `FIRE INIT <version> <node_variant> <node_version>` line printed by every EVM Firehose tracer (geth and forks: Injective, BSC, Polygon/bor, etc) and map it to `sf.ethereum.type.v2.Block`, instead of writing an invalid `Payload.TypeUrl`.
+
+- `reader-node` and `reader-node-stdin` also decode `FIRE INIT <version> <protobuf_fully_qualified_type> <node_name> <node_version>`, trusting the given type and treating the trailing fields as informational, for any chain.
+
 - Substreams: `external_calls_<kind>` metering metrics (for example `external_calls_eth_call`), counting the calls made by WASM extensions. A batch counts for as many calls as it contains.
 
 ### Changed
