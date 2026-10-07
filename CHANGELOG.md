@@ -24,6 +24,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
+- Store URLs, such as `--common-merged-blocks-store-url`, accept `compression_config` to tune how files are written, matching the store's compression: a zstd level with an optional window in MiB (`best`, `better/32`), or a gzip level from `1` to `9`. For example `gs://bucket/merged-blocks?compression_config=best/32`. Files written with any setting are read back without configuration. An invalid value makes opening the store fail.
+
 - `tools substreams prune-states`, `prune-outputs` and `purge`: `--delete-rate` (default `500`) caps deletions per second, `0` removes the cap.
 
 - `reader-node` and `reader-node-stdin` (not `reader-node-firehose`, which doesn't parse console lines) now decode the `FIRE INIT <version> <node_variant> <node_version>` line printed by every EVM Firehose tracer (geth and forks: Injective, BSC, Polygon/bor, etc) and map it to `sf.ethereum.type.v2.Block`, instead of writing an invalid `Payload.TypeUrl`.
