@@ -24,7 +24,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
-- Store URLs, such as `--common-merged-blocks-store-url`, accept `compression_config` to tune how files are written: a zstd level with an optional window in MiB (`best`, `better/32`, `best/32`), or a gzip level from `1` to `9`. For example `gs://bucket/merged-blocks?compression_config=best/32`. Files written with any setting are read back without configuration. `compression=zstd|gzip|none` and `extension=` override a store's compression and file extension; every reader of that store must then use the same values. An invalid value makes opening the store fail.
+- Store URLs, such as `--common-merged-blocks-store-url`, accept `compression_config` to tune how files are written, matching the store's compression: a zstd level with an optional window in MiB (`best`, `better/32`), or a gzip level from `1` to `9`. For example `gs://bucket/merged-blocks?compression_config=best/32`. Files written with any setting are read back without configuration. An invalid value makes opening the store fail.
 
 - `tools substreams prune-states`, `prune-outputs` and `purge`: `--delete-rate` (default `500`) caps deletions per second, `0` removes the cap.
 
