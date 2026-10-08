@@ -17,6 +17,7 @@ package relayer
 import (
 	"context"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/streamingfast/dstore"
@@ -64,18 +65,23 @@ type Relayer struct {
 	ready bool
 
 	blockStreamServer *hub.BlockstreamServer
+
+	stuckDetectionThreshold time.Duration
+	sourceMaxBlockNum       atomic.Uint64
 }
 
 func NewRelayer(
 	liveSourceFactory bstream.SourceFactory,
 	grpcListenAddr string,
 	oneBlocksStore dstore.Store,
+	stuckDetectionThreshold time.Duration,
 ) *Relayer {
 	r := &Relayer{
-		Shutter:           shutter.New(),
-		grpcListenAddr:    grpcListenAddr,
-		liveSourceFactory: liveSourceFactory,
+		Shutter:                 shutter.New(),
+		grpcListenAddr:          grpcListenAddr,
+		stuckDetectionThreshold: stuckDetectionThreshold,
 	}
+	r.liveSourceFactory = wrapLiveSourceFactoryForStuckDetection(liveSourceFactory, &r.sourceMaxBlockNum)
 
 	gs := dgrpcfactory.ServerFromOptions()
 	pbhealth.RegisterHealthServer(gs.ServiceRegistrar(), r)
@@ -181,6 +187,8 @@ func (r *Relayer) Run() {
 	zlog.Info("relayer started")
 	r.ready = true
 	metrics.AppReadiness.SetReady()
+
+	go r.watchForStuckRelayer(r.stuckDetectionThreshold)
 
 	<-r.hub.Terminating()
 	r.Shutdown(r.hub.Err())

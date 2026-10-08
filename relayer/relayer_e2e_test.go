@@ -116,7 +116,7 @@ func TestRelayerReconnectsAfterSourceRestart(t *testing.T) {
 		return NewMultiplexedSource(h, []SourceAddr{{URL: readerAddr}}, 30*time.Second, 10)
 	})
 
-	r := NewRelayer(liveSourceFactory, relayerListenAddr, oneBlocksStore)
+	r := NewRelayer(liveSourceFactory, relayerListenAddr, oneBlocksStore, 0)
 
 	go r.Run()
 	t.Cleanup(func() { r.Shutdown(nil); <-r.Terminated() })
