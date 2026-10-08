@@ -9,6 +9,9 @@ type Runtime struct {
 	AbsDataDir string
 	InfoServer *info.InfoServer
 
+	// Apps are the IDs of the apps launched in the process.
+	Apps []string
+
 	// SessionPool is the pool configured by `common-session-plugin`, shared by every app of the
 	// process.
 	SessionPool dsession.SessionPool

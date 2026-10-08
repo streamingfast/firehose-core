@@ -99,6 +99,11 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 				serverOptions = append(serverOptions, server.WithLeakyBucketLimiter(limiterSize, limiterRefillRate))
 			}
 
+			forkableHub, err := sharedLiveHub(runtime)
+			if err != nil {
+				return nil, fmt.Errorf("unable to set up the shared forkable hub: %w", err)
+			}
+
 			return firehose.New(appLogger, appTracer, &firehose.Config{
 				MergedBlocksStoreURL:    mergedBlocksStoreURL,
 				OneBlocksStoreURL:       oneBlocksStoreURL,
@@ -118,6 +123,7 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 				TransformRegistry:          registry,
 				CheckPendingShutdown:       runtime.IsPendingShutdown,
 				InfoServer:                 runtime.InfoServer,
+				ForkableHub:                forkableHub,
 			}), nil
 		},
 	})

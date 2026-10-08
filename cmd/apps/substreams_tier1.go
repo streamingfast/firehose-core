@@ -263,6 +263,11 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				NominalCapacity:    viper.GetFloat64("substreams-tier1-cpu-eviction-nominal-capacity"),
 			}
 
+			forkableHub, err := sharedLiveHub(runtime)
+			if err != nil {
+				return nil, fmt.Errorf("unable to set up the shared forkable hub: %w", err)
+			}
+
 			return app.NewTier1(appLogger,
 				config, &app.Tier1Modules{
 					Authenticator:         authenticator,
@@ -271,6 +276,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 					CheckPendingShutDown:  runtime.IsPendingShutdown,
 					InfoServer:            runtime.InfoServer,
 					SessionPool:           runtime.SessionPool,
+					ForkableHub:           forkableHub,
 				}), nil
 		},
 	})
