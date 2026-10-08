@@ -12,6 +12,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Fixed
 
+- zstd stores (merged blocks, one-block files, substreams states) now close the object's HTTP stream or file when a reader is closed before the end of the file. Streams stopping mid-bundle, at their stop block or when the client goes away, used to leave it open.
+
 - Firehose and substreams-tier1 now return the sessions they still hold to the session server before exiting, whatever `--common-system-shutdown-signal-delay` is set to. Sessions of requests cut by the shutdown used to be released in the background while the process exited, so they stayed counted against the organization until they expired on the session server, and a client reconnecting right away could be refused with `Concurrent stream limit exceeded`. This applies to session plugins implementing `Close(ctx) error`, which the `tgm://` plugin does.
 
 - Substreams: Fix tier1 requests rejected before their body is read (authentication, compression enforcement) sometimes failing at a load balancer with HTTP 502 or `INTERNAL` instead of returning their error.
@@ -26,6 +28,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Store URLs, such as `--common-merged-blocks-store-url`, accept `compression_config` to tune how files are written, matching the store's compression: a zstd level with an optional window in MiB (`best`, `better/32`), or a gzip level from `1` to `9`. For example `gs://bucket/merged-blocks?compression_config=best/32`. Files written with any setting are read back without configuration. An invalid value makes opening the store fail.
 
+- On zstd stores, `compression_config` also takes decoder settings, comma separated after the level or alone: `lowmem=false` gives each decoder a history buffer of twice the window, and `pool=<name>` reuses decoders across reads and across every store using that name, in place of the `default` pool. `pool=none` gives each file a decoder of its own. For example `--common-merged-blocks-store-url=gs://bucket/merged-blocks?compression_config=best/32,lowmem=false,pool=blocks` and `--substreams-state-store-url=gs://bucket/states?compression_config=better/16,pool=cache`. Substreams tier2 gets them through the URLs tier1 sends. Reading 100 MiB `best/32` merged blocks files 10 at a time, adding `lowmem=false` to the `default` pool used 70% less CPU and 57% more peak heap. `lowmem=false` only helps files larger than their window plus about 1 MiB.
+
 - `tools substreams prune-states`, `prune-outputs` and `purge`: `--delete-rate` (default `500`) caps deletions per second, `0` removes the cap.
 
 - `reader-node` and `reader-node-stdin` (not `reader-node-firehose`, which doesn't parse console lines) now decode the `FIRE INIT <version> <node_variant> <node_version>` line printed by every EVM Firehose tracer (geth and forks: Injective, BSC, Polygon/bor, etc) and map it to `sf.ethereum.type.v2.Block`, instead of writing an invalid `Payload.TypeUrl`.
@@ -36,7 +40,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Changed
 
-- `firehose` and `substreams-tier1` launched in the same process now share one forkable hub instead of each holding its own copy of the live blocks; on Solana that saves about 0.5 GiB per process. Firehose still streams complete blocks only. With `--firehose-discard-partial-blocks`, the two apps keep separate hubs, since tier1 needs the partial blocks.
+- `firehose` and `substreams-tier1` launched in the same process now share one forkable hub instead of each holding its own copy of the live blocks; on Solana that saves about 0.5 GiB per process. Firehose still streams complete blocks only.
 
 - The firehose hub keeps as many final blocks as the substreams-tier1 hub: two merged-blocks files worth, at least 200, instead of at least 500. Clients resuming between 200 and 500 blocks below the last irreversible block now read those blocks from merged-blocks files.
 
@@ -50,6 +54,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - The relayer, firehose and substreams-tier1 no longer look up one-block files, nor log `block not linkable after one-block lookup`, when a live source sends a block they already have below LIB. With several `--relayer-source`, this happened every few seconds.
 
+- zstd stores (merged blocks, one-block files, substreams states) now read with decoders kept in a process-wide `default` pool when `compression_config` names no pool, and those decoders work on the reading goroutine instead of 4 background ones. Reading 100 MiB `best/32` merged blocks files 10 at a time, that used 6% less CPU and 53% less peak heap; on 2 MiB files, 42% less CPU. `compression_config=pool=none` brings back a decoder per file.
+
+- Firehose, substreams-tier1 and the relayer now detect a relayer or reader that disappears without closing the connection (for example a host reboot) in about 40s instead of 5 minutes. They send gRPC keepalive pings after `30s` without data and drop the connection after `10s` without an answer.
+
 - Substreams: tier2 logs `refusing Substreams ProcessRange request` and the gRPC `finished streaming call with code ResourceExhausted` line at `Debug` instead of `Info`. The `substreams_tier2_rejected_request_counter` metric still counts the refusals by reason.
 
 ### Performance improvements
@@ -57,6 +65,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - Substreams: tier1 handles Ethereum partial blocks about 20x faster, with almost no allocations. It reads the transaction traces straight from the encoded block and drops the ones already sent by copying bytes, instead of decoding and re-encoding the whole block for every partial.
 
 - Merged blocks are read without copying their payload, which halves the memory allocated per merged-blocks file read (25.8 MiB instead of 50.8 MiB for 100 blocks of 256 KiB).
+
+### Removed
+
+- Removed the `--firehose-discard-partial-blocks` flag. Firehose clients only receive complete blocks, and the hub firehose builds when it runs without substreams-tier1 never receives partial blocks from the relayer, so the flag no longer did anything. Operators setting it must drop it, as an unknown flag stops the process from starting.
 
 ### Deprecated
 
