@@ -39,6 +39,8 @@ import (
 	"github.com/streamingfast/shutter"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
+
+	ssapp "github.com/streamingfast/substreams/app"
 )
 
 // Unlinkable live blocks in a row that mean the hub is wedged for good. Resets on
@@ -69,6 +71,11 @@ type Modules struct {
 
 	// Optional dependencies
 	FinalizedBlockNumberMetric *coremetrics.FinalizedBlockNum
+
+	// ForkableHub is a hub that another part of the process owns, runs and feeds
+	// metrics from, shared with substreams tier1. When nil, firehose builds and
+	// runs its own.
+	ForkableHub *hub.ForkableHub
 }
 
 type App struct {
@@ -119,11 +126,15 @@ func (a *App) Run() error {
 		}
 	}
 
-	withLive := a.config.BlockStreamAddr != ""
+	withLive := a.config.BlockStreamAddr != "" || a.modules.ForkableHub != nil
 
 	var forkableHub *hub.ForkableHub
 
-	if withLive {
+	if a.modules.ForkableHub != nil {
+		a.logger.Info("using the forkable hub shared by the process")
+		forkableHub = a.modules.ForkableHub
+		forkableHub.OnTerminated(a.Shutdown)
+	} else if withLive {
 		discardPartialBlocks := a.config.DiscardPartialBlocks
 		if discardPartialBlocks {
 			a.logger.Info("partial (flash) blocks will be discarded from the live source before reaching the forkable hub")
@@ -150,12 +161,9 @@ func (a *App) Run() error {
 			)
 		})
 
-		// the hub must hold at least two merged-blocks files worth of final
-		// blocks so the joining source can hand off from a file boundary
-		keepFinalBlocks := int(max(500, 2*bstream.DefaultMergedBlocksBundleSize))
 		forkableHub = hub.NewForkableHubWithOptions(
 			liveSourceFactory,
-			keepFinalBlocks,
+			ssapp.HubKeepFinalBlocks(bstream.DefaultMergedBlocksBundleSize),
 			oneBlocksStore,
 			[]hub.Option{
 				hub.WithLogger(a.logger),

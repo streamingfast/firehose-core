@@ -141,6 +141,10 @@ func (sf *StreamFactory) New(
 	// configuration explicit at the stream level
 	options = append(options, stream.WithMergedBlocksBundleSize(bstream.DefaultMergedBlocksBundleSize))
 
+	// Firehose serves complete blocks only. The hub holds partial blocks when it
+	// is shared with substreams tier1, which needs them.
+	options = append(options, stream.WithoutPartialBlocks())
+
 	str := stream.New(
 		forkedBlocksStore,
 		mergedBlocksStore,
