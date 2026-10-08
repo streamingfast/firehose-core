@@ -6,6 +6,8 @@ import (
 	"strconv"
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/dmetrics"
+	"go.uber.org/zap"
 )
 
 func GetEnvForceFinalityAfterBlocks() *uint64 {
@@ -34,6 +36,31 @@ func GetEnvMergerMaxUnlinkableBlocks() *int {
 	return nil
 }
 
+// ClampLibNum enforces the invariant that a block's LIB number cannot exceed its own block
+// number. A buggy chain client can emit the opposite (e.g. firehose-geyser-plugin's 2026-10-08
+// incident, where a Solana LibNum was one past its block's Number): propagated as-is, it moves
+// bstream's forkable LIB past head, which stalls the relayer forever without panicking or
+// failing health checks. Called unconditionally on every decoded block, chain-agnostic, so a bad
+// value is clamped and surfaced instead of silently wedging the pipeline or crashing the reader.
+func ClampLibNum(blk *pbbstream.Block, logger *zap.Logger, clampedCount *dmetrics.Counter) {
+	if blk.LibNum <= blk.Number {
+		return
+	}
+
+	logger.Error("block has lib_num greater than its own block number, clamping lib_num to block number",
+		zap.Uint64("block_num", blk.Number),
+		zap.String("block_id", blk.Id),
+		zap.Uint64("original_lib_num", blk.LibNum),
+	)
+
+	clampedCount.Inc()
+	blk.LibNum = blk.Number
+}
+
+// TweakBlockFinality forces a block's LIB to never be more than maxDistanceToBlock behind its
+// own block number. The console-reader path (node-manager/mindreader) runs [ClampLibNum] on
+// every block before reaching here, so blk.LibNum > blk.Number is unreachable from that caller;
+// it panics instead of silently misbehaving if some other caller skips that precondition.
 func TweakBlockFinality(blk *pbbstream.Block, maxDistanceToBlock uint64) {
 	if blk.LibNum > blk.Number {
 		distance := blk.LibNum - blk.Number

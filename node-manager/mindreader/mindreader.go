@@ -520,6 +520,8 @@ func (p *MindReaderPlugin) readOneMessage(blocks chan<- *pbbstream.Block) error 
 	}
 	p.recordSample(&p.readBlockSamples, start)
 
+	utils.ClampLibNum(block, p.zlogger, metrics.InvalidLibNumClampedCount)
+
 	if p.forceFinalityAfterBlocks != nil {
 		utils.TweakBlockFinality(block, *p.forceFinalityAfterBlocks)
 	}
