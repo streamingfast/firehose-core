@@ -32,6 +32,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - `tools substreams prune-states`, `prune-outputs` and `purge`: `--delete-rate` (default `500`) caps deletions per second, `0` removes the cap.
 
+- Relayer: new `--relayer-stuck-detection-threshold` (default `3m`) shuts the relayer down for a restart when it is stuck but looks alive: a source has delivered a block past the relayer's current head, and that head has not advanced at all for this long, even though blocks are still flowing in. This catches a hub/forkable wedge that the existing "consecutive unlinkable blocks" guard cannot see, because the blocks involved keep linking fine, they are just never turned into emitted output. A head that keeps advancing, however slowly (e.g. a reconnect replaying a backlog), never triggers it. Set to `0` to disable.
+
 - `reader-node` and `reader-node-stdin` (not `reader-node-firehose`, which doesn't parse console lines) now decode the `FIRE INIT <version> <node_variant> <node_version>` line printed by every EVM Firehose tracer (geth and forks: Injective, BSC, Polygon/bor, etc) and map it to `sf.ethereum.type.v2.Block`, instead of writing an invalid `Payload.TypeUrl`.
 
 - `reader-node` and `reader-node-stdin` also decode `FIRE INIT <version> <protobuf_fully_qualified_type> <node_name> <node_version>`, trusting the given type and treating the trailing fields as informational, for any chain.
