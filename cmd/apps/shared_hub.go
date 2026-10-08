@@ -29,8 +29,7 @@ var (
 // memory once. It is built and started on the first call.
 //
 // It returns nil, each app then building its own hub, when one of the two apps
-// is not launched, when there is no live source, or when firehose drops partial
-// blocks (--firehose-discard-partial-blocks), which tier1 needs.
+// is not launched or when there is no live source.
 func sharedLiveHub(runtime *launcher.Runtime) (*hub.ForkableHub, error) {
 	if !slices.Contains(runtime.Apps, "firehose") || !slices.Contains(runtime.Apps, "substreams-tier1") {
 		return nil, nil
@@ -38,11 +37,6 @@ func sharedLiveHub(runtime *launcher.Runtime) (*hub.ForkableHub, error) {
 
 	blockStreamAddr := viper.GetString("common-live-blocks-addr")
 	if blockStreamAddr == "" {
-		return nil, nil
-	}
-
-	if viper.GetBool("firehose-discard-partial-blocks") {
-		liveHubLogger.Info("firehose and substreams-tier1 keep separate hubs, firehose discards partial blocks and tier1 needs them")
 		return nil, nil
 	}
 

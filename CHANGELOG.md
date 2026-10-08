@@ -40,7 +40,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Changed
 
-- `firehose` and `substreams-tier1` launched in the same process now share one forkable hub instead of each holding its own copy of the live blocks; on Solana that saves about 0.5 GiB per process. Firehose still streams complete blocks only. With `--firehose-discard-partial-blocks`, the two apps keep separate hubs, since tier1 needs the partial blocks.
+- `firehose` and `substreams-tier1` launched in the same process now share one forkable hub instead of each holding its own copy of the live blocks; on Solana that saves about 0.5 GiB per process. Firehose still streams complete blocks only.
 
 - The firehose hub keeps as many final blocks as the substreams-tier1 hub: two merged-blocks files worth, at least 200, instead of at least 500. Clients resuming between 200 and 500 blocks below the last irreversible block now read those blocks from merged-blocks files.
 
@@ -65,6 +65,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - Substreams: tier1 handles Ethereum partial blocks about 20x faster, with almost no allocations. It reads the transaction traces straight from the encoded block and drops the ones already sent by copying bytes, instead of decoding and re-encoding the whole block for every partial.
 
 - Merged blocks are read without copying their payload, which halves the memory allocated per merged-blocks file read (25.8 MiB instead of 50.8 MiB for 100 blocks of 256 KiB).
+
+### Removed
+
+- Removed the `--firehose-discard-partial-blocks` flag. Firehose clients only receive complete blocks, and the hub firehose builds when it runs without substreams-tier1 never receives partial blocks from the relayer, so the flag no longer did anything. Operators setting it must drop it, as an unknown flag stops the process from starting.
 
 ### Deprecated
 
