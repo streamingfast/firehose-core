@@ -12,6 +12,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Fixed
 
+- Merger no longer moves canonical one-block files to the forked-blocks store when readers write the same block with a different LIB, as happens on Polygon PoS / Amoy. Only blocks with another ID at the same height are moved.
+
 - The reader now always clamps a decoded block's `lib_num` down to its own block number when the node/plugin reports `lib_num` greater than the block number (invalid; `lib_num` equal to the block number is still valid), logs an error and increments `reader_node_invalid_libnum_clamped_count`, instead of letting the bad value reach the relayer where it moved LIB past head and silently stalled it forever.
 
 - zstd stores (merged blocks, one-block files, substreams states) now close the object's HTTP stream or file when a reader is closed before the end of the file. Streams stopping mid-bundle, at their stop block or when the client goes away, used to leave it open.

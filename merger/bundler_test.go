@@ -539,3 +539,56 @@ func TestBundlerSkipsWholeBundles(t *testing.T) {
 	assert.Equal(t, 8, len(written))
 	assert.Equal(t, uint64(900), b.baseBlockNum)
 }
+
+type testForkAwareMergerIO struct {
+	*TestMergerIO
+	mu    sync.Mutex
+	moved []*bstream.OneBlockFile
+}
+
+func (io *testForkAwareMergerIO) MoveForkedBlocks(_ context.Context, oneBlockFiles []*bstream.OneBlockFile) {
+	io.mu.Lock()
+	defer io.mu.Unlock()
+	io.moved = append(io.moved, oneBlockFiles...)
+}
+
+func (io *testForkAwareMergerIO) DeleteForkedBlocksAsync(_, _ uint64) {}
+
+func TestBundlerCanonicalCopiesWithDifferentLIBAreNotForks(t *testing.T) {
+	walk := []string{
+		"0000000100-0000000000000100a-0000000000000099a-98-readera",
+		"0000000100-0000000000000100a-0000000000000099a-99-readerb",
+		"0000000101-0000000000000101a-0000000000000100a-99-readera",
+		"0000000101-0000000000000101a-0000000000000100a-100-readerb",
+		"0000000101-0000000000000101b-0000000000000100a-99-readera",
+		"0000000101-0000000000000101b-0000000000000100a-99-readerc",
+		"0000000102-0000000000000102a-0000000000000101a-100-readera",
+		"0000000102-0000000000000102a-0000000000000101a-101-readerb",
+		"0000000103-0000000000000103a-0000000000000102a-101-readera",
+		"0000000103-0000000000000103a-0000000000000102a-102-readerb",
+		"0000000104-0000000000000104a-0000000000000103a-102-readera",
+		"0000000104-0000000000000104a-0000000000000103a-103-readerb",
+	}
+
+	var merged [][]*bstream.OneBlockFile
+	io := &testForkAwareMergerIO{TestMergerIO: &TestMergerIO{
+		MergeAndStoreFunc: func(_ context.Context, _ uint64, oneBlockFiles []*bstream.OneBlockFile) error {
+			merged = append(merged, oneBlockFiles)
+			return nil
+		},
+	}}
+	b := NewBundler(100, 700, 2, 2, io, 1, nil)
+
+	for _, filename := range walk {
+		require.NoError(t, b.HandleBlockFile(bstream.MustNewOneBlockFile(filename)))
+	}
+	b.WaitForMerges()
+
+	require.Len(t, merged, 1)
+	require.Len(t, merged[0], 2)
+	assert.Equal(t, "0000000000000100a", merged[0][0].ID)
+	assert.Equal(t, "0000000000000101a", merged[0][1].ID)
+
+	require.Len(t, io.moved, 1, "only the real fork should be moved to the forked store")
+	assert.Equal(t, "0000000000000101b", io.moved[0].ID)
+}

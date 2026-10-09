@@ -140,6 +140,7 @@ func (b *Bundler) forkedBlocksInCurrentBundle() (out []*bstream.OneBlockFile) {
 	for name, block := range b.seenBlockFiles {
 		if block.Num < b.baseBlockNum {
 			delete(b.seenBlockFiles, name) // too old, just cleaning up the map of lingering old blocks
+			continue
 		}
 		if block.Num < highBoundary {
 			out = append(out, block)
