@@ -7,7 +7,12 @@ import (
 	"testing"
 
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/dmetrics"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestGetEnvForceFinalityAfterBlocks(t *testing.T) {
@@ -89,6 +94,66 @@ func TestTweakBlockFinality(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			TweakBlockFinality(tc.blk, tc.maxDistanceToBlock)
 			assert.Equal(t, tc.expectedLibNum, tc.blk.LibNum)
+		})
+	}
+}
+
+func TestClampLibNum(t *testing.T) {
+	testCases := []struct {
+		name           string
+		blk            *pbbstream.Block
+		expectedLibNum uint64
+		expectClamp    bool
+	}{
+		{
+			name:           "lib_num less than number",
+			blk:            &pbbstream.Block{Number: 100, Id: "block-100", LibNum: 80},
+			expectedLibNum: 80,
+			expectClamp:    false,
+		},
+		{
+			name:           "lib_num equal to number is valid (e.g. an already-rooted slot)",
+			blk:            &pbbstream.Block{Number: 100, Id: "block-100", LibNum: 100},
+			expectedLibNum: 100,
+			expectClamp:    false,
+		},
+		{
+			name:           "lib_num greater than number gets clamped",
+			blk:            &pbbstream.Block{Number: 508940774, Id: "block-508940774", LibNum: 508940775},
+			expectedLibNum: 508940774,
+			expectClamp:    true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			originalLibNum := tc.blk.LibNum
+
+			core, logs := observer.New(zapcore.ErrorLevel)
+			logger := zap.New(core)
+
+			metricSet := dmetrics.NewSet()
+			counter := metricSet.NewCounter("test_clamp_libnum_count")
+
+			require.NotPanics(t, func() {
+				ClampLibNum(tc.blk, logger, counter)
+			})
+
+			assert.Equal(t, tc.expectedLibNum, tc.blk.LibNum)
+
+			if !tc.expectClamp {
+				assert.Equal(t, 0, logs.Len())
+				assert.Equal(t, float64(0), counter.Get())
+				return
+			}
+
+			require.Equal(t, 1, logs.Len())
+			entry := logs.All()[0]
+			assert.Equal(t, zapcore.ErrorLevel, entry.Level)
+			assert.Equal(t, tc.blk.Number, entry.ContextMap()["block_num"])
+			assert.Equal(t, tc.blk.Id, entry.ContextMap()["block_id"])
+			assert.Equal(t, originalLibNum, entry.ContextMap()["original_lib_num"])
+			assert.Equal(t, float64(1), counter.Get())
 		})
 	}
 }

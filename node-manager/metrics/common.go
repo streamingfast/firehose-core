@@ -29,6 +29,10 @@ var MaxReadBlockSize = Metricset.NewGauge("reader_node_max_read_block_size_bytes
 // bytes of the buffer reading lines (blocks) out of the node process.
 var LineBufferSize = Metricset.NewGauge("reader_node_line_buffer_size_bytes", "Configured normal size in bytes of the buffer reading a single line (block) out of the node process ('reader-node-line-buffer-size')")
 
+// InvalidLibNumClampedCount counts blocks whose decoded lib_num was greater than their own
+// block number (invalid) and had to be clamped down to the block number.
+var InvalidLibNumClampedCount = Metricset.NewCounter("reader_node_invalid_libnum_clamped_count", "Number of blocks whose decoded lib_num was greater than their own block number and got clamped to the block number")
+
 func NewHeadBlockTimeDrift(serviceName string) *dmetrics.HeadTimeDrift {
 	return Metricset.NewHeadTimeDrift(serviceName)
 }
