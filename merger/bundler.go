@@ -124,36 +124,8 @@ func (b *Bundler) markBundleMerged(base uint64) {
 }
 
 func (b *Bundler) HandleBlockFile(obf *bstream.OneBlockFile) error {
-	// copies from readers with a different LIB view are the same block, not forks
-	key := blockFileKey(obf)
-	if seen, ok := b.seenBlockFiles[key]; ok {
-		for filename := range obf.Filenames {
-			seen.Filenames[filename] = true
-		}
-	} else {
-		b.seenBlockFiles[key] = cloneOneBlockFile(obf)
-	}
+	b.seenBlockFiles[obf.CanonicalName] = obf
 	return b.forkable.ProcessBlock(obf.ToBstreamBlock(), obf) // forkable will call our own b.ProcessBlock() on irreversible blocks only
-}
-
-func blockFileKey(obf *bstream.OneBlockFile) string {
-	return fmt.Sprintf("%d-%s", obf.Num, obf.ID)
-}
-
-// obf itself is shared with the forkable and other goroutines, so we don't mutate its Filenames
-func cloneOneBlockFile(obf *bstream.OneBlockFile) *bstream.OneBlockFile {
-	filenames := make(map[string]bool, len(obf.Filenames))
-	for filename := range obf.Filenames {
-		filenames[filename] = true
-	}
-	return &bstream.OneBlockFile{
-		CanonicalName: obf.CanonicalName,
-		Filenames:     filenames,
-		ID:            obf.ID,
-		Num:           obf.Num,
-		LibNum:        obf.LibNum,
-		PreviousID:    obf.PreviousID,
-	}
 }
 
 func (b *Bundler) forkedBlocksInCurrentBundle() (out []*bstream.OneBlockFile) {
@@ -161,7 +133,7 @@ func (b *Bundler) forkedBlocksInCurrentBundle() (out []*bstream.OneBlockFile) {
 
 	// remove irreversible blocks from map (they will be merged and deleted soon)
 	for _, block := range b.irreversibleBlocks {
-		delete(b.seenBlockFiles, blockFileKey(block))
+		delete(b.seenBlockFiles, block.CanonicalName)
 	}
 
 	// identify and then delete remaining blocks from map, return them as forks

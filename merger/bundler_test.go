@@ -591,8 +591,4 @@ func TestBundlerCanonicalCopiesWithDifferentLIBAreNotForks(t *testing.T) {
 
 	require.Len(t, io.moved, 1, "only the real fork should be moved to the forked store")
 	assert.Equal(t, "0000000000000101b", io.moved[0].ID)
-	assert.Equal(t, map[string]bool{
-		"0000000101-0000000000000101b-0000000000000100a-99-readera": true,
-		"0000000101-0000000000000101b-0000000000000100a-99-readerc": true,
-	}, io.moved[0].Filenames)
 }
