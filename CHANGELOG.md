@@ -12,7 +12,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Fixed
 
-- `index-builder` now serves the gRPC health check on `--index-builder-grpc-listen-addr`, which it never listened on.
+- `index-builder` now serves its health check, over gRPC and HTTP `/healthz`, on `--index-builder-grpc-listen-addr`, which it never listened on.
 
 - Merger no longer moves canonical one-block files to the forked-blocks store when readers write the same block with a different LIB, as happens on Polygon PoS / Amoy. Only blocks with another ID at the same height are moved.
 
@@ -31,8 +31,6 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - `tools substreams prune-states`, `prune-outputs` and `purge` no longer fail deletions on GCS with `429 rateLimitExceeded` ("request distribution is too uneven across the key-ranges" or "request-rate on the bucket has ramped up too fast"). They now delete in random order instead of listing order, which sent every concurrent deletion to the same part of the bucket, are capped by the new `--delete-rate` flag, and retry a failed deletion 5 times over several seconds instead of twice over 50ms.
 
 ### Added
-
-- `index-builder` now exposes HTTP `/healthz` on `--index-builder-http-healthz-addr` (default `:10019`), like the merger and relayer.
 
 - Store URLs, such as `--common-merged-blocks-store-url`, accept `compression_config` to tune how files are written, matching the store's compression: a zstd level with an optional window in MiB (`best`, `better/32`), or a gzip level from `1` to `9`. For example `gs://bucket/merged-blocks?compression_config=best/32`. Files written with any setting are read back without configuration. An invalid value makes opening the store fail.
 

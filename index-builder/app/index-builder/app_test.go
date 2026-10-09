@@ -2,7 +2,6 @@ package index_builder
 
 import (
 	"context"
-	"io"
 	"net"
 	"net/http"
 	"testing"
@@ -13,35 +12,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestApp_ServesHTTPHealthz(t *testing.T) {
+func TestApp_ServesHealthCheck(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	addr := listener.Addr().String()
+	require.NoError(t, listener.Close())
+
 	app := New(&Config{
-		BlockHandler:          bstream.HandlerFunc(func(*pbbstream.Block, interface{}) error { return nil }),
-		StartBlockResolver:    func(context.Context) (uint64, error) { return 0, nil },
-		MergedBlocksStoreURL:  "file://" + t.TempDir(),
-		GRPCListenAddr:        freeAddr(t),
-		HTTPHealthzListenAddr: freeAddr(t),
+		BlockHandler:         bstream.HandlerFunc(func(*pbbstream.Block, interface{}) error { return nil }),
+		StartBlockResolver:   func(context.Context) (uint64, error) { return 0, nil },
+		MergedBlocksStoreURL: "file://" + t.TempDir(),
+		GRPCListenAddr:       addr,
 	})
 	require.NoError(t, app.Run())
 	defer app.Shutdown(nil)
 
-	url := "http://" + app.config.HTTPHealthzListenAddr + "/healthz"
-	require.Eventually(t, func() bool {
-		resp, err := http.Get(url)
-		if err != nil {
-			return false
-		}
-		defer resp.Body.Close()
-		body, _ := io.ReadAll(resp.Body)
-		return resp.StatusCode == http.StatusOK && string(body) == "ready\n"
-	}, 10*time.Second, 100*time.Millisecond)
-
+	// gRPC health check, which IsReady queries
 	require.Eventually(t, app.IsReady, 10*time.Second, 100*time.Millisecond)
+
+	// HTTP /healthz on the same address
+	resp, err := http.Get("http://" + addr + "/healthz")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
-func freeAddr(t *testing.T) string {
-	t.Helper()
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+func TestApp_HealthCheckNotReadyWhenPendingShutdown(t *testing.T) {
+	app := New(&Config{IsPendingShutdown: func() bool { return true }})
+
+	isReady, _, err := app.healthCheck(context.Background())
 	require.NoError(t, err)
-	defer listener.Close()
-	return listener.Addr().String()
+	require.False(t, isReady)
 }

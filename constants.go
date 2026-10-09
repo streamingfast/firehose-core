@@ -18,7 +18,6 @@ var (
 	SubstreamsTier1GRPCServingAddr string = ":10016"
 	SubstreamsTier2GRPCServingAddr string = ":10017"
 	RelayerHTTPHealthzAddr         string = ":10018"
-	IndexBuilderHTTPHealthzAddr    string = ":10019"
 
 	// Data storage default locations
 	BlocksCacheDirectory string = "file://{data-dir}/storage/blocks-cache"

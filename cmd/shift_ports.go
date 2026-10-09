@@ -25,7 +25,6 @@ var portFlags = []string{
 	"substreams-tier1-grpc-listen-addr",
 	"substreams-tier2-grpc-listen-addr",
 	"index-builder-grpc-listen-addr",
-	"index-builder-http-healthz-addr",
 
 	// Client-side connection addresses (defaults point to services above)
 	"common-live-blocks-addr",

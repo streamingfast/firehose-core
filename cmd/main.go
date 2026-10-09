@@ -125,7 +125,6 @@ func Main[B firecore.Block](chain *firecore.Chain[B]) {
 			    --substreams-tier1-grpc-listen-addr   :10016
 			    --substreams-tier2-grpc-listen-addr   :10017
 			    --index-builder-grpc-listen-addr      :10009
-			    --index-builder-http-healthz-addr     :10019
 
 			  Client connection addresses:
 			    --common-live-blocks-addr                  :10014

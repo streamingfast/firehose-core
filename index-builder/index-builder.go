@@ -27,26 +27,21 @@ type IndexBuilder struct {
 	handler bstream.Handler
 
 	blocksStore dstore.Store
-
-	grpcListenAddr string
 }
 
-func NewIndexBuilder(logger *zap.Logger, handler bstream.Handler, startBlockNum, stopBlockNum uint64, blockStore dstore.Store, grpcListenAddr string) *IndexBuilder {
+func NewIndexBuilder(logger *zap.Logger, handler bstream.Handler, startBlockNum, stopBlockNum uint64, blockStore dstore.Store) *IndexBuilder {
 	return &IndexBuilder{
-		Shutter:        shutter.New(),
-		startBlockNum:  startBlockNum,
-		stopBlockNum:   stopBlockNum,
-		handler:        handler,
-		blocksStore:    blockStore,
-		grpcListenAddr: grpcListenAddr,
+		Shutter:       shutter.New(),
+		startBlockNum: startBlockNum,
+		stopBlockNum:  stopBlockNum,
+		handler:       handler,
+		blocksStore:   blockStore,
 
 		logger: logger,
 	}
 }
 
 func (app *IndexBuilder) Launch() {
-	app.startGRPCServer()
-
 	err := app.launch()
 	if errors.Is(err, stream.ErrStopBlockReached) {
 		app.logger.Info("index builder reached stop block", zap.Uint64("stop_block_num", app.stopBlockNum))

@@ -63,12 +63,6 @@ func TestShiftAddressPort(t *testing.T) {
 			expected: ":10109",
 		},
 		{
-			name:     "index builder http healthz default port",
-			addr:     ":10019",
-			offset:   100,
-			expected: ":10119",
-		},
-		{
 			name:     "reader node grpc default port",
 			addr:     ":10010",
 			offset:   100,
