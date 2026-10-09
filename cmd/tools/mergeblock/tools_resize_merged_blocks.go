@@ -41,6 +41,7 @@ func NewToolsResizeMergedBlocksCmd[B firecore.Block](chain *firecore.Chain[B], r
 	cmd.Flags().Uint64("source-bundle-size", 100, "Number of blocks per merged-blocks file in the source store")
 	cmd.Flags().Uint64("target-bundle-size", 0, "Number of blocks per merged-blocks file to write to the destination store (required)")
 	cmd.Flags().Uint64("first-streamable-block", 0, "First streamable block of the chain, used to allow a <start> below the first target boundary")
+	cmd.Flags().Bool("force", false, "Skip the confirmation prompt when --source-bundle-size and --target-bundle-size are equal")
 
 	return cmd
 }
@@ -77,8 +78,12 @@ func createResizeMergedBlocksE(rootLog *zap.Logger) firecore.CommandExecutor {
 		if err := firecore.ValidateMergedBlocksBundleSize(targetSize); err != nil {
 			return fmt.Errorf("invalid target-bundle-size: %w", err)
 		}
-		if sourceSize == targetSize {
-			return fmt.Errorf("source-bundle-size and target-bundle-size are both %d, nothing to do", sourceSize)
+		if sourceSize == targetSize && !sflags.MustGetBool(cmd, "force") {
+			message := fmt.Sprintf("source-bundle-size and target-bundle-size are both %d, files will be rewritten as-is (ex: to change compression). Continue?", sourceSize)
+			if confirmed, _ := cli.PromptConfirm(message); !confirmed {
+				rootLog.Info("skipped by user")
+				return nil
+			}
 		}
 		if targetSize%sourceSize != 0 && sourceSize%targetSize != 0 {
 			return fmt.Errorf("bundle sizes must divide evenly (source %d, target %d)", sourceSize, targetSize)
