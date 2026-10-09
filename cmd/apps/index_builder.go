@@ -22,6 +22,7 @@ func RegisterIndexBuilderApp[B firecore.Block](chain *firecore.Chain[B], rootLog
 		Description: "App the builds indexes out of Firehose blocks",
 		RegisterFlags: func(cmd *cobra.Command) error {
 			cmd.Flags().String("index-builder-grpc-listen-addr", firecore.IndexBuilderServiceAddr, "Address to listen for grpc-based healthz check")
+			cmd.Flags().String("index-builder-http-healthz-addr", firecore.IndexBuilderHTTPHealthzAddr, "Address to listen on for the HTTP /healthz endpoint. Set to an empty string to disable. Returns 200 when ready, 503 otherwise.")
 			cmd.Flags().Uint64("index-builder-index-size", 10000, "Size of index bundles that will be created")
 			cmd.Flags().Uint64("index-builder-start-block", 0, "Block number to start indexing")
 			cmd.Flags().Uint64("index-builder-stop-block", 0, "Block number to stop indexing")
@@ -81,11 +82,13 @@ func RegisterIndexBuilderApp[B firecore.Block](chain *firecore.Chain[B], rootLog
 			})
 
 			app := index_builder.New(&index_builder.Config{
-				BlockHandler:         handler,
-				StartBlockResolver:   startBlockResolver,
-				EndBlock:             stopBlockNum,
-				MergedBlocksStoreURL: mergedBlocksStoreURL,
-				GRPCListenAddr:       viper.GetString("index-builder-grpc-listen-addr"),
+				BlockHandler:          handler,
+				StartBlockResolver:    startBlockResolver,
+				EndBlock:              stopBlockNum,
+				MergedBlocksStoreURL:  mergedBlocksStoreURL,
+				GRPCListenAddr:        viper.GetString("index-builder-grpc-listen-addr"),
+				HTTPHealthzListenAddr: viper.GetString("index-builder-http-healthz-addr"),
+				IsPendingShutdown:     runtime.IsPendingShutdown,
 			})
 
 			return app, nil

@@ -3,6 +3,8 @@ package index_builder
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"time"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dgrpc"
@@ -22,6 +24,10 @@ type Config struct {
 	MergedBlocksStoreURL string
 	ForkedBlocksStoreURL string
 	GRPCListenAddr       string
+
+	HTTPHealthzListenAddr string
+
+	IsPendingShutdown func() bool `json:"-"`
 }
 
 type App struct {
@@ -59,6 +65,7 @@ func (a *App) Run() error {
 		startBlock,
 		a.config.EndBlock,
 		blockStore,
+		a.config.GRPCListenAddr,
 	)
 
 	gs, err := dgrpc.NewInternalClient(a.config.GRPCListenAddr)
@@ -72,10 +79,45 @@ func (a *App) Run() error {
 	a.OnTerminating(indexBuilder.Shutdown)
 	indexBuilder.OnTerminated(a.Shutdown)
 
+	if a.config.HTTPHealthzListenAddr != "" {
+		a.startHTTPHealthzServer(indexBuilder)
+	}
+
 	go indexBuilder.Launch()
 
 	zlog.Info("index builder running")
 	return nil
+}
+
+func (a *App) startHTTPHealthzServer(indexBuilder *index_builder.IndexBuilder) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		if a.config.IsPendingShutdown != nil && a.config.IsPendingShutdown() {
+			http.Error(w, "not ready: shutting down", http.StatusServiceUnavailable)
+			return
+		}
+		resp, err := indexBuilder.Check(context.Background(), &pbhealth.HealthCheckRequest{})
+		if err != nil || resp.Status != pbhealth.HealthCheckResponse_SERVING {
+			http.Error(w, "not ready", http.StatusServiceUnavailable)
+			return
+		}
+		w.Write([]byte("ready\n"))
+	})
+
+	srv := &http.Server{Addr: a.config.HTTPHealthzListenAddr, Handler: mux}
+	a.OnTerminating(func(_ error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(ctx)
+	})
+
+	zlog.Info("starting index builder http healthz server", zap.String("addr", a.config.HTTPHealthzListenAddr))
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			zlog.Error("index builder http healthz server failed", zap.Error(err))
+			a.Shutdown(err)
+		}
+	}()
 }
 
 func (a *App) IsReady() bool {

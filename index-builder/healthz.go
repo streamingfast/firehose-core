@@ -28,6 +28,17 @@ func (app *IndexBuilder) Check(ctx context.Context, in *pbhealth.HealthCheckRequ
 	}, nil
 }
 
+func (app *IndexBuilder) List(ctx context.Context, in *pbhealth.HealthListRequest) (*pbhealth.HealthListResponse, error) {
+	status := pbhealth.HealthCheckResponse_SERVING
+	return &pbhealth.HealthListResponse{
+		Statuses: map[string]*pbhealth.HealthCheckResponse{
+			"index-builder": &pbhealth.HealthCheckResponse{
+				Status: status,
+			},
+		},
+	}, nil
+}
+
 // Watch is basic GRPC Healthcheck as a stream
 func (app *IndexBuilder) Watch(req *pbhealth.HealthCheckRequest, stream pbhealth.Health_WatchServer) error {
 	err := stream.Send(&pbhealth.HealthCheckResponse{
