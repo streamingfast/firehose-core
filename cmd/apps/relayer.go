@@ -42,6 +42,7 @@ Examples:
   ${READER_HOST}:10010?secret=${READER_SECRET}&retry_interval=2m
 `))
 			cmd.Flags().Duration("relayer-max-source-latency", 999999*time.Hour, "Max latency tolerated to connect to a source. A performance optimization for when you have redundant sources and some may not have caught up")
+			cmd.Flags().Duration("relayer-stuck-detection-threshold", 3*time.Minute, "If a source has delivered a block past the relayer's current head and the head has not advanced at all for this long, shut down for a restart (the relayer is wedged even though it is still receiving blocks). A head that keeps advancing, however slowly, never triggers this, so it is safe to leave at the default on slow or bursty chains. Set to 0 to disable")
 			return nil
 		},
 		FactoryFunc: func(runtime *launcher.Runtime) (launcher.App, error) {
@@ -59,12 +60,13 @@ Examples:
 			}
 
 			return relayerapp.New(&relayerapp.Config{
-				Sources:               sources,
-				OneBlocksURL:          oneBlocksStoreURL,
-				GRPCListenAddr:        viper.GetString("relayer-grpc-listen-addr"),
-				HTTPHealthzListenAddr: viper.GetString("relayer-http-healthz-addr"),
-				MaxSourceLatency:      viper.GetDuration("relayer-max-source-latency"),
-				IsPendingShutdown:     runtime.IsPendingShutdown,
+				Sources:                 sources,
+				OneBlocksURL:            oneBlocksStoreURL,
+				GRPCListenAddr:          viper.GetString("relayer-grpc-listen-addr"),
+				HTTPHealthzListenAddr:   viper.GetString("relayer-http-healthz-addr"),
+				MaxSourceLatency:        viper.GetDuration("relayer-max-source-latency"),
+				StuckDetectionThreshold: viper.GetDuration("relayer-stuck-detection-threshold"),
+				IsPendingShutdown:       runtime.IsPendingShutdown,
 			}), nil
 		},
 	})
