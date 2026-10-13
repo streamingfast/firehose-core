@@ -40,7 +40,9 @@ func NewToolsResizeMergedBlocksCmd[B firecore.Block](chain *firecore.Chain[B], r
 			    empty files of a gap, duplicates);
 			  - a block above the last block written must have it as parent, the process fails
 			    otherwise. A store holding forked blocks cannot be read in that mode;
-			  - each block gets the last block written as parent number.
+			  - each block gets the last block written as parent number;
+			  - the files before the one of <start> are read too while they hold blocks at or
+			    above <start>.
 
 			Files in the legacy block format (no 'payload') are read when the
 			ACCEPT_LEGACY_BLOCK_FORMAT environment variable is set. The deprecated 'payload_kind'
@@ -187,7 +189,15 @@ func resizeFixingMisplacedBlocks(ctx context.Context, sourceStore dstore.Store, 
 	var last *pbbstream.Block
 	var movedCount, skippedCount uint64
 
-	err := sourceStore.WalkFrom(ctx, "", fmt.Sprintf("%010d", firecore.LowBoundaryFor(start, sourceSize)), func(filename string) error {
+	firstFileLowBlockNum, err := firstSourceFileHolding(ctx, sourceStore, start, sourceSize)
+	if err != nil {
+		return err
+	}
+	if firstFileLowBlockNum != firecore.LowBoundaryFor(start, sourceSize) {
+		logger.Info("reading source files before the start block, they hold blocks at or above it", zap.Uint64("first_file", firstFileLowBlockNum))
+	}
+
+	err = sourceStore.WalkFrom(ctx, "", fmt.Sprintf("%010d", firstFileLowBlockNum), func(filename string) error {
 		fileLowBlockNum, err := strconv.ParseUint(filename, 10, 64)
 		if err != nil {
 			return fmt.Errorf("parsing merged-blocks file name %q: %w", filename, err)
@@ -254,4 +264,59 @@ func resizeFixingMisplacedBlocks(ctx context.Context, sourceStore dstore.Store, 
 	}
 
 	return fmt.Errorf("source store ended before the stop block %d", writer.StopBlockNum)
+}
+
+// firstSourceFileHolding returns the lowest block number of the first source file to read for
+// blocks at or above start. Starting from the file of start, it goes back one file at a time
+// while the previous file holds a block at or above start, as the files of a gap in block
+// numbers can.
+func firstSourceFileHolding(ctx context.Context, sourceStore dstore.Store, start, sourceSize uint64) (uint64, error) {
+	low := firecore.LowBoundaryFor(start, sourceSize)
+	for low >= sourceSize {
+		previous := low - sourceSize
+		filename := fmt.Sprintf("%010d", previous)
+
+		exists, err := sourceStore.FileExists(ctx, filename)
+		if err != nil {
+			return 0, fmt.Errorf("checking merged-blocks file %s: %w", filename, err)
+		}
+		if !exists {
+			return low, nil
+		}
+
+		highest, err := highestBlockNumIn(ctx, sourceStore, filename)
+		if err != nil {
+			return 0, err
+		}
+		if highest < start {
+			return low, nil
+		}
+		low = previous
+	}
+	return low, nil
+}
+
+func highestBlockNumIn(ctx context.Context, sourceStore dstore.Store, filename string) (uint64, error) {
+	reader, err := sourceStore.OpenObject(ctx, filename)
+	if err != nil {
+		return 0, fmt.Errorf("opening merged-blocks file %s: %w", filename, err)
+	}
+	defer reader.Close()
+
+	blockReader, err := bstream.NewDBinBlockReader(reader)
+	if err != nil {
+		return 0, fmt.Errorf("reading merged-blocks file %s: %w", filename, err)
+	}
+
+	var highest uint64
+	for {
+		blk, err := blockReader.Read()
+		if err == io.EOF {
+			return highest, nil
+		}
+		if err != nil {
+			return 0, fmt.Errorf("reading block from merged-blocks file %s: %w", filename, err)
+		}
+		highest = max(highest, blk.Number)
+	}
 }

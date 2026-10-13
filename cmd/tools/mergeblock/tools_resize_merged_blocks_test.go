@@ -293,6 +293,29 @@ func TestResizeMergedBlocksFixMisplacedBlocks(t *testing.T) {
 	assert.Equal(t, second, files["0000001000"])
 }
 
+func TestResizeMergedBlocksFixMisplacedBlocksStartAfterGap(t *testing.T) {
+	tmp := t.TempDir()
+	srcURL := "file://" + filepath.Join(tmp, "src")
+	dstURL := "file://" + filepath.Join(tmp, "dst")
+
+	srcStore, err := dstore.NewDBinStore(srcURL)
+	require.NoError(t, err)
+	fillMisplacedBlocksStore(t, srcStore)
+
+	require.NoError(t, runResizeFixingMisplacedBlocks(t, srcURL, dstURL, 1000, 2000))
+
+	dstStore, err := dstore.NewDBinStore(dstURL)
+	require.NoError(t, err)
+	files := readStore(t, dstStore)
+	require.Len(t, files, 1)
+
+	expected := []uint64{1350, 1352, 1354, 1356, 1358, 1360, 1362, 1364, 1366, 1368}
+	for i := uint64(1370); i < 2000; i++ {
+		expected = append(expected, i)
+	}
+	assert.Equal(t, expected, files["0000001000"])
+}
+
 func TestResizeMergedBlocksFixMisplacedBlocksUnlinkedBlock(t *testing.T) {
 	tmp := t.TempDir()
 	srcURL := "file://" + filepath.Join(tmp, "src")
