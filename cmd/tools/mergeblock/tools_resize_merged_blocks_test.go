@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -85,12 +86,16 @@ func readStore(t *testing.T, store dstore.Store) map[string][]uint64 {
 	return out
 }
 
-func runResize(t *testing.T, srcURL, dstURL string, start, stop uint64, sourceSize, targetSize uint64) error {
+func runResize(t *testing.T, srcURL, dstURL string, start, stop uint64, sourceSize, targetSize uint64, flags ...string) error {
 	t.Helper()
 	cmd := NewToolsResizeMergedBlocksCmd(&firecore.Chain[testChainBlock]{}, zap.NewNop())
 	cmd.SetContext(context.Background())
 	require.NoError(t, cmd.Flags().Set("source-bundle-size", fmt.Sprintf("%d", sourceSize)))
 	require.NoError(t, cmd.Flags().Set("target-bundle-size", fmt.Sprintf("%d", targetSize)))
+	for _, flag := range flags {
+		name, value, _ := strings.Cut(flag, "=")
+		require.NoError(t, cmd.Flags().Set(name, value))
+	}
 	return cmd.RunE(cmd, []string{srcURL, dstURL, fmt.Sprintf("%d", start), fmt.Sprintf("%d", stop)})
 }
 
@@ -141,13 +146,37 @@ func TestResizeMergedBlocksDownsize(t *testing.T) {
 	assert.Equal(t, uint64(999), files["0000000900"][99])
 }
 
+func TestResizeMergedBlocksSameSize(t *testing.T) {
+	tmp := t.TempDir()
+	srcURL := "file://" + filepath.Join(tmp, "src")
+	dstURL := "file://" + filepath.Join(tmp, "dst")
+
+	srcStore, err := dstore.NewDBinStore(srcURL)
+	require.NoError(t, err)
+
+	// blocks 0..399 in 100-blocks files: the stream needs to read the stop
+	// block (300) from the source, so the file 0000000300 must exist
+	fillStore(t, srcStore, 100, 0, 399)
+
+	require.NoError(t, runResize(t, srcURL, dstURL, 0, 300, 100, 100, "force=true"))
+
+	dstStore, err := dstore.NewDBinStore(dstURL)
+	require.NoError(t, err)
+	files := readStore(t, dstStore)
+	require.Len(t, files, 3)
+	for _, name := range []string{"0000000000", "0000000100", "0000000200"} {
+		assert.Len(t, files[name], 100, name)
+	}
+	assert.Equal(t, uint64(0), files["0000000000"][0])
+	assert.Equal(t, uint64(100), files["0000000100"][0])
+	assert.Equal(t, uint64(299), files["0000000200"][99])
+}
+
 func TestResizeMergedBlocksValidation(t *testing.T) {
 	tmp := t.TempDir()
 	srcURL := "file://" + filepath.Join(tmp, "src")
 	dstURL := "file://" + filepath.Join(tmp, "dst")
 
-	// same size
-	assert.Error(t, runResize(t, srcURL, dstURL, 0, 1000, 100, 100))
 	// non-multiple-of-100 target
 	assert.Error(t, runResize(t, srcURL, dstURL, 0, 1000, 100, 250))
 	// sizes not dividing evenly

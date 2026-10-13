@@ -20,7 +20,7 @@ import (
 func NewToolsResizeMergedBlocksCmd[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "resize-merged-blocks <source> <destination> <start> <stop>",
-		Short: "Rewrites a merged-blocks store to a new store with a different number of blocks per file (ex: 100 -> 1000)",
+		Short: "Rewrites a merged-blocks store to a new store with a different number of blocks per file (ex: 100 -> 1000) or different compression settings",
 		Long: cli.Dedent(`
 			Reads merged-blocks files of --source-bundle-size blocks from <source> and rewrites
 			them as merged-blocks files of --target-bundle-size blocks into <destination>.
@@ -33,6 +33,14 @@ func NewToolsResizeMergedBlocksCmd[B firecore.Block](chain *firecore.Chain[B], r
 			Example: rewrite 100-blocks files into 1000-blocks files:
 
 			  firecore tools resize-merged-blocks ./merged-100 ./merged-1000 0 5000 --target-bundle-size=1000
+
+			When --source-bundle-size and --target-bundle-size are equal, files are rewritten as-is,
+			which is useful to change their compression with the 'compression_config' query parameter
+			of <destination>. This asks for confirmation unless --force is passed.
+
+			Example: recompress 100-blocks files with zstd 'best', keeping the bundle size:
+
+			  firecore tools resize-merged-blocks ./merged "./merged-best?compression_config=best" 0 5000 --target-bundle-size=100 --force
 		`),
 		Args: cobra.ExactArgs(4),
 		RunE: createResizeMergedBlocksE(rootLog),
@@ -41,6 +49,7 @@ func NewToolsResizeMergedBlocksCmd[B firecore.Block](chain *firecore.Chain[B], r
 	cmd.Flags().Uint64("source-bundle-size", 100, "Number of blocks per merged-blocks file in the source store")
 	cmd.Flags().Uint64("target-bundle-size", 0, "Number of blocks per merged-blocks file to write to the destination store (required)")
 	cmd.Flags().Uint64("first-streamable-block", 0, "First streamable block of the chain, used to allow a <start> below the first target boundary")
+	cmd.Flags().Bool("force", false, "Skip the confirmation prompt when --source-bundle-size and --target-bundle-size are equal")
 
 	return cmd
 }
@@ -77,9 +86,6 @@ func createResizeMergedBlocksE(rootLog *zap.Logger) firecore.CommandExecutor {
 		if err := firecore.ValidateMergedBlocksBundleSize(targetSize); err != nil {
 			return fmt.Errorf("invalid target-bundle-size: %w", err)
 		}
-		if sourceSize == targetSize {
-			return fmt.Errorf("source-bundle-size and target-bundle-size are both %d, nothing to do", sourceSize)
-		}
 		if targetSize%sourceSize != 0 && sourceSize%targetSize != 0 {
 			return fmt.Errorf("bundle sizes must divide evenly (source %d, target %d)", sourceSize, targetSize)
 		}
@@ -91,6 +97,17 @@ func createResizeMergedBlocksE(rootLog *zap.Logger) firecore.CommandExecutor {
 		}
 		if stop <= start {
 			return fmt.Errorf("stop block %d must be above start block %d", stop, start)
+		}
+		if sourceSize == targetSize && !sflags.MustGetBool(cmd, "force") {
+			message := fmt.Sprintf("source-bundle-size and target-bundle-size are both %d, files will be rewritten as-is (ex: to change compression). Continue?", sourceSize)
+			confirmed, answered := cli.PromptConfirm(message)
+			if !answered {
+				return fmt.Errorf("source-bundle-size and target-bundle-size are both %d, pass --force to rewrite files as-is when not running in a terminal", sourceSize)
+			}
+			if !confirmed {
+				rootLog.Info("skipped by user")
+				return nil
+			}
 		}
 
 		if exists, err := destStore.FileExists(cmd.Context(), fmt.Sprintf("%010d", firecore.LowBoundaryFor(start, targetSize))); err == nil && exists {
