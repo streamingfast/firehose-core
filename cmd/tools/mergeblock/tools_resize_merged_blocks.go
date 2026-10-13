@@ -39,7 +39,12 @@ func NewToolsResizeMergedBlocksCmd[B firecore.Block](chain *firecore.Chain[B], r
 			  - a block at or below the last block written is skipped (blocks carried into the
 			    empty files of a gap, duplicates);
 			  - a block above the last block written must have it as parent, the process fails
-			    otherwise. A store holding forked blocks cannot be read in that mode.
+			    otherwise. A store holding forked blocks cannot be read in that mode;
+			  - each block gets the last block written as parent number.
+
+			Files in the legacy block format (no 'payload') are read when the
+			ACCEPT_LEGACY_BLOCK_FORMAT environment variable is set. The deprecated 'payload_kind'
+			and 'payload_buffer' fields are cleared from every block written.
 
 			Example: rewrite 100-blocks files into 1000-blocks files:
 
@@ -142,6 +147,7 @@ func createResizeMergedBlocksE(rootLog *zap.Logger) firecore.CommandExecutor {
 			BundleSize:   targetSize,
 			StopBlockNum: stop,
 			Logger:       rootLog,
+			TweakBlock:   clearLegacyPayloadFields,
 		}
 
 		if sflags.MustGetBool(cmd, "fix-misplaced-blocks") {
@@ -160,6 +166,17 @@ func createResizeMergedBlocksE(rootLog *zap.Logger) firecore.CommandExecutor {
 		}
 		return err
 	}
+}
+
+// clearLegacyPayloadFields clears the deprecated payload_kind and payload_buffer fields,
+// the block data is in payload.
+func clearLegacyPayloadFields(blk *pbbstream.Block) (*pbbstream.Block, error) {
+	if len(blk.PayloadBuffer) > 0 && (blk.Payload == nil || len(blk.Payload.Value) == 0) {
+		return nil, fmt.Errorf("block %s has its data in payload_buffer only", blk.AsRef())
+	}
+	blk.PayloadKind = pbbstream.Protocol_UNKNOWN
+	blk.PayloadBuffer = nil
+	return blk, nil
 }
 
 // resizeFixingMisplacedBlocks reads the source files in order and hands their blocks to the
@@ -210,6 +227,10 @@ func resizeFixingMisplacedBlocks(ctx context.Context, sourceStore dstore.Store, 
 				if blk.ParentId != last.Id {
 					return fmt.Errorf("block %s in merged-blocks file %s does not link to the last block written %s: its parent is #%d (%s)", blk.AsRef(), filename, last.AsRef(), blk.ParentNum, blk.ParentId)
 				}
+
+				// Blocks in the legacy format are read with a parent number of their number
+				// minus one, which is wrong across skipped heights.
+				blk.ParentNum = last.Number
 			}
 
 			if firecore.LowBoundaryFor(blk.Number, sourceSize) != fileLowBlockNum {

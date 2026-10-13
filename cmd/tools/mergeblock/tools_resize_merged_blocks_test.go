@@ -11,11 +11,13 @@ import (
 
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
+	"github.com/streamingfast/dbin"
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -198,6 +200,28 @@ func writeSourceFile(t *testing.T, store dstore.Store, lowBlockNum uint64, block
 	require.NoError(t, store.WriteObject(context.Background(), fmt.Sprintf("%010d", lowBlockNum), pr))
 }
 
+// writeLegacySourceFile writes blocks to the merged-blocks file named after lowBlockNum with
+// the content type that legacy files have in their header.
+func writeLegacySourceFile(t *testing.T, store dstore.Store, lowBlockNum uint64, blocks ...*pbbstream.Block) {
+	t.Helper()
+	pr, pw := io.Pipe()
+	go func() {
+		writer := dbin.NewWriter(pw)
+		err := writer.WriteHeader("ETH")
+		for _, blk := range blocks {
+			if err != nil {
+				break
+			}
+			var data []byte
+			if data, err = proto.Marshal(blk); err == nil {
+				err = writer.WriteMessage(data)
+			}
+		}
+		pw.CloseWithError(err)
+	}()
+	require.NoError(t, store.WriteObject(context.Background(), fmt.Sprintf("%010d", lowBlockNum), pr))
+}
+
 func runResizeFixingMisplacedBlocks(t *testing.T, srcURL, dstURL string, start, stop uint64) error {
 	t.Helper()
 	cmd := NewToolsResizeMergedBlocksCmd(&firecore.Chain[testChainBlock]{}, zap.NewNop())
@@ -282,6 +306,64 @@ func TestResizeMergedBlocksFixMisplacedBlocksUnlinkedBlock(t *testing.T) {
 	fillStore(t, srcStore, 100, 200, 1099)
 
 	assert.ErrorContains(t, runResizeFixingMisplacedBlocks(t, srcURL, dstURL, 0, 1000), "does not link to the last block written")
+}
+
+func TestResizeMergedBlocksFixMisplacedBlocksLegacyFormat(t *testing.T) {
+	t.Setenv("ACCEPT_LEGACY_BLOCK_FORMAT", "true")
+
+	tmp := t.TempDir()
+	srcURL := "file://" + filepath.Join(tmp, "src")
+	dstURL := "file://" + filepath.Join(tmp, "dst")
+
+	srcStore, err := dstore.NewDBinStore(srcURL)
+	require.NoError(t, err)
+
+	// Block 150 is skipped, legacy blocks have no payload and no parent number.
+	legacy := func(blk *pbbstream.Block) *pbbstream.Block {
+		blk.Payload = nil
+		blk.ParentNum = 0
+		blk.PayloadKind = pbbstream.Protocol_NEAR
+		blk.PayloadBuffer = []byte{0x01}
+		return blk
+	}
+	var blocks []*pbbstream.Block
+	for _, blk := range append(append(blockRange(100, 149), chainBlock(151, 149)), blockRange(152, 199)...) {
+		blocks = append(blocks, legacy(blk))
+	}
+
+	fillStore(t, srcStore, 100, 0, 99)
+	writeLegacySourceFile(t, srcStore, 100, blocks...)
+	fillStore(t, srcStore, 100, 200, 1099)
+
+	require.NoError(t, runResizeFixingMisplacedBlocks(t, srcURL, dstURL, 0, 1000))
+
+	dstStore, err := dstore.NewDBinStore(dstURL)
+	require.NoError(t, err)
+	reader, err := dstStore.OpenObject(context.Background(), "0000000000")
+	require.NoError(t, err)
+	defer reader.Close()
+	blockReader, err := bstream.NewDBinBlockReader(reader)
+	require.NoError(t, err)
+
+	parentNums := map[uint64]uint64{}
+	for {
+		blk, err := blockReader.Read()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+		require.NotNil(t, blk.Payload, "block %d", blk.Number)
+		if blk.Number >= 100 && blk.Number < 200 {
+			assert.Equal(t, []byte{0x01}, blk.Payload.Value, "block %d", blk.Number)
+		}
+		assert.Nil(t, blk.PayloadBuffer, "block %d", blk.Number)
+		assert.Equal(t, pbbstream.Protocol_UNKNOWN, blk.PayloadKind, "block %d", blk.Number)
+		parentNums[blk.Number] = blk.ParentNum
+	}
+	assert.Len(t, parentNums, 999)
+	assert.Equal(t, uint64(148), parentNums[149])
+	assert.Equal(t, uint64(149), parentNums[151])
+	assert.Equal(t, uint64(151), parentNums[152])
 }
 
 func TestResizeMergedBlocksValidation(t *testing.T) {
