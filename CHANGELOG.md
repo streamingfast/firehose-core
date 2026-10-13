@@ -52,6 +52,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Bump `firehose-networks` to `v0.3.0`.
 
+- Bump `golang.org/x/net` to `v0.61.0` for its HTTP/2 security fixes.
+
 - RPC pollers (`blockpoller`) print each `FIRE BLOCK` line 11-15x faster and no longer allocate several times the block size to do it: the line is built once in a reused buffer, with SIMD base64 encoding.
 
 - Subscribers to live blocks (relayer, firehose and substreams subscriptions to live) are no longer disconnected as soon as 100 blocks are waiting for them. On fast chains, a live source pausing for a few seconds and then sending its backlog at once filled those 100 slots before a subscriber could send the first block, disconnecting every subscriber at the same time. A subscriber is now disconnected when it has not caught up for `--common-live-subscriber-catch-up-timeout` (default `30s`), which catches one that is stuck or slower than the chain, or when `--common-live-subscriber-max-buffered-blocks` (default `10000`) blocks are waiting for it.
