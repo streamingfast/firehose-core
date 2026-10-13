@@ -136,6 +136,15 @@ func (w *MergedBlocksWriter) WriteBundle() error {
 		return fmt.Errorf("no blocks to write to bundle")
 	}
 
+	// The only block allowed outside of the file's range is the previous bundle's last block,
+	// carried alone into the file of a gap.
+	isGapBundle := len(w.blocks) == 1 && w.blocks[0] == w.lastBlock
+	for _, blk := range w.blocks {
+		if blk.Number >= w.LowBlockNum+w.bundleSize() || (blk.Number < w.LowBlockNum && !isGapBundle) {
+			return fmt.Errorf("block %s does not belong to merged-blocks file %s holding blocks %d to %d", blk.AsRef(), file, w.LowBlockNum, w.LowBlockNum+w.bundleSize()-1)
+		}
+	}
+
 	pr, pw := io.Pipe()
 	done := make(chan struct{})
 

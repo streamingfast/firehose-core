@@ -192,6 +192,20 @@ func TestMergedBlocksWriterMultiBundleGapFourBundles(t *testing.T) {
 	assert.Equal(t, []uint64{5}, files["0000000300"])
 }
 
+func TestMergedBlocksWriterRejectsBlockOutsideOfFile(t *testing.T) {
+	store := dstore.NewMockStore(nil)
+	writer := &MergedBlocksWriter{
+		Store:       store,
+		LowBlockNum: 100,
+		BundleSize:  100,
+		Logger:      zap.NewNop(),
+	}
+
+	require.NoError(t, writer.ProcessBlock(testBlock(50), nil))
+	assert.ErrorContains(t, writer.Flush(), "does not belong to merged-blocks file 0000000100")
+	assert.Empty(t, writtenFiles(t, store))
+}
+
 func TestLowBoundaryFor(t *testing.T) {
 	assert.Equal(t, uint64(12300), LowBoundaryFor(12345, 100))
 	assert.Equal(t, uint64(12000), LowBoundaryFor(12345, 1000))
