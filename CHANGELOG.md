@@ -42,6 +42,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Substreams: `external_calls_<kind>` metering metrics (for example `external_calls_eth_call`), counting the calls made by WASM extensions. A batch counts for as many calls as it contains.
 
+- Substreams: `--substreams-tier1-allow-store-truncation` lets tier1 serve modules whose initial block is below `--common-first-streamable-block`, after that block was raised (the chain was truncated). They run from the first streamable block on, and their stores resume from the snapshots taken before the truncation. A request is refused when a store has no snapshot at or after the first streamable block to resume from. Tier2 must run this version before the flag is set on tier1.
+
 ### Changed
 
 - `tools resize-merged-blocks` now accepts equal `--source-bundle-size` and `--target-bundle-size` to rewrite merged-blocks files with different settings (ex: compression). It asks for confirmation first; pass `--force` to skip the prompt.
