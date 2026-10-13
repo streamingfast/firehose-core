@@ -99,7 +99,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().String("substreams-tier1-hosted-store-registry-address", "", "gRPC address of the control-plane registry service used to resolve hosted foundational stores (legacy/current stores continue to use the JSON config path)")
 			cmd.Flags().Uint64("substreams-tier1-output-buffer-size", 100, "max number of messages bundled into BlockScopedDatas (for clients using v4)")
 			cmd.Flags().Uint64("substreams-tier1-store-size-limit", 0, "Override the default store size limit (in bytes) for tier2 stores. 0 keeps the default of 1GiB. Forwarded to tier2 on each subrequest.")
-			cmd.Flags().Bool("substreams-tier1-allow-store-truncation", false, "Serve modules whose initial block is below --common-first-streamable-block: they run from that block on, and their stores resume from snapshots taken before the chain was truncated. Forwarded to tier2 on each subrequest.")
+			cmd.Flags().Bool("substreams-tier1-allow-store-truncation", false, "Serve modules whose initial block is below --common-first-streamable-block: they run from that block on, and their stores resume from snapshots taken before the chain was truncated. Requests using a store without an initial block are refused. Forwarded to tier2 on each subrequest.")
 			cmd.Flags().String("substreams-tier1-cpu-eviction-mode", "off", cli.FlagDescription(`
 				How the tier1 reacts when its own cgroup reports the CPU saturated:
 
