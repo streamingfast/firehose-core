@@ -14,6 +14,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - The tools writing merged-blocks files (`resize-merged-blocks`, `download-from-firehose` and others) now fail instead of writing a block to a file whose range does not hold it. The previous bundle's last block carried into the files of a gap is still written.
 
+- `index-builder` no longer restarts indexing from `--index-builder-start-block` when the index store errors at startup (for example, a transient S3 failure). It now retries, then fails startup so the process restarts, instead of treating the store as empty. A failed index write now stops the indexer instead of being logged and skipped, which left a gap that made every later restart rewind to it (requires chains to propagate the error from their indexer's `ProcessBlock`) (#288).
+
 - Merger no longer moves canonical one-block files to the forked-blocks store when readers write the same block with a different LIB, as happens on Polygon PoS / Amoy. Only blocks with another ID at the same height are moved.
 
 - The reader now always clamps a decoded block's `lib_num` down to its own block number when the node/plugin reports `lib_num` greater than the block number (invalid; `lib_num` equal to the block number is still valid), logs an error and increments `reader_node_invalid_libnum_clamped_count`, instead of letting the bad value reach the relayer where it moved LIB past head and silently stalled it forever.
@@ -87,6 +89,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### Deprecated
 
 - The `SOURCE_CHAN_SIZE` environment variable, replaced by `--common-live-subscriber-max-buffered-blocks`. It is still used when the flag is not set, with a warning at startup.
+
+### Security
+
+- Bump `golang.org/x/net` to `v0.61.0` to fix CVE-2026-78663 (critical), CVE-2026-78669, CVE-2026-78660 and CVE-2026-78659 (high).
 
 ## v1.20.1
 
