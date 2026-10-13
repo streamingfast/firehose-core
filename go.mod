@@ -24,7 +24,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
-	github.com/streamingfast/bstream v0.0.2-0.20261009144850-ebcb5eca571b
+	github.com/streamingfast/bstream v0.0.2-0.20261009192206-775b59feeda3
 	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b
 	github.com/streamingfast/dauth v0.0.0-20260318230957-4ab1e1d2ebc3
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
@@ -284,14 +284,14 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.71.0
 	go.uber.org/atomic v1.12.0
 	go.uber.org/automaxprocs v1.6.0
-	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/mod v0.41.0 // indirect
-	golang.org/x/net v0.60.0
+	golang.org/x/net v0.61.0
 	golang.org/x/oauth2 v0.37.0
-	golang.org/x/sync v0.23.0
-	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/term v0.46.0 // indirect
-	golang.org/x/text v0.42.0 // indirect
+	golang.org/x/sync v0.24.0
+	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/term v0.47.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.16.0
 	google.golang.org/api v0.299.0
 	google.golang.org/genproto v0.0.0-20260715232425-e75dac1f907d // indirect

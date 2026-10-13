@@ -12,6 +12,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Fixed
 
+- The tools writing merged-blocks files (`resize-merged-blocks`, `download-from-firehose` and others) now fail instead of writing a block to a file whose range does not hold it. The previous bundle's last block carried into the files of a gap is still written.
+
+- `index-builder` no longer restarts indexing from `--index-builder-start-block` when the index store errors at startup (for example, a transient S3 failure). It now retries, then fails startup so the process restarts, instead of treating the store as empty. A failed index write now stops the indexer instead of being logged and skipped, which left a gap that made every later restart rewind to it (requires chains to propagate the error from their indexer's `ProcessBlock`) (#288).
+
 - Merger no longer moves canonical one-block files to the forked-blocks store when readers write the same block with a different LIB, as happens on Polygon PoS / Amoy. Only blocks with another ID at the same height are moved.
 
 - The reader now always clamps a decoded block's `lib_num` down to its own block number when the node/plugin reports `lib_num` greater than the block number (invalid; `lib_num` equal to the block number is still valid), logs an error and increments `reader_node_invalid_libnum_clamped_count`, instead of letting the bad value reach the relayer where it moved LIB past head and silently stalled it forever.
@@ -29,6 +33,12 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - `tools substreams prune-states`, `prune-outputs` and `purge` no longer fail deletions on GCS with `429 rateLimitExceeded` ("request distribution is too uneven across the key-ranges" or "request-rate on the bucket has ramped up too fast"). They now delete in random order instead of listing order, which sent every concurrent deletion to the same part of the bucket, are capped by the new `--delete-rate` flag, and retry a failed deletion 5 times over several seconds instead of twice over 50ms.
 
 ### Added
+
+- `tools resize-merged-blocks --fix-misplaced-blocks` rewrites a store where a merged-blocks file holds blocks outside of its range, as the empty files of a gap in block numbers can (ex: near-testnet around block 53461716). The source files are read in order and every block is written to the file of its own number. A block at or below the last block written is skipped, and a block above it that does not have it as parent stops the process with an error. Without the flag, such a store fails with `contains block ..., beyond the configured bundle size`.
+
+- `tools resize-merged-blocks --fix-misplaced-blocks` sets each block's parent number to the number of the last block written. Blocks in the legacy format (read with `ACCEPT_LEGACY_BLOCK_FORMAT` set) otherwise get their number minus one as parent number, which is wrong across skipped heights.
+
+- `tools resize-merged-blocks` clears the deprecated `payload_kind` and `payload_buffer` fields from every block written, the block data stays in `payload`.
 
 - Store URLs, such as `--common-merged-blocks-store-url`, accept `compression_config` to tune how files are written, matching the store's compression: a zstd level with an optional window in MiB (`best`, `better/32`), or a gzip level from `1` to `9`. For example `gs://bucket/merged-blocks?compression_config=best/32`. Files written with any setting are read back without configuration. An invalid value makes opening the store fail.
 
@@ -81,6 +91,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### Deprecated
 
 - The `SOURCE_CHAN_SIZE` environment variable, replaced by `--common-live-subscriber-max-buffered-blocks`. It is still used when the flag is not set, with a warning at startup.
+
+### Security
+
+- Bump `golang.org/x/net` to `v0.61.0` to fix CVE-2026-78663 (critical), CVE-2026-78669, CVE-2026-78660 and CVE-2026-78659 (high).
 
 ## v1.20.1
 
