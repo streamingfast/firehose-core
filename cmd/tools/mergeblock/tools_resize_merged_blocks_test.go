@@ -172,6 +172,118 @@ func TestResizeMergedBlocksSameSize(t *testing.T) {
 	assert.Equal(t, uint64(299), files["0000000200"][99])
 }
 
+// chainBlock is block num with parentNum as parent, the ids following testBlock's.
+func chainBlock(num, parentNum uint64) *pbbstream.Block {
+	blk := testBlock(num)
+	blk.ParentNum = parentNum
+	blk.ParentId = fmt.Sprintf("%08x", parentNum)
+	return blk
+}
+
+// writeSourceFile writes blocks as they are to the merged-blocks file named after lowBlockNum.
+func writeSourceFile(t *testing.T, store dstore.Store, lowBlockNum uint64, blocks ...*pbbstream.Block) {
+	t.Helper()
+	pr, pw := io.Pipe()
+	go func() {
+		writer, err := bstream.NewDBinBlockWriter(pw)
+		if err == nil {
+			for _, blk := range blocks {
+				if err = writer.Write(blk); err != nil {
+					break
+				}
+			}
+		}
+		pw.CloseWithError(err)
+	}()
+	require.NoError(t, store.WriteObject(context.Background(), fmt.Sprintf("%010d", lowBlockNum), pr))
+}
+
+func runResizeFixingMisplacedBlocks(t *testing.T, srcURL, dstURL string, start, stop uint64) error {
+	t.Helper()
+	cmd := NewToolsResizeMergedBlocksCmd(&firecore.Chain[testChainBlock]{}, zap.NewNop())
+	cmd.SetContext(context.Background())
+	require.NoError(t, cmd.Flags().Set("target-bundle-size", "1000"))
+	require.NoError(t, cmd.Flags().Set("fix-misplaced-blocks", "true"))
+	return cmd.RunE(cmd, []string{srcURL, dstURL, fmt.Sprintf("%d", start), fmt.Sprintf("%d", stop)})
+}
+
+// fillMisplacedBlocksStore writes the blocks 0..216, then a gap up to block 1350, like
+// near-testnet around block 53461716: the files 300 to 1200 have no block of their own, the
+// first ones carry block 216 and the blocks 1350, 1352, ..., 1368 are written one per file
+// from 0000000300 to 0000001200. The file 0000001300 starts at block 1370.
+func fillMisplacedBlocksStore(t *testing.T, store dstore.Store) {
+	t.Helper()
+	fillStore(t, store, 100, 0, 199)
+	writeSourceFile(t, store, 200, blockRange(200, 216)...)
+
+	previous := uint64(216)
+	for i, low := uint64(0), uint64(300); low <= 1200; i, low = i+1, low+100 {
+		num := 1350 + 2*i
+		blocks := []*pbbstream.Block{chainBlock(num, previous)}
+		if low <= 400 {
+			blocks = append([]*pbbstream.Block{testBlock(216)}, blocks...)
+		}
+		writeSourceFile(t, store, low, blocks...)
+		previous = num
+	}
+
+	writeSourceFile(t, store, 1300, append([]*pbbstream.Block{chainBlock(1370, previous)}, blockRange(1371, 1399)...)...)
+	fillStore(t, store, 100, 1400, 2099)
+}
+
+func blockRange(from, to uint64) (out []*pbbstream.Block) {
+	for i := from; i <= to; i++ {
+		out = append(out, testBlock(i))
+	}
+	return out
+}
+
+func TestResizeMergedBlocksFixMisplacedBlocks(t *testing.T) {
+	tmp := t.TempDir()
+	srcURL := "file://" + filepath.Join(tmp, "src")
+	dstURL := "file://" + filepath.Join(tmp, "dst")
+
+	srcStore, err := dstore.NewDBinStore(srcURL)
+	require.NoError(t, err)
+	fillMisplacedBlocksStore(t, srcStore)
+
+	require.ErrorContains(t, runResize(t, srcURL, dstURL, 0, 2000, 100, 1000), "beyond the configured bundle size")
+
+	require.NoError(t, runResizeFixingMisplacedBlocks(t, srcURL, dstURL, 0, 2000))
+
+	dstStore, err := dstore.NewDBinStore(dstURL)
+	require.NoError(t, err)
+	files := readStore(t, dstStore)
+	require.Len(t, files, 2)
+
+	var first []uint64
+	for _, blk := range blockRange(0, 216) {
+		first = append(first, blk.Number)
+	}
+	assert.Equal(t, first, files["0000000000"])
+
+	second := []uint64{1350, 1352, 1354, 1356, 1358, 1360, 1362, 1364, 1366, 1368}
+	for i := uint64(1370); i < 2000; i++ {
+		second = append(second, i)
+	}
+	assert.Equal(t, second, files["0000001000"])
+}
+
+func TestResizeMergedBlocksFixMisplacedBlocksUnlinkedBlock(t *testing.T) {
+	tmp := t.TempDir()
+	srcURL := "file://" + filepath.Join(tmp, "src")
+	dstURL := "file://" + filepath.Join(tmp, "dst")
+
+	srcStore, err := dstore.NewDBinStore(srcURL)
+	require.NoError(t, err)
+
+	fillStore(t, srcStore, 100, 0, 149)
+	writeSourceFile(t, srcStore, 100, append(blockRange(100, 149), chainBlock(150, 148))...)
+	fillStore(t, srcStore, 100, 200, 1099)
+
+	assert.ErrorContains(t, runResizeFixingMisplacedBlocks(t, srcURL, dstURL, 0, 1000), "does not link to the last block written")
+}
+
 func TestResizeMergedBlocksValidation(t *testing.T) {
 	tmp := t.TempDir()
 	srcURL := "file://" + filepath.Join(tmp, "src")
