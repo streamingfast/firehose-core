@@ -12,6 +12,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Fixed
 
+- `index-builder` now serves its health check, over gRPC and HTTP `/healthz`, on `--index-builder-grpc-listen-addr`, which it never listened on.
+
 - The tools writing merged-blocks files (`resize-merged-blocks`, `download-from-firehose` and others) now fail instead of writing a block to a file whose range does not hold it. The previous bundle's last block carried into the files of a gap is still written.
 
 - `index-builder` no longer restarts indexing from `--index-builder-start-block` when the index store errors at startup (for example, a transient S3 failure). It now retries, then fails startup so the process restarts, instead of treating the store as empty. A failed index write now stops the indexer instead of being logged and skipped, which left a gap that made every later restart rewind to it (requires chains to propagate the error from their indexer's `ProcessBlock`) (#288).
