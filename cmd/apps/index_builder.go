@@ -9,6 +9,7 @@ import (
 	"github.com/streamingfast/bstream"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	bstransform "github.com/streamingfast/bstream/transform"
+	"github.com/streamingfast/derr"
 	firecore "github.com/streamingfast/firehose-core"
 	index_builder "github.com/streamingfast/firehose-core/index-builder/app/index-builder"
 	"github.com/streamingfast/firehose-core/launcher"
@@ -55,13 +56,22 @@ func RegisterIndexBuilderApp[B firecore.Block](chain *firecore.Chain[B], rootLog
 				default:
 				}
 
-				startBlockNum := bstransform.FindNextUnindexed(
-					ctx,
-					viper.GetUint64("index-builder-start-block"),
-					lookupIdxSizes,
-					indexShortName,
-					indexStore,
-				)
+				// A store error must never be read as "nothing indexed yet", that would restart
+				// indexing from the configured start block, so retry then fail startup.
+				var startBlockNum uint64
+				err := derr.RetryContext(ctx, 5, func(ctx context.Context) (err error) {
+					startBlockNum, err = bstransform.FindNextUnindexed(
+						ctx,
+						viper.GetUint64("index-builder-start-block"),
+						lookupIdxSizes,
+						indexShortName,
+						indexStore,
+					)
+					return err
+				})
+				if err != nil {
+					return 0, fmt.Errorf("find next unindexed block: %w", err)
+				}
 
 				return startBlockNum, nil
 			}
