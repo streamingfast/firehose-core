@@ -33,12 +33,13 @@ import (
 var RelayerStartAborted = fmt.Errorf("getting start block aborted by relayer application terminating signal")
 
 type Config struct {
-	Sources               []relayer.SourceAddr
-	GRPCListenAddr        string
-	HTTPHealthzListenAddr string
-	SourceRequestBurst    int
-	MaxSourceLatency      time.Duration
-	OneBlocksURL          string
+	Sources                 []relayer.SourceAddr
+	GRPCListenAddr          string
+	HTTPHealthzListenAddr   string
+	SourceRequestBurst      int
+	MaxSourceLatency        time.Duration
+	OneBlocksURL            string
+	StuckDetectionThreshold time.Duration
 
 	IsPendingShutdown func() bool `json:"-"`
 }
@@ -55,6 +56,7 @@ func (c *Config) ZapFields() []zap.Field {
 		zap.Int("source_request_burst", c.SourceRequestBurst),
 		zap.Duration("max_source_latency", c.MaxSourceLatency),
 		zap.String("one_blocks_url", c.OneBlocksURL),
+		zap.Duration("stuck_detection_threshold", c.StuckDetectionThreshold),
 	}
 }
 
@@ -94,6 +96,7 @@ func (a *App) Run() error {
 		liveSourceFactory,
 		a.config.GRPCListenAddr,
 		oneBlocksStore,
+		a.config.StuckDetectionThreshold,
 	)
 
 	a.OnTerminating(a.relayer.Shutdown)
