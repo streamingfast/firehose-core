@@ -99,7 +99,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			cmd.Flags().String("substreams-tier1-hosted-store-registry-address", "", "gRPC address of the control-plane registry service used to resolve hosted foundational stores (legacy/current stores continue to use the JSON config path)")
 			cmd.Flags().Uint64("substreams-tier1-output-buffer-size", 100, "max number of messages bundled into BlockScopedDatas (for clients using v4)")
 			cmd.Flags().Uint64("substreams-tier1-store-size-limit", 0, "Override the default store size limit (in bytes) for tier2 stores. 0 keeps the default of 1GiB. Forwarded to tier2 on each subrequest.")
-			cmd.Flags().Bool("substreams-tier1-allow-tail-truncation", false, "Serve modules (mappers and stores) whose initial block is below --common-first-streamable-block, after the chain's tail was truncated: they run from that block on, and their stores resume from snapshots taken before the truncation. Requests using a store without an initial block are refused. Forwarded to tier2 on each subrequest.")
+			cmd.Flags().Bool("substreams-tier1-allow-pruned-chain", false, "Serve modules (mappers and stores) whose initial block is below --common-first-streamable-block, after the chain was pruned: they run from that block on, and their stores resume from snapshots taken before the pruning. Requests using a store without an initial block are refused. Forwarded to tier2 on each subrequest.")
 			cmd.Flags().String("substreams-tier1-cpu-eviction-mode", "off", cli.FlagDescription(`
 				How the tier1 reacts when its own cgroup reports the CPU saturated:
 
@@ -238,7 +238,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			config.StoresScratchSpace = firecore.MustReplaceDataDir(sfDataDir, viper.GetString("substreams-stores-scratch-space"))
 			config.StoresBackend = viper.GetString("substreams-stores-backend")
 			config.StoreSizeLimit = viper.GetUint64("substreams-tier1-store-size-limit")
-			config.AllowTailTruncation = viper.GetBool("substreams-tier1-allow-tail-truncation")
+			config.AllowPrunedChain = viper.GetBool("substreams-tier1-allow-pruned-chain")
 
 			evictionMode, err := active_requests.ParseEvictionMode(viper.GetString("substreams-tier1-cpu-eviction-mode"))
 			if err != nil {
