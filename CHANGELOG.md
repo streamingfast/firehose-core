@@ -52,7 +52,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Substreams: `external_calls_<kind>` metering metrics (for example `external_calls_eth_call`), counting the calls made by WASM extensions. A batch counts for as many calls as it contains.
 
-- Substreams: `--substreams-tier1-allow-store-truncation` lets tier1 serve modules whose initial block is below `--common-first-streamable-block`, after that block was raised (the chain was truncated). They run from the first streamable block on, and their stores resume from the snapshots taken before the truncation. A request is refused when a store has no snapshot at or after the first streamable block to resume from, or when a store has no initial block: every store must set one, at or above the first streamable block. Tier2 must run this version before the flag is set on tier1.
+- Substreams: `--substreams-tier1-allow-tail-truncation` lets tier1 serve modules (mappers and stores) whose initial block is below `--common-first-streamable-block`, after that block was raised (the chain's tail was truncated). They run from the first streamable block on, and their stores resume from the snapshots taken before the truncation. A request is refused when a store has no snapshot at the first streamable block to resume from, or when a store has no initial block: every store must set one, at or above the first streamable block. Tier2 must run this version before the flag is set on tier1.
 
 ### Changed
 
