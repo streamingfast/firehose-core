@@ -34,6 +34,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - `tools substreams prune-states`, `prune-outputs` and `purge` no longer fail deletions on GCS with `429 rateLimitExceeded` ("request distribution is too uneven across the key-ranges" or "request-rate on the bucket has ramped up too fast"). They now delete in random order instead of listing order, which sent every concurrent deletion to the same part of the bucket, are capped by the new `--delete-rate` flag, and retry a failed deletion 5 times over several seconds instead of twice over 50ms.
 
+- Startup no longer lowers the open-files limit (`RLIMIT_NOFILE`) to 24,576 when it can't raise it to 1,000,000 and the current limit is already higher, as in containers without `CAP_SYS_RESOURCE` (k0s: 999,999, containerd 2.x: 524,288). It now keeps the current limit and logs a warning.
+
 ### Added
 
 - `tools resize-merged-blocks --fix-misplaced-blocks` rewrites a store where a merged-blocks file holds blocks outside of its range, as the empty files of a gap in block numbers can (ex: near-testnet around block 53461716). The source files are read in order and every block is written to the file of its own number. A block at or below the last block written is skipped, and a block above it that does not have it as parent stops the process with an error. Without the flag, such a store fails with `contains block ..., beyond the configured bundle size`.
