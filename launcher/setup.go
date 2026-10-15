@@ -66,7 +66,11 @@ func SetAutoMaxProcs(logger *zap.Logger) {
 }
 
 func SetMaxOpenFilesLimit(logger *zap.Logger, goodEnoughMaxOpenFiles, osxStockMaxOpenFiles uint64) error {
-	maxOpenFilesLimit, err := getMaxOpenFilesLimit()
+	return setMaxOpenFilesLimit(logger, goodEnoughMaxOpenFiles, osxStockMaxOpenFiles, getMaxOpenFilesLimit, trySetMaxOpenFilesLimit)
+}
+
+func setMaxOpenFilesLimit(logger *zap.Logger, goodEnoughMaxOpenFiles, osxStockMaxOpenFiles uint64, getLimit func() (uint64, error), setLimit func(uint64) error) error {
+	maxOpenFilesLimit, err := getLimit()
 	if err != nil {
 		return err
 	}
@@ -80,25 +84,32 @@ func SetMaxOpenFilesLimit(logger *zap.Logger, goodEnoughMaxOpenFiles, osxStockMa
 	// We first try to set the value to our good enough value. It might or might not
 	// work depending if the user permits the operation and if on OS X, the maximal
 	// value possible as been increased (https://superuser.com/a/514049/459230).
-	//
-	// If our first try didn't work, let's try with a small value that should fit
-	// most stock OS X value. This should probably be done only for OS X, other OSes
-	// should probably even try a higher value than the minimal OS X value first.
-	//
-	// We might need conditional compilation units here to make the logic easier.
-	err = trySetMaxOpenFilesLimit(goodEnoughMaxOpenFiles)
-	if err != nil {
-		logger.Debug("unable to use our good enough ulimit max open files value, going to try with something lower", zap.Error(err))
-	} else {
-		return logValueAfterAdjustment(logger)
+	err = setLimit(goodEnoughMaxOpenFiles)
+	if err == nil {
+		return logValueAfterAdjustment(logger, getLimit)
 	}
 
-	err = trySetMaxOpenFilesLimit(osxStockMaxOpenFiles)
+	// Raising the hard limit needs privileges (CAP_SYS_RESOURCE on Linux) that containers
+	// usually don't have, and container runtimes set it below our good enough value (k0s:
+	// 999,999, containerd 2.x: 524,288). The Go runtime already raised the soft limit to
+	// the hard limit, so keep it rather than lowering it to the OS X fallback value.
+	if maxOpenFilesLimit >= osxStockMaxOpenFiles {
+		logger.Debug("unable to raise ulimit max open files to our good enough value, keeping current value",
+			zap.Uint64("current_value", maxOpenFilesLimit),
+			zap.Uint64("good_enough_value", goodEnoughMaxOpenFiles),
+			zap.Error(err),
+		)
+		return nil
+	}
+
+	// Otherwise, let's try with a small value that should fit most stock OS X value.
+	logger.Debug("unable to use our good enough ulimit max open files value, going to try with something lower", zap.Error(err))
+	err = setLimit(osxStockMaxOpenFiles)
 	if err != nil {
 		return fmt.Errorf("cannot set ulimit max open files: %w", err)
 	}
 
-	return logValueAfterAdjustment(logger)
+	return logValueAfterAdjustment(logger, getLimit)
 }
 
 func trySetMaxOpenFilesLimit(value uint64) error {
@@ -124,8 +135,8 @@ func getMaxOpenFilesLimit() (uint64, error) {
 	return rLimit.Cur, nil
 }
 
-func logValueAfterAdjustment(logger *zap.Logger) error {
-	maxOpenFilesLimit, err := getMaxOpenFilesLimit()
+func logValueAfterAdjustment(logger *zap.Logger, getLimit func() (uint64, error)) error {
+	maxOpenFilesLimit, err := getLimit()
 	if err != nil {
 		return err
 	}
