@@ -96,6 +96,7 @@ func RegisterIndexBuilderApp[B firecore.Block](chain *firecore.Chain[B], rootLog
 				EndBlock:             stopBlockNum,
 				MergedBlocksStoreURL: mergedBlocksStoreURL,
 				GRPCListenAddr:       viper.GetString("index-builder-grpc-listen-addr"),
+				IsPendingShutdown:    runtime.IsPendingShutdown,
 			})
 
 			return app, nil

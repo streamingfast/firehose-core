@@ -6,6 +6,8 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dgrpc"
+	dgrpcserver "github.com/streamingfast/dgrpc/server"
+	dgrpcfactory "github.com/streamingfast/dgrpc/server/factory"
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dstore"
 	index_builder "github.com/streamingfast/firehose-core/index-builder"
@@ -22,6 +24,8 @@ type Config struct {
 	MergedBlocksStoreURL string
 	ForkedBlocksStoreURL string
 	GRPCListenAddr       string
+
+	IsPendingShutdown func() bool `json:"-"`
 }
 
 type App struct {
@@ -72,10 +76,33 @@ func (a *App) Run() error {
 	a.OnTerminating(indexBuilder.Shutdown)
 	indexBuilder.OnTerminated(a.Shutdown)
 
+	a.startGRPCServer()
+
 	go indexBuilder.Launch()
 
 	zlog.Info("index builder running")
 	return nil
+}
+
+// startGRPCServer serves the health check over gRPC and HTTP (/healthz) on GRPCListenAddr.
+func (a *App) startGRPCServer() {
+	gs := dgrpcfactory.ServerFromOptions(
+		dgrpcserver.WithLogger(zlog),
+		dgrpcserver.WithHealthCheck(dgrpcserver.HealthCheckOverGRPC|dgrpcserver.HealthCheckOverHTTP, a.healthCheck),
+	)
+	gs.OnTerminated(a.Shutdown)
+	a.OnTerminating(func(_ error) {
+		gs.Shutdown(0)
+	})
+
+	go gs.Launch(a.config.GRPCListenAddr)
+}
+
+func (a *App) healthCheck(_ context.Context) (isReady bool, out interface{}, err error) {
+	if a.config.IsPendingShutdown != nil && a.config.IsPendingShutdown() {
+		return false, nil, nil
+	}
+	return true, nil, nil
 }
 
 func (a *App) IsReady() bool {
