@@ -94,7 +94,7 @@ func setMaxOpenFilesLimit(logger *zap.Logger, goodEnoughMaxOpenFiles, osxStockMa
 	// 999,999, containerd 2.x: 524,288). The Go runtime already raised the soft limit to
 	// the hard limit, so keep it rather than lowering it to the OS X fallback value.
 	if maxOpenFilesLimit >= osxStockMaxOpenFiles {
-		logger.Warn("unable to raise ulimit max open files to our good enough value, keeping current value",
+		logger.Debug("unable to raise ulimit max open files to our good enough value, keeping current value",
 			zap.Uint64("current_value", maxOpenFilesLimit),
 			zap.Uint64("good_enough_value", goodEnoughMaxOpenFiles),
 			zap.Error(err),

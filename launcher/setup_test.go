@@ -40,7 +40,7 @@ func TestSetMaxOpenFilesLimit(t *testing.T) {
 		maxSettable  uint64
 		expectLimit  uint64
 		expectCalls  []uint64
-		expectWarn   bool
+		expectKept   bool
 		expectErrors bool
 	}{
 		{
@@ -62,7 +62,7 @@ func TestSetMaxOpenFilesLimit(t *testing.T) {
 			maxSettable: 999999,
 			expectLimit: 999999,
 			expectCalls: []uint64{1000000},
-			expectWarn:  true,
+			expectKept:  true,
 		},
 		{
 			name:        "containerd 2.x limit kept",
@@ -70,7 +70,7 @@ func TestSetMaxOpenFilesLimit(t *testing.T) {
 			maxSettable: 524288,
 			expectLimit: 524288,
 			expectCalls: []uint64{1000000},
-			expectWarn:  true,
+			expectKept:  true,
 		},
 		{
 			name:        "low limit raised to fallback",
@@ -103,7 +103,7 @@ func TestSetMaxOpenFilesLimit(t *testing.T) {
 
 			assert.Equal(t, test.expectLimit, limit.current)
 			assert.Equal(t, test.expectCalls, limit.setCalls)
-			assert.Equal(t, test.expectWarn, logs.FilterLevelExact(zapcore.WarnLevel).Len() > 0)
+			assert.Equal(t, test.expectKept, logs.FilterMessageSnippet("keeping current value").Len() > 0)
 		})
 	}
 }
