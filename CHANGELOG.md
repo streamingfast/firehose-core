@@ -64,6 +64,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Go 1.27 or newer is now required to build.
 
+- Substreams: production-mode requests disconnected for being more than 2 segments behind the last final block now get `back-processing ended too far behind the last final block of the chain, please reconnect to process the gap in parallel` or `stream fell too far behind the last final block of the chain, please reconnect to process the gap in parallel` instead of `endpoint is shutting down, please reconnect`. Both are still `Unavailable`.
+
 - `tools resize-merged-blocks` now accepts equal `--source-bundle-size` and `--target-bundle-size` to rewrite merged-blocks files with different settings (ex: compression). It asks for confirmation first; pass `--force` to skip the prompt.
 
 - `firehose` and `substreams-tier1` launched in the same process now share one forkable hub instead of each holding its own copy of the live blocks; on Solana that saves about 0.5 GiB per process. Firehose still streams complete blocks only.
