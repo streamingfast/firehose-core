@@ -40,11 +40,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
-- `tools resize-merged-blocks --fix-misplaced-blocks` rewrites a store where a merged-blocks file holds blocks outside of its range, as the empty files of a gap in block numbers can (ex: near-testnet around block 53461716). The source files are read in order and every block is written to the file of its own number. A block at or below the last block written is skipped, and a block above it that does not have it as parent stops the process with an error. Without the flag, such a store fails with `contains block ..., beyond the configured bundle size`.
-
-- `tools resize-merged-blocks --fix-misplaced-blocks` sets each block's parent number to the number of the last block written. Blocks in the legacy format (read with `ACCEPT_LEGACY_BLOCK_FORMAT` set) otherwise get their number minus one as parent number, which is wrong across skipped heights.
-
-- `tools resize-merged-blocks` clears the deprecated `payload_kind` and `payload_buffer` fields from every block written, the block data stays in `payload`.
+- `tools resize-merged-blocks --fix-misplaced-blocks` rewrites a store where merged-blocks files hold blocks outside of their range, as the empty files of a gap in block numbers can (ex: near-testnet around block 53461716). Each block is written to the file of its own number, with its parent number set to the last block written. A block at or below the last block written is skipped, and one that does not have it as parent stops the process with an error. Without the flag, such a store fails with `contains block ..., beyond the configured bundle size`.
 
 - Store URLs, such as `--common-merged-blocks-store-url`, accept `compression_config` to tune how files are written, matching the store's compression: a zstd level with an optional window in MiB (`best`, `better/32`), or a gzip level from `1` to `9`. For example `gs://bucket/merged-blocks?compression_config=best/32`. Files written with any setting are read back without configuration. An invalid value makes opening the store fail.
 
@@ -66,7 +62,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Substreams: production-mode requests disconnected for being more than 2 segments behind the last final block now get `back-processing ended too far behind the last final block of the chain, please reconnect to process the gap in parallel` or `stream fell too far behind the last final block of the chain, please reconnect to process the gap in parallel` instead of `endpoint is shutting down, please reconnect`. Both are still `Unavailable`.
 
-- `tools resize-merged-blocks` now accepts equal `--source-bundle-size` and `--target-bundle-size` to rewrite merged-blocks files with different settings (ex: compression). It asks for confirmation first; pass `--force` to skip the prompt.
+- `tools resize-merged-blocks` now accepts equal `--source-bundle-size` and `--target-bundle-size` to rewrite merged-blocks files with different settings (ex: compression), after a confirmation prompt (`--force` skips it). It also clears the deprecated `payload_kind` and `payload_buffer` fields from every block written; the block data stays in `payload`.
 
 - `firehose` and `substreams-tier1` launched in the same process now share one forkable hub instead of each holding its own copy of the live blocks; on Solana that saves about 0.5 GiB per process. Firehose still streams complete blocks only.
 
