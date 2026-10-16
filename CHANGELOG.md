@@ -8,7 +8,7 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.21.0
 
 ### Fixed
 
@@ -36,6 +36,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Startup no longer lowers the open-files limit (`RLIMIT_NOFILE`) to 24,576 when it can't raise it to 1,000,000 and the current limit is already higher, as in containers without `CAP_SYS_RESOURCE` (k0s: 999,999, containerd 2.x: 524,288). It now keeps the current limit.
 
+- Substreams: Fix wasm calls that fail because the host ran out of file descriptors or memory (for example `Too many open files` while creating an instance) being reported as deterministic errors, which returned `InvalidArgument` and were cached for 1h. They now return `Internal`, and the shared cache runs the call again instead of handing the same error to every stream on that block.
+
 ### Added
 
 - `tools resize-merged-blocks --fix-misplaced-blocks` rewrites a store where a merged-blocks file holds blocks outside of its range, as the empty files of a gap in block numbers can (ex: near-testnet around block 53461716). The source files are read in order and every block is written to the file of its own number. A block at or below the last block written is skipped, and a block above it that does not have it as parent stops the process with an error. Without the flag, such a store fails with `contains block ..., beyond the configured bundle size`.
@@ -59,6 +61,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - Substreams: `--substreams-tier1-allow-pruned-chain` lets tier1 serve modules (mappers and stores) whose initial block is below `--common-first-streamable-block`, after that block was raised (the chain was pruned). They run from the first streamable block on, and their stores resume from the snapshots taken before the pruning. A request is refused when a store has no snapshot at the first streamable block to resume from, or when a store has no initial block: every store must set one, at or above the first streamable block. Tier2 must run this version before the flag is set on tier1.
 
 ### Changed
+
+- Go 1.27 or newer is now required to build.
 
 - `tools resize-merged-blocks` now accepts equal `--source-bundle-size` and `--target-bundle-size` to rewrite merged-blocks files with different settings (ex: compression). It asks for confirmation first; pass `--force` to skip the prompt.
 
@@ -99,6 +103,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### Security
 
 - Bump `golang.org/x/net` to `v0.61.0` to fix CVE-2026-78663 (critical), CVE-2026-78669, CVE-2026-78660 and CVE-2026-78659 (high).
+
+- Bump OpenTelemetry to `v1.47.0` to fix known vulnerabilities.
 
 ## v1.20.1
 
