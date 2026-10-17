@@ -224,3 +224,37 @@ func TestBoundsArePushedDown(t *testing.T) {
 	assert.False(t, boundsArePushedDown(""))
 	assert.False(t, boundsArePushedDown("memory"))
 }
+
+func TestPurgeStoreIgnoresCompressionConfig(t *testing.T) {
+	const h1 = "ddc9230698a79b25c443c73753c9a94e038373c1"
+
+	ctx := context.Background()
+	base := "file://" + t.TempDir()
+
+	store, err := dstore.NewSimpleStore(base)
+	require.NoError(t, err)
+	require.NoError(t, store.WriteObject(ctx, "eth-mainnet/substreams-states/"+h1+"/last_used.zst", emptyReader()))
+
+	backend, err := newPurgeStore(ctx, base+"?compression_config=better/16,pool=states,lowmem=false", 1, zap.NewNop())
+	require.NoError(t, err)
+	defer backend.Close()
+
+	networks, err := backend.Networks(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"eth-mainnet"}, networks)
+}
+
+func TestWithoutCompressionConfig(t *testing.T) {
+	for _, tc := range []struct {
+		in, want string
+	}{
+		{"gs://bucket/eth-mainnet", "gs://bucket/eth-mainnet"},
+		{"gs://bucket/eth-mainnet?project=p", "gs://bucket/eth-mainnet?project=p"},
+		{"gs://bucket/eth-mainnet?project=p&compression_config=better/16,pool=states,lowmem=false", "gs://bucket/eth-mainnet?project=p"},
+		{"gs://bucket/eth-mainnet?compression_config=best", "gs://bucket/eth-mainnet"},
+	} {
+		got, err := withoutCompressionConfig(tc.in)
+		require.NoError(t, err)
+		assert.Equal(t, tc.want, got, tc.in)
+	}
+}

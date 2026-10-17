@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-
+	"net/url"
 	"path"
 	"strings"
 	"sync"
@@ -53,7 +53,11 @@ func boundsArePushedDown(scheme string) bool {
 }
 
 func newPurgeStore(ctx context.Context, storeURL string, scanWorkers int, logger *zap.Logger) (*purgeStore, error) {
-	baseURL := strings.TrimSuffix(storeURL, "/")
+	baseURL, err := withoutCompressionConfig(strings.TrimSuffix(storeURL, "/"))
+	if err != nil {
+		return nil, fmt.Errorf("parsing store URL %q: %w", storeURL, err)
+	}
+
 	store, err := dstore.NewSimpleStore(baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("creating store for %q: %w", storeURL, err)
@@ -77,6 +81,26 @@ func newPurgeStore(ctx context.Context, storeURL string, scanWorkers int, logger
 		logger:        logger,
 		shardListings: shardListings,
 	}, nil
+}
+
+// withoutCompressionConfig drops the `compression_config` parameter of a store URL. It is
+// meant for the zstd store substreams-tier1 opens on the same URL, but the purge store has
+// no compression (it lists and deletes, and decodes the markers it reads itself), and
+// dstore refuses the parameter on such a store.
+func withoutCompressionConfig(storeURL string) (string, error) {
+	u, err := url.Parse(storeURL)
+	if err != nil {
+		return "", err
+	}
+
+	query := u.Query()
+	if !query.Has("compression_config") {
+		return storeURL, nil
+	}
+
+	query.Del("compression_config")
+	u.RawQuery = query.Encode()
+	return u.String(), nil
 }
 
 func (s *purgeStore) Describe() string { return s.baseURL }
