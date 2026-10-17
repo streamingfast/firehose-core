@@ -8,6 +8,12 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Fixed
+
+- `tools substreams prune-states`, `prune-outputs` and `purge` now accept a store URL carrying `compression_config`, so they can take the same state store URL as substreams-tier1. They failed with `compression_config ... requires a zstd or gzip store, this store has no compression`.
+
 ## v1.21.0
 
 ### Fixed
