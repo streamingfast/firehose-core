@@ -8,6 +8,12 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Changed
+
+- Bumped `dauth`: with continuous authentication (`?continuous=true` on the `grpc` auth plugin), each continuous `Authenticate` response now refreshes the stream's trusted headers. A stream whose first authentication returned no headers (for example an authenticator that failed open) is metered with its identity from the next continuous call on, instead of without it for its whole lifetime.
+
 ## v1.21.0
 
 ### Fixed
