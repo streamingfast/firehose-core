@@ -9,7 +9,7 @@ import (
 )
 
 // SourceHeadBlockTimeDrift tracks, per source, the time elapsed since the
-// last block received from that source. The drift is computed at scrape
+// most recent block received from that source. The drift is computed at scrape
 // time, so it keeps growing while a source is silent.
 var SourceHeadBlockTimeDrift = newSourceHeadTimeDrift("relayer")
 
@@ -35,6 +35,9 @@ func newSourceHeadTimeDrift(app string) *sourceHeadTimeDrift {
 func (s *sourceHeadTimeDrift) SetBlockTime(source string, blockTime time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if prev, ok := s.lastBlockTimes[source]; ok && !blockTime.After(prev) {
+		return
+	}
 	s.lastBlockTimes[source] = blockTime
 }
 

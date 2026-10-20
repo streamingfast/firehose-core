@@ -8,6 +8,12 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Fixed
+
+- Relayer: `source_head_block_time_drift` no longer moves back when a source sends a block older than one it already sent, such as a fork block for a past slot that arrives late. A single late orphan made every source look minutes behind until the next block, which could falsely trigger lag alerts and rescuers.
+
 ## v1.21.1
 
 ### Changed
