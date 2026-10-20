@@ -60,6 +60,23 @@ func TestSourceHeadTimeDriftGrowsWhileSilent(t *testing.T) {
 	assert.Greater(t, third["reader-2"], wait.Seconds())
 }
 
+func TestSourceHeadTimeDriftIgnoresOlderBlocks(t *testing.T) {
+	drift := newSourceHeadTimeDrift("relayer")
+	reg := prometheus.NewRegistry()
+	require.NoError(t, reg.Register(drift))
+
+	drift.SetBlockTime("reader-1", time.Now())
+
+	// a late fork block for an old slot must not make a live source look behind
+	drift.SetBlockTime("reader-1", time.Now().Add(-2*time.Minute))
+	assert.Less(t, gatherDrift(t, reg)["reader-1"], 1.0)
+
+	// a newer block still moves it forward
+	drift.SetBlockTime("reader-1", time.Now().Add(-5*time.Second))
+	drift.SetBlockTime("reader-1", time.Now())
+	assert.Less(t, gatherDrift(t, reg)["reader-1"], 0.1)
+}
+
 func TestSourceHeadTimeDriftLabels(t *testing.T) {
 	drift := newSourceHeadTimeDrift("relayer")
 	reg := prometheus.NewRegistry()
