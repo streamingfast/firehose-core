@@ -242,3 +242,31 @@ func Test_GetNext(t *testing.T) {
 	require.Equal(t, uint64(18570800), block.LibNum)
 	require.Equal(t, int32(time.Unix(0, 1699992393935935000).Nanosecond()), block.Timestamp.Nanos)
 }
+
+func Test_GetNext_CursorLine(t *testing.T) {
+	lines := make(chan string, 4)
+	reader := newConsoleReader(lines, zlogTest, tracerTest)
+
+	type cursorLine struct {
+		num   uint64
+		id    string
+		value string
+	}
+	var cursors []cursorLine
+	reader.OnCursor(func(num uint64, id string, value string) {
+		cursors = append(cursors, cursorLine{num, id, value})
+	})
+
+	lines <- "FIRE INIT 1.0 sf.ethereum.type.v2.Block"
+	lines <- "FIRE CURSOR 18570999 55de88c909fa368ae1e93b6b8ffb3fbb12e64aefec1d4a1fcc27ae7633de2f81 c3RhdGU9MQ=="
+	lines <- "FIRE BLOCK 18571000 d2836a703a02f3ca2a13f05efe26fc48c6fa0db0d754a49e56b066d3b7d54659 18570999 55de88c909fa368ae1e93b6b8ffb3fbb12e64aefec1d4a1fcc27ae7633de2f81 18570800 1699992393935935000 Ci10eXBlLmdvb2dsZWFwaXMuY29tL3NmLmV0aGVyZXVtLnR5cGUudjIuQmxvY2sSJxIg0oNqcDoC88oqE/Be/ib8SMb6DbDXVKSeVrBm07fVRlkY+L3tCA=="
+	close(lines)
+
+	block, err := reader.ReadBlock()
+	require.NoError(t, err)
+	require.Equal(t, uint64(18571000), block.Number)
+	require.Equal(t, []cursorLine{{18570999, "55de88c909fa368ae1e93b6b8ffb3fbb12e64aefec1d4a1fcc27ae7633de2f81", "c3RhdGU9MQ=="}}, cursors)
+
+	_, err = newConsoleReader(make(chan string), zlogTest, tracerTest).readLine("FIRE CURSOR 1 abc has spaces")
+	require.Error(t, err)
+}

@@ -70,10 +70,30 @@ type BlockLineConsoleReader interface {
 
 type ConsolerReaderFactory func(lines chan string) (ConsolerReader, error)
 
+// CursorConsoleReader is a ConsolerReader that reads "FIRE CURSOR" lines, the reader's own
+// cursor for a block it printed, and hands them to the given handler.
+type CursorConsoleReader interface {
+	ConsolerReader
+
+	OnCursor(handler func(blockNum uint64, blockID string, value string))
+}
+
+type Option func(*options)
+
+type options struct {
+	readerCursor bool
+}
+
+// WithReaderCursor keeps the reader cursor file (see [ReaderCursor]) in the working directory.
+func WithReaderCursor() Option {
+	return func(o *options) { o.readerCursor = true }
+}
+
 type MindReaderPlugin struct {
 	*shutter.Shutter
 
 	archiver                 *Archiver // transformed blocks are sent to Archiver
+	cursorTracker            *CursorTracker
 	consoleReaderFactory     ConsolerReaderFactory
 	stopBlock                uint64 // if set, call shutdownFunc(nil) when we hit this number
 	channelCapacity          int    // transformed blocks are buffered in a channel
@@ -121,10 +141,16 @@ func NewMindReaderPlugin(
 	testModeComparator *TestModeComparator,
 	zlogger *zap.Logger,
 	tracer logging.Tracer,
+	opts ...Option,
 ) (*MindReaderPlugin, error) {
 	err := validateOneBlockSuffix(oneBlockSuffix)
 	if err != nil {
 		return nil, err
+	}
+
+	o := &options{}
+	for _, opt := range opts {
+		opt(o)
 	}
 
 	testModeEnabled := testModeComparator != nil
@@ -142,11 +168,19 @@ func NewMindReaderPlugin(
 	)
 
 	var archiver *Archiver
+	var cursorTracker *CursorTracker
 	if !testModeEnabled {
 		// Create directory and its parent(s), it's a no-op if everything already exists
 		err = os.MkdirAll(workingDirectory, os.ModePerm)
 		if err != nil {
 			return nil, fmt.Errorf("create working directory: %w", err)
+		}
+
+		if o.readerCursor {
+			cursorTracker, err = NewCursorTracker(workingDirectory, zlogger)
+			if err != nil {
+				return nil, fmt.Errorf("new reader cursor tracker: %w", err)
+			}
 		}
 
 		// local store
@@ -166,6 +200,7 @@ func NewMindReaderPlugin(
 			oneBlockSuffix,
 			localOneBlocksStore,
 			remoteOneBlocksStore,
+			cursorTracker,
 			zlogger,
 			tracer,
 		)
@@ -177,6 +212,7 @@ func NewMindReaderPlugin(
 	return &MindReaderPlugin{
 		Shutter:                  shutter.New(),
 		archiver:                 archiver,
+		cursorTracker:            cursorTracker,
 		consoleReaderFactory:     consoleReaderFactory,
 		stopBlock:                stopBlockNum,
 		channelCapacity:          channelCapacity,
@@ -225,6 +261,14 @@ func (p *MindReaderPlugin) Launch() {
 	if blockLineReader, ok := consoleReader.(BlockLineConsoleReader); ok {
 		p.consoleLines = make(chan consoleline.Line, cap(lines))
 		blockLineReader.ReadLines(p.consoleLines)
+	}
+
+	if p.cursorTracker != nil {
+		if cursorReader, ok := consoleReader.(CursorConsoleReader); ok {
+			cursorReader.OnCursor(p.cursorTracker.SetValue)
+		} else {
+			p.zlogger.Warn("the console reader doesn't read \"FIRE CURSOR\" lines, the reader cursor will have no value")
+		}
 	}
 
 	p.consoleReader = consoleReader

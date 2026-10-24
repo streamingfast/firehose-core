@@ -10,6 +10,32 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Added
+
+- **New flag `--reader-node-cursor`:** the reader node keeps a reader cursor file, `reader-cursor.json` in `--reader-node-working-dir`.
+  - **What it holds:** the last block stored in the one-block store such that every block the reader printed before it is stored too, and that block's LIB.
+  - **When it's written:** only once the block's upload to the one-block store has returned. It is replaced atomically and synced.
+  - **Why:** a reader that records a block as done as soon as it prints it can lose blocks for good. The block is still in firecore's in-memory pipeline when a crash, an OOM kill or a SIGKILL takes down firecore and the reader together. Such a reader then resumes after a block that was never stored, and the merger can't link past the gap.
+
+  The reader gets the cursor through new `--reader-node-arguments` templates, read from the file **each time the reader starts**:
+
+  | Template | Value |
+  |---|---|
+  | `{cursor-file}` | the cursor file's path |
+  | `{resume-block-num}`, `{resume-block-id}` | the cursor's block |
+  | `{resume-lib-num}` | its LIB |
+  | `{resume-cursor}`, `{resume-cursor-block-num}` | the reader's own value (below) and the block it was given for |
+
+  Each template is empty when there is no cursor yet.
+
+  A reader can also attach a value of its own to a block by printing `FIRE CURSOR <block_num> <block_id> <value>` after it. The value has no whitespace (base64 or hex, say). firecore writes it to the cursor file once that block is stored, and the reader gets it back with `{resume-cursor}`. Older firecore versions ignore the line, as they do any `FIRE` line they don't know.
+
+  How readers use it:
+  - **A reader that can produce any block again** (an RPC poller, say) restarts from `{resume-lib-num}`. The blocks it prints again are ignored downstream as already known.
+  - **A reader whose state only moves forward** has two rules:
+    - It commits its state only up to the block `{cursor-file}` shows. The file can be read while the reader runs.
+    - It refuses to start when its state is past `{resume-block-num}`, rather than skip blocks.
+
 ### Fixed
 
 - Relayer: `source_head_block_time_drift` no longer moves back when a source sends a block older than one it already sent, such as a fork block for a past slot that arrives late. A single late orphan made every source look minutes behind until the next block, which could falsely trigger lag alerts and rescuers.

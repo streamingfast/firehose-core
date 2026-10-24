@@ -28,6 +28,8 @@ const InitLogPrefix = "INIT "
 const InitLogPrefixLen = len(InitLogPrefix)
 const BlockLogPrefix = "BLOCK "
 const BlockLogPrefixLen = len(BlockLogPrefix)
+const CursorLogPrefix = "CURSOR "
+const CursorLogPrefixLen = len(CursorLogPrefix)
 
 // ethereumBlockType is the protobuf fully qualified block type used by every EVM Firehose
 // tracer (geth and its forks: Injective, BSC, Polygon/bor, etc). Those tracers print
@@ -109,7 +111,15 @@ type ConsoleReader struct {
 
 	lib uint64
 
+	onCursor func(blockNum uint64, blockID string, value string)
+
 	blockRate *dmetrics.AvgRatePromCounter
+}
+
+// OnCursor hands the reader's "FIRE CURSOR" lines to handler. It implements
+// [mindreader.CursorConsoleReader].
+func (r *ConsoleReader) OnCursor(handler func(blockNum uint64, blockID string, value string)) {
+	r.onCursor = handler
 }
 
 func NewConsoleReader(lines chan string, blockEncoder BlockEncoder, logger *zap.Logger, tracer logging.Tracer) (mindreader.ConsolerReader, error) {
@@ -250,6 +260,9 @@ func (r *ConsoleReader) readLine(line string) (out *pbbstream.Block, err error) 
 
 	case strings.HasPrefix(line, InitLogPrefix):
 		err = r.readInit(line[InitLogPrefixLen:])
+
+	case strings.HasPrefix(line, CursorLogPrefix):
+		err = r.readCursor(line[CursorLogPrefixLen:])
 	default:
 		if r.tracer.Enabled() {
 			r.logger.Debug("skipping unknown Firehose log line", zap.String("line", line))
@@ -263,6 +276,29 @@ func (r *ConsoleReader) readLine(line string) (out *pbbstream.Block, err error) 
 	}
 
 	return out, nil
+}
+
+// Format
+// [block_num] [block_hash] [value]
+//
+// The reader's own cursor for a block it printed: once that block is stored, the value is in
+// the reader cursor file and given back to the reader when it starts. The value has no
+// whitespace (base64 or hex, say), so it can be a single command line argument.
+func (r *ConsoleReader) readCursor(line string) error {
+	chunks := strings.Fields(line)
+	if len(chunks) != 3 {
+		return fmt.Errorf("expected 3 fields (block num, block hash, value), got %d", len(chunks))
+	}
+
+	blockNum, err := strconv.ParseUint(chunks[0], 10, 64)
+	if err != nil {
+		return fmt.Errorf("parsing block num %q: %w", chunks[0], err)
+	}
+
+	if r.onCursor != nil {
+		r.onCursor(blockNum, chunks[1], chunks[2])
+	}
+	return nil
 }
 
 // Formats

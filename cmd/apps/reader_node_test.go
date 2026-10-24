@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	reader "github.com/streamingfast/firehose-core/node-manager/mindreader"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -69,4 +70,23 @@ func Test_buildNodeArguments(t *testing.T) {
 			assert.Equal(t, tt.want, args)
 		})
 	}
+}
+
+func Test_buildNodeArguments_ReaderCursor(t *testing.T) {
+	args := "--cursor-file={cursor-file} --resume-block={resume-block-num} --resume-id={resume-block-id} --resume-lib={resume-lib-num} --resume-cursor={resume-cursor} --resume-cursor-block={resume-cursor-block-num}"
+
+	resolver := createNodeArgumentsResolverWithCursor("/data", "/data/node", "host", 0, 10, 20, "/work/reader-cursor.json", nil)
+	got, err := buildNodeArguments(args, resolver)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"--cursor-file=/work/reader-cursor.json", "--resume-block=", "--resume-id=", "--resume-lib=", "--resume-cursor=", "--resume-cursor-block="}, got)
+
+	cursor := &reader.ReaderCursor{
+		Block:  reader.CursorBlockRef{Num: 120, ID: "abc"},
+		LibNum: 114,
+		Value:  &reader.CursorValue{Block: reader.CursorBlockRef{Num: 119, ID: "abb"}, Value: "c3RhdGU="},
+	}
+	resolver = createNodeArgumentsResolverWithCursor("/data", "/data/node", "host", 0, 10, 20, "/work/reader-cursor.json", cursor)
+	got, err = buildNodeArguments(args, resolver)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"--cursor-file=/work/reader-cursor.json", "--resume-block=120", "--resume-id=abc", "--resume-lib=114", "--resume-cursor=c3RhdGU=", "--resume-cursor-block=119"}, got)
 }

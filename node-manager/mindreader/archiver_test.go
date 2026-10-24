@@ -41,7 +41,7 @@ func TestArchiver_ShutdownDrainsFileUploader(t *testing.T) {
 		return nil
 	}
 
-	archiver := NewArchiver(1, "test", localStore, destStore, testLogger, testTracer)
+	archiver := NewArchiver(1, "test", localStore, destStore, nil, testLogger, testTracer)
 
 	// Simulate the mindreader plugin lifecycle: the context wiring the upload
 	// loop is canceled when the plugin starts terminating, before the archiver
