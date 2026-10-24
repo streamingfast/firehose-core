@@ -90,3 +90,9 @@ func Test_buildNodeArguments_ReaderCursor(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"--cursor-file=/work/reader-cursor.json", "--resume-block=120", "--resume-id=abc", "--resume-lib=114", "--resume-cursor=c3RhdGU=", "--resume-cursor-block=119"}, got)
 }
+
+func Test_usesCursorTemplates(t *testing.T) {
+	assert.False(t, usesCursorTemplates("fetch rpc {first-streamable-block} --state-dir={data-dir}/poller"))
+	assert.True(t, usesCursorTemplates("fetch rpc --resume-lib={resume-lib-num}"))
+	assert.True(t, usesCursorTemplates("reader --cursor-file={cursor-file}"))
+}

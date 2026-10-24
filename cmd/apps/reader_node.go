@@ -231,13 +231,19 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 				argumentsSetter, ok := superviser.(interface {
 					SetArgumentsFunc(func() ([]string, error))
 				})
-				if !ok {
-					return nil, fmt.Errorf("'reader-node-cursor' isn't supported by this chain's superviser")
+				switch {
+				case ok:
+					argumentsSetter.SetArgumentsFunc(func() ([]string, error) {
+						_, arguments, err := resolveNodeArguments()
+						return arguments, err
+					})
+				case usesCursorTemplates(viper.GetString("reader-node-arguments")):
+					return nil, fmt.Errorf("'reader-node-arguments' uses reader cursor templates, but this chain's superviser can't resolve its arguments again when the node restarts")
+				default:
+					// no template: the arguments don't change between starts, and the cursor file is
+					// still kept
+					appLogger.Info("reader cursor kept, 'reader-node-arguments' uses no reader cursor template")
 				}
-				argumentsSetter.SetArgumentsFunc(func() ([]string, error) {
-					_, arguments, err := resolveNodeArguments()
-					return arguments, err
-				})
 			}
 
 			var bootstrapper operator.Bootstrapper
@@ -347,6 +353,14 @@ func readerNodeLineBufferSize() (uint64, error) {
 }
 
 var variablesRegex = regexp.MustCompile(`\{(data-dir|node-data-dir|hostname|first-streamable-block|start-block-num|stop-block-num|cursor-file|resume-block-num|resume-block-id|resume-lib-num|resume-cursor|resume-cursor-block-num)\}`)
+
+var cursorTemplatesRegex = regexp.MustCompile(`\{(cursor-file|resume-block-num|resume-block-id|resume-lib-num|resume-cursor|resume-cursor-block-num)\}`)
+
+// usesCursorTemplates tells if the reader arguments take the reader cursor, which then has to be
+// read again each time the reader starts
+func usesCursorTemplates(arguments string) bool {
+	return cursorTemplatesRegex.MatchString(arguments)
+}
 
 // overridable for testing purposes
 var osEnvExpandGetter = os.Getenv
