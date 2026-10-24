@@ -36,6 +36,13 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
     - It commits its state only up to the block `{cursor-file}` shows. The file can be read while the reader runs.
     - It refuses to start when its state is past `{resume-block-num}`, rather than skip blocks.
 
+  **Enabling the flag before the reader supports it** is safe:
+  - The reader runs exactly as before, and firecore keeps the file anyway.
+  - A reader is only affected when `--reader-node-arguments` uses one of the new templates.
+  - A reader that doesn't know the flag a template feeds into will refuse it and not start, so it fails visibly at the first start.
+
+  `devel/reader-cursor` has a reference reader and kill tests.
+
 ### Fixed
 
 - Relayer: `source_head_block_time_drift` no longer moves back when a source sends a block older than one it already sent, such as a fork block for a past slot that arrives late. A single late orphan made every source look minutes behind until the next block, which could falsely trigger lag alerts and rescuers.
