@@ -15,6 +15,7 @@ import (
 	"github.com/streamingfast/shutter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestMindReaderPlugin_OfficialPrefix_ReadFlow(t *testing.T) {
@@ -108,6 +109,38 @@ func TestMindReaderPlugin_StopAtBlockNumReached(t *testing.T) {
 	assert.Equal(t, numOfLines, len(blocks)) // moderate requirement, race condition can make it pass more blocks
 }
 
+func TestMindReaderPlugin_StartBlockTimestampReached(t *testing.T) {
+	lines := make(chan string, 2)
+	blocks := make(chan *pbbstream.Block, 2)
+
+	startBlockTimestamp := time.Unix(1000, 0).UTC()
+	mindReader := &MindReaderPlugin{
+		Shutter:             shutter.New(),
+		lines:               lines,
+		consoleReader:       newTestConsoleReader(lines),
+		startBlockTimestamp: &startBlockTimestamp,
+	}
+
+	blockBeforeStartTime := startBlockTimestamp.Add(-time.Second)
+	blockAtStartTime := startBlockTimestamp
+
+	mindReader.LogLine(fmt.Sprintf(`DMLOG {"id":"00000001a","timestamp":"%s"}`, blockBeforeStartTime.Format(time.RFC3339Nano)))
+	err := mindReader.readOneMessage(blocks)
+	require.NoError(t, err)
+	assert.Equal(t, 0, len(blocks))
+
+	mindReader.LogLine(fmt.Sprintf(`DMLOG {"id":"00000002a","timestamp":"%s"}`, blockAtStartTime.Format(time.RFC3339Nano)))
+	err = mindReader.readOneMessage(blocks)
+	require.NoError(t, err)
+
+	select {
+	case block := <-blocks:
+		require.Equal(t, uint64(2), block.Number)
+	case <-time.After(time.Second):
+		t.Fatal("expected block to pass the timestamp gate")
+	}
+}
+
 func TestMindReaderPlugin_OneBlockSuffixFormat(t *testing.T) {
 	assert.Error(t, validateOneBlockSuffix(""))
 	assert.NoError(t, validateOneBlockSuffix("example"))
@@ -142,17 +175,28 @@ func (c *testConsoleReader) ReadBlock() (*pbbstream.Block, error) {
 	}
 
 	type block struct {
-		ID string `json:"id"`
+		ID        string `json:"id"`
+		Timestamp string `json:"timestamp,omitempty"`
 	}
 
 	data := new(block)
 	if err := json.Unmarshal([]byte(formatedLine), data); err != nil {
 		return nil, fmt.Errorf("marshalling error on '%s': %w", formatedLine, err)
 	}
-	return &pbbstream.Block{
+	out := &pbbstream.Block{
 		Id:     data.ID,
 		Number: toBlockNum(data.ID),
-	}, nil
+	}
+
+	if data.Timestamp != "" {
+		timestamp, err := time.Parse(time.RFC3339Nano, data.Timestamp)
+		if err != nil {
+			return nil, fmt.Errorf("invalid timestamp %q: %w", data.Timestamp, err)
+		}
+		out.Timestamp = timestamppb.New(timestamp)
+	}
+
+	return out, nil
 }
 
 func toBlockNum(blockID string) uint64 {
