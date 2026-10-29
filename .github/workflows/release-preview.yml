@@ -11,6 +11,8 @@ permissions:
 
 env:
   CHANGELOG_PATH: "CHANGELOG.md"
+  SFRELEASER_DISABLE_PTY: "true"
+  SFRELEASER_VERSION: "v0.17.1-rc.2"
 
 jobs:
   release-preview:
@@ -25,6 +27,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
+      - name: Install sfreleaser
+        run: |
+          curl -sSfL "https://github.com/streamingfast/sfreleaser/releases/download/$SFRELEASER_VERSION/sfreleaser_linux_x86_64.tar.gz" | tar -xz -C "$RUNNER_TEMP" sfreleaser
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
       - name: Write release preview
         id: preview
         env:
@@ -32,27 +39,13 @@ jobs:
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           REPO: ${{ github.repository }}
         run: |
-          detect() {
-            grep -E '^##[^#]' | tr '[:upper:]' '[:lower:]' | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+[a-z0-9._-]*' | head -n1 || true
-          }
-
-          version=$(detect < "$CHANGELOG_PATH")
-          previous=$( (git show "$BASE_SHA:$CHANGELOG_PATH" 2>/dev/null || true) | detect)
-          if [[ -z "$version" || "v${version#v}" == "v${previous#v}" ]]; then
-            echo "No new version heading in $CHANGELOG_PATH, not a release PR"
-            exit 0
-          fi
-          version="v${version#v}"
-
-          if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
-            echo "Tag $version already exists, merging this will not release anything"
-            exit 0
-          fi
-
-          first=$(grep -m1 -E '^##[^#]' "$CHANGELOG_PATH" | detect)
-          if [[ "v${first#v}" != "$version" ]]; then
-            echo "::error::$version must be the first section of $CHANGELOG_PATH, the release notes are taken from the first section"
+          if ! version=$(sfreleaser changelog detect-release "$CHANGELOG_PATH" --before "$BASE_SHA" 2>"$RUNNER_TEMP/detect.log"); then
+            echo "::error::$(tail -n1 "$RUNNER_TEMP/detect.log")"
             exit 1
+          fi
+          cat "$RUNNER_TEMP/detect.log"
+          if [[ -z "$version" ]]; then
+            exit 0
           fi
 
           if [[ "$HEAD_REPO" != "$REPO" ]]; then

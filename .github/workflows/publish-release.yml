@@ -19,93 +19,29 @@ concurrency:
 
 env:
   TAG: ${{ inputs.tag || github.event.release.tag_name }}
-  TAP_REPO: streamingfast/homebrew-tap
-  FORMULA: ${{ github.event.repository.name }}.rb
+  SFRELEASER_DISABLE_PTY: "true"
+  SFRELEASER_VERSION: "v0.17.1-rc.2"
 
 jobs:
   homebrew:
-    if: ${{ !github.event.release.prerelease && !contains(inputs.tag || github.event.release.tag_name, '-') }}
     runs-on: ubuntu-24.04
     defaults:
       run:
         shell: bash
     steps:
-      - name: Fetch current formula
-        env:
-          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-        run: |
-          gh api "repos/$TAP_REPO/contents/$FORMULA" > current.json
-          jq -r .content current.json | base64 -d > current.rb
-          echo "FILE_SHA=$(jq -r .sha current.json)" >> "$GITHUB_ENV"
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TAG }}
 
-      - name: Download release archives
+      - name: Install sfreleaser
+        run: |
+          curl -sSfL "https://github.com/streamingfast/sfreleaser/releases/download/$SFRELEASER_VERSION/sfreleaser_linux_x86_64.tar.gz" | tar -xz -C "$RUNNER_TEMP" sfreleaser
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Update Homebrew formula
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
-          mkdir archives
-          grep -oE '[^/"]+\.tar\.gz' current.rb | sort -u > archives.txt
-          while read -r archive; do
-            gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p "$archive" -D archives
-          done < archives.txt
-          (cd archives && sha256sum *.tar.gz) > sums.txt
-          cat sums.txt
-
-      - name: Render formula
-        run: |
-          awk -v version="${TAG#v}" -v base="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG" '
-            BEGIN { while ((getline line < "sums.txt") > 0) { split(line, f, " "); sum[f[2]] = f[1] } }
-            /^  version "/ { sub(/"[^"]*"/, "\"" version "\"") }
-            /^ *url "/ {
-              match($0, /[^\/"]+\.tar\.gz/)
-              archive = substr($0, RSTART, RLENGTH)
-              if (!(archive in sum)) { print "no checksum for " archive > "/dev/stderr"; exit 1 }
-              sub(/"[^"]*"/, "\"" base "/" archive "\"")
-              pending = archive
-            }
-            /^ *sha256 "/ && pending != "" { sub(/"[^"]*"/, "\"" sum[pending] "\""); pending = "" }
-            { print }
-          ' current.rb > formula.rb
-          diff current.rb formula.rb || true
-
-      - name: Open and merge formula PR
-        env:
-          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-        run: |
-          if cmp -s current.rb formula.rb; then
-            echo "$FORMULA already points at $TAG"
-            exit 0
-          fi
-
-          name="${FORMULA%.rb}"
-          branch="bump/$name-$TAG"
-          base=$(gh api "repos/$TAP_REPO" --jq .default_branch)
-          base_sha=$(gh api "repos/$TAP_REPO/git/ref/heads/$base" --jq .object.sha)
-
-          if gh api "repos/$TAP_REPO/git/ref/heads/$branch" >/dev/null 2>&1; then
-            gh api --method PATCH "repos/$TAP_REPO/git/refs/heads/$branch" -f sha="$base_sha" -F force=true >/dev/null
-          else
-            gh api --method POST "repos/$TAP_REPO/git/refs" -f ref="refs/heads/$branch" -f sha="$base_sha" >/dev/null
-          fi
-
-          head_sha=$(gh api --method PUT "repos/$TAP_REPO/contents/$FORMULA" \
-            -f message="chore: update $name to $TAG" \
-            -f content="$(base64 -w0 formula.rb)" \
-            -f sha="$FILE_SHA" \
-            -f branch="$branch" --jq .commit.sha)
-
-          url=$(gh pr list -R "$TAP_REPO" --head "$branch" --state open --json url,isCrossRepository \
-            --jq '[.[] | select(.isCrossRepository == false)][0].url // empty')
-          if [[ -z "$url" ]]; then
-            url=$(gh pr create -R "$TAP_REPO" --base "$base" --head "$branch" \
-              --title "chore: update $name to $TAG" \
-              --body "Formula bump for $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG.")
-          fi
-          echo "Formula PR: $url"
-
-          for _ in $(seq 30); do
-            (( $(gh pr view "$url" --json statusCheckRollup --jq '.statusCheckRollup | length') > 0 )) && break
-            sleep 10
-          done
-          gh pr checks "$url" --watch --fail-fast
-          gh pr merge "$url" --squash --admin --match-head-commit "$head_sha"
-          echo "Merged $url" >> "$GITHUB_STEP_SUMMARY"
+          sfreleaser publish-brew "$TAG" --brew-pull-request --merge
