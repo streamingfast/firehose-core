@@ -45,7 +45,7 @@ require (
 	github.com/streamingfast/dsession v0.0.0-20260414190543-79b9846e7c58
 	github.com/streamingfast/dstore v0.2.4-0.20261008160055-755341d68ee7
 	github.com/streamingfast/dtracing v0.0.0-20260303163312-862cb0fb60c9
-	github.com/streamingfast/firehose-networks v0.3.0
+	github.com/streamingfast/firehose-networks v0.3.1
 	github.com/streamingfast/logging v1.2.3-0.20260810132752-360563ac68a9
 	github.com/streamingfast/payment-gateway v0.0.0-20260928153037-ec91d4feb67c
 	github.com/streamingfast/pbgo v0.0.6-0.20260206150405-2b95acf70437
