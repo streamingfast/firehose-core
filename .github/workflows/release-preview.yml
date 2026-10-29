@@ -1,0 +1,113 @@
+name: Release preview
+
+on:
+  pull_request:
+    paths:
+      - "CHANGELOG.md"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  CHANGELOG_PATH: "CHANGELOG.md"
+
+jobs:
+  release-preview:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Write release preview
+        id: preview
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          detect() {
+            grep -E '^##[^#]' | tr '[:upper:]' '[:lower:]' | grep -m1 -oE 'v?[0-9]+\.[0-9]+\.[0-9]+[a-z0-9._-]*' | head -n1 || true
+          }
+
+          version=$(detect < "$CHANGELOG_PATH")
+          previous=$( (git show "$BASE_SHA:$CHANGELOG_PATH" 2>/dev/null || true) | detect)
+          if [[ -z "$version" || "v${version#v}" == "v${previous#v}" ]]; then
+            echo "No new version heading in $CHANGELOG_PATH, not a release PR"
+            exit 0
+          fi
+          version="v${version#v}"
+
+          if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
+            echo "Tag $version already exists, merging this will not release anything"
+            exit 0
+          fi
+
+          first=$(grep -m1 -E '^##[^#]' "$CHANGELOG_PATH" | detect)
+          if [[ "v${first#v}" != "$version" ]]; then
+            echo "::error::$version must be the first section of $CHANGELOG_PATH, the release notes are taken from the first section"
+            exit 1
+          fi
+
+          if [[ "$HEAD_REPO" != "$REPO" ]]; then
+            echo "::error::This fork pull request changes $CHANGELOG_PATH to $version. Merging it will not draft a release automatically, run \"Draft release\" from Actions to release it."
+            exit 1
+          fi
+
+          last_tag=$(git tag --list 'v*' --sort=-v:refname --merged "$BASE_SHA" | head -n1)
+          notes=$(awk '/^##[^#]/ { if (found) exit; found=1; next } found' "$CHANGELOG_PATH" | sed '/./,$!d')
+          if [[ -n "$last_tag" ]]; then
+            range="$last_tag..HEAD"
+            compare="https://github.com/$REPO/compare/$last_tag...$GITHUB_HEAD_REF"
+          else
+            range="HEAD"
+            compare=""
+          fi
+          commit_count=$(git rev-list --count --no-merges "$range")
+          commits=$(git log --no-merges --format='- %h %s (%an)' "$range" | head -n 50)
+
+          {
+            echo "<!-- release-preview -->"
+            echo "### Merging this releases \`$version\`"
+            echo
+            echo "Previous release: \`${last_tag:-none}\`. Merging creates a **draft** release, then someone publishes it on GitHub to make it live."
+            echo
+            echo "#### Release notes"
+            echo
+            echo "${notes:-_The $version section of $CHANGELOG_PATH is empty._}"
+            echo
+            echo "#### Commits since \`${last_tag:-the start}\` ($commit_count)"
+            echo
+            echo "$commits"
+            if (( commit_count > 50 )); then
+              echo "- … and $(( commit_count - 50 )) more"
+            fi
+            if [[ -n "$compare" ]]; then
+              echo
+              echo "[Full diff]($compare)"
+            fi
+          } > "$RUNNER_TEMP/preview.md"
+
+          echo "body=$RUNNER_TEMP/preview.md" >> "$GITHUB_OUTPUT"
+
+      - name: Post or update comment
+        if: steps.preview.outputs.body != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          BODY: ${{ steps.preview.outputs.body }}
+        run: |
+          existing=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- release-preview -->"))) | .id' | head -n1)
+          if [[ -n "$existing" ]]; then
+            gh api --method PATCH "repos/$REPO/issues/comments/$existing" -F body=@"$BODY" >/dev/null
+          else
+            gh api --method POST "repos/$REPO/issues/$PR/comments" -F body=@"$BODY" >/dev/null
+          fi
