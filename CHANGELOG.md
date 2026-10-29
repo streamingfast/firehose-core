@@ -12,6 +12,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Fixed
 
+- `github.com/go-jose/go-jose/v4` is updated from `v4.1.4` to `v4.1.6` to fix CVE-2026-116587 (High, inefficient algorithmic complexity).
+
 - Relayer: `source_head_block_time_drift` no longer moves back when a source sends a block older than one it already sent, such as a fork block for a past slot that arrives late. A single late orphan made every source look minutes behind until the next block, which could falsely trigger lag alerts and rescuers.
 
 ## v1.21.1
