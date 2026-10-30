@@ -39,7 +39,7 @@ jobs:
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           REPO: ${{ github.repository }}
         run: |
-          if ! version=$(sfreleaser changelog detect-release "$CHANGELOG_PATH" --before "$BASE_SHA" 2>"$RUNNER_TEMP/detect.log"); then
+          if ! version=$(sfreleaser release detect 2>"$RUNNER_TEMP/detect.log"); then
             echo "::error::$(tail -n1 "$RUNNER_TEMP/detect.log")"
             exit 1
           fi

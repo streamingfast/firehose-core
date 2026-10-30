@@ -23,7 +23,7 @@ env:
   SFRELEASER_VERSION: "v0.17.1-rc.2"
 
 jobs:
-  homebrew:
+  publish:
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -39,9 +39,8 @@ jobs:
           curl -sSfL "https://github.com/streamingfast/sfreleaser/releases/download/$SFRELEASER_VERSION/sfreleaser_linux_x86_64.tar.gz" | tar -xz -C "$RUNNER_TEMP" sfreleaser
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
 
-      - name: Update Homebrew formula
+      - name: Publish release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-        run: |
-          sfreleaser publish-brew "$TAG" --brew-pull-request --merge
+        run: sfreleaser release publish "$TAG"
