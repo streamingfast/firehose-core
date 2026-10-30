@@ -48,6 +48,10 @@ type Superviser struct {
 	*shutter.Shutter
 	Binary    string
 	Arguments []string
+
+	// ArgumentsFunc, when set, gives the arguments again each time the process starts, for
+	// arguments that change between runs (the reader cursor)
+	ArgumentsFunc func() ([]string, error)
 	// Env represents the environment variables the command will run with, the `nil`
 	// is handled differently than the `[]string{}` empty case. In the `nil` case,
 	// the process inherits from the parent process. In the empty case, it starts
@@ -102,6 +106,11 @@ func New(logger *zap.Logger, binary string, arguments []string) *Superviser {
 // process, see [consoleline.NewSplitter]. It applies from the next Start.
 func (s *Superviser) SetLineBufferSize(size int) {
 	s.lineBufferSize = size
+}
+
+// SetArgumentsFunc makes the process start with the arguments f gives each time.
+func (s *Superviser) SetArgumentsFunc(f func() ([]string, error)) {
+	s.ArgumentsFunc = f
 }
 
 func (s *Superviser) RegisterLogPlugin(plugin logplugin.LogPlugin) {
@@ -227,6 +236,14 @@ func (s *Superviser) Start(options ...nodeManager.StartOption) error {
 				return fmt.Errorf("previous process is still stopping after %s, refusing to start a new one", stoppingWaitTimeout)
 			}
 		}
+	}
+
+	if s.ArgumentsFunc != nil {
+		arguments, err := s.ArgumentsFunc()
+		if err != nil {
+			return fmt.Errorf("resolving arguments: %w", err)
+		}
+		s.Arguments = arguments
 	}
 
 	s.Logger.Info("creating new command instance and launch read loop",

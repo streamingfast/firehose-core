@@ -19,6 +19,9 @@ type FileUploader struct {
 	destinationStore dstore.Store
 	logger           *zap.Logger
 	complete         chan struct{}
+
+	// onUploaded is called with each file's name once it is in the destination store
+	onUploaded func(filename string)
 }
 
 func NewFileUploader(localStore dstore.Store, destinationStore dstore.Store, logger *zap.Logger) *FileUploader {
@@ -90,6 +93,9 @@ func (fu *FileUploader) uploadFiles(ctx context.Context) error {
 			// goroutine, it would be a data race with the other upload goroutines.
 			if err := fu.destinationStore.PushLocalFile(ctx, fu.localStore.ObjectPath(filename), filename); err != nil {
 				return fmt.Errorf("moving file %q to storage: %w", filename, err)
+			}
+			if fu.onUploaded != nil {
+				fu.onUploaded(filename)
 			}
 			return nil
 		})

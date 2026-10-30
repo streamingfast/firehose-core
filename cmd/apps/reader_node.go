@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"time"
 
@@ -59,6 +60,16 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 				  {start-block-num}		   The resolved start block number defined by the flag 'reader-node-start-block-num' (can be overwritten)
 				  {stop-block-num}		   The stop block number defined by the flag 'reader-node-stop-block-num'
 
+				With 'reader-node-cursor', these are read from the reader cursor file each time the node starts, and are empty
+				when there is no cursor yet:
+
+				  {cursor-file}			   The reader cursor file's path
+				  {resume-block-num}	   The last block stored, every block read before it being stored too
+				  {resume-block-id}		   That block's id
+				  {resume-lib-num}		   The last irreversible block number of that block
+				  {resume-cursor}		   The reader's own cursor ("FIRE CURSOR" line) for the last stored block that had one
+				  {resume-cursor-block-num} The block number that cursor was given for
+
 				Furthermore, environment variables expansion is also performed on the arguments passed to the node, so that every occurence
 				of ${ENV_VAR} will be replaced with the value of the environment variable ENV_VAR if defined, or empty string if not.
 
@@ -68,6 +79,12 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 			flags.String("reader-node-grpc-listen-addr", firecore.ReaderNodeGRPCAddr, "The gRPC listening address to use for serving real-time blocks")
 			flags.Bool("reader-node-discard-after-stop-num", false, "Ignore remaining blocks being processed after stop num (only useful if we discard the reader data after reprocessing a chunk of blocks)")
 			flags.String("reader-node-working-dir", "{data-dir}/reader/work", "Path where reader will stores its files")
+			flags.Bool("reader-node-cursor", false, cli.FlagDescription(`
+				Keep the reader cursor file, 'reader-cursor.json' in 'reader-node-working-dir': the last block stored in the
+				one-block store with every block read before it stored too, and the reader's own cursor ("FIRE CURSOR <num> <id> <value>"
+				lines) for it. The '{resume-*}' and '{cursor-file}' templates of 'reader-node-arguments' are read from it each time the
+				node starts, so the node restarts from what was stored rather than from what it printed.
+			`))
 			flags.Uint("reader-node-start-block-num", 0, "Blocks that were produced with smaller block number then the given block num are skipped")
 			flags.Uint("reader-node-stop-block-num", 0, "Shutdown reader when we the following 'stop-block-num' has been reached, inclusively.")
 			flags.Int("reader-node-blocks-chan-capacity", 100, "Capacity of the channel holding blocks read by the reader. Process will shutdown reader-node if the channel gets over 90% of that capacity to prevent horrible consequences. Raise this number when processing tiny blocks very quickly")
@@ -157,11 +174,34 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 			stopBlockNum := viper.GetUint64("reader-node-stop-block-num")
 
 			hostname, _ := os.Hostname()
-			nodeArgumentResolver := createNodeArgumentsResolver(sfDataDir, nodeDataDir, hostname, firstStreamableBlock, resolveStartBlockNum, stopBlockNum)
+			workingDir := firecore.MustReplaceDataDir(sfDataDir, viper.GetString("reader-node-working-dir"))
+			readerCursor := viper.GetBool("reader-node-cursor")
+			cursorFile := ""
+			if readerCursor {
+				cursorFile = filepath.Join(workingDir, reader.ReaderCursorFileName)
+			}
 
-			nodeArguments, err := buildNodeArguments(viper.GetString("reader-node-arguments"), nodeArgumentResolver)
+			// with the reader cursor, the arguments are resolved again each time the node starts
+			resolveNodeArguments := func() (firecore.ReaderNodeArgumentResolver, []string, error) {
+				var cursor *reader.ReaderCursor
+				if readerCursor {
+					var err error
+					cursor, err = reader.ReadReaderCursor(cursorFile)
+					if err != nil {
+						return nil, nil, err
+					}
+				}
+				resolver := createNodeArgumentsResolverWithCursor(sfDataDir, nodeDataDir, hostname, firstStreamableBlock, resolveStartBlockNum, stopBlockNum, cursorFile, cursor)
+				arguments, err := buildNodeArguments(viper.GetString("reader-node-arguments"), resolver)
+				if err != nil {
+					return nil, nil, fmt.Errorf("cannot split 'reader-node-arguments' value: %w", err)
+				}
+				return resolver, arguments, nil
+			}
+
+			nodeArgumentResolver, nodeArguments, err := resolveNodeArguments()
 			if err != nil {
-				return nil, fmt.Errorf("cannot split 'reader-node-arguments' value: %w", err)
+				return nil, err
 			}
 
 			headBlockTimeDrift := metrics.NewHeadBlockTimeDrift("reader-node")
@@ -187,6 +227,24 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 
 			superviser := sv.SupervisorFactory(chain.ExecutableName, nodePath, nodeArguments, lineBufferSize, appLogger)
 			superviser.RegisterLogPlugin(sv.NewNodeLogPlugin(debugFirehose))
+			if readerCursor {
+				argumentsSetter, ok := superviser.(interface {
+					SetArgumentsFunc(func() ([]string, error))
+				})
+				switch {
+				case ok:
+					argumentsSetter.SetArgumentsFunc(func() ([]string, error) {
+						_, arguments, err := resolveNodeArguments()
+						return arguments, err
+					})
+				case usesCursorTemplates(viper.GetString("reader-node-arguments")):
+					return nil, fmt.Errorf("'reader-node-arguments' uses reader cursor templates, but this chain's superviser can't resolve its arguments again when the node restarts")
+				default:
+					// no template: the arguments don't change between starts, and the cursor file is
+					// still kept
+					appLogger.Info("reader cursor kept, 'reader-node-arguments' uses no reader cursor template")
+				}
+			}
 
 			var bootstrapper operator.Bootstrapper
 			if chain.ReaderNodeBootstrapperFactory != nil {
@@ -231,10 +289,14 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 			grpcSecretKey := os.Expand(viper.GetString("reader-node-grpc-secret-key"), os.Getenv)
 
 			blockStreamServer := blockstream.NewUnmanagedServer(blockstream.ServerOptionWithLogger(appLogger))
-			workingDir := firecore.MustReplaceDataDir(sfDataDir, viper.GetString("reader-node-working-dir"))
 			gprcListenAddr := viper.GetString("reader-node-grpc-listen-addr")
 			oneBlockFileSuffix := viper.GetString("reader-node-one-block-suffix")
 			blocksChanCapacity := viper.GetInt("reader-node-blocks-chan-capacity")
+
+			var readerPluginOptions []reader.Option
+			if readerCursor {
+				readerPluginOptions = append(readerPluginOptions, reader.WithReaderCursor())
+			}
 
 			readerPlugin, err := reader.NewMindReaderPlugin(
 				oneBlocksStoreURL,
@@ -254,6 +316,7 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 				testModeComparator,
 				appLogger,
 				appTracer,
+				readerPluginOptions...,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("new reader plugin: %w", err)
@@ -289,7 +352,15 @@ func readerNodeLineBufferSize() (uint64, error) {
 	return size, nil
 }
 
-var variablesRegex = regexp.MustCompile(`\{(data-dir|node-data-dir|hostname|first-streamable-block|start-block-num|stop-block-num)\}`)
+var variablesRegex = regexp.MustCompile(`\{(data-dir|node-data-dir|hostname|first-streamable-block|start-block-num|stop-block-num|cursor-file|resume-block-num|resume-block-id|resume-lib-num|resume-cursor|resume-cursor-block-num)\}`)
+
+var cursorTemplatesRegex = regexp.MustCompile(`\{(cursor-file|resume-block-num|resume-block-id|resume-lib-num|resume-cursor|resume-cursor-block-num)\}`)
+
+// usesCursorTemplates tells if the reader arguments take the reader cursor, which then has to be
+// read again each time the reader starts
+func usesCursorTemplates(arguments string) bool {
+	return cursorTemplatesRegex.MatchString(arguments)
+}
 
 // overridable for testing purposes
 var osEnvExpandGetter = os.Getenv
@@ -315,9 +386,42 @@ func buildNodeArguments(in string, resolver firecore.ReaderNodeArgumentResolver)
 }
 
 func createNodeArgumentsResolver(dataDir, nodeDataDir, hostname string, firstStreamableBlock, startBlockNum, stopBlockNum uint64) firecore.ReaderNodeArgumentResolver {
+	return createNodeArgumentsResolverWithCursor(dataDir, nodeDataDir, hostname, firstStreamableBlock, startBlockNum, stopBlockNum, "", nil)
+}
+
+// createNodeArgumentsResolverWithCursor also resolves the reader cursor templates, from cursor
+// (nil when there is none yet).
+func createNodeArgumentsResolverWithCursor(dataDir, nodeDataDir, hostname string, firstStreamableBlock, startBlockNum, stopBlockNum uint64, cursorFile string, cursor *reader.ReaderCursor) firecore.ReaderNodeArgumentResolver {
 	return func(in string) string {
 		return variablesRegex.ReplaceAllStringFunc(in, func(match string) string {
 			switch match {
+			case "{cursor-file}":
+				return cursorFile
+			case "{resume-block-num}":
+				if cursor == nil {
+					return ""
+				}
+				return fmt.Sprintf("%d", cursor.Block.Num)
+			case "{resume-block-id}":
+				if cursor == nil {
+					return ""
+				}
+				return cursor.Block.ID
+			case "{resume-lib-num}":
+				if cursor == nil {
+					return ""
+				}
+				return fmt.Sprintf("%d", cursor.LibNum)
+			case "{resume-cursor}":
+				if cursor == nil || cursor.Value == nil {
+					return ""
+				}
+				return cursor.Value.Value
+			case "{resume-cursor-block-num}":
+				if cursor == nil || cursor.Value == nil {
+					return ""
+				}
+				return fmt.Sprintf("%d", cursor.Value.Block.Num)
 			case "{data-dir}":
 				return dataDir
 			case "{node-data-dir}":

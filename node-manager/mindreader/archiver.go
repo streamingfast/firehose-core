@@ -36,9 +36,10 @@ type Archiver struct {
 
 	localOneBlocksStore dstore.Store
 
-	fileUploader *FileUploader
-	logger       *zap.Logger
-	tracer       logging.Tracer
+	fileUploader  *FileUploader
+	cursorTracker *CursorTracker // nil when the reader cursor isn't kept
+	logger        *zap.Logger
+	tracer        logging.Tracer
 }
 
 func NewArchiver(
@@ -46,6 +47,7 @@ func NewArchiver(
 	oneblockSuffix string,
 	localOneBlocksStore dstore.Store,
 	remoteOneBlocksStore dstore.Store,
+	cursorTracker *CursorTracker,
 	logger *zap.Logger,
 	tracer logging.Tracer,
 ) *Archiver {
@@ -54,6 +56,9 @@ func NewArchiver(
 		localOneBlocksStore,
 		remoteOneBlocksStore,
 		logger)
+	if cursorTracker != nil {
+		fileUploader.onUploaded = cursorTracker.Uploaded
+	}
 
 	a := &Archiver{
 		Shutter:             shutter.New(),
@@ -61,6 +66,7 @@ func NewArchiver(
 		oneblockSuffix:      oneblockSuffix,
 		localOneBlocksStore: localOneBlocksStore,
 		fileUploader:        fileUploader,
+		cursorTracker:       cursorTracker,
 		logger:              logger,
 		tracer:              tracer,
 	}
@@ -77,6 +83,9 @@ func (a *Archiver) Start(ctx context.Context) {
 		a.fileUploader.Shutdown(err)
 		<-a.fileUploader.Done()
 		a.logger.Info("file uploader terminated")
+		if a.cursorTracker != nil {
+			a.cursorTracker.Close()
+		}
 	})
 
 	a.OnTerminated(func(err error) {
@@ -95,6 +104,13 @@ func (a *Archiver) StoreBlock(ctx context.Context, block *pbbstream.Block) error
 		return nil
 	}
 
+	fileName := bstream.BlockFileNameWithSuffix(block, a.oneblockSuffix)
+
+	// queued before the file exists, so its upload can't be missed
+	if a.cursorTracker != nil {
+		a.cursorTracker.Queued(fileName, block)
+	}
+
 	pipeRead, pipeWrite := io.Pipe()
 
 	// We are in a pipe context and `a.blockWriterFactory.New(pipeWrite)` writes some bytes to the writer when called.
@@ -102,7 +118,7 @@ func (a *Archiver) StoreBlock(ctx context.Context, block *pbbstream.Block) error
 	// forever because nobody is reading the pipe.
 	writeObjectErrChan := make(chan error)
 	go func() {
-		writeObjectErrChan <- a.localOneBlocksStore.WriteObject(ctx, bstream.BlockFileNameWithSuffix(block, a.oneblockSuffix), pipeRead)
+		writeObjectErrChan <- a.localOneBlocksStore.WriteObject(ctx, fileName, pipeRead)
 	}()
 
 	blockWriter, err := bstream.NewDBinBlockWriter(pipeWrite)
