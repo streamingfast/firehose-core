@@ -1,0 +1,46 @@
+name: Publish release
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Published release tag to run the publish steps for again, e.g. v1.8.0"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-release
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ inputs.tag || github.event.release.tag_name }}
+  SFRELEASER_DISABLE_PTY: "true"
+  SFRELEASER_VERSION: "v0.17.1-rc.2"
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Install sfreleaser
+        run: |
+          curl -sSfL "https://github.com/streamingfast/sfreleaser/releases/download/$SFRELEASER_VERSION/sfreleaser_linux_x86_64.tar.gz" | tar -xz -C "$RUNNER_TEMP" sfreleaser
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Publish release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: sfreleaser release publish "$TAG"

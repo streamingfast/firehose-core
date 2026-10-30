@@ -1,0 +1,60 @@
+name: Draft release
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - "develop"
+    paths:
+      - "CHANGELOG.md"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: draft-release
+  cancel-in-progress: false
+
+env:
+  SFRELEASER_DISABLE_PTY: "true"
+  SFRELEASER_VERSION: "v0.17.1-rc.2"
+
+jobs:
+  draft-release:
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.base.ref || github.ref_name }}
+          fetch-depth: 0
+
+      - name: Install sfreleaser
+        run: |
+          curl -sSfL "https://github.com/streamingfast/sfreleaser/releases/download/$SFRELEASER_VERSION/sfreleaser_linux_x86_64.tar.gz" | tar -xz -C "$RUNNER_TEMP" sfreleaser
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Detect version
+        id: version
+        run: sfreleaser release detect
+
+      - name: Set up Go
+        if: steps.version.outputs.version != ''
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          check-latest: true
+
+      - name: Prepare release
+        if: steps.version.outputs.version != ''
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: sfreleaser release prepare "$VERSION"
