@@ -88,6 +88,11 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 				Set it a bit under the stream duration limit of the load balancer serving requests, so requests end cleanly
 				before the load balancer cuts them. 0 means no limit.
 			`))
+			cmd.Flags().String("substreams-tier1-status-page-template", "", cli.FlagDescription(`
+				Path to a Go html/template file served to browsers opening the root of the tier1 endpoint. The template can
+				use {{ .ChainName }}, {{ .Ready }}, {{ .Live }}, {{ .HeadBlockNum }}, {{ .HeadBlockID }} and {{ .HeadBlockTime }}.
+				The file is reloaded when it changes. Empty serves no status page.
+			`))
 			cmd.Flags().String("substreams-tier1-quicksave-store", "", "If enabled, substreams will use this store to put 'quicksave' data when shutting down while running requests with 'stores'. Use this flag with a non-zero --common-system-shutdown-signal-delay")
 			cmd.Flags().String("substreams-tier1-global-worker-pool-address", "", "Address of the global worker pool to use for the substreams tier1. (disabled if empty)")
 			cmd.Flags().String("substreams-tier1-global-request-pool-address", "", "Address of the global worker pool to use for the substreams tier1. (disabled if empty)")
@@ -232,6 +237,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			config.ServiceDiscoveryURL = serviceDiscoveryURL
 			config.QuickSaveStoreURL = viper.GetString("substreams-tier1-quicksave-store")
 			config.MaxRequestDuration = viper.GetDuration("substreams-tier1-max-request-duration")
+			config.StatusPageTemplateFile = viper.GetString("substreams-tier1-status-page-template")
 			config.FoundationalStoresConfigPath = viper.GetString("substreams-tier1-foundational-stores-config-path")
 			config.HostedStoreRegistryAddress = viper.GetString("substreams-tier1-hosted-store-registry-address")
 			config.OutputBufferSize = viper.GetUint64("substreams-tier1-output-buffer-size")
