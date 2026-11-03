@@ -10,6 +10,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Added
+
+- Substreams: `--substreams-tier1-status-page-template` takes the path to a Go html/template file that tier1 serves to anything doing `GET /` on its endpoint, with the chain name, readiness, liveness and head block (`{{ .ChainName }}`, `{{ .Ready }}`, `{{ .Live }}`, `{{ .HeadBlockNum }}`, `{{ .HeadBlockID }}`, `{{ .HeadBlockTime }}`). A client asking for `application/json` gets the same data as JSON. The file is reloaded when it changes. The page is served whatever the `Accept` header says and is not subject to `--substreams-tier1-enforce-compression`, like `/healthz`.
+
 ### Fixed
 
 - `github.com/go-jose/go-jose/v4` is updated from `v4.1.4` to `v4.1.6` to fix CVE-2026-116587 (High, inefficient algorithmic complexity).
