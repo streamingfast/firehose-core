@@ -20,7 +20,7 @@ concurrency:
 env:
   TAG: ${{ inputs.tag || github.event.release.tag_name }}
   SFRELEASER_DISABLE_PTY: "true"
-  SFRELEASER_VERSION: "v0.17.1-rc.2"
+  SFRELEASER_VERSION: "v0.17.1-rc.3"
 
 jobs:
   publish:

@@ -19,7 +19,7 @@ concurrency:
 
 env:
   SFRELEASER_DISABLE_PTY: "true"
-  SFRELEASER_VERSION: "v0.17.1-rc.2"
+  SFRELEASER_VERSION: "v0.17.1-rc.3"
 
 jobs:
   draft-release:
@@ -41,20 +41,20 @@ jobs:
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
 
       - name: Detect version
-        id: version
+        id: detect
         run: sfreleaser release detect
 
       - name: Set up Go
-        if: steps.version.outputs.version != ''
+        if: steps.detect.outputs.is_release_pr == 'true'
         uses: actions/setup-go@v6
         with:
           go-version: stable
           check-latest: true
 
       - name: Prepare release
-        if: steps.version.outputs.version != ''
+        if: steps.detect.outputs.is_release_pr == 'true'
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ steps.detect.outputs.version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: sfreleaser release prepare "$VERSION"
