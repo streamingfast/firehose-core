@@ -16,6 +16,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Substreams: `--substreams-tier1-status-page-template` takes the path to a Go html/template file that tier1 serves to anything doing `GET /` on its endpoint, with the chain name, readiness, liveness and head block (`{{ .ChainName }}`, `{{ .Ready }}`, `{{ .Live }}`, `{{ .HeadBlockNum }}`, `{{ .HeadBlockID }}`, `{{ .HeadBlockTime }}`). A client asking for `application/json` gets the same data as JSON. The file is reloaded when it changes. The page is served whatever the `Accept` header says and is not subject to `--substreams-tier1-enforce-compression`, like `/healthz`.
 
+### Changed
+
+- Reader: `--reader-node-blocks-chan-capacity` now also sets how many blocks a subscriber of the reader (a relayer) can lag behind before the reader disconnects it, at least `200` (the previous fixed size). Blocks that pile up in the reader during a stall are sent in one burst when it resumes, and a burst over 200 blocks disconnected every relayer at once, after which they could fail to link the next blocks. Applies to `reader-node` and `reader-node-stdin`. If you raised the flag, a lagging relayer now holds up to that many blocks in the reader's memory before being disconnected.
+
 ### Fixed
 
 - `tools relayer stream` and `tools relayer write-one-blocks` now read the `?secret=<key>` query parameter and `${ENV_VAR}` interpolation in `<source>`, like `--relayer-source` does. Before, the whole string including `?secret=...` was used as the gRPC address and the secret was never sent.
