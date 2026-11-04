@@ -70,7 +70,7 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 			flags.String("reader-node-working-dir", "{data-dir}/reader/work", "Path where reader will stores its files")
 			flags.Uint("reader-node-start-block-num", 0, "Blocks that were produced with smaller block number then the given block num are skipped")
 			flags.Uint("reader-node-stop-block-num", 0, "Shutdown reader when we the following 'stop-block-num' has been reached, inclusively.")
-			flags.Int("reader-node-blocks-chan-capacity", 100, "Capacity of the channel holding blocks read by the reader. Process will shutdown reader-node if the channel gets over 90% of that capacity to prevent horrible consequences. Raise this number when processing tiny blocks very quickly")
+			flags.Int("reader-node-blocks-chan-capacity", 100, "Capacity of the channel holding blocks read by the reader. Process will shutdown reader-node if the channel gets over 90% of that capacity to prevent horrible consequences. Raise this number when processing tiny blocks very quickly. Also sets how many blocks a subscriber of the reader (a relayer) can lag behind before it is disconnected, at least 200, so that a backlog drained at once fits")
 			flags.Uint64("reader-node-line-buffer-size", consoleline.DefaultBufferSize, cli.FlagDescription(fmt.Sprintf(`
 				Normal size in bytes of the buffer reading a single line (block) out of the node, at least %d. The buffer grows past it in
 				pieces of that size for a longer line, up to %d bytes (the longest line whose block fits in the 2 GiB messages the Firehose
@@ -230,11 +230,16 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 
 			grpcSecretKey := os.Expand(viper.GetString("reader-node-grpc-secret-key"), os.Getenv)
 
-			blockStreamServer := blockstream.NewUnmanagedServer(blockstream.ServerOptionWithLogger(appLogger))
+			blocksChanCapacity := viper.GetInt("reader-node-blocks-chan-capacity")
+			blockStreamServer := blockstream.NewUnmanagedServer(
+				blockstream.ServerOptionWithLogger(appLogger),
+				// Blocks that pile up in the reader's blocks channel are sent to
+				// subscribers in one burst, so a subscriber must be able to hold as many.
+				blockstream.ServerOptionWithSubscriptionChannelSize(max(blockstream.DefaultSubscriptionChannelSize, blocksChanCapacity)),
+			)
 			workingDir := firecore.MustReplaceDataDir(sfDataDir, viper.GetString("reader-node-working-dir"))
 			gprcListenAddr := viper.GetString("reader-node-grpc-listen-addr")
 			oneBlockFileSuffix := viper.GetString("reader-node-one-block-suffix")
-			blocksChanCapacity := viper.GetInt("reader-node-blocks-chan-capacity")
 
 			readerPlugin, err := reader.NewMindReaderPlugin(
 				oneBlocksStoreURL,
