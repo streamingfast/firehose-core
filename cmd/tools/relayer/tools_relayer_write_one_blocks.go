@@ -31,12 +31,17 @@ import (
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
+	relayerpkg "github.com/streamingfast/firehose-core/relayer"
 	"go.uber.org/zap"
 )
 
 func toolsRelayerWriteOneBlocksRunner(logger *zap.Logger) firecore.CommandExecutor {
 	return func(cmd *cobra.Command, args []string) error {
-		endpoint := args[0]
+		sourceAddr, err := relayerpkg.ParseSourceAddress(args[0])
+		if err != nil {
+			return fmt.Errorf("invalid source: %w", err)
+		}
+		endpoint := sourceAddr.URL
 		destination := args[1]
 
 		stop := int64(-1)
@@ -45,7 +50,10 @@ func toolsRelayerWriteOneBlocksRunner(logger *zap.Logger) firecore.CommandExecut
 		partialOnly := sflags.MustGetBool(cmd, "partial-only")
 		withPartials := sflags.MustGetBool(cmd, "with-partials") || partialOnly
 		oneBlockSuffix := sflags.MustGetString(cmd, "one-block-suffix")
-		secretKey := os.Expand(sflags.MustGetString(cmd, "secret-key"), os.Getenv)
+		secretKey := sourceAddr.SecretKey
+		if flagKey := os.Expand(sflags.MustGetString(cmd, "secret-key"), os.Getenv); flagKey != "" {
+			secretKey = flagKey
+		}
 
 		if len(args) == 3 {
 			input := strings.TrimPrefix(args[2], ":")

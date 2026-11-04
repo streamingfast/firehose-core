@@ -33,6 +33,7 @@ import (
 	"github.com/streamingfast/cli"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/cmd/tools/print"
+	relayerpkg "github.com/streamingfast/firehose-core/relayer"
 	"go.uber.org/zap"
 )
 
@@ -54,6 +55,11 @@ func NewToolsRelayerGroup[B firecore.Block](chain *firecore.Chain[B], logger *za
 			RangeArgs(1, 2),
 			Description(`
 				Connects to a 'relayer' source and streams blocks to the console.
+
+				The source accepts the same format as '--relayer-source', including
+				'${ENV_VAR}' interpolation and a '?secret=<key>' query parameter
+				(e.g. ':10010?secret=${READER_SECRET}'). The '--secret-key' flag takes
+				precedence over the query parameter when both are set.
 
 				The connection is done over gRPC on the 'sf.bstream.v1.BlockStream/Blocks'
 				endpoint of the source.
@@ -83,6 +89,11 @@ func NewToolsRelayerGroup[B firecore.Block](chain *firecore.Chain[B], logger *za
 				Connects to a 'relayer' source and writes each received block as a
 				one-block file in the destination store.
 
+				The source accepts the same format as '--relayer-source', including
+				'${ENV_VAR}' interpolation and a '?secret=<key>' query parameter
+				(e.g. ':10010?secret=${READER_SECRET}'). The '--secret-key' flag takes
+				precedence over the query parameter when both are set.
+
 				The destination can be any URL supported by 'dstore' (e.g. './my-dir',
 				'gs://bucket/path', 's3://...'). Files are written in 'dbin.zst' format,
 				following the conventional one-block filename layout.
@@ -105,14 +116,21 @@ func NewToolsRelayerGroup[B firecore.Block](chain *firecore.Chain[B], logger *za
 
 func toolsRelayerStreamRunner[B firecore.Block](chain *firecore.Chain[B], logger *zap.Logger) firecore.CommandExecutor {
 	return func(cmd *cobra.Command, args []string) error {
-		endpoint := args[0]
+		sourceAddr, err := relayerpkg.ParseSourceAddress(args[0])
+		if err != nil {
+			return fmt.Errorf("invalid source: %w", err)
+		}
+		endpoint := sourceAddr.URL
 
 		stop := int64(-1)
 		stopIsRelative := false
 
 		onlyClock := sflags.MustGetBool(cmd, "clock")
 		withPartials := sflags.MustGetBool(cmd, "with-partials")
-		secretKey := os.Expand(sflags.MustGetString(cmd, "secret-key"), os.Getenv)
+		secretKey := sourceAddr.SecretKey
+		if flagKey := os.Expand(sflags.MustGetString(cmd, "secret-key"), os.Getenv); flagKey != "" {
+			secretKey = flagKey
+		}
 
 		if len(args) == 2 {
 			input := strings.TrimPrefix(args[1], ":")

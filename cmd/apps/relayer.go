@@ -2,8 +2,6 @@ package apps
 
 import (
 	"fmt"
-	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -53,9 +51,13 @@ Examples:
 			}
 
 			rawSources := viper.GetStringSlice("relayer-source")
-			sources, err := parseSourceAddresses(rawSources)
-			if err != nil {
-				return nil, fmt.Errorf("parsing relayer sources: %w", err)
+			sources := make([]relayer.SourceAddr, 0, len(rawSources))
+			for _, raw := range rawSources {
+				source, err := relayer.ParseSourceAddress(raw)
+				if err != nil {
+					return nil, fmt.Errorf("parsing relayer sources: %w", err)
+				}
+				sources = append(sources, source)
 			}
 
 			return relayerapp.New(&relayerapp.Config{
@@ -68,60 +70,4 @@ Examples:
 			}), nil
 		},
 	})
-}
-
-// minRelayerSourceRetryInterval must match the reconnect loop delay of bstream's MultiplexedSource.
-const minRelayerSourceRetryInterval = 5 * time.Second
-
-// parseSourceAddresses processes a slice of raw source address strings, performing:
-//  1. Environment variable interpolation: ${ENV_VAR_NAME} is replaced with os.Getenv("ENV_VAR_NAME").
-//  2. Secret key extraction: if the address contains "?secret=<key>", the key is stripped from the
-//     URL and stored separately in SourceAddr.SecretKey.
-//  3. Retry interval extraction: if the address contains "?retry_interval=<duration>", the duration is stripped
-//     from the URL and stored separately in SourceAddr.RetryInterval.
-//
-// Example inputs:
-//
-//	":10010"                          -> SourceAddr{URL: ":10010"}
-//	":10010?secret=abc"               -> SourceAddr{URL: ":10010", SecretKey: "abc"}
-//	"${HOST}:10010?secret=${SECRET}"  -> SourceAddr{URL: "<HOST>:10010", SecretKey: "<SECRET>"}
-//	":10010?retry_interval=120s"      -> SourceAddr{URL: ":10010", RetryInterval: 120 * time.Second}
-func parseSourceAddresses(raw []string) ([]relayer.SourceAddr, error) {
-	out := make([]relayer.SourceAddr, 0, len(raw))
-	for _, entry := range raw {
-		// 1. Expand environment variables.
-		expanded := os.Expand(entry, os.Getenv)
-
-		// 2. Split on '?' to separate the address from the query string.
-		//    We do not use net/url.Parse directly because the address portion
-		//    (e.g. "dns:///host:port" or ":10010") is not a valid URL on its own.
-		addr, query, hasQuery := strings.Cut(expanded, "?")
-		if addr == "" {
-			return nil, fmt.Errorf("empty address in source %q (after env expansion: %q)", entry, expanded)
-		}
-
-		sa := relayer.SourceAddr{URL: addr}
-
-		if hasQuery {
-			// Parse only the query portion so we can extract "secret" and "retry_interval".
-			vals, err := url.ParseQuery(query)
-			if err != nil {
-				return nil, fmt.Errorf("invalid query string in source %q: %w", expanded, err)
-			}
-			sa.SecretKey = vals.Get("secret")
-
-			if retryInterval := vals.Get("retry_interval"); retryInterval != "" {
-				sa.RetryInterval, err = time.ParseDuration(retryInterval)
-				if err != nil {
-					return nil, fmt.Errorf("invalid retry_interval in source %q: %w", expanded, err)
-				}
-				if sa.RetryInterval < minRelayerSourceRetryInterval {
-					return nil, fmt.Errorf("retry_interval in source %q is below the %s minimum", expanded, minRelayerSourceRetryInterval)
-				}
-			}
-		}
-
-		out = append(out, sa)
-	}
-	return out, nil
 }
