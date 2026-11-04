@@ -2201,8 +2201,6 @@ github.com/pierrec/lz4/v4 v4.1.15/go.mod h1:gZWDp/Ze/IJXGXf23ltt2EXimqmTUXEy0GFu
 github.com/pierrec/lz4/v4 v4.1.18/go.mod h1:gZWDp/Ze/IJXGXf23ltt2EXimqmTUXEy0GFuRQyBid4=
 github.com/pierrec/lz4/v4 v4.1.27 h1:+PhzhWDrjRj89TH2sw43nE3+4+W8lSxIuQadEHZyjUk=
 github.com/pierrec/lz4/v4 v4.1.27/go.mod h1:EoQMVJgeeEOMsCqCzqFm2O0cJvljX2nGZjcRIPL34O4=
-github.com/pinax-network/bstream v0.0.0-20261104154556-74411f1e62b5 h1:zbtPlsQKcjlg0GPxa8LE0oyAE3QysUzLmFuNPaeN5uY=
-github.com/pinax-network/bstream v0.0.0-20261104154556-74411f1e62b5/go.mod h1:duqjBtD6U7/Y2swB/VCwgzoLODC5L+x6fDmvlgZIAPM=
 github.com/pinax-network/graph-networks-libs/packages/golang v0.8.0 h1:i3GJAIvjgJmyMTs2sn/+/9Rgv0hFjks4C1MS53X8PZI=
 github.com/pinax-network/graph-networks-libs/packages/golang v0.8.0/go.mod h1:G76L6ql7YCygVzN45BmtSBqA+qwcDuFWMM42tDnGJbE=
 github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c h1:+mdjkGKdHQG3305AYmdv1U2eRNDiU2ErMBj1gwrq8eQ=
@@ -2292,6 +2290,8 @@ github.com/spf13/viper v1.21.0/go.mod h1:P0lhsswPGWD/1lZJ9ny3fYnVqxiegrlNrEmgLjb
 github.com/spiffe/go-spiffe/v2 v2.8.1 h1:eXZMLsu+3MLEPJyGJkolqtVrteZfQdUpOWj6LTiDl/E=
 github.com/spiffe/go-spiffe/v2 v2.8.1/go.mod h1:47Q0Q9/AqGha8QLHp+kxpH4Wca7X7EnOtlIJy3mxZ3U=
 github.com/stoewer/go-strcase v1.3.0/go.mod h1:fAH5hQ5pehh+j3nZfvwdk2RgEgQjAoM8wodgtPmh1xo=
+github.com/streamingfast/bstream v0.0.2-0.20261104202417-6a5b7e4000ed h1:crUkKVZy+gDVEJu2Ls5CpWpvp8PJXe5FOLbLkANp4oI=
+github.com/streamingfast/bstream v0.0.2-0.20261104202417-6a5b7e4000ed/go.mod h1:duqjBtD6U7/Y2swB/VCwgzoLODC5L+x6fDmvlgZIAPM=
 github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b h1:ztYeX3/5rg2tV2EU7edcrcHzMz6wUbdJB+LqCrP5W8s=
 github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b/go.mod h1:o9R/tjNON01X2mgWL5qirl2MV6xQ4EZI5D504ST3K/M=
 github.com/streamingfast/dauth v0.0.0-20261009160221-75940c11f03e h1:7/iZMjY9F6PM+s58yKok6mPQHPURRYm4dJcXcw6ooyQ=

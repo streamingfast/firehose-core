@@ -32,7 +32,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
-	github.com/streamingfast/bstream v0.0.2-0.20261009192206-775b59feeda3
+	github.com/streamingfast/bstream v0.0.2-0.20261104202417-6a5b7e4000ed
 	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b
 	github.com/streamingfast/dauth v0.0.0-20261009160221-75940c11f03e
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
@@ -312,7 +312,4 @@ replace (
 	github.com/ShinyTrinkets/overseer => github.com/streamingfast/overseer v0.2.1-0.20260917150444-9ebead8ffdef
 	github.com/jhump/protoreflect => github.com/streamingfast/protoreflect v0.0.0-20231205191344-4b629d20ce8d
 	github.com/tetratelabs/wazero => github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed
-
-	// Temporary, until streamingfast/bstream#91 (ServerOptionWithSubscriptionChannelSize) is merged.
-	github.com/streamingfast/bstream => github.com/pinax-network/bstream v0.0.0-20261104154556-74411f1e62b5
 )
