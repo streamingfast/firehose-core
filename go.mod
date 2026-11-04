@@ -312,4 +312,7 @@ replace (
 	github.com/ShinyTrinkets/overseer => github.com/streamingfast/overseer v0.2.1-0.20260917150444-9ebead8ffdef
 	github.com/jhump/protoreflect => github.com/streamingfast/protoreflect v0.0.0-20231205191344-4b629d20ce8d
 	github.com/tetratelabs/wazero => github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed
+
+	// Temporary, until streamingfast/bstream#91 (ServerOptionWithSubscriptionChannelSize) is merged.
+	github.com/streamingfast/bstream => github.com/pinax-network/bstream v0.0.0-20261104154556-74411f1e62b5
 )

@@ -116,6 +116,9 @@ func (a *App) Run() error {
 	blockStreamServer := blockstream.NewUnmanagedServer(
 		blockstream.ServerOptionWithLogger(a.zlogger),
 		blockstream.ServerOptionWithBuffer(1),
+		// Blocks that pile up in the reader's blocks channel are sent to
+		// subscribers in one burst, so a subscriber must be able to hold as many.
+		blockstream.ServerOptionWithSubscriptionChannelSize(max(blockstream.DefaultSubscriptionChannelSize, a.Config.MindReadBlocksChanCapacity)),
 	)
 
 	a.zlogger.Info("launching reader log plugin")
