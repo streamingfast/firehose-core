@@ -2,10 +2,6 @@ name: Draft release
 
 on:
   pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
     branches:
       - "develop"
     paths:
