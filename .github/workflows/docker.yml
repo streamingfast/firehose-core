@@ -111,6 +111,7 @@ jobs:
           dockerhub-password: ${{ secrets.DOCKER_SCOUT_PASSWORD }}
           command: cves
           only-severities: critical,high
+          only-fixed: true
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.extract-version.outputs.VERSION }}-${{ matrix.architecture }}
           github-token: ${{ secrets.PR_COMMENTER }}
           write-comment: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
