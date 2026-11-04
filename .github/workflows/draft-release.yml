@@ -54,6 +54,15 @@ jobs:
           go-version: stable
           check-latest: true
 
+      - name: Cache zig
+        if: steps.detect.outputs.is_release_pr
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/sfreleaser
+            ~/.cache/zig
+          key: ${{ runner.os }}-zig-${{ env.SFRELEASER_VERSION }}
+
       - name: Prepare release
         if: steps.detect.outputs.is_release_pr
         env:
