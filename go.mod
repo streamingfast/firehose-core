@@ -34,7 +34,7 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/streamingfast/bstream v0.0.2-0.20261104202417-6a5b7e4000ed
 	github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b
-	github.com/streamingfast/dauth v0.0.0-20261009160221-75940c11f03e
+	github.com/streamingfast/dauth v0.0.0-20261104193507-69230e98d89e
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7
 	github.com/streamingfast/dgrpc v0.0.0-20260929191947-99e20897ecc7
@@ -52,7 +52,7 @@ require (
 	github.com/streamingfast/sf-tracing v0.0.0-20260716142341-6172a527bdd6
 	github.com/streamingfast/shutter v1.5.0
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.26.1-0.20261103202247-8bff89df7904
+	github.com/streamingfast/substreams v1.26.1-0.20261105152839-1e52d5af7834
 	github.com/stretchr/testify v1.12.1
 	github.com/test-go/testify v1.1.4
 	github.com/testcontainers/testcontainers-go v0.44.0
@@ -64,7 +64,7 @@ require (
 	go.uber.org/multierr v1.11.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/exp v0.0.0-20250813145105-42675adae3e6
-	golang.org/x/net v0.61.0
+	golang.org/x/net v0.62.0
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sync v0.24.0
 	golang.org/x/time v0.16.0
