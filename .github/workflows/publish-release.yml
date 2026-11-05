@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  SFRELEASER_VERSION: "v0.17.1-rc.4"
+  SFRELEASER_VERSION: "v0.17.1-rc.5"
 
 jobs:
   publish:
