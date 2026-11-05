@@ -96,7 +96,7 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 		realIP = auth.RealIP()
 	}
 
-	logger.Info("incoming firehose Blocks request",
+	incomingFields := []zap.Field{
 		zap.String("organization_id", organizationID),
 		zap.String("api_key_id", apiKeyID),
 		zap.String("real_ip", realIP),
@@ -104,7 +104,9 @@ func (s *Server) Blocks(ctx context.Context, request *connect.Request[pbfirehose
 		zap.Uint64("stop_block", request.Msg.StopBlockNum),
 		zap.Bool("final_blocks_only", request.Msg.FinalBlocksOnly),
 		zap.String("cursor", request.Msg.Cursor),
-	)
+	}
+	incomingFields = append(incomingFields, auth.AuthLogFields()...)
+	logger.Info("incoming firehose Blocks request", incomingFields...)
 
 	var (
 		firstDataSent   bool
