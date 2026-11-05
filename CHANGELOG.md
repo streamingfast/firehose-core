@@ -8,6 +8,16 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Changed
+
+- Firehose: the `incoming firehose Blocks request` and `processing incoming blocks request` log lines now carry `auth_method`, `auth_jwt_lifetime_bucket`, `auth_jwt_iat` and `auth_jwt_exp` when the auth plugin returns the `x-auth-method`, `x-auth-jwt-lifetime-bucket`, `x-auth-jwt-iat` and `x-auth-jwt-exp` headers. Fields are omitted when the headers are absent.
+
+### Security
+
+- `golang.org/x/net` is updated from `v0.61.0` to `v0.62.0` to fix CVE-2026-78661 (High).
+
 ## v1.21.2-rc.1
 
 ### Added
