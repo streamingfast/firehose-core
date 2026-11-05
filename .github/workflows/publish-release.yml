@@ -49,14 +49,6 @@ jobs:
         if: github.event_name == 'pull_request'
         run: sfreleaser release detect
 
-      - name: Point the draft at the merge commit
-        if: steps.detect.outputs.is_release_pr
-        env:
-          VERSION: ${{ steps.detect.outputs.version }}
-          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --target "$MERGE_SHA"
-
       - name: Publish release
         if: steps.detect.outputs.is_release_pr || github.event_name == 'workflow_dispatch'
         env:
