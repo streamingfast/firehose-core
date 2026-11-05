@@ -10,6 +10,15 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Changed
+
+- Firehose: the `incoming firehose Blocks request` and `processing incoming blocks request` log lines now carry `auth_method`, `auth_jwt_lifetime_bucket`, `auth_jwt_iat` and `auth_jwt_exp` when the auth plugin returns the `x-auth-method`, `x-auth-jwt-lifetime-bucket`, `x-auth-jwt-iat` and `x-auth-jwt-exp` headers. Fields are omitted when the headers are absent.
+- Substreams: bump `github.com/streamingfast/substreams` to pick up auth-method logging, the `incoming Substreams Blocks request` and estimate log lines now carry `auth_method`, `auth_jwt_lifetime_bucket`, `auth_jwt_iat` and `auth_jwt_exp` under the same conditions.
+
+### Security
+
+- `golang.org/x/net` is updated from `v0.61.0` to `v0.62.0` to fix CVE-2026-78661 (High).
+
 ## v1.21.2-rc.1
 
 ### Added

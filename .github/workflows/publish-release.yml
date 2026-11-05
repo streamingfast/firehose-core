@@ -1,28 +1,33 @@
 name: Publish release
 
 on:
-  release:
+  pull_request:
     types:
-      - published
+      - closed
+    branches:
+      - "develop"
+    paths:
+      - "CHANGELOG.md"
   workflow_dispatch:
     inputs:
       tag:
-        description: "Published release tag to run the publish steps for again, e.g. v1.8.0"
+        description: "Release tag to run the publish steps for again, e.g. v1.8.0"
         required: true
 
 permissions:
-  contents: read
+  actions: write
+  contents: write
 
 concurrency:
   group: publish-release
   cancel-in-progress: false
 
 env:
-  TAG: ${{ inputs.tag || github.event.release.tag_name }}
   SFRELEASER_VERSION: "v0.17.1-rc.4"
 
 jobs:
   publish:
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -31,15 +36,38 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          ref: ${{ env.TAG }}
+          ref: ${{ github.event.pull_request.merge_commit_sha || inputs.tag }}
+          fetch-depth: 0
 
       - name: Install sfreleaser
         run: |
           curl -sSfL "https://github.com/streamingfast/sfreleaser/releases/download/$SFRELEASER_VERSION/sfreleaser_linux_x86_64.tar.gz" | tar -xz -C "$RUNNER_TEMP" sfreleaser
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
 
-      - name: Publish release
+      - name: Detect version
+        id: detect
+        if: github.event_name == 'pull_request'
+        run: sfreleaser release detect
+
+      - name: Point the draft at the merge commit
+        if: steps.detect.outputs.is_release_pr
         env:
+          VERSION: ${{ steps.detect.outputs.version }}
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "$VERSION" --repo "$GITHUB_REPOSITORY" --target "$MERGE_SHA"
+
+      - name: Publish release
+        if: steps.detect.outputs.is_release_pr || github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ steps.detect.outputs.version || inputs.tag }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-        run: sfreleaser release publish "$TAG"
+        run: sfreleaser release publish "$VERSION"
+
+      - name: Build Docker images
+        if: steps.detect.outputs.is_release_pr || github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ steps.detect.outputs.version || inputs.tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run docker.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION"
