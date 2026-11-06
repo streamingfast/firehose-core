@@ -33,6 +33,13 @@ var LineBufferSize = Metricset.NewGauge("reader_node_line_buffer_size_bytes", "C
 // block number (invalid) and had to be clamped down to the block number.
 var InvalidLibNumClampedCount = Metricset.NewCounter("reader_node_invalid_libnum_clamped_count", "Number of blocks whose decoded lib_num was greater than their own block number and got clamped to the block number")
 
+// OneBlockUploadPendingFiles and OneBlockUploadOldestPendingSeconds report, at each upload
+// pass, the one-block files still waiting in the reader's local staging directory and how long
+// the oldest one has waited. While the one-block store is slow or down they keep growing, which
+// nothing else shows: the reader keeps reading blocks and serving them to its relayers.
+var OneBlockUploadPendingFiles = Metricset.NewGauge("reader_node_one_block_upload_pending_files", "Number of one-block files waiting in the reader's local staging directory to be uploaded, at the start of the last upload pass")
+var OneBlockUploadOldestPendingSeconds = Metricset.NewGauge("reader_node_one_block_upload_oldest_pending_seconds", "How long the oldest one-block file waiting in the reader's local staging directory has waited, at the start of the last upload pass")
+
 func NewHeadBlockTimeDrift(serviceName string) *dmetrics.HeadTimeDrift {
 	return Metricset.NewHeadTimeDrift(serviceName)
 }

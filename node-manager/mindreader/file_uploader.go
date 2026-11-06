@@ -8,6 +8,7 @@ import (
 
 	"github.com/abourget/llerrgroup"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/firehose-core/node-manager/metrics"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
 )
@@ -74,10 +75,18 @@ func (fu *FileUploader) uploadFiles(ctx context.Context) error {
 	defer fu.mutex.Unlock()
 
 	eg := llerrgroup.New(200)
-	_ = fu.localStore.Walk(ctx, "", func(filename string) error {
+	pending := 0
+	var oldest time.Time
+	_ = fu.localStore.WalkAttributes(ctx, "", func(entry dstore.ObjectEntry) error {
+		pending++
+		if oldest.IsZero() || entry.LastModified.Before(oldest) {
+			oldest = entry.LastModified
+		}
+
 		if eg.Stop() {
 			return nil
 		}
+		filename := entry.Name
 		eg.Go(func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 			defer cancel()
@@ -96,6 +105,13 @@ func (fu *FileUploader) uploadFiles(ctx context.Context) error {
 
 		return nil
 	})
+
+	metrics.OneBlockUploadPendingFiles.SetUint64(uint64(pending))
+	if pending == 0 {
+		metrics.OneBlockUploadOldestPendingSeconds.SetFloat64(0)
+	} else {
+		metrics.OneBlockUploadOldestPendingSeconds.SetFloat64(time.Since(oldest).Seconds())
+	}
 
 	return eg.Wait()
 }
