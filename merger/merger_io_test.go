@@ -328,3 +328,76 @@ func TestMergerIO_NextBundleAllBundlesEmpty(t *testing.T) {
 	require.Equal(t, uint64(300), nextBase)
 	require.Nil(t, lib)
 }
+
+func newTestForkAwareDStoreIO(t *testing.T, retryAttempts int, forkedWrite func(name string) error) (*ForkAwareDStoreIO, <-chan string) {
+	t.Helper()
+
+	deleted := make(chan string, 10)
+	oneBlockStore := dstore.NewMockStore(nil)
+	oneBlockStore.OpenObjectFunc = func(_ context.Context, _ string) (io.ReadCloser, error) {
+		return makeBlockReader(t), nil
+	}
+	oneBlockStore.DeleteObjectFunc = func(_ context.Context, name string) error {
+		deleted <- name
+		return nil
+	}
+
+	forkedBlocksStore := dstore.NewMockStore(nil)
+	forkedBlocksStore.WriteObjectFunc = func(_ context.Context, name string, f io.Reader, _ ...string) error {
+		if _, err := io.Copy(io.Discard, f); err != nil {
+			return err
+		}
+		return forkedWrite(name)
+	}
+
+	mio := NewDStoreIO(testLogger, oneBlockStore, dstore.NewMockStore(nil), forkedBlocksStore, retryAttempts, 0, 100, 1)
+	return mio.(*ForkAwareDStoreIO), deleted
+}
+
+func receivedNames(names <-chan string) (out []string) {
+	for {
+		select {
+		case name := <-names:
+			out = append(out, name)
+		case <-time.After(200 * time.Millisecond):
+			return out
+		}
+	}
+}
+
+func TestMergerIO_MoveForkedBlocksKeepsFilesNotCopied(t *testing.T) {
+	copied := "0000000100-0000000000000100b-0000000000000099a-98-suffix"
+	notCopied := "0000000101-0000000000000101b-0000000000000100b-98-suffix"
+
+	mio, deleted := newTestForkAwareDStoreIO(t, 1, func(name string) error {
+		if name == notCopied {
+			return fmt.Errorf("write refused")
+		}
+		return nil
+	})
+
+	mio.MoveForkedBlocks(context.Background(), []*bstream.OneBlockFile{
+		bstream.MustNewOneBlockFile(copied),
+		bstream.MustNewOneBlockFile(notCopied),
+	})
+
+	require.Equal(t, []string{copied}, receivedNames(deleted))
+}
+
+func TestMergerIO_MoveForkedBlocksRetriesCopy(t *testing.T) {
+	name := "0000000100-0000000000000100b-0000000000000099a-98-suffix"
+
+	attempts := 0
+	mio, deleted := newTestForkAwareDStoreIO(t, 3, func(string) error {
+		attempts++
+		if attempts == 1 {
+			return fmt.Errorf("transient error")
+		}
+		return nil
+	})
+
+	mio.MoveForkedBlocks(context.Background(), []*bstream.OneBlockFile{bstream.MustNewOneBlockFile(name)})
+
+	require.Equal(t, 2, attempts)
+	require.Equal(t, []string{name}, receivedNames(deleted))
+}

@@ -318,24 +318,47 @@ func (s *DStoreIO) DeleteAsync(oneBlockFiles []*bstream.OneBlockFile) error {
 	return s.od.Delete(oneBlockFiles)
 }
 
+// MoveForkedBlocks deletes a one-block file only once one of its copies is in the forked-blocks
+// store. A file whose copy keeps failing is left for the one-block pruning, so a store error
+// costs at most that fork block, not every fork block of the bundle.
 func (s *ForkAwareDStoreIO) MoveForkedBlocks(ctx context.Context, oneBlockFiles []*bstream.OneBlockFile) {
+	var moved []*bstream.OneBlockFile
 	for _, f := range oneBlockFiles {
-		for name := range f.Filenames {
-			reader, err := s.oneBlocksStore.OpenObject(ctx, name)
-			if err != nil {
-				s.logger.Warn("could not copy forked block", zap.Error(err))
-				continue
-			}
-			err = s.forkedBlocksStore.WriteObject(ctx, name, reader)
-			if err != nil {
-				s.logger.Warn("could not copy forked block", zap.Error(err))
-				continue
-			}
-			reader.Close()
-			break
+		err := Retry(s.logger, s.retryAttempts, s.retryCooldown, func() error {
+			return s.copyForkedBlock(ctx, f)
+		})
+		if err != nil {
+			s.logger.Warn("could not copy forked block, keeping its one-block file", zap.Stringer("block", f), zap.Error(err))
+			continue
+		}
+		moved = append(moved, f)
+	}
+	_ = s.od.Delete(moved)
+}
+
+// copyForkedBlock copies the first of the block's one-block files that can be read to the
+// forked-blocks store.
+func (s *ForkAwareDStoreIO) copyForkedBlock(ctx context.Context, f *bstream.OneBlockFile) (err error) {
+	for name := range f.Filenames {
+		err = s.copyObject(ctx, name)
+		if err == nil {
+			return nil
 		}
 	}
-	_ = s.od.Delete(oneBlockFiles)
+	return err
+}
+
+func (s *ForkAwareDStoreIO) copyObject(ctx context.Context, name string) error {
+	reader, err := s.oneBlocksStore.OpenObject(ctx, name)
+	if err != nil {
+		return fmt.Errorf("opening %s: %w", name, err)
+	}
+	defer reader.Close()
+
+	if err := s.forkedBlocksStore.WriteObject(ctx, name, reader); err != nil {
+		return fmt.Errorf("writing %s: %w", name, err)
+	}
+	return nil
 }
 
 func (s *ForkAwareDStoreIO) DeleteForkedBlocksAsync(inclusiveLowBoundary, inclusiveHighBoundary uint64) {

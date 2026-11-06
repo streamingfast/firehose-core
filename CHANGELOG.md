@@ -8,6 +8,12 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Fixed
+
+- Merger: a forked block whose copy to the forked-blocks store fails is no longer deleted from the one-block store. The copy is retried with the merger's write retries, and only blocks that were copied are deleted. Before, it was deleted anyway and was gone from both stores, along with cursor recovery for clients on that fork.
+
 ## v1.21.2-rc.2
 
 ### Changed
