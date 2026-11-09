@@ -10,6 +10,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ## Unreleased
 
+### Added
+
+- Reader: `reader_node_one_block_upload_pending_files` and `reader_node_one_block_upload_oldest_pending_seconds` report the one-block files waiting in the local staging directory and how long the oldest has waited, measured at each upload pass. When the one-block store is slow or down the reader keeps reading blocks and serving its relayers, and its `/healthz` stays ready, so this backlog was not visible anywhere until the disk filled up.
+
 ### Fixed
 
 - Merger: a forked block whose copy to the forked-blocks store fails is no longer deleted from the one-block store. The copy is retried with the merger's write retries, and only blocks that were copied are deleted. Before, it was deleted anyway and was gone from both stores, along with cursor recovery for clients on that fork.
