@@ -21,7 +21,7 @@ require (
 	github.com/iancoleman/strcase v0.3.0
 	github.com/jhump/protoreflect v1.14.0
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
-	github.com/klauspost/compress v1.20.1
+	github.com/klauspost/compress v1.20.2
 	github.com/manifoldco/promptui v0.9.0
 	github.com/mattn/go-isatty v0.0.24
 	github.com/moby/moby/api v1.56.0
