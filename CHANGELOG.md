@@ -17,6 +17,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### Changed
 
 - Merger: logs its unlinkable-blocks limit once at startup (`merger unlinkable-blocks circuit breaker configured`, with `max_unlinkable_blocks` and `source`), so operators can confirm a `MERGER_MAX_UNLINKABLE_BLOCKS` override took effect. The limit is now resolved once per run instead of on every walk; behavior is unchanged.
+- Bumped `github.com/klauspost/compress` to `v1.20.2` to fix CVE-2026-116591.
 
 ## v1.21.2-rc.2
 
