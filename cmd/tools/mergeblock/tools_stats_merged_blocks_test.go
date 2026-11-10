@@ -85,15 +85,61 @@ func TestDescribeBlockRange(t *testing.T) {
 	assert.Equal(t, "1,000,000 to 2,000,000 (exclusive)", describeBlockRange(1000000, 2000000))
 }
 
-func TestNewStatsReport(t *testing.T) {
-	months := map[string]*mergedBlocksTally{
-		"2025-11": {files: 1, blocks: 100, compressed: 1000, uncompressed: 2000, firstBlock: 1800},
-		"2025-10": {files: 2, blocks: 200, compressed: 2000, uncompressed: 6000, firstBlock: 1000},
+func annotatedObject(lowBlockNum uint64, size int64, timestamp string) mergedBlocksObject {
+	return mergedBlocksObject{
+		attrs: &storage.ObjectAttrs{Size: size, Metadata: map[string]string{
+			dataSizeMetadataKey:  "4000",
+			itemCountMetadataKey: "100",
+			timestampMetadataKey: timestamp,
+		}},
+		lowBlockNum: lowBlockNum,
 	}
-	total := mergedBlocksTally{files: 3, blocks: 300, compressed: 3000, uncompressed: 8000, firstBlock: 1000}
+}
+
+func unannotatedObject(lowBlockNum uint64, size int64) mergedBlocksObject {
+	return mergedBlocksObject{attrs: &storage.ObjectAttrs{Size: size}, lowBlockNum: lowBlockNum}
+}
+
+func TestStatsAccumulator(t *testing.T) {
+	acc := newStatsAccumulator()
+
+	// Unannotated files ahead of the annotated ones, the shape of a store annotated
+	// only from some point on.
+	assert.False(t, acc.add(unannotatedObject(0, 300)))
+	assert.False(t, acc.add(unannotatedObject(100, 500)))
+	assert.True(t, acc.add(annotatedObject(200, 1000, "2025-10-12 10:23:12")))
+	assert.True(t, acc.add(annotatedObject(300, 2000, "2025-11-01 00:00:00")))
+
+	assert.Equal(t, uint64(4), acc.seen)
+	// The first block seen is the first file listed, annotated or not.
+	assert.Equal(t, uint64(0), acc.firstBlock)
+	assert.Equal(t, uint64(300), acc.lastBlock)
+
+	assert.Equal(t, uint64(2), acc.unannotated)
+	assert.Equal(t, int64(800), acc.unannotatedCompressed)
+
+	assert.Equal(t, mergedBlocksTally{files: 2, blocks: 200, compressed: 3000, uncompressed: 8000, firstBlock: 200}, acc.total)
+	require.Len(t, acc.months, 2)
+	assert.Equal(t, int64(1000), acc.months["2025-10"].compressed)
+	assert.Equal(t, int64(2000), acc.months["2025-11"].compressed)
+}
+
+func TestNewStatsReport(t *testing.T) {
+	acc := &statsAccumulator{
+		months: map[string]*mergedBlocksTally{
+			"2025-11": {files: 1, blocks: 100, compressed: 1000, uncompressed: 2000, firstBlock: 1800},
+			"2025-10": {files: 2, blocks: 200, compressed: 2000, uncompressed: 6000, firstBlock: 1000},
+		},
+		total:                 mergedBlocksTally{files: 3, blocks: 300, compressed: 3000, uncompressed: 8000, firstBlock: 1000},
+		seen:                  7,
+		firstBlock:            1000,
+		lastBlock:             1900,
+		unannotated:           4,
+		unannotatedCompressed: 4200,
+	}
 	cfg := statsConfig{startBlock: 1000, stopBlock: 2000, chainName: "eth-mainnet"}
 
-	report := newStatsReport(cfg, months, total, false, 1000, 1900, 4, 1500*time.Millisecond)
+	report := newStatsReport(cfg, acc, 1500*time.Millisecond)
 
 	assert.Equal(t, "eth-mainnet", report.ChainName)
 	assert.Equal(t, uint64(1000), report.StartBlock)
@@ -103,6 +149,7 @@ func TestNewStatsReport(t *testing.T) {
 	require.NotNil(t, report.LastBlockSeen)
 	assert.Equal(t, uint64(1900), *report.LastBlockSeen)
 	assert.Equal(t, uint64(4), report.UnannotatedFiles)
+	assert.Equal(t, int64(4200), report.UnannotatedCompressedBytes)
 	assert.Equal(t, 1.5, report.ListedInSeconds)
 
 	// Months come out sorted.
@@ -128,10 +175,11 @@ func TestNewStatsReport(t *testing.T) {
 	out, err := json.Marshal(report)
 	require.NoError(t, err)
 	assert.Contains(t, string(out), `"months":[{"month":"2025-10"`)
+	assert.Contains(t, string(out), `"unannotated_compressed_bytes":4200`)
 }
 
 func TestNewStatsReportEmpty(t *testing.T) {
-	report := newStatsReport(statsConfig{}, nil, mergedBlocksTally{}, true, 0, 0, 0, 0)
+	report := newStatsReport(statsConfig{}, newStatsAccumulator(), 0)
 
 	assert.Nil(t, report.FirstBlockSeen)
 	assert.Nil(t, report.LastBlockSeen)

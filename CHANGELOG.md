@@ -13,6 +13,11 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### Added
 
 - Reader: `reader_node_one_block_upload_pending_files` and `reader_node_one_block_upload_oldest_pending_seconds` report the one-block files waiting in the local staging directory and how long the oldest has waited, measured at each upload pass. When the one-block store is slow or down the reader keeps reading blocks and serving its relayers, and its `/healthz` stays ready, so this backlog was not visible anywhere until the disk filled up.
+- Tools: `firecore tools stats-merged-blocks` reports the total compressed size of the files missing the `datasize`/`itemcount`/`timestamp` annotation, as `unannotated_compressed_bytes` in `--json` and in the warning under the table. Those files count towards no total, so this shows how much of the store the report leaves out.
+
+### Fixed
+
+- Tools: `firecore tools stats-merged-blocks` now reports the first listed file as `first_block_seen` (and `Blocks seen` in the table) even when that file is unannotated. It used to report the first annotated file instead.
 
 ## v1.21.2-rc.2
 

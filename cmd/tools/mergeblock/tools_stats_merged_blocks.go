@@ -33,7 +33,8 @@ func NewToolsStatsMergedBlocksCmd(rootLog *zap.Logger) *cobra.Command {
 			'timestamp' metadata entries that 'firecore tools annotate-merged-blocks' wrote
 			on each object, and those come back with the listing, so the whole report costs
 			one listing however large the range is. Run the annotation first: files missing
-			any of the three entries are counted and reported, and contribute to nothing.
+			any of the three entries contribute to nothing, and are reported apart as a file
+			count and their total compressed size, the one size the listing gives for them.
 
 			The month a file counts towards is the month of its first block, so a file
 			straddling a month boundary counts entirely towards the month it starts in.
@@ -162,6 +163,50 @@ func (t mergedBlocksTally) compressedPerBlock() float64 {
 	return float64(t.compressed) / float64(t.blocks)
 }
 
+// statsAccumulator gathers the report one listed file at a time.
+type statsAccumulator struct {
+	months map[string]*mergedBlocksTally
+	total  mergedBlocksTally
+	// seen counts every file listed, annotated or not, and firstBlock/lastBlock are the
+	// first blocks of the first and last of them.
+	seen       uint64
+	firstBlock uint64
+	lastBlock  uint64
+	// unannotated counts the files missing part of the annotation, and
+	// unannotatedCompressed sums their stored size.
+	unannotated           uint64
+	unannotatedCompressed int64
+}
+
+func newStatsAccumulator() *statsAccumulator {
+	return &statsAccumulator{months: map[string]*mergedBlocksTally{}}
+}
+
+// add counts one listed file and returns false when it carries no complete annotation.
+func (a *statsAccumulator) add(object mergedBlocksObject) bool {
+	if a.seen == 0 {
+		a.firstBlock = object.lowBlockNum
+	}
+	a.seen++
+	a.lastBlock = object.lowBlockNum
+
+	file, ok := readAnnotation(object)
+	if !ok {
+		a.unannotated++
+		a.unannotatedCompressed += object.attrs.Size
+		return false
+	}
+
+	month := a.months[file.month]
+	if month == nil {
+		month = &mergedBlocksTally{}
+		a.months[file.month] = month
+	}
+	month.add(file.tally)
+	a.total.add(file.tally)
+	return true
+}
+
 func runStatsMergedBlocks(ctx context.Context, storeURL string, cfg statsConfig, logger *zap.Logger) error {
 	target, err := parseGSURL(storeURL)
 	if err != nil {
@@ -190,33 +235,15 @@ func runStatsMergedBlocks(ctx context.Context, storeURL string, cfg statsConfig,
 		fmt.Println()
 	}
 
-	months := map[string]*mergedBlocksTally{}
-	var total mergedBlocksTally
-	var unannotated, firstBlock, lastBlock uint64
+	acc := newStatsAccumulator()
 	started := time.Now()
 
 	err = walkMergedBlocks(ctx, bucketHandle(client, target), target.prefix, cfg.startBlock, cfg.stopBlock,
 		[]string{"Name", "Size", "Metadata"},
 		func(object mergedBlocksObject) error {
-			if total.files == 0 {
-				firstBlock = object.lowBlockNum
-			}
-			lastBlock = object.lowBlockNum
-
-			file, ok := readAnnotation(object)
-			if !ok {
-				unannotated++
+			if !acc.add(object) {
 				logger.Debug("file carries no complete annotation", zap.String("file", object.attrs.Name))
-				return nil
 			}
-
-			month := months[file.month]
-			if month == nil {
-				month = &mergedBlocksTally{}
-				months[file.month] = month
-			}
-			month.add(file.tally)
-			total.add(file.tally)
 			return nil
 		},
 	)
@@ -224,27 +251,26 @@ func runStatsMergedBlocks(ctx context.Context, storeURL string, cfg statsConfig,
 		return fmt.Errorf("listing %s: %w", storeURL, err)
 	}
 
-	empty := total.files == 0 && unannotated == 0
-
 	if cfg.asJSON {
-		report := newStatsReport(cfg, months, total, empty, firstBlock, lastBlock, unannotated, time.Since(started))
+		report := newStatsReport(cfg, acc, time.Since(started))
 		encoder := json.NewEncoder(os.Stdout)
 		encoder.SetIndent("", "  ")
 		return encoder.Encode(report)
 	}
 
-	if empty {
+	if acc.seen == 0 {
 		fmt.Println(stylex.Note("No merged-blocks file found in that range"))
 		return nil
 	}
 
-	printMergedBlocksTable(months, total)
+	printMergedBlocksTable(acc.months, acc.total)
 
 	fmt.Println()
-	fmt.Println(stylex.Valuef("Blocks seen: %s to %s", humanize.Comma(int64(firstBlock)), humanize.Comma(int64(lastBlock))))
+	fmt.Println(stylex.Valuef("Blocks seen: %s to %s", humanize.Comma(int64(acc.firstBlock)), humanize.Comma(int64(acc.lastBlock))))
 	fmt.Println(stylex.Valuef("Listed in:   %s", time.Since(started).Round(time.Millisecond)))
-	if unannotated > 0 {
-		fmt.Println(stylex.Warnf("%d file(s) carry no complete annotation and count towards nothing, run 'firecore tools annotate-merged-blocks' on them", unannotated))
+	if acc.unannotated > 0 {
+		fmt.Println(stylex.Warnf("%d file(s) holding %s compressed carry no complete annotation and count towards nothing, run 'firecore tools annotate-merged-blocks' on them",
+			acc.unannotated, humanize.IBytes(uint64(acc.unannotatedCompressed))))
 	}
 	return nil
 }
@@ -260,7 +286,10 @@ type statsReport struct {
 	Months           []statsBucket `json:"months"`
 	Total            statsBucket   `json:"total"`
 	UnannotatedFiles uint64        `json:"unannotated_files"`
-	ListedInSeconds  float64       `json:"listed_in_seconds"`
+	// UnannotatedCompressedBytes is the stored size of the unannotated files, which
+	// Total leaves out.
+	UnannotatedCompressedBytes int64   `json:"unannotated_compressed_bytes"`
+	ListedInSeconds            float64 `json:"listed_in_seconds"`
 }
 
 type statsBucket struct {
@@ -289,28 +318,30 @@ func newStatsBucket(month string, tally mergedBlocksTally) statsBucket {
 	}
 }
 
-func newStatsReport(cfg statsConfig, months map[string]*mergedBlocksTally, total mergedBlocksTally, empty bool, firstBlock, lastBlock, unannotated uint64, listedIn time.Duration) statsReport {
+func newStatsReport(cfg statsConfig, acc *statsAccumulator, listedIn time.Duration) statsReport {
 	report := statsReport{
-		ChainName:        cfg.chainName,
-		StartBlock:       cfg.startBlock,
-		StopBlock:        cfg.stopBlock,
-		Months:           []statsBucket{},
-		Total:            newStatsBucket("", total),
-		UnannotatedFiles: unannotated,
-		ListedInSeconds:  listedIn.Seconds(),
+		ChainName:                  cfg.chainName,
+		StartBlock:                 cfg.startBlock,
+		StopBlock:                  cfg.stopBlock,
+		Months:                     []statsBucket{},
+		Total:                      newStatsBucket("", acc.total),
+		UnannotatedFiles:           acc.unannotated,
+		UnannotatedCompressedBytes: acc.unannotatedCompressed,
+		ListedInSeconds:            listedIn.Seconds(),
 	}
-	if !empty {
+	if acc.seen > 0 {
+		firstBlock, lastBlock := acc.firstBlock, acc.lastBlock
 		report.FirstBlockSeen = &firstBlock
 		report.LastBlockSeen = &lastBlock
 	}
 
-	names := make([]string, 0, len(months))
-	for name := range months {
+	names := make([]string, 0, len(acc.months))
+	for name := range acc.months {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		report.Months = append(report.Months, newStatsBucket(name, *months[name]))
+		report.Months = append(report.Months, newStatsBucket(name, *acc.months[name]))
 	}
 
 	return report
