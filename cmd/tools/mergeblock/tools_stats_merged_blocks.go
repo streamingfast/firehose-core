@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/url"
 	"os"
 	"sort"
@@ -32,9 +33,11 @@ func NewToolsStatsMergedBlocksCmd(rootLog *zap.Logger) *cobra.Command {
 			Nothing is downloaded. Every number comes from the 'datasize', 'itemcount' and
 			'timestamp' metadata entries that 'firecore tools annotate-merged-blocks' wrote
 			on each object, and those come back with the listing, so the whole report costs
-			one listing however large the range is. Run the annotation first: files missing
-			any of the three entries contribute to nothing, and are reported apart as a file
-			count and their total compressed size, the one size the listing gives for them.
+			one listing however large the range is. Run the annotation first: for a file
+			missing any of the three entries, only its compressed size is known. Its block
+			count and uncompressed size are estimated from the annotated files in the range
+			(same blocks per file, same compression ratio), and it belongs to no month. Such
+			files get a row of their own and are included in the total.
 
 			The month a file counts towards is the month of its first block, so a file
 			straddling a month boundary counts entirely towards the month it starts in.
@@ -165,17 +168,17 @@ func (t mergedBlocksTally) compressedPerBlock() float64 {
 
 // statsAccumulator gathers the report one listed file at a time.
 type statsAccumulator struct {
-	months map[string]*mergedBlocksTally
-	total  mergedBlocksTally
+	// months and annotated hold the annotated files only.
+	months    map[string]*mergedBlocksTally
+	annotated mergedBlocksTally
+	// unannotated holds the files missing part of the annotation, of which only the file
+	// count, compressed size and first block are known: see estimatedUnannotated.
+	unannotated mergedBlocksTally
 	// seen counts every file listed, annotated or not, and firstBlock/lastBlock are the
 	// first blocks of the first and last of them.
 	seen       uint64
 	firstBlock uint64
 	lastBlock  uint64
-	// unannotated counts the files missing part of the annotation, and
-	// unannotatedCompressed sums their stored size.
-	unannotated           uint64
-	unannotatedCompressed int64
 }
 
 func newStatsAccumulator() *statsAccumulator {
@@ -192,8 +195,7 @@ func (a *statsAccumulator) add(object mergedBlocksObject) bool {
 
 	file, ok := readAnnotation(object)
 	if !ok {
-		a.unannotated++
-		a.unannotatedCompressed += object.attrs.Size
+		a.unannotated.add(mergedBlocksTally{files: 1, compressed: object.attrs.Size, firstBlock: object.lowBlockNum})
 		return false
 	}
 
@@ -203,8 +205,27 @@ func (a *statsAccumulator) add(object mergedBlocksObject) bool {
 		a.months[file.month] = month
 	}
 	month.add(file.tally)
-	a.total.add(file.tally)
+	a.annotated.add(file.tally)
 	return true
+}
+
+// estimatedUnannotated is the unannotated files with their block count and uncompressed size
+// estimated from the annotated files: the same blocks per file and the same compression ratio.
+// Both stay 0 when no file is annotated, as there is nothing to estimate from.
+func (a *statsAccumulator) estimatedUnannotated() mergedBlocksTally {
+	estimate := a.unannotated
+	if a.annotated.files > 0 {
+		estimate.blocks = int64(math.Round(float64(a.annotated.blocks) * float64(estimate.files) / float64(a.annotated.files)))
+	}
+	estimate.uncompressed = int64(math.Round(a.annotated.compressionRatio() * float64(estimate.compressed)))
+	return estimate
+}
+
+// total is every listed file, the unannotated ones at their estimate.
+func (a *statsAccumulator) total() mergedBlocksTally {
+	total := a.annotated
+	total.add(a.estimatedUnannotated())
+	return total
 }
 
 func runStatsMergedBlocks(ctx context.Context, storeURL string, cfg statsConfig, logger *zap.Logger) error {
@@ -263,14 +284,14 @@ func runStatsMergedBlocks(ctx context.Context, storeURL string, cfg statsConfig,
 		return nil
 	}
 
-	printMergedBlocksTable(acc.months, acc.total)
+	printMergedBlocksTable(acc.months, acc.estimatedUnannotated(), acc.total())
 
 	fmt.Println()
 	fmt.Println(stylex.Valuef("Blocks seen: %s to %s", humanize.Comma(int64(acc.firstBlock)), humanize.Comma(int64(acc.lastBlock))))
 	fmt.Println(stylex.Valuef("Listed in:   %s", time.Since(started).Round(time.Millisecond)))
-	if acc.unannotated > 0 {
-		fmt.Println(stylex.Warnf("%d file(s) holding %s compressed carry no complete annotation and count towards nothing, run 'firecore tools annotate-merged-blocks' on them",
-			acc.unannotated, humanize.IBytes(uint64(acc.unannotatedCompressed))))
+	if acc.unannotated.files > 0 {
+		fmt.Println(stylex.Warnf("%d file(s) carry no complete annotation, their blocks and uncompressed size in the %s row and the total are estimated, run 'firecore tools annotate-merged-blocks' on them",
+			acc.unannotated.files, unannotatedRowName))
 	}
 	return nil
 }
@@ -278,18 +299,22 @@ func runStatsMergedBlocks(ctx context.Context, storeURL string, cfg statsConfig,
 // statsReport is the '--json' shape of the report. Sizes are in bytes, blocks and files are
 // counts, and the per-block numbers are the same divisions the table shows.
 type statsReport struct {
-	ChainName        string        `json:"chain_name"`
-	StartBlock       uint64        `json:"start_block"`
-	StopBlock        uint64        `json:"stop_block"`
-	FirstBlockSeen   *uint64       `json:"first_block_seen"`
-	LastBlockSeen    *uint64       `json:"last_block_seen"`
-	Months           []statsBucket `json:"months"`
-	Total            statsBucket   `json:"total"`
-	UnannotatedFiles uint64        `json:"unannotated_files"`
-	// UnannotatedCompressedBytes is the stored size of the unannotated files, which
-	// Total leaves out.
-	UnannotatedCompressedBytes int64   `json:"unannotated_compressed_bytes"`
-	ListedInSeconds            float64 `json:"listed_in_seconds"`
+	ChainName      string  `json:"chain_name"`
+	StartBlock     uint64  `json:"start_block"`
+	StopBlock      uint64  `json:"stop_block"`
+	FirstBlockSeen *uint64 `json:"first_block_seen"`
+	LastBlockSeen  *uint64 `json:"last_block_seen"`
+	// Months cover the annotated files only.
+	Months []statsBucket `json:"months"`
+	// Total covers every listed file, the unannotated ones at their estimate.
+	Total statsBucket `json:"total"`
+	// Unannotated is the part of Total from files missing part of the annotation. Its
+	// files, compressed bytes and first block are exact, its blocks and uncompressed bytes
+	// are estimated from the annotated files' blocks per file and compression ratio.
+	Unannotated statsBucket `json:"unannotated"`
+	// UnannotatedFiles is Unannotated.Files.
+	UnannotatedFiles uint64  `json:"unannotated_files"`
+	ListedInSeconds  float64 `json:"listed_in_seconds"`
 }
 
 type statsBucket struct {
@@ -320,14 +345,14 @@ func newStatsBucket(month string, tally mergedBlocksTally) statsBucket {
 
 func newStatsReport(cfg statsConfig, acc *statsAccumulator, listedIn time.Duration) statsReport {
 	report := statsReport{
-		ChainName:                  cfg.chainName,
-		StartBlock:                 cfg.startBlock,
-		StopBlock:                  cfg.stopBlock,
-		Months:                     []statsBucket{},
-		Total:                      newStatsBucket("", acc.total),
-		UnannotatedFiles:           acc.unannotated,
-		UnannotatedCompressedBytes: acc.unannotatedCompressed,
-		ListedInSeconds:            listedIn.Seconds(),
+		ChainName:        cfg.chainName,
+		StartBlock:       cfg.startBlock,
+		StopBlock:        cfg.stopBlock,
+		Months:           []statsBucket{},
+		Total:            newStatsBucket("", acc.total()),
+		Unannotated:      newStatsBucket("", acc.estimatedUnannotated()),
+		UnannotatedFiles: uint64(acc.unannotated.files),
+		ListedInSeconds:  listedIn.Seconds(),
 	}
 	if acc.seen > 0 {
 		firstBlock, lastBlock := acc.firstBlock, acc.lastBlock
@@ -381,7 +406,11 @@ func readAnnotation(object mergedBlocksObject) (annotatedFile, bool) {
 	}, true
 }
 
-func printMergedBlocksTable(months map[string]*mergedBlocksTally, total mergedBlocksTally) {
+// unannotatedRowName labels the table row of the files missing part of the annotation, the
+// asterisk marking its estimated numbers.
+const unannotatedRowName = "UNANNOTATED*"
+
+func printMergedBlocksTable(months map[string]*mergedBlocksTally, unannotated, total mergedBlocksTally) {
 	names := make([]string, 0, len(months))
 	for name := range months {
 		names = append(names, name)
@@ -393,7 +422,10 @@ func printMergedBlocksTable(months map[string]*mergedBlocksTally, total mergedBl
 	for _, name := range names {
 		printMergedBlocksRow(table, name, *months[name])
 	}
-	if len(names) > 1 {
+	if unannotated.files > 0 {
+		printMergedBlocksRow(table, unannotatedRowName, unannotated)
+	}
+	if len(names) > 1 || unannotated.files > 0 {
 		fmt.Fprintln(table, "\t\t\t\t\t\t\t\t\t")
 		printMergedBlocksRow(table, "TOTAL", total)
 	}
