@@ -14,6 +14,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Reader: `reader_node_one_block_upload_pending_files` and `reader_node_one_block_upload_oldest_pending_seconds` report the one-block files waiting in the local staging directory and how long the oldest has waited, measured at each upload pass. When the one-block store is slow or down the reader keeps reading blocks and serving its relayers, and its `/healthz` stays ready, so this backlog was not visible anywhere until the disk filled up.
 
+### Fixed
+
+- Merger: jumping ahead to bundles published by another merger no longer lets the pruner delete one-block files of bundles still being uploaded.
+
 ## v1.21.2-rc.2
 
 ### Changed
