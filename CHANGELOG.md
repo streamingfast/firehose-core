@@ -14,6 +14,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Reader: `reader_node_one_block_upload_pending_files` and `reader_node_one_block_upload_oldest_pending_seconds` report the one-block files waiting in the local staging directory and how long the oldest has waited, measured at each upload pass. When the one-block store is slow or down the reader keeps reading blocks and serving its relayers, and its `/healthz` stays ready, so this backlog was not visible anywhere until the disk filled up.
 
+### Changed
+
+- Merger: logs its unlinkable-blocks limit once at startup (`merger unlinkable-blocks circuit breaker configured`, with `max_unlinkable_blocks` and `source`), so operators can confirm a `MERGER_MAX_UNLINKABLE_BLOCKS` override took effect. The limit is now resolved once per run instead of on every walk; behavior is unchanged.
+
 ## v1.21.2-rc.2
 
 ### Changed

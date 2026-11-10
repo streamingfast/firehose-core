@@ -193,6 +193,14 @@ func (m *Merger) pruningTarget(distance uint64) uint64 {
 func (m *Merger) run() error {
 	ctx := context.Background()
 
+	maxUnlinkableBlocks := int(m.bundler.bundleSize * 4)
+	maxUnlinkableBlocksSource := "bundleSize*4 default"
+	if override := utils.GetEnvMergerMaxUnlinkableBlocks(); override != nil {
+		maxUnlinkableBlocks = *override
+		maxUnlinkableBlocksSource = "MERGER_MAX_UNLINKABLE_BLOCKS override"
+	}
+	m.logger.Info("merger unlinkable-blocks circuit breaker configured", zap.Int("max_unlinkable_blocks", maxUnlinkableBlocks), zap.String("source", maxUnlinkableBlocksSource))
+
 	var holeFoundLogged bool
 	var consecutiveErrors int
 	for {
@@ -227,10 +235,6 @@ func (m *Merger) run() error {
 		}
 
 		unlinkableCount := 0
-		maxUnlinkableBlocks := int(m.bundler.bundleSize * 4)
-		if override := utils.GetEnvMergerMaxUnlinkableBlocks(); override != nil {
-			maxUnlinkableBlocks = *override
-		}
 		lastBase := m.bundler.baseBlockNum
 
 		err = m.io.WalkOneBlockFiles(ctx, base, func(obf *bstream.OneBlockFile) error {
