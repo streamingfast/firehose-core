@@ -56,6 +56,39 @@ func configureGlobalHelp(root *cobra.Command) {
 
 		return pflag.NormalizedName(name)
 	})
+
+	root.InitDefaultHelpCmd()
+	root.InitDefaultCompletionCmd()
+	hideBoolFlagSyntax(root)
+}
+
+// hideBoolFlagSyntax keeps bool flags rendering as '--flag' in the help output instead
+// of the '--flag[=true|false]' pflag prints since v1.1.0, which has no option to turn it
+// off (https://github.com/spf13/pflag/issues/454). It wraps the value of every bool flag
+// declared in the tree rooted at cmd, visiting each command's local flags so that a
+// persistent flag is wrapped once, by the command declaring it. The help flag is added
+// first since cobra otherwise only adds it when the command runs.
+func hideBoolFlagSyntax(cmd *cobra.Command) {
+	cmd.InitDefaultHelpFlag()
+	cmd.LocalFlags().VisitAll(hideBoolFlagSyntaxOf)
+
+	for _, child := range cmd.Commands() {
+		hideBoolFlagSyntax(child)
+	}
+}
+
+func hideBoolFlagSyntaxOf(flag *pflag.Flag) {
+	if flag.Value.Type() == "bool" {
+		flag.Value = boolFlagValue{flag.Value}
+	}
+}
+
+// boolFlagValue hides the IsBoolFlag method of a bool flag value, which is what makes
+// pflag print '[=true|false]', embedding pflag.Value only promotes String, Set and Type.
+// Parsing is unaffected, pflag already set the flag's NoOptDefVal to "true" when it was
+// added, which is what makes a bare '--flag' mean true.
+type boolFlagValue struct {
+	pflag.Value
 }
 
 // expandGlobalHelpArgs makes '--gh' (and '--global-help') usable on their own by turning
@@ -157,6 +190,7 @@ func showsGlobalFlags(cmd *cobra.Command) bool {
 func compactedGlobalFlagsUsage(hiddenCount int) string {
 	flagSet := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flagSet.Bool(globalHelpFlagAlias, false, fmt.Sprintf("Show global flags help, %d global flags hidden", hiddenCount))
+	flagSet.VisitAll(hideBoolFlagSyntaxOf)
 
 	return flagSet.FlagUsages()
 }
