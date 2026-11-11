@@ -6,41 +6,29 @@ on:
       - "develop"
     paths:
       - "CHANGELOG.md"
-  workflow_dispatch:
 
 permissions:
   contents: write
   pull-requests: write
 
 concurrency:
-  group: draft-release-${{ github.event.pull_request.number || github.ref_name }}
+  group: draft-release-${{ github.event.pull_request.number }}
   cancel-in-progress: true
-
-env:
-  SFRELEASER_VERSION: "v0.17.1-rc.5"
 
 jobs:
   draft-release:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
-    defaults:
-      run:
-        shell: bash
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.head_ref || github.ref_name }}
+          ref: ${{ github.head_ref }}
           fetch-depth: 0
 
-      - name: Install sfreleaser
-        run: |
-          curl -sSfL "https://github.com/streamingfast/sfreleaser/releases/download/$SFRELEASER_VERSION/sfreleaser_linux_x86_64.tar.gz" | tar -xz -C "$RUNNER_TEMP" sfreleaser
-          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
-
-      - name: Detect version
+      - name: Detect release PR
         id: detect
-        run: sfreleaser release detect
+        uses: streamingfast/actions/sfreleaser/detect@v1
 
       - name: Set up Go
         if: steps.detect.outputs.is_release_pr
@@ -56,12 +44,12 @@ jobs:
           path: |
             ~/.cache/sfreleaser
             ~/.cache/zig
-          key: ${{ runner.os }}-zig-${{ env.SFRELEASER_VERSION }}
+          key: ${{ runner.os }}-zig-${{ github.run_id }}
+          restore-keys: ${{ runner.os }}-zig-
 
       - name: Prepare release
         if: steps.detect.outputs.is_release_pr
-        env:
-          VERSION: ${{ steps.detect.outputs.version }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-        run: sfreleaser release prepare "$VERSION" --yes
+        uses: streamingfast/actions/sfreleaser/prepare@v1
+        with:
+          version: ${{ steps.detect.outputs.version }}
+          homebrew-tap-token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
