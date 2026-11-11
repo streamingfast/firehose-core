@@ -331,18 +331,21 @@ func TestMergerIO_NextBundleAllBundlesEmpty(t *testing.T) {
 
 func TestMergerIO_MergeSkipsBundleWrittenByAnotherMerger(t *testing.T) {
 	tests := []struct {
-		name         string
-		bundleExists bool
-		expectErr    bool
+		name          string
+		bundleExists  bool
+		expectErr     bool
+		expectedOpens int
 	}{
-		{"bundle written by another merger", true, false},
-		{"bundle missing", false, true},
+		{"bundle written by another merger", true, false, 1},
+		{"bundle missing", false, true, 3},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			var opens int
 			oneBlockStore := dstore.NewMockStore(nil)
 			oneBlockStore.OpenObjectFunc = func(_ context.Context, name string) (io.ReadCloser, error) {
+				opens++
 				return nil, dstore.ErrNotFound
 			}
 
@@ -356,7 +359,7 @@ func TestMergerIO_MergeSkipsBundleWrittenByAnotherMerger(t *testing.T) {
 				mergedBlocksStore.SetFile("0000000100", []byte("bundle"))
 			}
 
-			mio := newTestDStoreIO(oneBlockStore, mergedBlocksStore)
+			mio := NewDStoreIO(testLogger, oneBlockStore, mergedBlocksStore, nil, 3, 0, 100, 0)
 			err := mio.MergeAndStore(context.Background(), 100, []*bstream.OneBlockFile{block100(), block101()})
 			if test.expectErr {
 				require.Error(t, err)
@@ -364,6 +367,7 @@ func TestMergerIO_MergeSkipsBundleWrittenByAnotherMerger(t *testing.T) {
 				require.NoError(t, err)
 			}
 			require.Equal(t, 0, writes)
+			require.Equal(t, test.expectedOpens, opens, "one header open per attempt")
 		})
 	}
 }
