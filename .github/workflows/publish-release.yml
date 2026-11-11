@@ -8,58 +8,36 @@ on:
       - "develop"
     paths:
       - "CHANGELOG.md"
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Release tag to run the publish steps for again, e.g. v1.8.0"
-        required: true
 
 permissions:
   actions: write
   contents: write
 
 concurrency:
-  group: publish-release
+  group: publish-release-${{ github.event.pull_request.number }}
   cancel-in-progress: false
-
-env:
-  SFRELEASER_VERSION: "v0.17.1-rc.5"
 
 jobs:
   publish:
-    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged && github.event.pull_request.head.repo.full_name == github.repository)
+    if: github.event.pull_request.merged && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
-    defaults:
-      run:
-        shell: bash
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha || inputs.tag }}
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-depth: 0
 
-      - name: Install sfreleaser
-        run: |
-          curl -sSfL "https://github.com/streamingfast/sfreleaser/releases/download/$SFRELEASER_VERSION/sfreleaser_linux_x86_64.tar.gz" | tar -xz -C "$RUNNER_TEMP" sfreleaser
-          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
-
-      - name: Detect version
+      - name: Detect release PR
         id: detect
-        if: github.event_name == 'pull_request'
-        run: sfreleaser release detect
+        uses: streamingfast/actions/sfreleaser/detect@v1
+        with:
+          before: ${{ github.event.pull_request.merge_commit_sha }}^1
 
       - name: Publish release
-        if: steps.detect.outputs.is_release_pr || github.event_name == 'workflow_dispatch'
-        env:
-          VERSION: ${{ steps.detect.outputs.version || inputs.tag }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-        run: sfreleaser release publish "$VERSION"
-
-      - name: Build Docker images
-        if: steps.detect.outputs.is_release_pr || github.event_name == 'workflow_dispatch'
-        env:
-          VERSION: ${{ steps.detect.outputs.version || inputs.tag }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run docker.yml --repo "$GITHUB_REPOSITORY" --ref "$VERSION"
+        if: steps.detect.outputs.is_release_pr
+        uses: streamingfast/actions/sfreleaser/publish@v1
+        with:
+          version: ${{ steps.detect.outputs.version }}
+          build-workflow: docker.yml
+          homebrew-tap-token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
