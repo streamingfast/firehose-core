@@ -159,3 +159,34 @@ func runTestCommandHelp(t *testing.T, args []string) string {
 
 	return buffer.String()
 }
+
+func TestHideBoolFlagSyntaxKeepsParsing(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected bool
+	}{
+		{"absent", nil, false},
+		{"bare", []string{"--enabled"}, true},
+		{"explicit true", []string{"--enabled=true"}, true},
+		{"explicit false", []string{"--enabled=false"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var enabled bool
+			root := &cobra.Command{Use: "test", Run: func(*cobra.Command, []string) {}}
+			root.Flags().BoolVar(&enabled, "enabled", false, "Enable")
+
+			hideBoolFlagSyntax(root)
+			root.SetArgs(tt.args)
+
+			require.NoError(t, root.Execute())
+			assert.Equal(t, tt.expected, enabled)
+
+			value, err := root.Flags().GetBool("enabled")
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, value)
+		})
+	}
+}

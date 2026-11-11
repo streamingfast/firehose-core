@@ -19,6 +19,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // testChainBlock is a minimal firecore.Block implementation, only used to
@@ -404,4 +405,66 @@ func TestResizeMergedBlocksValidation(t *testing.T) {
 	assert.Error(t, runResize(t, srcURL, dstURL, 0, 1500, 100, 1000))
 	// stop below start
 	assert.Error(t, runResize(t, srcURL, dstURL, 2000, 1000, 100, 1000))
+}
+
+// The metadata the writer sets must be what annotate-merged-blocks computes from the file, so
+// stats-merged-blocks reads the same numbers whichever of the two annotated it.
+func TestMergedBlocksWriterAnnotationMatchesAnnotateTool(t *testing.T) {
+	ctx := context.Background()
+	store, err := dstore.NewStore("memory://merged", "dbin.zst", "zstd", true)
+	require.NoError(t, err)
+
+	writer := &firecore.MergedBlocksWriter{Store: store, BundleSize: 100, Logger: zap.NewNop(), Annotate: true}
+	start := time.Date(2025, 10, 12, 10, 23, 12, 0, time.UTC)
+	blockAt := func(num uint64) *pbbstream.Block {
+		blk := testBlock(num)
+		blk.Timestamp = timestamppb.New(start.Add(time.Duration(num) * time.Second))
+		return blk
+	}
+
+	// A full file, two gap files carrying block 99, then a file cut short by Flush.
+	for num := uint64(0); num < 100; num++ {
+		require.NoError(t, writer.ProcessBlock(blockAt(num), nil))
+	}
+	for num := uint64(350); num < 380; num++ {
+		require.NoError(t, writer.ProcessBlock(blockAt(num), nil))
+	}
+	require.NoError(t, writer.Flush())
+
+	expected := map[string]struct {
+		blocks    int64
+		firstTime time.Time
+	}{
+		"0000000000": {100, start},
+		"0000000100": {1, start.Add(99 * time.Second)},
+		"0000000200": {1, start.Add(99 * time.Second)},
+		"0000000300": {30, start.Add(350 * time.Second)},
+	}
+	for file, want := range expected {
+		t.Run(file, func(t *testing.T) {
+			attrs, err := store.ObjectAttributes(ctx, file)
+			require.NoError(t, err)
+
+			reader, err := store.OpenObject(ctx, file)
+			require.NoError(t, err)
+			defer reader.Close()
+			scan, err := scanMergedBlocksFile(reader, make([]byte, scanScratchBufferSize))
+			require.NoError(t, err)
+
+			assert.Equal(t, want.blocks, scan.blockCount)
+			assert.True(t, want.firstTime.Equal(scan.firstBlockTime))
+			assert.Equal(t, firecore.MergedBlocksMetadata(scan.dataSize, scan.blockCount, scan.firstBlockTime), attrs.Metadata)
+		})
+	}
+}
+
+func TestMergedBlocksWriterNoAnnotationByDefault(t *testing.T) {
+	store, err := dstore.NewStore("memory://merged", "dbin.zst", "zstd", true)
+	require.NoError(t, err)
+
+	fillStore(t, store, 100, 0, 99)
+
+	attrs, err := store.ObjectAttributes(context.Background(), "0000000000")
+	require.NoError(t, err)
+	assert.Empty(t, attrs.Metadata)
 }
