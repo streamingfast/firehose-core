@@ -8,7 +8,7 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
-## Unreleased
+## v1.21.2
 
 ### Added
 
@@ -24,6 +24,9 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Merger: logs its unlinkable-blocks limit once at startup (`merger unlinkable-blocks circuit breaker configured`, with `max_unlinkable_blocks` and `source`), so operators can confirm a `MERGER_MAX_UNLINKABLE_BLOCKS` override took effect. The limit is now resolved once per run instead of on every walk; behavior is unchanged.
 - Bumped `github.com/klauspost/compress` to `v1.20.2` to fix CVE-2026-116591.
+- Bumped `substreams` to `v1.27.0`, see its [release notes](https://github.com/streamingfast/substreams/releases/tag/v1.27.0).
+- Bumped `dstore`: an S3 upload now fails when its reader fails partway instead of storing a truncated object, S3 copies run server-side, and zstd stores accept `compression_config` (level, window, decoder `lowmem` and pool) in the store URL.
+- Bumped `dsession` to fix two worker counter leaks.
 
 ### Fixed
 
