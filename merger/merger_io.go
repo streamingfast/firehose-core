@@ -146,7 +146,7 @@ func (s *DStoreIO) MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64
 	// The bundle is streamed, so its uncompressed size is only known once it is written: count
 	// it on the way through rather than reading the file back to find out.
 	var dataSize int64
-	err = Retry(s.logger, s.retryAttempts, s.retryCooldown, func() error {
+	write := func() error {
 		inCtx, cancel := context.WithTimeout(ctx, WriteObjectTimeout)
 		defer cancel()
 		streamReader, err := NewStreamingBundleReader(inCtx, s.logger, filteredOBF, anyOneBlockFile, s.OpenOneBlockFile)
@@ -164,9 +164,26 @@ func (s *DStoreIO) MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64
 		}
 		dataSize = counter.count
 		return nil
+	}
+
+	var writtenElsewhere bool
+	err = Retry(s.logger, s.retryAttempts, s.retryCooldown, func() error {
+		err := write()
+		// Another merger running against the same stores may have written this bundle and
+		// pruned its one-block files while we were still reading them.
+		if err != nil && s.bundleExists(ctx, bundleFilename) {
+			s.logger.Info("cannot merge bundle but it already exists in merged-blocks store, assuming another merger wrote it", zap.String("filename", bundleFilename), zap.Error(err))
+			writtenElsewhere = true
+			return nil
+		}
+		return err
 	})
 	if err != nil {
 		return fmt.Errorf("write object error: %s", err)
+	}
+	if writtenElsewhere {
+		// annotating would overwrite the other merger's metadata with our partial counts
+		return nil
 	}
 
 	s.annotate(ctx, bundleFilename, dataSize, filteredOBF)
@@ -174,6 +191,17 @@ func (s *DStoreIO) MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64
 	s.logger.Info("merged and uploaded", zap.String("filename", fileNameForBlocksBundle(inclusiveLowerBlock)), zap.Duration("merge_time", time.Since(t0)))
 
 	return
+}
+
+func (s *DStoreIO) bundleExists(ctx context.Context, bundleFilename string) bool {
+	subCtx, cancel := context.WithTimeout(ctx, GetObjectTimeout)
+	defer cancel()
+	exists, err := s.mergedBlocksStore.FileExists(subCtx, bundleFilename)
+	if err != nil {
+		s.logger.Warn("cannot check if merged-blocks file exists", zap.String("filename", bundleFilename), zap.Error(err))
+		return false
+	}
+	return exists
 }
 
 // annotate records the bundle's uncompressed size, block count and first block time on the
