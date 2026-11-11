@@ -13,6 +13,17 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### Added
 
 - Reader: `reader_node_one_block_upload_pending_files` and `reader_node_one_block_upload_oldest_pending_seconds` report the one-block files waiting in the local staging directory and how long the oldest has waited, measured at each upload pass. When the one-block store is slow or down the reader keeps reading blocks and serving its relayers, and its `/healthz` stays ready, so this backlog was not visible anywhere until the disk filled up.
+- Tools: `firecore tools stats-merged-blocks` no longer leaves files missing the `datasize`/`itemcount`/`timestamp` annotation out of its total. Their compressed size comes from the listing, and their block count and uncompressed size are estimated from the annotated files in the range (same blocks per file, same compression ratio). They are reported apart as `unannotated` in `--json` and as an `UNANNOTATED*` row in the table, and are included in `total`. The months still cover annotated files only. `unannotated_files` is unchanged.
+- Tools: `firecore tools resize-merged-blocks` writes the `datasize`, `itemcount` and `timestamp` object metadata on every file it writes to Google Cloud Storage, as the merger does. Files it wrote before carry none and need `firecore tools annotate-merged-blocks`.
+
+### Fixed
+
+- Tools: `firecore tools stats-merged-blocks` now reports the first listed file as `first_block_seen` (and `Blocks seen` in the table) even when that file is unannotated. It used to report the first annotated file instead.
+
+### Changed
+
+- Merger: logs its unlinkable-blocks limit once at startup (`merger unlinkable-blocks circuit breaker configured`, with `max_unlinkable_blocks` and `source`), so operators can confirm a `MERGER_MAX_UNLINKABLE_BLOCKS` override took effect. The limit is now resolved once per run instead of on every walk; behavior is unchanged.
+- Bumped `github.com/klauspost/compress` to `v1.20.2` to fix CVE-2026-116591.
 
 ### Fixed
 

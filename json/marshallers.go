@@ -67,11 +67,13 @@ func NewMarshaller(registry *proto.Registry, options ...MarshallerOption) *Marsh
 		opt(m)
 	}
 
-	m.marshallers = json.NewMarshalers(
-		json.MarshalFuncV2(m.anypb),
-		json.MarshalFuncV2(m.dynamicpbMessage),
-		json.MarshalFuncV2(m.encodeKVList),
-		json.MarshalFuncV2(m.bytesEncoderFunc),
+	m.marshallers = json.JoinMarshalers(
+		json.MarshalToFunc(m.anypb),
+		json.MarshalToFunc(m.dynamicpbMessage),
+		json.MarshalToFunc(m.encodeKVList),
+		json.MarshalToFunc(func(encoder *jsontext.Encoder, t []byte) error {
+			return m.bytesEncoderFunc(encoder, t, encoder.Options())
+		}),
 	)
 
 	return m
@@ -94,7 +96,7 @@ func (m *Marshaller) MarshalToString(in any, jsonEncoderOption ...json.Options) 
 
 }
 
-func (m *Marshaller) anypb(encoder *jsontext.Encoder, t *anypb.Any, options json.Options) error {
+func (m *Marshaller) anypb(encoder *jsontext.Encoder, t *anypb.Any) error {
 	msg, err := m.registry.Unmarshal(t)
 	if err != nil {
 		return fmt.Errorf("unmarshalling proto any: %w", err)
@@ -107,8 +109,8 @@ func (m *Marshaller) anypb(encoder *jsontext.Encoder, t *anypb.Any, options json
 	return encoder.WriteValue(cnt)
 }
 
-func (m *Marshaller) encodeKVList(encoder *jsontext.Encoder, t kvList, options json.Options) error {
-	if err := encoder.WriteToken(jsontext.ObjectStart); err != nil {
+func (m *Marshaller) encodeKVList(encoder *jsontext.Encoder, t kvList) error {
+	if err := encoder.WriteToken(jsontext.BeginObject); err != nil {
 		return err
 	}
 	for _, kv := range t {
@@ -125,10 +127,10 @@ func (m *Marshaller) encodeKVList(encoder *jsontext.Encoder, t kvList, options j
 			return err
 		}
 	}
-	return encoder.WriteToken(jsontext.ObjectEnd)
+	return encoder.WriteToken(jsontext.EndObject)
 }
 
-func (m *Marshaller) dynamicpbMessage(encoder *jsontext.Encoder, msg *dynamicpb.Message, options json.Options) error {
+func (m *Marshaller) dynamicpbMessage(encoder *jsontext.Encoder, msg *dynamicpb.Message) error {
 	var kvl kvList
 
 	if m.includeUnknownFields {

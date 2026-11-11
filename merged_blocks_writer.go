@@ -28,6 +28,11 @@ type MergedBlocksWriter struct {
 	Cmd            *cobra.Command
 
 	TweakBlock func(*pbbstream.Block) (*pbbstream.Block, error)
+
+	// Annotate writes the datasize/itemcount/timestamp object metadata on each bundle after
+	// writing it, as the merger does. Set it only for a store where
+	// MergedBlocksMetadataSupported is true.
+	Annotate bool
 }
 
 // progressLogInterval is how often ProcessBlock emits a progress log, so a long
@@ -147,6 +152,8 @@ func (w *MergedBlocksWriter) WriteBundle() error {
 
 	pr, pw := io.Pipe()
 	done := make(chan struct{})
+	// Counts the bundle's bytes before the store compresses them, the datasize annotation.
+	counted := &countingWriter{Writer: pw}
 
 	go func() {
 		var err error
@@ -155,7 +162,7 @@ func (w *MergedBlocksWriter) WriteBundle() error {
 			pw.CloseWithError(err)
 		}()
 
-		blockWriter, err := bstream.NewDBinBlockWriter(pw)
+		blockWriter, err := bstream.NewDBinBlockWriter(counted)
 		if err != nil {
 			return
 		}
@@ -181,12 +188,38 @@ func (w *MergedBlocksWriter) WriteBundle() error {
 	pr.Close()
 	<-done
 
+	if err == nil && w.Annotate {
+		w.annotate(file, counted.count)
+	}
+
 	w.LowBlockNum += w.bundleSize()
 	w.lastBlock = w.blocks[len(w.blocks)-1]
 	w.blocks = nil
 
 	return err
 }
+
+// annotate describes the bundle just written in its object metadata. A failure does not fail
+// the write: the bundle is correct, only its description is missing, and
+// `firecore tools annotate-merged-blocks` fills that back in.
+func (w *MergedBlocksWriter) annotate(file string, dataSize int64) {
+	metadata := MergedBlocksMetadata(dataSize, int64(len(w.blocks)), w.blocks[0].Timestamp.AsTime())
+	if err := w.Store.SetMetadata(context.Background(), file, metadata); err != nil {
+		w.Logger.Warn("cannot annotate merged blocks file", zap.String("filename", file), zap.Error(err))
+	}
+}
+
+type countingWriter struct {
+	io.Writer
+	count int64
+}
+
+func (c *countingWriter) Write(p []byte) (int, error) {
+	n, err := c.Writer.Write(p)
+	c.count += int64(n)
+	return n, err
+}
+
 func filename(num uint64) string {
 	return fmt.Sprintf("%010d", num)
 }

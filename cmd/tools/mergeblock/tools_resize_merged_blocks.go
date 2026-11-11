@@ -48,6 +48,10 @@ func NewToolsResizeMergedBlocksCmd[B firecore.Block](chain *firecore.Chain[B], r
 			ACCEPT_LEGACY_BLOCK_FORMAT environment variable is set. The deprecated 'payload_kind'
 			and 'payload_buffer' fields are cleared from every block written.
 
+			On Google Cloud Storage ('gs://'), every file written gets the 'datasize', 'itemcount'
+			and 'timestamp' metadata the merger writes, which 'firecore tools stats-merged-blocks'
+			reports from.
+
 			Example: rewrite 100-blocks files into 1000-blocks files:
 
 			  firecore tools resize-merged-blocks ./merged-100 ./merged-1000 0 5000 --target-bundle-size=1000
@@ -150,6 +154,7 @@ func createResizeMergedBlocksE(rootLog *zap.Logger) firecore.CommandExecutor {
 			StopBlockNum: stop,
 			Logger:       rootLog,
 			TweakBlock:   clearLegacyPayloadFields,
+			Annotate:     firecore.MergedBlocksMetadataSupported(destStore),
 		}
 
 		if sflags.MustGetBool(cmd, "fix-misplaced-blocks") {
