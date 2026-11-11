@@ -165,14 +165,6 @@ func (b *Bundler) Reset(nextBase uint64, lib bstream.BlockRef) {
 	}
 	b.forkable = forkable.New(b, options...)
 
-	b.inFlightMu.Lock()
-	for k := range b.inFlightBundles {
-		if k < nextBase {
-			delete(b.inFlightBundles, k)
-		}
-	}
-	b.inFlightMu.Unlock()
-
 	b.Lock()
 	logFields := []zapcore.Field{
 		zap.Uint64("previous_base_block_num", b.baseBlockNum),

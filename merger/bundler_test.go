@@ -191,6 +191,19 @@ func TestBundlerReset(t *testing.T) {
 
 }
 
+func TestBundlerResetKeepsInFlightBundles(t *testing.T) {
+	b := NewBundler(100, 0, 2, 100, nil, 1, nil)
+
+	b.markBundleInFlight(100)
+	b.Reset(500, block100().ToBstreamBlock().AsRef())
+
+	assert.EqualValues(t, 500, b.baseBlockNum)
+	assert.EqualValues(t, 100, b.getSafeBaseBlockNum())
+
+	b.markBundleMerged(100)
+	assert.EqualValues(t, 500, b.getSafeBaseBlockNum())
+}
+
 func TestBundlerMergeKeepOne(t *testing.T) {
 
 	tests := []struct {
