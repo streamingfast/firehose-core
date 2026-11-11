@@ -166,6 +166,12 @@ func (s *DStoreIO) MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64
 		return nil
 	})
 	if err != nil {
+		// Another merger running against the same stores may have written this bundle and
+		// pruned its one-block files while we were still reading them.
+		if s.bundleExists(ctx, bundleFilename) {
+			s.logger.Info("cannot merge bundle but it already exists in merged-blocks store, assuming another merger wrote it", zap.String("filename", bundleFilename), zap.Error(err))
+			return nil
+		}
 		return fmt.Errorf("write object error: %s", err)
 	}
 
@@ -174,6 +180,17 @@ func (s *DStoreIO) MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64
 	s.logger.Info("merged and uploaded", zap.String("filename", fileNameForBlocksBundle(inclusiveLowerBlock)), zap.Duration("merge_time", time.Since(t0)))
 
 	return
+}
+
+func (s *DStoreIO) bundleExists(ctx context.Context, bundleFilename string) bool {
+	subCtx, cancel := context.WithTimeout(ctx, GetObjectTimeout)
+	defer cancel()
+	exists, err := s.mergedBlocksStore.FileExists(subCtx, bundleFilename)
+	if err != nil {
+		s.logger.Warn("cannot check if merged-blocks file exists", zap.String("filename", bundleFilename), zap.Error(err))
+		return false
+	}
+	return exists
 }
 
 // annotate records the bundle's uncompressed size, block count and first block time on the

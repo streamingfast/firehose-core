@@ -17,6 +17,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### Fixed
 
 - Merger: jumping ahead to bundles published by another merger no longer lets the pruner delete one-block files of bundles still being uploaded.
+- Merger: when two mergers run against the same stores, the slower one no longer shuts down when the faster one prunes the one-block files of a bundle it is still merging. If the merge fails and the bundle already exists in the merged-blocks store, it is treated as merged.
 
 ## v1.21.2-rc.2
 
