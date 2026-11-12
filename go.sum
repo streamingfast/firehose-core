@@ -2308,6 +2308,8 @@ github.com/spiffe/go-spiffe/v2 v2.8.1/go.mod h1:47Q0Q9/AqGha8QLHp+kxpH4Wca7X7EnO
 github.com/stoewer/go-strcase v1.3.0/go.mod h1:fAH5hQ5pehh+j3nZfvwdk2RgEgQjAoM8wodgtPmh1xo=
 github.com/streamingfast/bstream v0.0.2-0.20261112185558-c7b0faee9d01 h1:aKWwEhQT0CPCNPterMQHav6d2PEgFK5XPtmvMvkpP2Y=
 github.com/streamingfast/bstream v0.0.2-0.20261112185558-c7b0faee9d01/go.mod h1:duqjBtD6U7/Y2swB/VCwgzoLODC5L+x6fDmvlgZIAPM=
+github.com/streamingfast/bstream v0.0.2-0.20261112200532-4e89aa952996 h1:ct4YWNbdBGROKS6xnIo56bVsZJHew1VMatiulyvrkLQ=
+github.com/streamingfast/bstream v0.0.2-0.20261112200532-4e89aa952996/go.mod h1:duqjBtD6U7/Y2swB/VCwgzoLODC5L+x6fDmvlgZIAPM=
 github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b h1:ztYeX3/5rg2tV2EU7edcrcHzMz6wUbdJB+LqCrP5W8s=
 github.com/streamingfast/cli v0.0.4-0.20250815192146-d8a233ec3d0b/go.mod h1:o9R/tjNON01X2mgWL5qirl2MV6xQ4EZI5D504ST3K/M=
 github.com/streamingfast/dauth v0.0.0-20261104193507-69230e98d89e h1:nRgrvMMQCaYJtL2XjDuqrdwWvD75gVADk70SaJQ4sB4=
@@ -2367,6 +2369,8 @@ github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0 h1:Y15G1
 github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0/go.mod h1:/Rnz2TJvaShjUct0scZ9kKV2Jr9/+KBAoWy4UMYxgv4=
 github.com/streamingfast/substreams v1.26.1-0.20261112192459-17923f557700 h1:Rz3HkeYhpgj+7V5Jzm2azJ+9sV/wHhqtiNyoE+LkdyQ=
 github.com/streamingfast/substreams v1.26.1-0.20261112192459-17923f557700/go.mod h1:g8W3uLnTuFsFtbl64lYA9YC3/hGbx1CqRQ144VzLraQ=
+github.com/streamingfast/substreams v1.26.1-0.20261112200643-23a5a7a773a9 h1:UE0Q3xZtMJY6HIOmzBccW/hydxrFcMappkLZzyr2AVY=
+github.com/streamingfast/substreams v1.26.1-0.20261112200643-23a5a7a773a9/go.mod h1:gHKQTIvAugk/sCIfiymfVBG5a0ECero3kch4LVd09aI=
 github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed h1:LU6/c376zP1cMAo9L6rFLyjo0W7RU+hIh7BegH8Zo5M=
 github.com/streamingfast/wazero v0.0.0-20241202185309-91287c3640ed/go.mod h1:yAI0XTsMBhREkM/YDAK/zNou3GoiAce1P6+rp/wQhjs=
 github.com/streamingfast/worker-pool-protocol v0.0.0-20251029142144-b539534f3eb1 h1:aoPCoeTHwCQbzRwLBpT45GUvZgAzevIUBgPZjJzBbug=

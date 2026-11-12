@@ -165,7 +165,7 @@ func (a *App) Run() error {
 		hubOptions := []hub.Option{
 			hub.WithLogger(a.logger),
 			hub.WithMaxConsecutiveUnlinkableBlocks(maxConsecutiveUnlinkableBlocks),
-			hub.WithMergedBlocksStore(mergedBlocksStore, maxKeptFinalBlocks),
+			hub.WithMergedBlocksStore(mergedBlocksStore, bstream.DefaultMergedBlocksBundleSize, maxKeptFinalBlocks),
 		}
 		if a.modules.MergedBlocksLagMetric != nil {
 			hubOptions = append(hubOptions, hub.WithMergedBlocksLagMetric(a.modules.MergedBlocksLagMetric))
