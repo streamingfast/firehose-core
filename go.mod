@@ -47,7 +47,7 @@ require (
 	github.com/streamingfast/dtracing v0.0.0-20260303163312-862cb0fb60c9
 	github.com/streamingfast/firehose-networks v0.3.1
 	github.com/streamingfast/logging v1.2.3-0.20260810132752-360563ac68a9
-	github.com/streamingfast/payment-gateway v0.0.0-20260928153037-ec91d4feb67c
+	github.com/streamingfast/payment-gateway v0.0.0-20261112203506-7890dd0c5410
 	github.com/streamingfast/pbgo v0.0.6-0.20261112164158-3dc8cc15e275
 	github.com/streamingfast/protox v0.0.0-20260610151242-cd8a8cf98c45
 	github.com/streamingfast/sf-tracing v0.0.0-20260716142341-6172a527bdd6
