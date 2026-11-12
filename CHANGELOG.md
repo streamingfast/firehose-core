@@ -22,7 +22,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### Fixed
 
 - Fix firehose and substreams-tier1 streams stalling at the last merged-blocks file when the merger falls more than 200 blocks behind.
-- Fix substreams-tier1 placing the linear handoff above the last merged block when the merger is behind, which left tier2 jobs waiting for merged-blocks files.
+- Fix substreams-tier1 placing the linear handoff above the last merged-blocks file when the merger is behind, which left tier2 jobs waiting for files that were not written yet.
 
 ## v1.21.2
 
