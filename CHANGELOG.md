@@ -8,6 +8,12 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Changed
+
+- Metrics: `reader_node_firehose_block_write_count` and `ready{app="reader_node_firehose"}` are now exported only by processes running `reader-node-firehose`, and the `reader_test_mode_*` metrics only when `--reader-node-test-mode` is enabled. Before, every process exported them, stuck at 0. Dashboards or alerts that read them from other processes will now see no series instead of 0.
+
 ## v1.21.2
 
 ### Added
