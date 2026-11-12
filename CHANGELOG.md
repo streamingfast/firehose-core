@@ -17,7 +17,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Changed
 
-- Firehose and substreams-tier1 hold in memory every final block from the start of the last merged-blocks file, instead of a fixed 200 blocks (or two files worth) below the last finalized block. With no merger running they hold up to `--common-live-hub-max-final-blocks`.
+- Firehose and substreams-tier1 hold in memory every final block from the start of the last merged-blocks file, instead of a fixed 200 blocks (or two files worth) below the last finalized block. With no merger running they hold up to `--common-live-hub-max-final-blocks`. When one-block files are missing between the last merged-blocks file and the live blocks, they do not get ready and log the missing range every 30s, so streams never skip from merged blocks to live blocks over a hole.
 
 ### Fixed
 
