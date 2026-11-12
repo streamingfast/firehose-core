@@ -13,7 +13,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### Added
 
 - Add the `merged_blocks_lag{app}` metric on firehose and substreams-tier1: the number of final blocks the app has not found in merged-blocks files. It keeps growing when the merger is stopped or too slow.
-- Add `--common-live-hub-max-final-blocks`: the most final blocks firehose and substreams-tier1 hold in memory while the merger is behind (default 20 merged-blocks files worth, 2000 blocks with the default bundle size).
+- Add `--common-live-hub-max-final-blocks`: the most final blocks firehose and substreams-tier1 hold in memory while the merger is behind (default 20 merged-blocks files worth, 2000 blocks with the default bundle size, at least two files worth).
 
 ### Changed
 
