@@ -19,6 +19,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### Changed
 
 - Metrics: `reader_node_firehose_block_write_count` and `ready{app="reader_node_firehose"}` are now exported only by processes running `reader-node-firehose`, and the `reader_test_mode_*` metrics only when `--reader-node-test-mode` is enabled. Before, every process exported them, stuck at 0. Dashboards or alerts that read them from other processes will now see no series instead of 0.
+- Bump `github.com/streamingfast/payment-gateway` so the `tgm://` auth plugin sets the auth-method trusted headers (`x-auth-*`). The `auth_method`, `auth_jwt_lifetime_bucket`, `auth_jwt_iat` and `auth_jwt_exp` fields on incoming Firehose and Substreams request logs are now populated when tier1 authenticates through it, instead of always being empty.
 
 ### Fixed
 
