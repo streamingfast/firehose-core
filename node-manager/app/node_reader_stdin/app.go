@@ -171,7 +171,7 @@ func (a *App) Run() error {
 	if lineBufferSize == 0 {
 		lineBufferSize = consoleline.DefaultBufferSize
 	}
-	metrics.LineBufferSize.SetUint64(uint64(lineBufferSize))
+	metrics.RegisterLineReaderMetrics(uint64(lineBufferSize))
 
 	onLine := func(line string) {
 		if logPlugin != nil {
