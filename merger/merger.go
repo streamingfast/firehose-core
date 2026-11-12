@@ -273,6 +273,8 @@ func (m *Merger) run() error {
 			m.logger.Warn("error walking one block files, will retry", zap.Error(err))
 		}
 
+		m.bundler.RefreshHeadBlockTime()
+
 		if spentTime := time.Since(now); spentTime < m.timeBetweenPolling {
 			select {
 			case <-m.Terminating():

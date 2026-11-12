@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/abourget/llerrgroup"
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
@@ -28,7 +27,6 @@ import (
 	"github.com/streamingfast/bstream/forkable"
 	"github.com/streamingfast/firehose-core/merger/metrics"
 	"github.com/streamingfast/logging"
-	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -60,9 +58,7 @@ type Bundler struct {
 	irreversibleBlocks []*bstream.OneBlockFile
 	forkable           *forkable.Forkable
 
-	// these blockTimestamp values are used to force load "some" oneblocks, for metrics, without loading RAM full of them.
-	blockTimestampInFlight *atomic.Bool
-	blockTimestampLastRun  *atomic.Int64 // unix nanos
+	headTime headBlockTimeReader
 
 	logger *zap.Logger
 }
@@ -74,17 +70,15 @@ func NewBundler(startBlock, stopBlock, firstStreamableBlock, bundleSize uint64, 
 		maxMergingThreads = 1
 	}
 	b := &Bundler{
-		bundleSize:             bundleSize,
-		io:                     io,
-		firstStreamableBlock:   firstStreamableBlock,
-		stopBlock:              stopBlock,
-		eg:                     llerrgroup.New(maxMergingThreads),
-		inFlightBundles:        make(map[uint64]bool),
-		seenBlockFiles:         make(map[string]*bstream.OneBlockFile),
-		blockTimestampInFlight: atomic.NewBool(false),
-		blockTimestampLastRun:  atomic.NewInt64(0),
-		shutDownFunc:           shutDownFunc,
-		logger:                 logger,
+		bundleSize:           bundleSize,
+		io:                   io,
+		firstStreamableBlock: firstStreamableBlock,
+		stopBlock:            stopBlock,
+		eg:                   llerrgroup.New(maxMergingThreads),
+		inFlightBundles:      make(map[uint64]bool),
+		seenBlockFiles:       make(map[string]*bstream.OneBlockFile),
+		shutDownFunc:         shutDownFunc,
+		logger:               logger,
 	}
 	b.Reset(toBaseNum(startBlock, bundleSize), nil)
 	return b
@@ -213,18 +207,7 @@ func (b *Bundler) ProcessBlock(_ *pbbstream.Block, obj interface{}) error {
 		// finalized block, hence both metrics reporting the same value.
 		metrics.FinalizedBlockNumber.SetUint64(obf.Num)
 		b.Unlock()
-		if time.Since(time.Unix(0, b.blockTimestampLastRun.Load())) >= time.Second*5 && b.blockTimestampInFlight.CompareAndSwap(false, true) {
-			b.blockTimestampLastRun.Store(time.Now().UnixNano())
-			go func() {
-				defer b.blockTimestampInFlight.Store(false)
-				t, err := readBlockTimestamp(context.Background(), obf, b.io.OpenOneBlockFile)
-				if err != nil {
-					b.logger.Debug("cannot read block timestamp for head drift metric", zap.Error(err))
-					return
-				}
-				metrics.HeadBlockTimeDrift.SetBlockTimeForward(t)
-			}()
-		}
+		b.setHeadBlock(obf)
 		return nil
 	}
 
@@ -273,6 +256,9 @@ func (b *Bundler) ProcessBlock(_ *pbbstream.Block, obj interface{}) error {
 		})
 		b.baseBlockNum += b.bundleSize
 	}
+
+	// the block closing a bundle is irreversible too, and the newest one seen
+	b.setHeadBlock(obf)
 
 	if b.stopBlock != 0 && b.baseBlockNum >= b.stopBlock {
 		return ErrStopBlockReached
