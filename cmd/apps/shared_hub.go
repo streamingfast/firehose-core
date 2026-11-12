@@ -61,7 +61,7 @@ func sharedLiveHub(runtime *launcher.Runtime) (*hub.ForkableHub, error) {
 		}
 
 		liveHubLogger.Info("firehose and substreams-tier1 share one forkable hub")
-		sharedLiveHubHub = ssapp.NewLiveHub(ssapp.LiveHubConfig{
+		sharedLiveHubHub, sharedLiveHubErr = ssapp.NewLiveHub(ssapp.LiveHubConfig{
 			BlockStreamAddr:        blockStreamAddr,
 			MergedBlocksBundleSize: bstream.DefaultMergedBlocksBundleSize,
 			OneBlocksStore:         oneBlocksStore,
@@ -78,6 +78,9 @@ func sharedLiveHub(runtime *launcher.Runtime) (*hub.ForkableHub, error) {
 				ss1HeadTimeDriftmetric.SetBlockTime(blk.Time())
 			},
 		})
+		if sharedLiveHubErr != nil {
+			return
+		}
 		go sharedLiveHubHub.Run()
 	})
 
