@@ -15,6 +15,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - Add `fireproto` support for the `(firehose.block)` message option and the `(firehose.transactions)` and `(firehose.non_deterministic)` `FieldOptions` extensions to annotate Block proto fields with semantic meaning (transaction list and values that may differ between nodes).
 - Add `fireproto` package providing `FindBlockMessage`, `FindTransactionsField`, `TransactionType`, `WalkNonDeterministicFields` and `ClearNonDeterministicFields` to work with those annotations.
 
+### Changed
+
+- Metrics: `reader_node_firehose_block_write_count` and `ready{app="reader_node_firehose"}` are now exported only by processes running `reader-node-firehose`, and the `reader_test_mode_*` metrics only when `--reader-node-test-mode` is enabled. Before, every process exported them, stuck at 0. Dashboards or alerts that read them from other processes will now see no series instead of 0.
+
 ### Fixed
 
 - Reader: `reader-node-stdin` now exports `reader_node_one_block_upload_pending_files`, `reader_node_one_block_upload_oldest_pending_seconds`, `reader_node_invalid_libnum_clamped_count`, `reader_node_line_buffer_size_bytes` and `reader_node_max_read_block_size_bytes`. They were only exported when `reader-node` or `firehose` ran in the same process. Each group is now registered by the code that sets it (the one-block uploader, the block decoding, the line reading), so every reader exports the metrics of what it runs, and none of a feature it doesn't run.
