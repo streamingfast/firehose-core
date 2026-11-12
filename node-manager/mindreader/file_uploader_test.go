@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/firehose-core/node-manager/metrics"
 	"github.com/stretchr/testify/require"
@@ -77,4 +78,23 @@ func TestFileUploader_BacklogMetrics(t *testing.T) {
 
 	require.Equal(t, float64(0), metrics.OneBlockUploadPendingFiles.Get())
 	require.Equal(t, float64(0), metrics.OneBlockUploadOldestPendingSeconds.Get())
+}
+
+// Whichever reader app builds it, an uploader exports the backlog metrics. Line reading
+// metrics are registered by the line reading code, never here.
+func TestFileUploader_RegistersBacklogMetrics(t *testing.T) {
+	NewFileUploader(dstore.NewMockStore(nil), dstore.NewMockStore(nil), testLogger)
+
+	families, err := prometheus.DefaultGatherer.Gather()
+	require.NoError(t, err)
+
+	exported := map[string]bool{}
+	for _, family := range families {
+		exported[family.GetName()] = true
+	}
+
+	require.True(t, exported["reader_node_one_block_upload_pending_files"])
+	require.True(t, exported["reader_node_one_block_upload_oldest_pending_seconds"])
+	require.False(t, exported["reader_node_line_buffer_size_bytes"])
+	require.False(t, exported["reader_node_max_read_block_size_bytes"])
 }

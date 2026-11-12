@@ -8,6 +8,12 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Fixed
+
+- Reader: `reader-node-stdin` now exports `reader_node_one_block_upload_pending_files`, `reader_node_one_block_upload_oldest_pending_seconds`, `reader_node_invalid_libnum_clamped_count`, `reader_node_line_buffer_size_bytes` and `reader_node_max_read_block_size_bytes`. They were only exported when `reader-node` or `firehose` ran in the same process. Each group is now registered by the code that sets it (the one-block uploader, the block decoding, the line reading), so every reader exports the metrics of what it runs, and none of a feature it doesn't run.
+
 ## v1.21.2
 
 ### Added
