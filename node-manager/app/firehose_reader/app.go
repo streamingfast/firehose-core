@@ -65,6 +65,8 @@ type App struct {
 }
 
 func New(config Config, testModeComparator *mindreader.TestModeComparator, zlogger *zap.Logger, tracer logging.Tracer) *App {
+	registerMetrics()
+
 	n := &App{
 		Shutter:            shutter.New(),
 		config:             config,
