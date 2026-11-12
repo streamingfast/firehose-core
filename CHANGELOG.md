@@ -12,12 +12,16 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
-- Add the `merged_blocks_lag{app}` metric on firehose and substreams-tier1: the number of blocks between the last finalized block received live and the last block found in merged-blocks files. It keeps growing when the merger is stopped or too slow.
-- Add `--common-live-hub-max-final-blocks`: the most final blocks firehose and substreams-tier1 hold in memory while the merger is behind (default 5000 for firehose, 2000 for substreams-tier1 or when both run in one process).
+- Add the `merged_blocks_lag{app}` metric on firehose and substreams-tier1: the number of final blocks the app has not found in merged-blocks files. It keeps growing when the merger is stopped or too slow.
+- Add `--common-live-hub-max-final-blocks`: the most final blocks firehose and substreams-tier1 hold in memory while the merger is behind (default 20 merged-blocks files worth, 2000 blocks with the default bundle size).
+
+### Changed
+
+- Firehose and substreams-tier1 hold in memory every final block from the start of the last merged-blocks file, instead of a fixed 200 blocks (or two files worth) below the last finalized block. With no merger running they hold up to `--common-live-hub-max-final-blocks`.
 
 ### Fixed
 
-- Fix firehose and substreams-tier1 streams stalling at the last merged-blocks file when the merger falls more than a few hundred blocks behind: the live hub now keeps its final blocks in memory until they are merged.
+- Fix firehose and substreams-tier1 streams stalling at the last merged-blocks file when the merger falls more than 200 blocks behind.
 - Fix substreams-tier1 placing the linear handoff above the last merged block when the merger is behind, which left tier2 jobs waiting for merged-blocks files.
 
 ## v1.21.2
