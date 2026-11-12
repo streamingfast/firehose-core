@@ -13,6 +13,13 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 ### Added
 
 - Substreams tier1: `--substreams-tier1-subrequests-disappear-timeout` (default `90s`). The tier1 considers a tier2 disappeared when it sent nothing on a running job for that long, and sends the job again instead of waiting on it until the client disconnects. This covers a tier2 that disappears behind a load balancer that keeps the connection open. `0` turns it off. Counted in the new `substreams_tier1_worker_disappeared_counter` metric.
+- Add `fireproto` support for the `(firehose.block)` message option and the `(firehose.transactions)` and `(firehose.non_deterministic)` `FieldOptions` extensions to annotate Block proto fields with semantic meaning (transaction list and values that may differ between nodes).
+- Add `fireproto` package providing `FindBlockMessage`, `FindTransactionsField`, `TransactionType`, `WalkNonDeterministicFields` and `ClearNonDeterministicFields` to work with those annotations.
+
+### Fixed
+
+- Merger: `head_block_time_drift` no longer reports a false spike after a restart. On restart the merger reports the last block of the last merged bundle, which can be over an hour old with large bundles, then bundles the backlog of irreversible blocks in one go. Only the first block of that burst had its time read, so on chains where finality advances in steps the drift held near the restart value until the next step: one epoch, about 6.4 minutes, on Ethereum. The same effect overstated the drift by up to one step during normal operation. The merger now reads the time of the newest irreversible block once a burst ends, still at most one small one-block file read every 5 seconds. Its reads always target the newest block rather than the one that triggered them.
+- Merger: a failed read of a block's time for `head_block_time_drift` is now logged at Warn, at most once a minute, and is not retried for the same block.
 
 ## v1.21.2
 
