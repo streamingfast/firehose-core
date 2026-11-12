@@ -80,6 +80,7 @@ func NewBundler(startBlock, stopBlock, firstStreamableBlock, bundleSize uint64, 
 		shutDownFunc:         shutDownFunc,
 		logger:               logger,
 	}
+	b.headTime.readInterval = headBlockTimeReadInterval
 	b.Reset(toBaseNum(startBlock, bundleSize), nil)
 	return b
 }

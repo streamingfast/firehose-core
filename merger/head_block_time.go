@@ -10,9 +10,9 @@ import (
 	"go.uber.org/zap"
 )
 
-// headBlockTimeReadInterval bounds how often a stream of irreversible blocks
-// triggers a one-block-file read for the head drift metric, so catching up on
-// a long backlog does not open every file twice.
+// headBlockTimeReadInterval bounds how often a one-block file is read for the
+// head drift metric, so catching up on a long backlog or following a fast
+// chain does not open every file twice.
 const headBlockTimeReadInterval = 5 * time.Second
 
 // headBlockTimeWarnInterval bounds how often a failed read is logged at Warn,
@@ -30,28 +30,32 @@ type headBlockTimeReader struct {
 	lastWarn atomic.Int64                         // unix nanos of the last failed read logged at Warn
 	inFlight atomic.Bool                          // a read goroutine is running
 
+	// readInterval is the minimum time between two read starts, shortened in tests.
+	readInterval time.Duration
+
 	// setBlockTime receives each block time read, overridden in tests.
 	setBlockTime func(time.Time)
 }
 
-// setHeadBlock records obf as the newest irreversible block and starts a read
-// of its time, at most once every headBlockTimeReadInterval.
+// setHeadBlock records obf as the newest irreversible block and reads its time
+// if the throttle allows it.
 func (b *Bundler) setHeadBlock(obf *bstream.OneBlockFile) {
 	b.headTime.head.Store(obf)
-	if time.Since(time.Unix(0, b.headTime.lastRead.Load())) < headBlockTimeReadInterval {
-		return
-	}
-	b.startHeadBlockTimeRead()
+	b.RefreshHeadBlockTime()
 }
 
 // RefreshHeadBlockTime reads the time of the newest irreversible block if it
-// was not read yet, regardless of the throttle. The merger calls it after each
-// pass over the one-block files: irreversible blocks often arrive in bursts
-// (a whole epoch at once on Ethereum, or the whole backlog after a restart),
-// and the throttled read at the start of a burst would otherwise leave the
-// metric on the burst's first block until the next one, minutes later. A call
-// made while a read is running is dropped; the next pass makes it again.
+// was not read yet, at most once every readInterval. The merger calls it after
+// each pass over the one-block files: irreversible blocks often arrive in
+// bursts (a whole epoch at once on Ethereum, or the whole backlog after a
+// restart), and the throttled read at the start of a burst would otherwise
+// leave the metric on the burst's first block until the next one, minutes
+// later. A call made while throttled or while a read is running is dropped;
+// the next pass makes it again.
 func (b *Bundler) RefreshHeadBlockTime() {
+	if time.Since(time.Unix(0, b.headTime.lastRead.Load())) < b.headTime.readInterval {
+		return
+	}
 	b.startHeadBlockTimeRead()
 }
 

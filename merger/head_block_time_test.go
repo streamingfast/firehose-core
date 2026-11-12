@@ -88,6 +88,7 @@ func TestBundlerHeadBlockTimeFollowsNewestBlockOfBurst(t *testing.T) {
 
 	var rec blockTimeRecorder
 	b := NewBundler(100, 0, 100, 100, testIO, 1, nil)
+	b.headTime.readInterval = time.Millisecond
 	b.headTime.setBlockTime = rec.set
 
 	for _, obf := range buildChain(100, 150, nil) {
@@ -118,6 +119,7 @@ func TestBundlerRefreshHeadBlockTimeSkipsAlreadyReadBlock(t *testing.T) {
 	}
 
 	b := NewBundler(100, 0, 100, 100, testIO, 1, nil)
+	b.headTime.readInterval = time.Millisecond
 	b.headTime.setBlockTime = func(time.Time) {}
 
 	for _, obf := range buildChain(100, 110, nil) {
@@ -148,6 +150,7 @@ func TestBundlerRefreshHeadBlockTimeDoesNotRetryFailedBlock(t *testing.T) {
 	}
 
 	b := NewBundler(100, 0, 100, 100, testIO, 1, nil)
+	b.headTime.readInterval = time.Millisecond
 	b.headTime.setBlockTime = func(time.Time) { t.Error("no block time can be read") }
 
 	for _, obf := range buildChain(100, 110, nil) {
@@ -171,6 +174,7 @@ func TestBundlerBundleClosingBlockMovesHead(t *testing.T) {
 	testIO := &TestMergerIO{OpenOneBlockFileFunc: oneBlockFileWithTime(t)}
 
 	b := NewBundler(10, 0, 10, 10, testIO, 1, nil)
+	b.headTime.readInterval = time.Millisecond
 	b.headTime.setBlockTime = func(time.Time) {}
 
 	// block 20 closes bundle 10-19, it is the last irreversible block fed
@@ -217,6 +221,7 @@ func TestMergerRunReportsNewestBlockTimeAfterBurst(t *testing.T) {
 
 	merger := newRunTestMerger(testIO, 0, 100, 1)
 	var rec blockTimeRecorder
+	merger.bundler.headTime.readInterval = time.Millisecond
 	merger.bundler.headTime.setBlockTime = rec.set
 
 	done := make(chan error, 1)
@@ -236,4 +241,41 @@ func TestMergerRunReportsNewestBlockTimeAfterBurst(t *testing.T) {
 
 	require.Eventually(t, func() bool { return rec.lastIs(head.Num) }, 2*time.Second, 5*time.Millisecond,
 		"merger never reported the newest irreversible block %d", head.Num)
+}
+
+// TestBundlerRefreshHeadBlockTimeIsThrottled checks the end-of-pass refresh
+// shares the read throttle, so a chain whose head moves every pass is not read
+// once per pass.
+func TestBundlerRefreshHeadBlockTimeIsThrottled(t *testing.T) {
+	var opens openCounter
+	opener := oneBlockFileWithTime(t)
+	testIO := &TestMergerIO{
+		OpenOneBlockFileFunc: func(ctx context.Context, obf *bstream.OneBlockFile) (io.ReadCloser, error) {
+			opens.add(obf.Num)
+			return opener(ctx, obf)
+		},
+	}
+
+	var rec blockTimeRecorder
+	b := NewBundler(100, 0, 100, 100, testIO, 1, nil)
+	b.headTime.readInterval = time.Hour
+	b.headTime.setBlockTime = rec.set
+
+	chain := buildChain(100, 150, nil)
+	require.NoError(t, b.HandleBlockFile(chain[0]))
+	first := b.headTime.head.Load()
+	require.Eventually(t, func() bool { return rec.lastIs(first.Num) }, 2*time.Second, 5*time.Millisecond)
+
+	for _, obf := range chain[1:] {
+		require.NoError(t, b.HandleBlockFile(obf))
+		b.RefreshHeadBlockTime()
+	}
+	require.NotEqual(t, first.Num, b.headTime.head.Load().Num, "the head must have moved")
+	require.False(t, b.headTime.inFlight.Load(), "a refresh inside the throttle interval started a read")
+
+	total := 0
+	for _, obf := range chain {
+		total += opens.count(obf.Num)
+	}
+	require.Equal(t, 1, total, "only the first block may be read inside the throttle interval")
 }
