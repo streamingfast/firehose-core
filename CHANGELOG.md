@@ -14,15 +14,23 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Add the `merged_blocks_lag{app}` metric on firehose and substreams-tier1: the number of final blocks the app has not found in merged-blocks files. It keeps growing when the merger is stopped or too slow.
 - Add `--common-live-hub-max-final-blocks`: the most final blocks firehose and substreams-tier1 hold in memory while the merger is behind (default 20 merged-blocks files worth, 2000 blocks with the default bundle size, at least two files worth).
+- Substreams tier1: `--substreams-tier1-subrequests-disappear-timeout` (default `90s`). The tier1 considers a tier2 disappeared when it sent nothing on a running job for that long, and sends the job again instead of waiting on it until the client disconnects. This covers a tier2 that disappears behind a load balancer that keeps the connection open. `0` turns it off. Counted in the new `substreams_tier1_worker_disappeared_counter` metric.
+- Add `fireproto` support for the `(firehose.block)` message option and the `(firehose.transactions)` and `(firehose.non_deterministic)` `FieldOptions` extensions to annotate Block proto fields with semantic meaning (transaction list and values that may differ between nodes).
+- Add `fireproto` package providing `FindBlockMessage`, `FindTransactionsField`, `TransactionType`, `WalkNonDeterministicFields` and `ClearNonDeterministicFields` to work with those annotations.
 
 ### Changed
 
 - Firehose and substreams-tier1 hold in memory every final block from the start of the last merged-blocks file, instead of a fixed 200 blocks (or two files worth) below the last finalized block. With no merger running they hold up to `--common-live-hub-max-final-blocks`. When one-block files are missing between the last merged-blocks file and the live blocks, they do not get ready and log the missing range every 30s, so streams never skip from merged blocks to live blocks over a hole.
+- Metrics: `reader_node_firehose_block_write_count` and `ready{app="reader_node_firehose"}` are now exported only by processes running `reader-node-firehose`, and the `reader_test_mode_*` metrics only when `--reader-node-test-mode` is enabled. Before, every process exported them, stuck at 0. Dashboards or alerts that read them from other processes will now see no series instead of 0.
+- Bump `github.com/streamingfast/payment-gateway` so the `tgm://` auth plugin sets the auth-method trusted headers (`x-auth-*`). The `auth_method`, `auth_jwt_lifetime_bucket`, `auth_jwt_iat` and `auth_jwt_exp` fields on incoming Firehose and Substreams request logs are now populated when tier1 authenticates through it, instead of always being empty.
 
 ### Fixed
 
 - Fix firehose and substreams-tier1 streams stalling at the last merged-blocks file when the merger falls more than 200 blocks behind.
 - Fix substreams-tier1 placing the linear handoff above the last merged-blocks file when the merger is behind, which left tier2 jobs waiting for files that were not written yet.
+- Reader: `reader-node-stdin` now exports `reader_node_one_block_upload_pending_files`, `reader_node_one_block_upload_oldest_pending_seconds`, `reader_node_invalid_libnum_clamped_count`, `reader_node_line_buffer_size_bytes` and `reader_node_max_read_block_size_bytes`. They were only exported when `reader-node` or `firehose` ran in the same process. Each group is now registered by the code that sets it (the one-block uploader, the block decoding, the line reading), so every reader exports the metrics of what it runs, and none of a feature it doesn't run.
+- Merger: `head_block_time_drift` no longer reports a false spike after a restart. On restart the merger reports the last block of the last merged bundle, which can be over an hour old with large bundles, then bundles the backlog of irreversible blocks in one go. Only the first block of that burst had its time read, so on chains where finality advances in steps the drift held near the restart value until the next step: one epoch, about 6.4 minutes, on Ethereum. The same effect overstated the drift by up to one step during normal operation. The merger now reads the time of the newest irreversible block once a burst ends, still at most one small one-block file read every 5 seconds. Its reads always target the newest block rather than the one that triggered them.
+- Merger: a failed read of a block's time for `head_block_time_drift` is now logged at Warn, at most once a minute, and is not retried for the same block.
 
 ## v1.21.2
 

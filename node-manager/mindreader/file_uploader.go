@@ -23,6 +23,8 @@ type FileUploader struct {
 }
 
 func NewFileUploader(localStore dstore.Store, destinationStore dstore.Store, logger *zap.Logger) *FileUploader {
+	metrics.RegisterOneBlockUploadMetrics()
+
 	return &FileUploader{
 		Shutter:          shutter.New(),
 		complete:         make(chan struct{}),

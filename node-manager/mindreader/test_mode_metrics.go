@@ -4,11 +4,9 @@ import (
 	"github.com/streamingfast/dmetrics"
 )
 
+// testModeMetrics is registered by NewTestModeComparator, so a reader exports these metrics
+// only when test mode is enabled.
 var testModeMetrics = dmetrics.NewSet(dmetrics.PrefixNameWith("reader_test_mode"))
-
-func init() {
-	testModeMetrics.Register()
-}
 
 // Counter metrics
 var TestModeBlocksSeen = testModeMetrics.NewCounter("blocks_seen_total", "Total number of blocks seen in test mode (includes all blocks attempted)")

@@ -129,6 +129,8 @@ func NewMindReaderPlugin(
 
 	testModeEnabled := testModeComparator != nil
 
+	metrics.RegisterBlockReaderMetrics()
+
 	zlogger.Info("creating mindreader plugin",
 		zap.String("one_blocks_store_url", oneBlocksStoreURL),
 		zap.String("one_block_suffix", oneBlockSuffix),
