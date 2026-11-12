@@ -31,12 +31,33 @@ import (
 )
 
 func RegisterReaderNodeStdinApp[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) {
-	appLogger, appTracer := logging.PackageLogger("reader-node-stdin", chain.LoggerPackageID("reader-node-stdin"))
+	registerUnmanagedReaderNodeApp(chain, rootLog,
+		"reader-node-stdin",
+		"Reader Node (stdin)",
+		"Blocks reading node, unmanaged, reads Firehose logs from standard input and transform them into Firehose chain specific blocks",
+		false,
+	)
+}
+
+// RegisterReaderNodeCustomApp registers 'reader-node-custom', the same as 'reader-node-stdin'
+// but without reading standard input: the chain's console reader produces the blocks itself,
+// for example by reading files a node writes, and is never given lines.
+func RegisterReaderNodeCustomApp[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) {
+	registerUnmanagedReaderNodeApp(chain, rootLog,
+		"reader-node-custom",
+		"Reader Node (custom)",
+		"Blocks reading node, unmanaged, gets its blocks from the chain's own console reader instead of standard input or a node process",
+		true,
+	)
+}
+
+func registerUnmanagedReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger, appID, title, description string, noStdin bool) {
+	appLogger, appTracer := logging.PackageLogger(appID, chain.LoggerPackageID(appID))
 
 	launcher.RegisterApp(rootLog, &launcher.AppDef{
-		ID:          "reader-node-stdin",
-		Title:       "Reader Node (stdin)",
-		Description: "Blocks reading node, unmanaged, reads Firehose logs from standard input and transform them into Firehose chain specific blocks",
+		ID:          appID,
+		Title:       title,
+		Description: description,
 		RegisterFlags: func(cmd *cobra.Command) error {
 			// Test mode flags are registered at the global level in reader_node.go
 			return nil
@@ -64,7 +85,7 @@ func RegisterReaderNodeStdinApp[B firecore.Block](chain *firecore.Chain[B], root
 				return chain.ConsoleReaderFactory(lines, chain.BlockEncoder, appLogger, appTracer)
 			}
 
-			metricID := "reader-node-stdin"
+			metricID := appID
 			headBlockTimeDrift := metrics.NewHeadBlockTimeDrift(metricID)
 			headBlockNumber := metrics.NewHeadBlockNumber(metricID)
 			headBlockRelativeTime := metrics.NewHeadBlockRelativeTime(metricID)
@@ -82,6 +103,7 @@ func RegisterReaderNodeStdinApp[B firecore.Block](chain *firecore.Chain[B], root
 				OneBlockSuffix:             viper.GetString("reader-node-one-block-suffix"),
 				LineBufferSizeInBytes:      int64(lineBufferSize),
 				GRPCSecretKey:              os.Expand(viper.GetString("reader-node-grpc-secret-key"), os.Getenv),
+				NoStdin:                    noStdin,
 			}, &nodeReaderStdinApp.Modules{
 				ConsoleReaderFactory:       consoleReaderFactory,
 				MetricsAndReadinessManager: metricsAndReadinessManager,

@@ -19,6 +19,7 @@ This repository contains all the base components of [Firehose](https://firehose.
   - substreams-tier1
   - substreams-tier2
   - (reader-node-stdin -- not run by default)
+  - (reader-node-custom -- not run by default; the chain's console reader produces blocks itself, no stdin)
 
 * You can use a config file like this (default: `firehose.yaml`)
 

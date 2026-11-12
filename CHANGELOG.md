@@ -14,6 +14,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 - Add `fireproto` support for the `(firehose.block)` message option and the `(firehose.transactions)` and `(firehose.non_deterministic)` `FieldOptions` extensions to annotate Block proto fields with semantic meaning (transaction list and values that may differ between nodes).
 - Add `fireproto` package providing `FindBlockMessage`, `FindTransactionsField`, `TransactionType`, `WalkNonDeterministicFields` and `ClearNonDeterministicFields` to work with those annotations.
+- Reader: new `reader-node-custom` app, for chains whose console reader produces blocks itself (for example by tailing files a node writes) instead of parsing lines. It is `reader-node-stdin` without reading standard input: same flags, same one-block and block stream pipeline, metrics under `reader-node-custom`. With `reader-node-stdin`, such a reader stopped as soon as standard input reached its end, which is immediately under systemd (`/dev/null`). Like `reader-node-stdin`, it is not run by default.
 
 ### Changed
 
