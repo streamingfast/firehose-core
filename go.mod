@@ -53,7 +53,7 @@ require (
 	github.com/streamingfast/sf-tracing v0.0.0-20260716142341-6172a527bdd6
 	github.com/streamingfast/shutter v1.5.0
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.27.1-0.20261112154751-4ea0b05a5656
+	github.com/streamingfast/substreams v1.27.1-0.20261112201106-e37a3654faa4
 	github.com/stretchr/testify v1.12.1
 	github.com/test-go/testify v1.1.4
 	github.com/testcontainers/testcontainers-go v0.45.0
