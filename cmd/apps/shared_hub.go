@@ -12,6 +12,7 @@ import (
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/launcher"
+	coremetrics "github.com/streamingfast/firehose-core/metrics"
 	"github.com/streamingfast/logging"
 	ssapp "github.com/streamingfast/substreams/app"
 )
@@ -41,9 +42,15 @@ func sharedLiveHub(runtime *launcher.Runtime) (*hub.ForkableHub, error) {
 	}
 
 	sharedLiveHubOnce.Do(func() {
-		_, oneBlocksStoreURL, _, err := firecore.GetCommonStoresURLs(runtime.AbsDataDir)
+		mergedBlocksStoreURL, oneBlocksStoreURL, _, err := firecore.GetCommonStoresURLs(runtime.AbsDataDir)
 		if err != nil {
 			sharedLiveHubErr = err
+			return
+		}
+
+		mergedBlocksStore, err := dstore.NewDBinStore(mergedBlocksStoreURL)
+		if err != nil {
+			sharedLiveHubErr = fmt.Errorf("failed setting up merged-blocks store from url %q: %w", mergedBlocksStoreURL, err)
 			return
 		}
 
@@ -58,6 +65,9 @@ func sharedLiveHub(runtime *launcher.Runtime) (*hub.ForkableHub, error) {
 			BlockStreamAddr:        blockStreamAddr,
 			MergedBlocksBundleSize: bstream.DefaultMergedBlocksBundleSize,
 			OneBlocksStore:         oneBlocksStore,
+			MergedBlocksStore:      mergedBlocksStore,
+			MaxKeptFinalBlocks:     viper.GetInt("common-live-hub-max-final-blocks"),
+			MergedBlocksLagMetric:  coremetrics.NewMergedBlocksLag("firehose", "substreams-tier1"),
 			Requester:              "firehose+substreams-tier1",
 			Logger:                 liveHubLogger,
 			OnBlock: func(blk *pbbstream.Block) {

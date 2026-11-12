@@ -8,6 +8,18 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Added
+
+- Add the `merged_blocks_lag{app}` metric on firehose and substreams-tier1: the number of blocks between the last finalized block received live and the last block found in merged-blocks files. It keeps growing when the merger is stopped or too slow.
+- Add `--common-live-hub-max-final-blocks`: the most final blocks firehose and substreams-tier1 hold in memory while the merger is behind (default 5000 for firehose, 2000 for substreams-tier1 or when both run in one process).
+
+### Fixed
+
+- Fix firehose and substreams-tier1 streams stalling at the last merged-blocks file when the merger falls more than a few hundred blocks behind: the live hub now keeps its final blocks in memory until they are merged.
+- Fix substreams-tier1 placing the linear handoff above the last merged block when the merger is behind, which left tier2 jobs waiting for merged-blocks files.
+
 ## v1.21.2
 
 ### Added
