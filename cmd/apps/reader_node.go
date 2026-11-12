@@ -183,7 +183,7 @@ func RegisterReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *
 			if err != nil {
 				return nil, err
 			}
-			metrics.LineBufferSize.SetUint64(lineBufferSize)
+			metrics.RegisterLineReaderMetrics(lineBufferSize)
 
 			superviser := sv.SupervisorFactory(chain.ExecutableName, nodePath, nodeArguments, lineBufferSize, appLogger)
 			superviser.RegisterLogPlugin(sv.NewNodeLogPlugin(debugFirehose))
