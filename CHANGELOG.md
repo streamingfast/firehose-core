@@ -8,6 +8,12 @@ Operators, you should copy/paste content of this content straight to your projec
 
 If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you should copy the content between those 2 version to your own repository, replacing placeholder value `fire{chain}` with your chain's own binary.
 
+## Unreleased
+
+### Added
+
+- Substreams tier1: `--substreams-tier1-subrequests-silence-timeout` (default `90s`). The tier1 gives up on a tier2 that sent nothing on a running job for that long and sends the job again, instead of waiting on it until the client disconnects. This covers a tier2 that disappears behind a load balancer that keeps the connection open. Tier2 instances older than v1.18.0 are silent while a single block runs: set the flag above `--substreams-block-execution-timeout`, or to `0` to turn it off, when some are in use. Counted in the new `substreams_tier1_worker_silent_counter` metric.
+
 ## v1.21.2
 
 ### Added

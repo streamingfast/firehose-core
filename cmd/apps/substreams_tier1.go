@@ -65,6 +65,13 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			`))
 			cmd.Flags().Bool("substreams-tier1-enforce-compression", true, "Reject any request that does not accept gzip or zstd encoding in their GRPC/Connect header")
 			cmd.Flags().Int("substreams-tier1-max-subrequests", 4, "default number of parallel subrequests that the tier1 makes to the tier2 per request")
+			cmd.Flags().Duration("substreams-tier1-subrequests-silence-timeout", 90*time.Second, cli.FlagDescription(`
+				How long the tier1 waits for the next message from a tier2 on a running job before it gives up on that tier2
+				and sends the job again. A tier2 reports on a job every 10 seconds, so a silent one is gone, or the path to it
+				is: a load balancer in between can keep the connection open long after the tier2 behind it disappeared.
+				Tier2 instances older than firehose-core v1.18.0 are silent while a single block runs, set this above
+				--substreams-block-execution-timeout when some are in use. 0 waits forever.
+			`))
 			cmd.Flags().String("substreams-tier1-block-type", "", "Block type to use for the substreams tier1 (Ex: sf.ethereum.type.v2.Block)")
 			cmd.Flags().Int("substreams-tier1-active-requests-soft-limit", 0, cli.FlagDescription(`
 				The number of client active requests that a tier1 accepts before starting to be report itself as 'unready' within the health
@@ -237,6 +244,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			config.ServiceDiscoveryURL = serviceDiscoveryURL
 			config.QuickSaveStoreURL = viper.GetString("substreams-tier1-quicksave-store")
 			config.MaxRequestDuration = viper.GetDuration("substreams-tier1-max-request-duration")
+			config.SubrequestSilenceTimeout = viper.GetDuration("substreams-tier1-subrequests-silence-timeout")
 			config.StatusPageTemplateFile = viper.GetString("substreams-tier1-status-page-template")
 			config.FoundationalStoresConfigPath = viper.GetString("substreams-tier1-foundational-stores-config-path")
 			config.HostedStoreRegistryAddress = viper.GetString("substreams-tier1-hosted-store-registry-address")
