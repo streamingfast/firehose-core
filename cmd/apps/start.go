@@ -38,7 +38,6 @@ import (
 	pbfirehose "github.com/streamingfast/pbgo/sf/firehose/v2"
 	tracing "github.com/streamingfast/sf-tracing"
 	"go.uber.org/zap"
-	"golang.org/x/exp/slices"
 )
 
 var StartCmd = &cobra.Command{Use: "start", Args: cobra.ArbitraryArgs}
@@ -171,8 +170,8 @@ func start[B firecore.Block](cmd *cobra.Command, dataDir string, args []string, 
 	rootLog.Debug("launcher created")
 
 	runByDefault := func(app string) bool {
-		appsNotRunningByDefault := []string{"reader-node-stdin", "reader-node-firehose"}
-		return !slices.Contains(appsNotRunningByDefault, app)
+		appDef, found := launcher.AppRegistry[app]
+		return !found || !appDef.NotRunByDefault
 	}
 
 	apps := launcher.ParseAppsFromArgs(args, runByDefault)

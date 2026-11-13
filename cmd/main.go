@@ -142,7 +142,7 @@ func Main[B firecore.Block](chain *firecore.Chain[B]) {
 
 	registerCommonFlags(chain)
 	apps.RegisterReaderNodeApp(chain, rootLog)
-	apps.RegisterReaderNodeStdinApp(chain, rootLog)
+	apps.RegisterReaderNodeStdinApp(chain)
 	apps.RegisterReaderNodeFirehoseApp(chain, rootLog)
 	apps.RegisterMergerApp(rootLog)
 	apps.RegisterRelayerApp(rootLog)
