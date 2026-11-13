@@ -252,7 +252,9 @@ func (m *Merger) run() error {
 				unlinkableCount = 0
 				lastBase = m.bundler.baseBlockNum
 			}
-			if obf.Num > m.bundler.baseBlockNum && !m.bundler.forkable.Linkable(obf.ToBstreamBlock()) {
+			// a walk starts again at the bundle base: blocks at or below the forkable's LIB were already
+			// released as irreversible and Linkable() reports them as unlinkable, so don't count them
+			if obf.Num > m.bundler.baseBlockNum && obf.Num > m.bundler.forkable.LIBNum() && !m.bundler.forkable.Linkable(obf.ToBstreamBlock()) {
 				unlinkableCount++
 				if unlinkableCount > maxUnlinkableBlocks {
 					m.logger.Warn("too many unlinkable blocks, continuing to next loop", zap.Uint64("base", obf.Num), zap.Int("unlinkable_count", unlinkableCount), zap.Stringer("last_seen_block", obf))
