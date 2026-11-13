@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -41,6 +42,11 @@ type Merger struct {
 	oneBlockFilesPruneDistance uint64
 
 	bundler *Bundler
+
+	// blocked is true while the last polling pass could not make progress: a hole in
+	// the merged-blocks files, or a one-block walk cut short by the unlinkable-blocks
+	// circuit breaker. The health check reports NOT_SERVING while it is set.
+	blocked atomic.Bool
 }
 
 func NewMerger(
@@ -210,8 +216,9 @@ func (m *Merger) run() error {
 		}
 
 		base, lib, err := m.io.NextBundle(ctx, m.bundler.baseBlockNum)
+		holeFound := errors.Is(err, ErrHoleFound)
 		if err != nil {
-			if errors.Is(err, ErrHoleFound) {
+			if holeFound {
 				if holeFoundLogged {
 					m.logger.Debug("found hole in merged files. this is not normal behavior unless reprocessing batches", zap.Error(err))
 				} else {
@@ -245,7 +252,9 @@ func (m *Merger) run() error {
 				unlinkableCount = 0
 				lastBase = m.bundler.baseBlockNum
 			}
-			if obf.Num > m.bundler.baseBlockNum && !m.bundler.forkable.Linkable(obf.ToBstreamBlock()) {
+			// a walk starts again at the bundle base: blocks at or below the forkable's LIB were already
+			// released as irreversible and Linkable() reports them as unlinkable, so don't count them
+			if obf.Num > m.bundler.baseBlockNum && obf.Num > m.bundler.forkable.LIBNum() && !m.bundler.forkable.Linkable(obf.ToBstreamBlock()) {
 				unlinkableCount++
 				if unlinkableCount > maxUnlinkableBlocks {
 					m.logger.Warn("too many unlinkable blocks, continuing to next loop", zap.Uint64("base", obf.Num), zap.Int("unlinkable_count", unlinkableCount), zap.Stringer("last_seen_block", obf))
@@ -255,14 +264,15 @@ func (m *Merger) run() error {
 			return m.bundler.HandleBlockFile(obf)
 		})
 
-		switch err {
-		case nil:
+		// stores wrap the callback's error (e.g. dstore's s3 store: "processing object list: %w"), so match with errors.Is
+		switch {
+		case err == nil:
 			consecutiveErrors = 0
-		case errCheckLoop:
+		case errors.Is(err, errCheckLoop):
 			// not an error, the walk was cut short on purpose; still subject to the polling delay below
-		case errTerminating:
+		case errors.Is(err, errTerminating):
 			return nil
-		case ErrStopBlockReached:
+		case errors.Is(err, ErrStopBlockReached):
 			m.logger.Info("stop block reached")
 			return nil
 		default:
@@ -273,6 +283,8 @@ func (m *Merger) run() error {
 			m.logger.Warn("error walking one block files, will retry", zap.Error(err))
 		}
 
+		m.setBlocked(holeFound || errors.Is(err, errCheckLoop))
+
 		m.bundler.RefreshHeadBlockTime()
 
 		if spentTime := time.Since(now); spentTime < m.timeBetweenPolling {
@@ -282,5 +294,16 @@ func (m *Merger) run() error {
 			case <-time.After(m.timeBetweenPolling - spentTime):
 			}
 		}
+	}
+}
+
+func (m *Merger) setBlocked(blocked bool) {
+	if m.blocked.Swap(blocked) == blocked {
+		return
+	}
+	if blocked {
+		m.logger.Warn("merger cannot make progress, reporting unhealthy", zap.Uint64("base", m.bundler.baseBlockNum))
+	} else {
+		m.logger.Info("merger is making progress again, reporting healthy", zap.Uint64("base", m.bundler.baseBlockNum))
 	}
 }
