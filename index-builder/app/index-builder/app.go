@@ -72,6 +72,7 @@ func (a *App) Run() error {
 	a.readinessProbe = pbhealth.NewHealthClient(gs)
 
 	dmetrics.Register(metrics.MetricSet)
+	metrics.AppReadiness.Init()
 
 	a.OnTerminating(indexBuilder.Shutdown)
 	indexBuilder.OnTerminated(a.Shutdown)
