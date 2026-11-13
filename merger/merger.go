@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -41,6 +42,11 @@ type Merger struct {
 	oneBlockFilesPruneDistance uint64
 
 	bundler *Bundler
+
+	// blocked is true while the last polling pass could not make progress: a hole in
+	// the merged-blocks files, or a one-block walk cut short by the unlinkable-blocks
+	// circuit breaker. The health check reports NOT_SERVING while it is set.
+	blocked atomic.Bool
 }
 
 func NewMerger(
@@ -210,8 +216,9 @@ func (m *Merger) run() error {
 		}
 
 		base, lib, err := m.io.NextBundle(ctx, m.bundler.baseBlockNum)
+		holeFound := errors.Is(err, ErrHoleFound)
 		if err != nil {
-			if errors.Is(err, ErrHoleFound) {
+			if holeFound {
 				if holeFoundLogged {
 					m.logger.Debug("found hole in merged files. this is not normal behavior unless reprocessing batches", zap.Error(err))
 				} else {
@@ -273,6 +280,8 @@ func (m *Merger) run() error {
 			m.logger.Warn("error walking one block files, will retry", zap.Error(err))
 		}
 
+		m.setBlocked(holeFound || errors.Is(err, errCheckLoop))
+
 		m.bundler.RefreshHeadBlockTime()
 
 		if spentTime := time.Since(now); spentTime < m.timeBetweenPolling {
@@ -282,5 +291,16 @@ func (m *Merger) run() error {
 			case <-time.After(m.timeBetweenPolling - spentTime):
 			}
 		}
+	}
+}
+
+func (m *Merger) setBlocked(blocked bool) {
+	if m.blocked.Swap(blocked) == blocked {
+		return
+	}
+	if blocked {
+		m.logger.Warn("merger cannot make progress, reporting unhealthy", zap.Uint64("base", m.bundler.baseBlockNum))
+	} else {
+		m.logger.Info("merger is making progress again, reporting healthy", zap.Uint64("base", m.bundler.baseBlockNum))
 	}
 }
