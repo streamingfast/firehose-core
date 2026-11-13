@@ -110,6 +110,7 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 				BlockStreamAddr:         viper.GetString("common-live-blocks-addr"),
 				GRPCListenAddr:          viper.GetString("firehose-grpc-listen-addr"),
 				GRPCShutdownGracePeriod: 1 * time.Second,
+				HubMaxKeptFinalBlocks:   viper.GetInt("common-live-hub-max-final-blocks"),
 				ServiceDiscoveryURL:     serviceDiscoveryURL,
 				ServerOptions:           serverOptions,
 			}, &firehose.Modules{
@@ -118,6 +119,7 @@ func RegisterFirehoseApp[B firecore.Block](chain *firecore.Chain[B], rootLog *za
 				HeadTimeDriftMetric:        headTimeDriftmetric,
 				HeadBlockNumberMetric:      headBlockNumMetric,
 				FinalizedBlockNumberMetric: finalizedBlockNumMetric,
+				MergedBlocksLagMetric:      coremetrics.NewMergedBlocksLag("firehose"),
 				TransformRegistry:          registry,
 				CheckPendingShutdown:       runtime.IsPendingShutdown,
 				InfoServer:                 runtime.InfoServer,

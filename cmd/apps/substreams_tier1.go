@@ -29,6 +29,7 @@ import (
 	_ "github.com/streamingfast/dsession/local"
 	firecore "github.com/streamingfast/firehose-core"
 	"github.com/streamingfast/firehose-core/launcher"
+	coremetrics "github.com/streamingfast/firehose-core/metrics"
 	"github.com/streamingfast/logging"
 	app "github.com/streamingfast/substreams/app"
 	"github.com/streamingfast/substreams/service/active_requests"
@@ -226,6 +227,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 			config.StateStoreDefaultTag = viper.GetString("substreams-state-store-default-tag")
 			config.StateBundleSize = viper.GetUint64("substreams-state-bundle-size")
 			config.MergedBlocksBundleSize = viper.GetUint64("common-merged-blocks-bundle-size")
+			config.HubMaxKeptFinalBlocks = viper.GetInt("common-live-hub-max-final-blocks")
 			config.MaxSubrequests = viper.GetUint64("substreams-tier1-max-subrequests")
 			config.SubrequestsEndpoint = viper.GetString("substreams-tier1-subrequests-endpoint")
 			config.ActiveRequestsSoftLimit = viper.GetInt("substreams-tier1-active-requests-soft-limit")
@@ -292,6 +294,7 @@ func RegisterSubstreamsTier1App[B firecore.Block](chain *firecore.Chain[B], root
 					InfoServer:            runtime.InfoServer,
 					SessionPool:           runtime.SessionPool,
 					ForkableHub:           forkableHub,
+					MergedBlocksLagMetric: coremetrics.NewMergedBlocksLag("substreams-tier1"),
 				}), nil
 		},
 	})

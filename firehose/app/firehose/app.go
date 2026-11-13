@@ -55,6 +55,7 @@ type Config struct {
 	GRPCListenAddr          string        // gRPC address where this app will listen to
 	GRPCShutdownGracePeriod time.Duration // The duration we allow for gRPC connections to terminate gracefully prior forcing shutdown
 	ServiceDiscoveryURL     *url.URL
+	HubMaxKeptFinalBlocks   int             // final blocks the live hub holds at most while merged blocks are behind (0 means 20 merged-blocks files worth)
 	ServerOptions           []server.Option `json:"-"`
 }
 
@@ -70,6 +71,10 @@ type Modules struct {
 
 	// Optional dependencies
 	FinalizedBlockNumberMetric *coremetrics.FinalizedBlockNum
+
+	// MergedBlocksLagMetric reports how many blocks the LIB of the hub this app builds
+	// is ahead of the last merged block. Not used with a shared ForkableHub.
+	MergedBlocksLagMetric *coremetrics.MergedBlocksLag
 
 	// ForkableHub is a hub that another part of the process owns, runs and feeds
 	// metrics from, shared with substreams tier1. When nil, firehose builds and
@@ -152,15 +157,22 @@ func (a *App) Run() error {
 			)
 		})
 
-		forkableHub = hub.NewForkableHubWithOptions(
-			liveSourceFactory,
-			ssapp.HubKeepFinalBlocks(bstream.DefaultMergedBlocksBundleSize),
-			oneBlocksStore,
-			[]hub.Option{
-				hub.WithLogger(a.logger),
-				hub.WithMaxConsecutiveUnlinkableBlocks(maxConsecutiveUnlinkableBlocks),
-			},
-		)
+		maxKeptFinalBlocks := a.config.HubMaxKeptFinalBlocks
+		if maxKeptFinalBlocks == 0 {
+			maxKeptFinalBlocks = ssapp.HubMaxKeptFinalBlocks(bstream.DefaultMergedBlocksBundleSize)
+		}
+
+		hubOptions := []hub.Option{
+			hub.WithLogger(a.logger),
+			hub.WithMaxConsecutiveUnlinkableBlocks(maxConsecutiveUnlinkableBlocks),
+			hub.WithMergedBlocksStore(mergedBlocksStore, bstream.DefaultMergedBlocksBundleSize, maxKeptFinalBlocks),
+		}
+		if a.modules.MergedBlocksLagMetric != nil {
+			hubOptions = append(hubOptions, hub.WithMergedBlocksLagMetric(a.modules.MergedBlocksLagMetric))
+		}
+
+		// keepFinalBlocks is 0: the merged-blocks store decides what the hub keeps
+		forkableHub = hub.NewForkableHubWithOptions(liveSourceFactory, 0, oneBlocksStore, hubOptions)
 		forkableHub.OnTerminated(a.Shutdown)
 
 		go forkableHub.Run()
