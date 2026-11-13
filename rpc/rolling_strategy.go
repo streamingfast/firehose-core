@@ -1,7 +1,7 @@
 package rpc
 
 type RollingStrategy[C any] interface {
-	// reset prepares the strategy for a new [WithClientsContext] call, it does **not**
+	// reset prepares the strategy for a new [Clients.Do] call, it does **not**
 	// change which client is going to be returned first, use [resetToDeclaredOrder] for
 	// that.
 	reset()
@@ -100,7 +100,7 @@ type rollingStrategySequentialOptions struct {
 type RollingStrategySequentialOption func(*rollingStrategySequentialOptions)
 
 // WithSpreadStart makes the strategy spread its *starting* client round-robin
-// across successive [WithClientsContext] calls instead of always starting at
+// across successive [Clients.Do] calls instead of always starting at
 // the pool's first client, while preserving the pool's declared (or last
 // sorted) order for failover once a call has picked its start. It's for pools
 // used by batched/parallel polling, where concurrent calls would otherwise all

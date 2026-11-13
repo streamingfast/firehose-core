@@ -94,7 +94,7 @@ func (c *Clients[C]) Names() []string {
 }
 
 // Reset brings the rolling strategy back to the pool's declared order, so that the
-// next call to [WithClients]/[WithClientsContext] starts again from the first client
+// next call to [Clients.Do] starts again from the first client
 // of the pool. It's the failback operation: a sticky strategy that rolled to a
 // fallback provider after a transient error would otherwise stay on that fallback
 // until the process restarts.
@@ -147,25 +147,28 @@ func (c *Clients[C]) logRoll(from string, to string, err error) {
 	)
 }
 
-func WithClientsContext[C any, V any](clients *Clients[C], ctx context.Context, f func(context.Context, C) (v V, err error)) (v V, err error) {
+// Do calls `f` with a client picked by the rolling strategy, rolling to the next client
+// each time `f` fails until one succeeds or the strategy runs out of clients. Each call
+// to `f` is bounded by the pool's max block fetch duration.
+func (c *Clients[C]) Do[V any](ctx context.Context, f func(context.Context, C) (V, error)) (v V, err error) {
 	var errs error
 
 	// guard the rolling-strategy state (client selection), NOT the call to f
-	clients.lock.Lock()
-	clients.rollingStrategy.reset()
-	client, index, err := clients.rollingStrategy.next(clients)
+	c.lock.Lock()
+	c.rollingStrategy.reset()
+	client, index, err := c.rollingStrategy.next(c)
 	var name string
 	if err == nil {
-		name = clients.nameAt(index)
+		name = c.nameAt(index)
 	}
-	clients.lock.Unlock()
+	c.lock.Unlock()
 	if err != nil {
 		errs = multierror.Append(errs, err)
 		return v, errs
 	}
 
 	for {
-		ctx, cancel := context.WithTimeout(ctx, clients.maxBlockFetchDuration)
+		ctx, cancel := context.WithTimeout(ctx, c.maxBlockFetchDuration)
 
 		v, err := f(ctx, client)
 		cancel()
@@ -173,19 +176,19 @@ func WithClientsContext[C any, V any](clients *Clients[C], ctx context.Context, 
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("provider %q: %w", name, err))
 
-			clients.lock.Lock()
-			nextClient, nextIndex, nextErr := clients.rollingStrategy.next(clients)
+			c.lock.Lock()
+			nextClient, nextIndex, nextErr := c.rollingStrategy.next(c)
 			var nextName string
 			if nextErr == nil {
-				nextName = clients.nameAt(nextIndex)
+				nextName = c.nameAt(nextIndex)
 			}
-			clients.lock.Unlock()
+			c.lock.Unlock()
 			if nextErr != nil {
 				errs = multierror.Append(errs, nextErr)
 				return v, errs
 			}
 
-			clients.logRoll(name, nextName, err)
+			c.logRoll(name, nextName, err)
 
 			client, name = nextClient, nextName
 			continue
@@ -194,6 +197,13 @@ func WithClientsContext[C any, V any](clients *Clients[C], ctx context.Context, 
 	}
 }
 
+// Deprecated: Use `clients.Do(ctx, f)` instead.
+func WithClientsContext[C any, V any](clients *Clients[C], ctx context.Context, f func(context.Context, C) (v V, err error)) (v V, err error) {
+	return clients.Do(ctx, f)
+}
+
+// Deprecated: Use `clients.Do(context.Background(), f)` instead, or better, pass the
+// caller's context.
 func WithClients[C any, V any](clients *Clients[C], f func(context.Context, C) (v V, err error)) (v V, err error) {
-	return WithClientsContext(clients, context.Background(), f)
+	return clients.Do(context.Background(), f)
 }

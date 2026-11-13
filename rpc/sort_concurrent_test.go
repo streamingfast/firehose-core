@@ -13,7 +13,7 @@ import (
 
 // TestSortConcurrentWithPoolAccess is a race-detector regression test: Sort used to
 // read clients.clients and clients.names without holding the lock, while StartSorting
-// ran it on its own goroutine against a pool that AddNamed and WithClientsContext
+// ran it on its own goroutine against a pool that AddNamed and Clients.Do
 // mutate under it.
 func TestSortConcurrentWithPoolAccess(t *testing.T) {
 	clients := NewClients(2*time.Second, NewStickyRollingStrategy[*rollClient](), zlogTest)
@@ -27,7 +27,7 @@ func TestSortConcurrentWithPoolAccess(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < 50; j++ {
-				require.NoError(t, Sort(context.Background(), clients, &testSortFetcher{}, SortDirectionDescending))
+				require.NoError(t, Sort(t.Context(), clients, &testSortFetcher{}, SortDirectionDescending))
 			}
 		}()
 	}
@@ -37,7 +37,7 @@ func TestSortConcurrentWithPoolAccess(t *testing.T) {
 		defer wg.Done()
 		for j := 0; j < 50; j++ {
 			_ = clients.Names()
-			_, _ = WithClients(clients, func(context.Context, *rollClient) (any, error) { return nil, nil })
+			_, _ = clients.Do(t.Context(), func(context.Context, *rollClient) (any, error) { return nil, nil })
 		}
 	}()
 
@@ -84,7 +84,7 @@ func TestSortKeepsClientAddedMidRound(t *testing.T) {
 		clients.AddNamed(&rollClient{name: "c.3", sortValue: 102}, "late-arrival")
 	}}
 
-	require.NoError(t, Sort(context.Background(), clients, fetcher, SortDirectionDescending))
+	require.NoError(t, Sort(t.Context(), clients, fetcher, SortDirectionDescending))
 
 	// The round that raced the Add is discarded and redone, so the late client is not
 	// merely kept, it is sorted along with the rest.
@@ -98,7 +98,7 @@ func TestSortStopsRetryingOnCancelledContext(t *testing.T) {
 	clients := NewClients(2*time.Second, NewStickyRollingStrategy[*rollClient](), zlogTest)
 	clients.Add(&rollClient{name: "c.1", sortValue: 100})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	fetcher := &addingSortFetcher{add: func() {
 		clients.Add(&rollClient{name: "c.2", sortValue: 101})
@@ -122,7 +122,7 @@ func (f *reentrantSortFetcher) FetchSortValue(_ context.Context, client *rollCli
 // TestSortDoesNotHoldLockDuringFetch guards against the tempting fix to the race
 // above, wrapping all of Sort in the lock. FetchSortValue does a network call per
 // client and Sort is handed the app context with no timeout, so holding the lock
-// across the loop lets one hung provider wedge every WithClientsContext in the pool.
+// across the loop lets one hung provider wedge every Clients.Do in the pool.
 func TestSortDoesNotHoldLockDuringFetch(t *testing.T) {
 	clients := NewClients(2*time.Second, NewStickyRollingStrategy[*rollClient](), zlogTest)
 	clients.Add(&rollClient{name: "c.1", sortValue: 100, pool: clients})
@@ -131,7 +131,7 @@ func TestSortDoesNotHoldLockDuringFetch(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		done <- Sort(context.Background(), clients, fetcher, SortDirectionDescending)
+		done <- Sort(t.Context(), clients, fetcher, SortDirectionDescending)
 	}()
 
 	select {

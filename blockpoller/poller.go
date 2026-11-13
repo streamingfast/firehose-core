@@ -275,7 +275,7 @@ func (p *BlockPoller[C]) loadNextBlocks(requestedBlock uint64, numberOfBlockToFe
 		var blockItem *BlockItem
 		err := derr.Retry(p.fetchBlockRetryCount, func(ctx context.Context) error {
 
-			bi, err := rpc.WithClients(p.clients, func(ctx context.Context, client C) (*BlockItem, error) {
+			bi, err := p.clients.Do(ctx, func(ctx context.Context, client C) (*BlockItem, error) {
 				b, skipped, err := p.blockFetcher.Fetch(ctx, client, blockToFetch)
 				if err != nil {
 					return nil, fmt.Errorf("fetching block %d: %w", blockToFetch, err)
@@ -418,7 +418,7 @@ func (p *BlockPoller[C]) fetchBlockWithHash(blkNum uint64, hash string) (*pbbstr
 	var skipped bool
 
 	err := derr.Retry(p.fetchBlockRetryCount, func(ctx context.Context) error {
-		br, err := rpc.WithClients(p.clients, func(ctx context.Context, client C) (br *FetchResponse, err error) {
+		br, err := p.clients.Do(ctx, func(ctx context.Context, client C) (br *FetchResponse, err error) {
 			b, skipped, err := p.blockFetcher.Fetch(ctx, client, blkNum)
 			if err != nil {
 				return nil, fmt.Errorf("fetching block  block %d: %w", blkNum, err)

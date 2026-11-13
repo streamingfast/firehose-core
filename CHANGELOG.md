@@ -26,6 +26,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - Metrics: `reader_node_firehose_block_write_count` and `ready{app="reader_node_firehose"}` are now exported only by processes running `reader-node-firehose`, and the `reader_test_mode_*` metrics only when `--reader-node-test-mode` is enabled. Before, every process exported them, stuck at 0. Dashboards or alerts that read them from other processes will now see no series instead of 0.
 - Bump `github.com/streamingfast/payment-gateway` so the `tgm://` auth plugin sets the auth-method trusted headers (`x-auth-*`). The `auth_method`, `auth_jwt_lifetime_bucket`, `auth_jwt_iat` and `auth_jwt_exp` fields on incoming Firehose and Substreams request logs are now populated when tier1 authenticates through it, instead of always being empty.
 
+### Deprecated
+
+- Deprecate `rpc.WithClients` and `rpc.WithClientsContext` in favor of the generic method `(*rpc.Clients[C]).Do(ctx, f)`. Replace `rpc.WithClientsContext(clients, ctx, f)` with `clients.Do(ctx, f)` and `rpc.WithClients(clients, f)` with `clients.Do(context.Background(), f)`.
+
 ### Fixed
 
 - Tools: `firecore tools check merged-blocks .` (and any local store given as `.`) now finds the files of the current directory. It reported an empty range and `🆗 No hole found`. Bumps `github.com/streamingfast/dstore` for streamingfast/dstore#64.
