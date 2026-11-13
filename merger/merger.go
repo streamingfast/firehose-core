@@ -264,14 +264,15 @@ func (m *Merger) run() error {
 			return m.bundler.HandleBlockFile(obf)
 		})
 
-		switch err {
-		case nil:
+		// stores wrap the callback's error (e.g. dstore's s3 store: "processing object list: %w"), so match with errors.Is
+		switch {
+		case err == nil:
 			consecutiveErrors = 0
-		case errCheckLoop:
+		case errors.Is(err, errCheckLoop):
 			// not an error, the walk was cut short on purpose; still subject to the polling delay below
-		case errTerminating:
+		case errors.Is(err, errTerminating):
 			return nil
-		case ErrStopBlockReached:
+		case errors.Is(err, ErrStopBlockReached):
 			m.logger.Info("stop block reached")
 			return nil
 		default:
