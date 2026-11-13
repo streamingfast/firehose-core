@@ -12,6 +12,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
+- Reader: `bstream_blockstream_subscriptions_closed_full_total` counts relayers (and other block stream subscribers) the reader disconnected because they fell more blocks behind than their subscription channel size (`--reader-node-blocks-chan-capacity`, at least 200). Each one used to show only as a `reach max buffer size for subcription` log line. From bumping `github.com/streamingfast/bstream` to include streamingfast/bstream#93.
 - Add the `merged_blocks_lag{app}` metric on firehose and substreams-tier1: the number of final blocks the app has not found in merged-blocks files. It keeps growing when the merger is stopped or too slow.
 - Add `--common-live-hub-max-final-blocks`: the most final blocks firehose and substreams-tier1 hold in memory while the merger is behind (default 20 merged-blocks files worth, 2000 blocks with the default bundle size, at least two files worth).
 - Substreams tier1: `--substreams-tier1-subrequests-disappear-timeout` (default `90s`). The tier1 considers a tier2 disappeared when it sent nothing on a running job for that long, and sends the job again instead of waiting on it until the client disconnects. This covers a tier2 that disappears behind a load balancer that keeps the connection open. `0` turns it off. Counted in the new `substreams_tier1_worker_disappeared_counter` metric.
