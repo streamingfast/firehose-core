@@ -28,6 +28,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Fixed
 
+- Tools: `firecore tools check merged-blocks .` (and any local store given as `.`) now finds the files of the current directory. It reported an empty range and `🆗 No hole found`. Bumps `github.com/streamingfast/dstore` for streamingfast/dstore#64.
 - Fix firehose and substreams-tier1 streams stalling at the last merged-blocks file when the merger falls more than 200 blocks behind.
 - Fix substreams-tier1 placing the linear handoff above the last merged-blocks file when the merger is behind, which left tier2 jobs waiting for files that were not written yet.
 - Reader: `reader-node-stdin` now exports `reader_node_one_block_upload_pending_files`, `reader_node_one_block_upload_oldest_pending_seconds`, `reader_node_invalid_libnum_clamped_count`, `reader_node_line_buffer_size_bytes` and `reader_node_max_read_block_size_bytes`. They were only exported when `reader-node` or `firehose` ran in the same process. Each group is now registered by the code that sets it (the one-block uploader, the block decoding, the line reading), so every reader exports the metrics of what it runs, and none of a feature it doesn't run.
