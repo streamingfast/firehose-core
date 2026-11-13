@@ -272,6 +272,60 @@ func TestMergerRun_CheckLoopRespectsPollingDelay(t *testing.T) {
 	assert.GreaterOrEqual(t, time.Since(start), 3*delay, "errCheckLoop must not skip the polling delay")
 }
 
+// TestMergerRun_WrappedCheckLoopIsNotAnError verifies that errCheckLoop is still
+// recognized when the store wraps the callback's error, as dstore's s3 store does
+// ("processing object list: %w"). Otherwise each cut-short walk counts toward the
+// consecutive errors limit and a merger waiting on a gap shuts down after 10 walks.
+func TestMergerRun_WrappedCheckLoopIsNotAnError(t *testing.T) {
+	const bundleSize = uint64(10) // maxUnlinkableBlocks = 40
+
+	var allBlocks []*bstream.OneBlockFile
+	allBlocks = append(allBlocks, buildChain(10, 19, nil)...)
+	allBlocks = append(allBlocks, buildChain(61, 120, nil)...) // 41+ unlinkable, trips errCheckLoop
+
+	walkCallCount := 0
+	checkLoopCount := 0
+	var merger *Merger
+
+	testIO := &TestMergerIO{
+		NextBundleFunc: func(_ context.Context, lowestBaseBlock uint64) (uint64, bstream.BlockRef, error) {
+			if lowestBaseBlock < 10 {
+				return 10, libRef(9), nil
+			}
+			return lowestBaseBlock, nil, nil
+		},
+		WalkOneBlockFilesFunc: func(_ context.Context, inclusiveLowerBlock uint64, callback func(*bstream.OneBlockFile) error) error {
+			walkCallCount++
+			if walkCallCount > 15 {
+				merger.Shutdown(nil)
+				return nil
+			}
+			for _, blk := range allBlocks {
+				if blk.Num < inclusiveLowerBlock {
+					continue
+				}
+				if err := callback(blk); err != nil {
+					if errors.Is(err, errCheckLoop) {
+						checkLoopCount++
+					}
+					return fmt.Errorf("processing object list: %w", err)
+				}
+			}
+			return nil
+		},
+		MergeAndStoreFunc: func(_ context.Context, _ uint64, _ []*bstream.OneBlockFile) error {
+			return nil
+		},
+	}
+
+	merger = newRunTestMerger(testIO, 0, bundleSize, 1)
+	err := merger.run()
+	require.NoError(t, err, "a wrapped errCheckLoop must not count toward the consecutive errors limit")
+	merger.bundler.WaitForMerges()
+
+	assert.Equal(t, 15, checkLoopCount, "fixture must trip errCheckLoop on every full walk")
+}
+
 // TestMergerRun_MaxUnlinkableBlocksEnvOverride verifies that MERGER_MAX_UNLINKABLE_BLOCKS
 // raises the maxUnlinkableBlocks circuit breaker above its bundleSize*4 default, letting the
 // merger walk through a gap that would otherwise trip errCheckLoop — same gap as
