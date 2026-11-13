@@ -32,9 +32,10 @@ func RegisterReaderNodeFirehoseApp[B firecore.Block](chain *firecore.Chain[B], r
 	appLogger, appTracer := logging.PackageLogger("reader-node-firehose", chain.LoggerPackageID("reader-node-firehose"))
 
 	launcher.RegisterApp(rootLog, &launcher.AppDef{
-		ID:          "reader-node-firehose",
-		Title:       "Reader Node (Firehose)",
-		Description: "Blocks reading node, consumes blocks from an already existing Firehose endpoint. This can be used to set up an indexer stack without having to run an instrumented blockchain node.",
+		ID:              "reader-node-firehose",
+		Title:           "Reader Node (Firehose)",
+		Description:     "Blocks reading node, consumes blocks from an already existing Firehose endpoint. This can be used to set up an indexer stack without having to run an instrumented blockchain node.",
+		NotRunByDefault: true,
 		RegisterFlags: func(cmd *cobra.Command) error {
 			cmd.Flags().String("reader-node-firehose-endpoint", "", "Firehose endpoint to connect to.")
 			cmd.Flags().String("reader-node-firehose-state", "{data-dir}/reader/state", "State file to store the cursor from the Firehose connection in.")
