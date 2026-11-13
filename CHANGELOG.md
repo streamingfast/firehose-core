@@ -12,6 +12,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Added
 
+- Block poller: warns `start block is above the chain head block, the poller waits until the chain reaches it` on startup when it starts from its start block (no cursor, or the cursor is ignored) and that block is above the chain's head block. The poller waits for the block to be produced, which looked like a stuck poller. The check needs the chain's block fetcher to implement the optional `blockpoller.HeadBlockNumberFetcher`; fetchers that don't are unaffected.
 - Add the `merged_blocks_lag{app}` metric on firehose and substreams-tier1: the number of final blocks the app has not found in merged-blocks files. It keeps growing when the merger is stopped or too slow.
 - Add `--common-live-hub-max-final-blocks`: the most final blocks firehose and substreams-tier1 hold in memory while the merger is behind (default 20 merged-blocks files worth, 2000 blocks with the default bundle size, at least two files worth).
 - Substreams tier1: `--substreams-tier1-subrequests-disappear-timeout` (default `90s`). The tier1 considers a tier2 disappeared when it sent nothing on a running job for that long, and sends the job again instead of waiting on it until the client disconnects. This covers a tier2 that disappears behind a load balancer that keeps the connection open. `0` turns it off. Counted in the new `substreams_tier1_worker_disappeared_counter` metric.
