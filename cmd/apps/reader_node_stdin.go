@@ -27,11 +27,10 @@ import (
 	"github.com/streamingfast/firehose-core/node-manager/metrics"
 	"github.com/streamingfast/firehose-core/node-manager/mindreader"
 	"github.com/streamingfast/logging"
-	"go.uber.org/zap"
 )
 
-func RegisterReaderNodeStdinApp[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) {
-	RegisterUnmanagedReaderNodeApp(chain, rootLog, UnmanagedReaderNodeOptions{
+func RegisterReaderNodeStdinApp[B firecore.Block](chain *firecore.Chain[B]) {
+	RegisterUnmanagedReaderNodeApp(chain, UnmanagedReaderNodeOptions{
 		ID:          "reader-node-stdin",
 		Title:       "Reader Node (stdin)",
 		Description: "Blocks reading node, unmanaged, reads Firehose logs from standard input and transform them into Firehose chain specific blocks",
@@ -58,10 +57,10 @@ type UnmanagedReaderNodeOptions struct {
 //
 // A chain binary calls it before calling `Main` from `github.com/streamingfast/firehose-core/cmd`
 // to add its own reader app.
-func RegisterUnmanagedReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger, opts UnmanagedReaderNodeOptions) {
+func RegisterUnmanagedReaderNodeApp[B firecore.Block](chain *firecore.Chain[B], opts UnmanagedReaderNodeOptions) {
 	appLogger, appTracer := logging.PackageLogger(opts.ID, chain.LoggerPackageID(opts.ID))
 
-	launcher.RegisterApp(rootLog, &launcher.AppDef{
+	launcher.RegisterApp(appLogger, &launcher.AppDef{
 		ID:              opts.ID,
 		Title:           opts.Title,
 		Description:     opts.Description,
