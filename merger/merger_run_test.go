@@ -326,6 +326,79 @@ func TestMergerRun_WrappedCheckLoopIsNotAnError(t *testing.T) {
 	assert.Equal(t, 15, checkLoopCount, "fixture must trip errCheckLoop on every full walk")
 }
 
+// TestMergerRun_RewalkBelowLIBIsNotUnlinkable verifies that a walk starting
+// again at the bundle base does not count the blocks the forkable already
+// released as irreversible as unlinkable. With several readers writing a file
+// per block, a LIB near the end of the bundle used to fill maxUnlinkableBlocks
+// with those files before the walk reached any new block, so the bundle never
+// completed until a restart.
+func TestMergerRun_RewalkBelowLIBIsNotUnlinkable(t *testing.T) {
+	const bundleSize = uint64(10) // maxUnlinkableBlocks = 40
+	const readers = 6
+
+	files := func(from, to uint64) (out []*bstream.OneBlockFile) {
+		for n := from; n <= to; n++ {
+			for r := 0; r < readers; r++ {
+				out = append(out, bstream.MustNewOneBlockFile(fmt.Sprintf("%010d-%016xa-%016xa-%d-r%d", n, n, n-1, n, r)))
+			}
+		}
+		return
+	}
+
+	walkCallCount := 0
+	checkLoopCount := 0
+	var mergedBases []uint64
+	var mu sync.Mutex
+	var merger *Merger
+
+	testIO := &TestMergerIO{
+		NextBundleFunc: func(_ context.Context, lowestBaseBlock uint64) (uint64, bstream.BlockRef, error) {
+			if lowestBaseBlock < 10 {
+				return 10, libRef(9), nil
+			}
+			return lowestBaseBlock, nil, nil
+		},
+		WalkOneBlockFilesFunc: func(_ context.Context, inclusiveLowerBlock uint64, callback func(*bstream.OneBlockFile) error) error {
+			walkCallCount++
+			if walkCallCount > 4 {
+				merger.Shutdown(nil)
+				return nil
+			}
+			// first walk ends with the LIB near the end of bundle 30, then block 40 arrives
+			available := files(10, 39)
+			if walkCallCount > 1 {
+				available = files(10, 45)
+			}
+			for _, obf := range available {
+				if obf.Num < inclusiveLowerBlock {
+					continue
+				}
+				if err := callback(obf); err != nil {
+					if errors.Is(err, errCheckLoop) {
+						checkLoopCount++
+					}
+					return err
+				}
+			}
+			return nil
+		},
+		MergeAndStoreFunc: func(_ context.Context, base uint64, _ []*bstream.OneBlockFile) error {
+			mu.Lock()
+			mergedBases = append(mergedBases, base)
+			mu.Unlock()
+			return nil
+		},
+	}
+
+	merger = newRunTestMerger(testIO, 0, bundleSize, 1)
+	err := merger.run()
+	require.NoError(t, err)
+	merger.bundler.WaitForMerges()
+
+	assert.Equal(t, 0, checkLoopCount, "re-walked blocks at or below the LIB must not count as unlinkable")
+	assert.Contains(t, mergedBases, uint64(30), "bundle 30 must complete once block 40 arrives")
+}
+
 // TestMergerRun_MaxUnlinkableBlocksEnvOverride verifies that MERGER_MAX_UNLINKABLE_BLOCKS
 // raises the maxUnlinkableBlocks circuit breaker above its bundleSize*4 default, letting the
 // merger walk through a gap that would otherwise trip errCheckLoop — same gap as
