@@ -13,6 +13,10 @@ type AppDef struct {
 	RegisterFlags func(cmd *cobra.Command) error
 	InitFunc      func(runtime *Runtime) error
 	FactoryFunc   func(runtime *Runtime) (App, error)
+
+	// NotRunByDefault, when true, leaves the app out of `start` when no app is named
+	// or when `all` is used; it runs only when named explicitly.
+	NotRunByDefault bool
 }
 
 func (a *AppDef) String() string {

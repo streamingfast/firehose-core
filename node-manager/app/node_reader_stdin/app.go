@@ -58,6 +58,11 @@ type Config struct {
 	// The value supports ${ENV_VAR} interpolation (resolved before this struct is
 	// populated by the caller).
 	GRPCSecretKey string
+
+	// NoStdin, when true, does not read standard input at all. Blocks then come only
+	// from the chain's console reader, which produces them itself (for example by
+	// reading files a node writes) instead of parsing lines.
+	NoStdin bool
 }
 
 type Modules struct {
@@ -90,7 +95,12 @@ func New(c *Config, modules *Modules, testModeComparator *mindreader.TestModeCom
 }
 
 func (a *App) Run() error {
-	a.zlogger.Info("launching reader-node app (reading from stdin)",
+	source := "reading from stdin"
+	if a.Config.NoStdin {
+		source = "blocks from the chain's console reader"
+	}
+
+	a.zlogger.Info("launching reader-node app ("+source+")",
 		zap.Reflect("config", a.Config),
 		zap.Object("test_mode", a.testModeComparator),
 	)
@@ -161,6 +171,10 @@ func (a *App) Run() error {
 	a.zlogger.Debug("running reader log plugin")
 	mindreaderLogPlugin.Launch()
 	go a.modules.MetricsAndReadinessManager.Launch()
+
+	if a.Config.NoStdin {
+		return nil
+	}
 
 	var logPlugin *logplugin.ToZapLogPlugin
 	if a.Config.LogToZap {

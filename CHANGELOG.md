@@ -17,6 +17,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - Substreams tier1: `--substreams-tier1-subrequests-disappear-timeout` (default `90s`). The tier1 considers a tier2 disappeared when it sent nothing on a running job for that long, and sends the job again instead of waiting on it until the client disconnects. This covers a tier2 that disappears behind a load balancer that keeps the connection open. `0` turns it off. Counted in the new `substreams_tier1_worker_disappeared_counter` metric.
 - Add `fireproto` support for the `(firehose.block)` message option and the `(firehose.transactions)` and `(firehose.non_deterministic)` `FieldOptions` extensions to annotate Block proto fields with semantic meaning (transaction list and values that may differ between nodes).
 - Add `fireproto` package providing `FindBlockMessage`, `FindTransactionsField`, `TransactionType`, `WalkNonDeterministicFields` and `ClearNonDeterministicFields` to work with those annotations.
+- Add `apps.RegisterUnmanagedReaderNodeApp` so a chain binary can register its own reader app running the `reader-node-stdin` pipeline under its own name. With `NoStdin: true`, the app does not read standard input and its console reader produces blocks itself, so it does not stop when standard input closes (immediately under systemd).
+- Add `NotRunByDefault` to `launcher.AppDef` to keep an app out of `start` unless it is named.
 
 ### Changed
 
@@ -27,6 +29,8 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Fixed
 
+- Tools: `firecore tools check merged-blocks` with `--validate-blocks` or `-s` no longer reports `🆗 No hole found` when blocks are missing inside the merged-blocks files. Blocks that do not link to the chain were only shown as `🔶 Block #N is not linkable` lines and a `🔶 Range … has issues with forks` line, while the summary looked at missing file names only. The summary now prints `🆘 Unlinkable blocks found!` with how many blocks do not link, from which to which block, and the last linkable block.
+- Tools: `firecore tools check merged-blocks .` (and any local store given as `.`) now finds the files of the current directory. It reported an empty range and `🆗 No hole found`. Bumps `github.com/streamingfast/dstore` for streamingfast/dstore#64.
 - Fix firehose and substreams-tier1 streams stalling at the last merged-blocks file when the merger falls more than 200 blocks behind.
 - Fix substreams-tier1 placing the linear handoff above the last merged-blocks file when the merger is behind, which left tier2 jobs waiting for files that were not written yet.
 - Reader: `reader-node-stdin` now exports `reader_node_one_block_upload_pending_files`, `reader_node_one_block_upload_oldest_pending_seconds`, `reader_node_invalid_libnum_clamped_count`, `reader_node_line_buffer_size_bytes` and `reader_node_max_read_block_size_bytes`. They were only exported when `reader-node` or `firehose` ran in the same process. Each group is now registered by the code that sets it (the one-block uploader, the block decoding, the line reading), so every reader exports the metrics of what it runs, and none of a feature it doesn't run.
