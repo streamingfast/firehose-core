@@ -28,6 +28,7 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 
 ### Fixed
 
+- Tools: `firecore tools check merged-blocks` with `--validate-blocks` or `-s` no longer reports `🆗 No hole found` when blocks are missing inside the merged-blocks files. Blocks that do not link to the chain were only shown as `🔶 Block #N is not linkable` lines and a `🔶 Range … has issues with forks` line, while the summary looked at missing file names only. The summary now prints `🆘 Unlinkable blocks found!` with how many blocks do not link, from which to which block, and the last linkable block.
 - Tools: `firecore tools check merged-blocks .` (and any local store given as `.`) now finds the files of the current directory. It reported an empty range and `🆗 No hole found`. Bumps `github.com/streamingfast/dstore` for streamingfast/dstore#64.
 - Fix firehose and substreams-tier1 streams stalling at the last merged-blocks file when the merger falls more than 200 blocks behind.
 - Fix substreams-tier1 placing the linear handoff above the last merged-blocks file when the merger is behind, which left tier2 jobs waiting for files that were not written yet.
