@@ -156,6 +156,47 @@ func TestCheckMergedBlocks_UnlinkableBlocksAreInSummary(t *testing.T) {
 	assert.NotContains(t, holesOnly, "Unlinkable blocks found")
 }
 
+func TestCheckMergedBlocks_HideShortSegments(t *testing.T) {
+	tmp := t.TempDir()
+	storeURL := "file://" + filepath.Join(tmp, "merged-blocks")
+
+	store, err := dstore.NewDBinStore(storeURL)
+	require.NoError(t, err)
+
+	// 0000000200 is short (block numbers skipped, still linkable), 0000000300 is bloated
+	writeCheckMergedFile(t, store, "0000000100", 100, 199, nil)
+	writeShortLinkedFile(t, store, "0000000200", 199, []uint64{200, 210, 250, 299})
+	writeCheckMergedFile(t, store, "0000000300", 300, 399, []uint64{420})
+
+	shown := runCheckMergedBlocks(t, storeURL, 100, types.NewClosedRange(100, 400), MergedBlocksCheckOptions{ValidateBlocks: true})
+	assert.Contains(t, shown, "🔶 Segment 0000000200 contained only 4 blocks (< 100)")
+
+	hidden := runCheckMergedBlocks(t, storeURL, 100, types.NewClosedRange(100, 400), MergedBlocksCheckOptions{ValidateBlocks: true, HideShortSegments: true})
+	assert.NotContains(t, hidden, "contained only")
+	assert.Contains(t, hidden, "Merged blocks file 0000000300 holds 1 block(s) beyond its bundle boundary", "other findings are still printed")
+	assert.Contains(t, hidden, "🆗 No hole found", "skipped block numbers are not holes")
+}
+
+// writeShortLinkedFile writes blocks that skip numbers but each link to the previous one,
+// like a chain that skips slots, the first one linking to parentNum.
+func writeShortLinkedFile(t *testing.T, store dstore.Store, name string, parentNum uint64, nums []uint64) {
+	t.Helper()
+
+	var buf bytes.Buffer
+	writer, err := bstream.NewDBinBlockWriter(&buf)
+	require.NoError(t, err)
+
+	for _, num := range nums {
+		block := newCheckTestBlock(num)
+		block.ParentNum = parentNum
+		block.ParentId = fmt.Sprintf("%08x", parentNum)
+		require.NoError(t, writer.Write(block))
+		parentNum = num
+	}
+
+	require.NoError(t, store.WriteObject(context.Background(), name, bytes.NewReader(buf.Bytes())))
+}
+
 // runCheckMergedBlocks runs the checker on a local store and returns its stdout.
 func runCheckMergedBlocks(t *testing.T, storeURL string, bundleSize uint64, blockRange types.BlockRange, options MergedBlocksCheckOptions) string {
 	t.Helper()
