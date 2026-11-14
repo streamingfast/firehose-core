@@ -38,6 +38,11 @@ type MergedBlocksCheckOptions struct {
 	// ValidateBlocks reads every file and validates its content: bundle boundaries,
 	// block ordering and chain linkability.
 	ValidateBlocks bool
+
+	// HideShortSegments drops the line printed for each file holding fewer blocks than the
+	// bundle size. On chains that skip block numbers (Solana skips slots) most files are
+	// short, and the line drowns the real findings.
+	HideShortSegments bool
 }
 
 func (o MergedBlocksCheckOptions) readAllBlocks() bool {
@@ -112,7 +117,7 @@ func CheckMergedBlocksWithOptions[B firecore.Block](ctx context.Context, chain *
 		expected = baseNum + fileBlockSize
 
 		if readAllBlocks {
-			lowestBlockSegment, highestBlockSegment, broken := validateBlockSegment(ctx, chain, blocksStore, filename, baseNum, fileBlockSize, blockRange, options.PrintDetails, tfdb)
+			lowestBlockSegment, highestBlockSegment, broken := validateBlockSegment(ctx, chain, blocksStore, filename, baseNum, fileBlockSize, blockRange, options.PrintDetails, options.HideShortSegments, tfdb)
 			if lowestBlockSegment < lowestBlockSeen {
 				lowestBlockSeen = lowestBlockSegment
 			}
@@ -318,6 +323,7 @@ func validateBlockSegment[B firecore.Block](
 	fileBlockSize uint64,
 	blockRange types.BlockRange,
 	printDetails PrintDetails,
+	hideShortSegments bool,
 	tfdb *trackedForkDB,
 ) (lowestBlockSeen, highestBlockSeen uint64, broken bool) {
 	lowestBlockSeen = firecore.MaxUint64
@@ -430,7 +436,7 @@ func validateBlockSegment[B firecore.Block](
 		}
 
 		if block == nil && errors.Is(err, io.EOF) {
-			if seenBlockCount < expectedBlockCount(segment, fileBlockSize) {
+			if !hideShortSegments && seenBlockCount < expectedBlockCount(segment, fileBlockSize) {
 				fmt.Printf("🔶 Segment %s contained only %d blocks (< %d), this can happen on some chains\n", segment, seenBlockCount, fileBlockSize)
 			}
 

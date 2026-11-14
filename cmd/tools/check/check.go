@@ -67,6 +67,7 @@ func NewCheckCommand[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Lo
 	toolsCheckMergedBlocksCmd.Flags().BoolP("validate-blocks", "b", false, "Read every merged-blocks file and validate its content: block numbers within the bundle boundaries claimed by the file name, block ordering and chain linkability. Without it only the file names are listed, which finds holes but not corrupted bundles")
 	toolsCheckMergedBlocksCmd.Flags().BoolP("print-stats", "s", false, "Natively decode each block in the segment and print statistics about it, ensuring it contains the required blocks (implies --validate-blocks)")
 	toolsCheckMergedBlocksCmd.Flags().BoolP("print-full", "f", false, "Natively decode each block and print the full JSON representation of the block, should be used with a small range only if you don't want to be overwhelmed (implies --validate-blocks)")
+	toolsCheckMergedBlocksCmd.Flags().Bool("hide-short-segments", false, "Don't print the 'Segment ... contained only N blocks' line for files holding fewer blocks than the bundle size. Useful on chains that skip block numbers (Solana skips slots), where most files are short")
 
 	toolsCheckForksCmd.Flags().Uint64("min-depth", 1, "Only show forks that are at least this deep")
 	toolsCheckForksCmd.Flags().Uint64("after-block", 0, "Only show forks that happened after this block number, if value is not 0")
@@ -109,8 +110,9 @@ func createToolsCheckMergedBlocksE[B firecore.Block](chain *firecore.Chain[B], r
 		}
 
 		return CheckMergedBlocksWithOptions(cmd.Context(), chain, rootLog, storeURL, fileBlockSize, blockRange, MergedBlocksCheckOptions{
-			PrintDetails:   printDetails,
-			ValidateBlocks: sflags.MustGetBool(cmd, "validate-blocks"),
+			PrintDetails:      printDetails,
+			ValidateBlocks:    sflags.MustGetBool(cmd, "validate-blocks"),
+			HideShortSegments: sflags.MustGetBool(cmd, "hide-short-segments"),
 		})
 	}
 }
