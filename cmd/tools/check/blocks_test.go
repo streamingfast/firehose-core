@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/streamingfast/bstream"
@@ -154,6 +155,72 @@ func TestCheckMergedBlocks_UnlinkableBlocksAreInSummary(t *testing.T) {
 	holesOnly := runCheckMergedBlocks(t, storeURL, 100, types.NewClosedRange(100, 400), MergedBlocksCheckOptions{})
 	assert.Contains(t, holesOnly, "🆗 No hole found", "linkability is only known when the blocks are read")
 	assert.NotContains(t, holesOnly, "Unlinkable blocks found")
+}
+
+// writeParallelTestStore writes 60 bundles from 100 with one of each problem: a missing
+// file, a file lacking blocks (unlinkable after it), a bloated file and a short file.
+func writeParallelTestStore(t *testing.T) string {
+	t.Helper()
+
+	storeURL := "file://" + filepath.Join(t.TempDir(), "merged-blocks")
+	store, err := dstore.NewDBinStore(storeURL)
+	require.NoError(t, err)
+
+	for base := uint64(100); base < 6100; base += 100 {
+		name := fmt.Sprintf("%010d", base)
+		switch base {
+		case 3000:
+			// missing
+		case 1500:
+			writeCheckMergedBlocks(t, store, name, append(blockNums(1500, 1539), blockNums(1560, 1599)...))
+		case 4200:
+			writeCheckMergedFile(t, store, name, 4200, 4299, []uint64{4320})
+		case 5100:
+			writeCheckMergedBlocks(t, store, name, blockNums(5100, 5149))
+		default:
+			writeCheckMergedFile(t, store, name, base, base+99, nil)
+		}
+	}
+
+	return storeURL
+}
+
+func TestCheckMergedBlocks_ParallelOutputMatchesSequential(t *testing.T) {
+	storeURL := writeParallelTestStore(t)
+	blockRange := types.NewClosedRange(100, 6100)
+
+	sequential := runCheckMergedBlocks(t, storeURL, 100, blockRange, MergedBlocksCheckOptions{ValidateBlocks: true})
+	// the store must exercise every kind of output for the comparison to mean something
+	assert.Contains(t, sequential, "❌ Range [#3 000, #3 099] (Missing")
+	assert.Contains(t, sequential, "🔶 Block #1560 is not linkable at this point")
+	assert.Contains(t, sequential, "Merged blocks file 0000004200 holds 1 block(s) beyond its bundle boundary")
+	assert.Contains(t, sequential, "🔶 Segment 0000005100 contained only 50 blocks")
+	assert.Contains(t, sequential, "🆘 Holes found!")
+
+	for _, parallel := range []int{2, 4, 8, 16} {
+		out := runCheckMergedBlocks(t, storeURL, 100, blockRange, MergedBlocksCheckOptions{ValidateBlocks: true, Parallel: parallel})
+		assert.Equal(t, sequential, out, "parallel %d", parallel)
+	}
+}
+
+func TestCheckMergedBlocks_ParallelPrintStatsMatchesSequential(t *testing.T) {
+	storeURL := writeParallelTestStore(t)
+	blockRange := types.NewClosedRange(100, 6100)
+
+	// the stats print each block's age, which changes between any two runs
+	age := regexp.MustCompile(`\(age [^)]*\)`)
+
+	sequential := runCheckMergedBlocks(t, storeURL, 100, blockRange, MergedBlocksCheckOptions{PrintDetails: PrintStats})
+	out := runCheckMergedBlocks(t, storeURL, 100, blockRange, MergedBlocksCheckOptions{PrintDetails: PrintStats, Parallel: 8})
+	assert.Contains(t, sequential, "(age ", "the stats must be printed for the comparison to mean something")
+	assert.Equal(t, age.ReplaceAllString(sequential, "(age)"), age.ReplaceAllString(out, "(age)"))
+}
+
+func TestCheckMergedBlocks_ParallelRefusesPrintFull(t *testing.T) {
+	storeURL := writeParallelTestStore(t)
+
+	err := CheckMergedBlocksWithOptions(context.Background(), &firecore.Chain[*pbbstream.Block]{}, zap.NewNop(), storeURL, 100, types.NewClosedRange(100, 6100), MergedBlocksCheckOptions{PrintDetails: PrintFull, Parallel: 4})
+	assert.ErrorContains(t, err, "cannot run in parallel")
 }
 
 // runCheckMergedBlocks runs the checker on a local store and returns its stdout.

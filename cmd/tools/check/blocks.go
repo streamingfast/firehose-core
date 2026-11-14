@@ -2,10 +2,7 @@ package check
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
-	"os"
 	"regexp"
 	"strconv"
 
@@ -14,7 +11,6 @@ import (
 	pbbstream "github.com/streamingfast/bstream/pb/sf/bstream/v1"
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
-	print2 "github.com/streamingfast/firehose-core/cmd/tools/print"
 	"github.com/streamingfast/firehose-core/types"
 	"go.uber.org/zap"
 )
@@ -38,6 +34,13 @@ type MergedBlocksCheckOptions struct {
 	// ValidateBlocks reads every file and validates its content: bundle boundaries,
 	// block ordering and chain linkability.
 	ValidateBlocks bool
+
+	// Parallel is how many merged-blocks files are read at the same time when their content
+	// is read. Each file is downloaded, decoded and checked against its bundle boundaries
+	// concurrently, but the results are linked into the chain and printed in file order, so
+	// the output is the same as a sequential run and at most Parallel files are held in
+	// memory. Zero or one reads the files one at a time. Not supported with PrintFull.
+	Parallel int
 }
 
 func (o MergedBlocksCheckOptions) readAllBlocks() bool {
@@ -52,6 +55,11 @@ func CheckMergedBlocks[B firecore.Block](ctx context.Context, chain *firecore.Ch
 
 func CheckMergedBlocksWithOptions[B firecore.Block](ctx context.Context, chain *firecore.Chain[B], logger *zap.Logger, storeURL string, fileBlockSize uint64, blockRange types.BlockRange, options MergedBlocksCheckOptions) error {
 	readAllBlocks := options.readAllBlocks()
+	parallel := max(options.Parallel, 1)
+	if parallel > 1 && options.PrintDetails == PrintFull {
+		return fmt.Errorf("printing full blocks cannot run in parallel, use a parallelism of 1")
+	}
+
 	fmt.Printf("Checking block holes on %s\n", storeURL)
 	if readAllBlocks {
 		fmt.Println("Content validation requested: all block files will be read, their blocks checked against the bundle boundaries of their file name and for continuity. This may take a while...")
@@ -80,7 +88,52 @@ func CheckMergedBlocksWithOptions[B firecore.Block](ctx context.Context, chain *
 		fdb: forkable.NewForkDB(),
 	}
 
-	logger.Debug("walking merged blocks", zap.Stringer("block_range", blockRange), zap.String("walk_prefix", walkPrefix))
+	// apply links one file into the chain and prints everything about it, always in file
+	// order and from a single goroutine: tfdb and the counters below are not shared
+	apply := func(item *checkItem) {
+		for _, line := range item.before {
+			fmt.Print(line)
+		}
+
+		if item.content != nil {
+			lowestBlockSegment, highestBlockSegment, broken := item.content.apply(tfdb)
+			if lowestBlockSegment < lowestBlockSeen {
+				lowestBlockSeen = lowestBlockSegment
+			}
+			if highestBlockSegment > highestBlockSeen {
+				highestBlockSeen = highestBlockSegment
+			}
+			if broken {
+				brokenSegments = append(brokenSegments, item.segment)
+			}
+		} else {
+			if item.baseNum < lowestBlockSeen {
+				lowestBlockSeen = item.baseNum
+			}
+			if item.baseNum+fileBlockSize > highestBlockSeen {
+				highestBlockSeen = item.baseNum + fileBlockSize
+			}
+		}
+
+		for _, line := range item.after {
+			fmt.Print(line)
+		}
+	}
+
+	// read downloads and checks one file, touching nothing shared, so files can be read concurrently
+	read := func(ctx context.Context, item *checkItem) (*checkItem, error) {
+		if readAllBlocks {
+			item.content = readBlockSegment(ctx, chain, blocksStore, item.segment, item.baseNum, fileBlockSize, blockRange, options.PrintDetails)
+		}
+		return item, nil
+	}
+
+	dispatch, finish := sequentialCheck(ctx, read, apply)
+	if parallel > 1 && readAllBlocks {
+		dispatch, finish = parallelCheck(ctx, logger, parallel, read, apply)
+	}
+
+	logger.Debug("walking merged blocks", zap.Stringer("block_range", blockRange), zap.String("walk_prefix", walkPrefix), zap.Int("parallel", parallel))
 	err = blocksStore.Walk(ctx, walkPrefix, func(filename string) error {
 		match := numberRegex.FindStringSubmatch(filename)
 		if match == nil {
@@ -96,45 +149,29 @@ func CheckMergedBlocksWithOptions[B firecore.Block](ctx context.Context, chain *
 			return nil
 		}
 
+		item := &checkItem{segment: filename, baseNum: baseNum}
+
 		if baseNum != expected {
 			// There is no previous valid block range if we are at the ever first seen file
 			if count > 1 {
-				fmt.Printf("✅ Range %s\n", types.NewClosedRange(int64(currentStartBlk), uint64(types.RoundToBundleEndBlock(expected-fileBlockSize, fileBlockSize))))
+				item.before = append(item.before, fmt.Sprintf("✅ Range %s\n", types.NewClosedRange(int64(currentStartBlk), uint64(types.RoundToBundleEndBlock(expected-fileBlockSize, fileBlockSize)))))
 			}
 
 			// Otherwise, we do not follow last seen element (previous is `100 - 199` but we are `299 - 300`)
 			missingRange := types.NewClosedRange(int64(expected), types.RoundToBundleEndBlock(baseNum-fileBlockSize, fileBlockSize))
-			fmt.Printf("❌ Range %s (Missing, [%s])\n", missingRange, missingRange.ReprocRange())
+			item.before = append(item.before, fmt.Sprintf("❌ Range %s (Missing, [%s])\n", missingRange, missingRange.ReprocRange()))
 			currentStartBlk = baseNum
 
 			holeFound = true
 		}
 		expected = baseNum + fileBlockSize
 
-		if readAllBlocks {
-			lowestBlockSegment, highestBlockSegment, broken := validateBlockSegment(ctx, chain, blocksStore, filename, baseNum, fileBlockSize, blockRange, options.PrintDetails, tfdb)
-			if lowestBlockSegment < lowestBlockSeen {
-				lowestBlockSeen = lowestBlockSegment
-			}
-			if highestBlockSegment > highestBlockSeen {
-				highestBlockSeen = highestBlockSegment
-			}
-			if broken {
-				brokenSegments = append(brokenSegments, filename)
-			}
-		} else {
-			if baseNum < lowestBlockSeen {
-				lowestBlockSeen = baseNum
-			}
-			if baseNum+fileBlockSize > highestBlockSeen {
-				highestBlockSeen = baseNum + fileBlockSize
-			}
-		}
-
 		if count%10000 == 0 {
-			fmt.Printf("✅ Range %s\n", types.NewClosedRange(int64(currentStartBlk), types.RoundToBundleEndBlock(baseNum, fileBlockSize)))
+			item.after = append(item.after, fmt.Sprintf("✅ Range %s\n", types.NewClosedRange(int64(currentStartBlk), types.RoundToBundleEndBlock(baseNum, fileBlockSize))))
 			currentStartBlk = baseNum + fileBlockSize
 		}
+
+		dispatch(item)
 
 		if blockRange.IsClosed() && types.RoundToBundleEndBlock(baseNum, fileBlockSize) >= *blockRange.Stop-1 {
 			return dstore.StopIteration
@@ -143,6 +180,10 @@ func CheckMergedBlocksWithOptions[B firecore.Block](ctx context.Context, chain *
 		return nil
 	})
 
+	// every file listed so far is applied before reporting, even when the walk failed
+	if finishErr := finish(); err == nil {
+		err = finishErr
+	}
 	if err != nil {
 		return err
 	}
@@ -275,22 +316,24 @@ func (v *segmentBoundaryValidator) bundleRange() types.BlockRange {
 	return types.NewClosedRange(int64(v.baseNum), v.baseNum+v.bundleSize-1)
 }
 
-// printSummary prints at most one line per kind of issue, to stay readable on a store
-// where every file is broken.
-func (v *segmentBoundaryValidator) printSummary() {
+// summary returns at most one line per kind of issue, to stay readable on a store where
+// every file is broken.
+func (v *segmentBoundaryValidator) summary() (lines []string) {
 	if v.blocksAboveBoundary > 0 {
-		fmt.Printf("❌ Merged blocks file %s holds %d block(s) beyond its bundle boundary %s (%s), it will fail any read configured with a bundle size of %d\n",
+		lines = append(lines, fmt.Sprintf("❌ Merged blocks file %s holds %d block(s) beyond its bundle boundary %s (%s), it will fail any read configured with a bundle size of %d\n",
 			v.segment,
 			v.blocksAboveBoundary,
 			v.bundleRange(),
 			v.formatOffendingBlocks(),
 			v.bundleSize,
-		)
+		))
 	}
 
 	if v.outOfOrderCount > 0 {
-		fmt.Printf("🔶 Merged blocks file %s holds %d block(s) out of order, first one #%d\n", v.segment, v.outOfOrderCount, v.firstOutOfOrder)
+		lines = append(lines, fmt.Sprintf("🔶 Merged blocks file %s holds %d block(s) out of order, first one #%d\n", v.segment, v.outOfOrderCount, v.firstOutOfOrder))
 	}
+
+	return lines
 }
 
 func (v *segmentBoundaryValidator) formatOffendingBlocks() string {
@@ -307,144 +350,6 @@ func (v *segmentBoundaryValidator) formatOffendingBlocks() string {
 	}
 
 	return out
-}
-
-func validateBlockSegment[B firecore.Block](
-	ctx context.Context,
-	chain *firecore.Chain[B],
-	store dstore.Store,
-	segment string,
-	baseNum uint64,
-	fileBlockSize uint64,
-	blockRange types.BlockRange,
-	printDetails PrintDetails,
-	tfdb *trackedForkDB,
-) (lowestBlockSeen, highestBlockSeen uint64, broken bool) {
-	lowestBlockSeen = firecore.MaxUint64
-	reader, err := store.OpenObject(ctx, segment)
-	if err != nil {
-		fmt.Printf("❌ Unable to read blocks segment %s: %s\n", segment, err)
-		return lowestBlockSeen, highestBlockSeen, true
-	}
-	defer reader.Close()
-
-	readerFactory, err := bstream.NewDBinBlockReader(reader)
-	if err != nil {
-		fmt.Printf("❌ Unable to read blocks segment %s: %s\n", segment, err)
-		return lowestBlockSeen, highestBlockSeen, true
-	}
-
-	printer := print2.TextOutputPrinter{}
-
-	validator := newSegmentBoundaryValidator(segment, baseNum, fileBlockSize)
-	defer validator.printSummary()
-
-	seenBlockCount := 0
-	for {
-		block, err := readerFactory.Read()
-		if block != nil {
-			// bundle boundaries belong to the file, not to the requested range: validate
-			// before the range filtering below
-			validator.add(block.Number)
-
-			if block.Number < uint64(blockRange.Start) {
-				continue
-			}
-
-			if blockRange.IsClosed() && block.Number > *blockRange.Stop {
-				return lowestBlockSeen, highestBlockSeen, validator.broken()
-			}
-
-			if block.Number < lowestBlockSeen {
-				lowestBlockSeen = block.Number
-			}
-			if block.Number > highestBlockSeen {
-				highestBlockSeen = block.Number
-			}
-
-			if !tfdb.fdb.HasLIB() {
-				tfdb.fdb.InitLIB(block.AsRef())
-			}
-
-			tfdb.fdb.AddLink(block.AsRef(), block.ParentId, nil)
-			revSeg, _ := tfdb.fdb.ReversibleSegment(block.AsRef())
-			if revSeg == nil {
-				tfdb.unlinkableSegmentCount++
-				if tfdb.firstUnlinkableBlock == nil {
-					tfdb.firstUnlinkableBlock = block
-				}
-
-				// TODO: this print should be under a 'check forkable' flag?
-				fmt.Printf("🔶 Block #%d is not linkable at this point\n", block.Number)
-
-				if tfdb.unlinkableSegmentCount > 99 && tfdb.unlinkableSegmentCount%100 == 0 {
-					// TODO: this print should be under a 'check forkable' flag?
-					fmt.Printf("❌ Large gap of %d unlinkable blocks found in chain. Last linked block: %d, first Unlinkable block: %d. \n", tfdb.unlinkableSegmentCount, tfdb.lastLinkedBlock.Number, tfdb.firstUnlinkableBlock.Number)
-				}
-			} else {
-				tfdb.lastLinkedBlock = block
-				tfdb.unlinkableSegmentCount = 0
-				tfdb.firstUnlinkableBlock = nil
-				tfdb.fdb.SetLIB(block.AsRef(), block.LibNum)
-				if tfdb.fdb.HasLIB() {
-					tfdb.fdb.PurgeBeforeLIB(0)
-				}
-			}
-			seenBlockCount++
-
-			if printDetails == PrintStats {
-				err := printer.PrintTo(block, os.Stdout)
-				if err != nil {
-					fmt.Printf("❌ Unable to print block %s: %s\n", block.AsRef(), err)
-					continue
-				}
-			}
-
-			if printDetails == PrintFull {
-				printer, err := print2.GetOutputPrinter(globalToolsCheckCmd, chain.BlockFileDescriptor())
-				if err != nil {
-					fmt.Printf("❌ Unable to create output printer: %s\n", err)
-					break
-				}
-
-				var b = chain.BlockFactory()
-
-				if _, ok := b.(*pbbstream.Block); ok {
-					//todo: implements when buf registry available ...
-					panic("printing full block is not supported for pbbstream.Block")
-				}
-
-				if err := block.Payload.UnmarshalTo(b); err != nil {
-					fmt.Printf("❌ Unable unmarshall block %s: %s\n", block.AsRef(), err)
-					break
-				}
-
-				err = printer.PrintTo(b, os.Stdout)
-				if err != nil {
-					fmt.Printf("❌ Unable to print full block %s: %s\n", block.AsRef(), err)
-					continue
-				}
-			}
-
-			continue
-		}
-
-		if block == nil && errors.Is(err, io.EOF) {
-			if seenBlockCount < expectedBlockCount(segment, fileBlockSize) {
-				fmt.Printf("🔶 Segment %s contained only %d blocks (< %d), this can happen on some chains\n", segment, seenBlockCount, fileBlockSize)
-			}
-
-			return lowestBlockSeen, highestBlockSeen, validator.broken()
-		}
-
-		if err != nil {
-			fmt.Printf("❌ Unable to read all blocks from segment %s after reading %d blocks: %s\n", segment, seenBlockCount, err)
-			return lowestBlockSeen, highestBlockSeen, true
-		}
-	}
-
-	// only reachable when the printing path above breaks out of the loop
-	return lowestBlockSeen, highestBlockSeen, validator.broken()
 }
 
 func WalkBlockPrefix(blockRange types.BlockRange, fileBlockSize uint64) string {
