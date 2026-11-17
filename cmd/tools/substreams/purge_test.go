@@ -3,12 +3,16 @@ package substreams
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/streamingfast/dstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"golang.org/x/time/rate"
 )
 
 func TestParseRetention(t *testing.T) {
@@ -173,5 +177,60 @@ func TestWaitNextPass(t *testing.T) {
 		require.ErrorIs(t, err, context.Canceled)
 	case <-time.After(time.Second):
 		t.Fatal("waitNextPass ignored the cancelled context")
+	}
+}
+
+func TestPurgeFoldersRechecksMarkers(t *testing.T) {
+	const hash = "ddc9230698a79b25c443c73753c9a94e038373c1"
+	ctx := context.Background()
+
+	for _, tc := range []struct {
+		name        string
+		usedAfter   bool
+		expectFiles int
+	}{
+		{name: "idle folder is deleted", usedAfter: false, expectFiles: 0},
+		{name: "folder used after the scan is kept", usedAfter: true, expectFiles: 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			base := "file://" + dir
+			store, err := dstore.NewSimpleStore(base)
+			require.NoError(t, err)
+
+			folderPrefix := "eth-mainnet/substreams-states/" + hash + "/"
+			for _, name := range []string{"last_used.zst", "outputs/0000123000-0000124000.output.zst"} {
+				require.NoError(t, store.WriteObject(ctx, folderPrefix+name, emptyReader()))
+			}
+			old := time.Now().Add(-60 * 24 * time.Hour)
+			require.NoError(t, os.Chtimes(filepath.Join(dir, folderPrefix, "last_used.zst"), old, old))
+
+			backend, err := newPurgeStore(ctx, base, 1, zap.NewNop())
+			require.NoError(t, err)
+			folders, _, err := backend.ModuleFolders(ctx, "eth-mainnet")
+			require.NoError(t, err)
+			require.Len(t, folders, 1)
+
+			cfg := &purgeConfig{
+				retention:     map[string]time.Duration{defaultPlan: 30 * 24 * time.Hour},
+				scanWorkers:   1,
+				deleteWorkers: 1,
+				deleteLimiter: rate.NewLimiter(rate.Inf, 1),
+				now:           time.Now(),
+			}
+			result := &networkResult{}
+			toPurge := scanModuleFolders(ctx, backend, cfg, folders, result, zap.NewNop())
+			require.Len(t, toPurge, 1)
+
+			if tc.usedAfter {
+				// A request starts on the folder between the scan and the deletion.
+				require.NoError(t, store.WriteObject(ctx, folderPrefix+"last_used.zst", emptyReader()))
+			}
+			purgeFolders(ctx, backend, cfg, toPurge, result, nil, zap.NewNop())
+
+			var remaining int
+			require.NoError(t, store.Walk(ctx, folderPrefix, func(string) error { remaining++; return nil }))
+			assert.Equal(t, tc.expectFiles, remaining)
+		})
 	}
 }
