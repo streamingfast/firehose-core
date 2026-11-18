@@ -105,6 +105,32 @@ func (p *BlockPoller[C]) Run(firstStreamableBlockNum uint64, stopBlock *uint64, 
 	return p.run(resolvedStartBlock, resolveStopBlock, blockFetchBatchSize)
 }
 
+// warnIfAboveHeadBlock warns when startBlockNum is not produced yet: fetching it blocks
+// until the chain reaches it, which otherwise looks like a stuck poller. Best effort, it
+// needs the block fetcher to implement HeadBlockNumberFetcher.
+func (p *BlockPoller[C]) warnIfAboveHeadBlock(startBlockNum uint64, logger *zap.Logger) {
+	headFetcher, ok := p.blockFetcher.(HeadBlockNumberFetcher[C])
+	if !ok {
+		return
+	}
+
+	headBlockNum, err := rpc.WithClients(p.clients, func(ctx context.Context, client C) (uint64, error) {
+		return headFetcher.FetchHeadBlockNumber(ctx, client)
+	})
+	if err != nil {
+		logger.Debug("unable to fetch head block number to check the start block", zap.Error(err))
+		return
+	}
+
+	if startBlockNum > headBlockNum {
+		logger.Warn("start block is above the chain head block, the poller waits until the chain reaches it",
+			zap.Uint64("start_block", startBlockNum),
+			zap.Uint64("head_block", headBlockNum),
+			zap.Uint64("blocks_ahead", startBlockNum-headBlockNum),
+		)
+	}
+}
+
 func (p *BlockPoller[C]) markClientSuccess() {
 	p.clientCallLock.Lock()
 	p.lastSuccessfulClientCall = time.Now()

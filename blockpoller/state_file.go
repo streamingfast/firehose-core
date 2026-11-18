@@ -118,6 +118,7 @@ func (p *BlockPoller[C]) initState(firstStreamableBlockNum uint64, stateStorePat
 
 	if ignoreCursor || !p.isStateFileExist(stateStorePath) {
 		logger.Info("ignoring cursor, fetching first streamable block", zap.Uint64("first_streamable_block", firstStreamableBlockNum))
+		p.warnIfAboveHeadBlock(firstStreamableBlockNum, logger)
 
 		for {
 			br, err := p.clients.Do(context.Background(), func(ctx context.Context, client C) (*FetchResponse, error) {

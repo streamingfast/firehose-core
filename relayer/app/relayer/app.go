@@ -74,6 +74,7 @@ func New(config *Config) *App {
 
 func (a *App) Run() error {
 	dmetrics.Register(metrics.MetricSet)
+	metrics.AppReadiness.Init()
 
 	oneBlocksStore, err := dstore.NewDBinStore(a.config.OneBlocksURL)
 	if err != nil {

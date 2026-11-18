@@ -168,9 +168,17 @@ func CheckMergedBlocksWithOptions[B firecore.Block](ctx context.Context, chain *
 		fmt.Printf("> 🔶 Incomplete range %s, started at block %s and stopped at block: %s\n", blockRange, types.PrettyBlockNum(lowestBlockSeen), types.PrettyBlockNum(highestBlockSeen))
 	}
 
+	// blocks are only linked when they are read, a run left unlinked at the end means
+	// blocks are missing inside the files even if no file is
+	unlinkableFound := tfdb.firstUnlinkableBlock != nil && tfdb.lastLinkedBlock != nil
+
 	if holeFound {
 		fmt.Printf("> 🆘 Holes found!\n")
-	} else {
+	}
+	if unlinkableFound {
+		fmt.Printf("> 🆘 Unlinkable blocks found! %d block(s) from #%d to #%d do not link to block #%d, the last linkable one\n", tfdb.unlinkableSegmentCount, tfdb.firstUnlinkableBlock.Number, highestBlockSeen, tfdb.lastLinkedBlock.Number)
+	}
+	if !holeFound && !unlinkableFound {
 		fmt.Printf("> 🆗 No hole found\n")
 	}
 

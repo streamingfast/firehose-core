@@ -2,11 +2,12 @@ package metrics
 
 import (
 	"github.com/streamingfast/dmetrics"
+	coremetrics "github.com/streamingfast/firehose-core/metrics"
 )
 
 var Metricset = dmetrics.NewSet()
 
-var AppReadiness = Metricset.NewAppReadiness("firehose")
+var AppReadiness = coremetrics.NewAppReadiness(Metricset, "firehose")
 var ActiveRequests = Metricset.NewGauge("firehose_active_requests", "Number of active requests")
 var RequestCounter = Metricset.NewCounter("firehose_requests_counter", "Request count")
 var FirehoseSessionDeniedCounter = Metricset.NewCounterVec("firehose_session_denied_counter", []string{"reason"}, "Number of denied session requests")

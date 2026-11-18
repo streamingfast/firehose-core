@@ -15,4 +15,4 @@ var HeadBlockNumber = MetricSet.NewHeadBlockNumber("block-indexer")
 // carried by those blocks would trail our own head and read as if the index builder
 // were lagging finality.
 var FinalizedBlockNumber = coremetrics.NewFinalizedBlockNumber("block-indexer")
-var AppReadiness = MetricSet.NewAppReadiness("block-indexer")
+var AppReadiness = coremetrics.NewAppReadiness(MetricSet, "block-indexer")

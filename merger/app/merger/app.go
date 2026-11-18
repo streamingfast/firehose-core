@@ -73,6 +73,7 @@ func (a *App) Run() error {
 	zlog.Info("running merger", zap.Reflect("config", a.config))
 
 	dmetrics.Register(metrics.MetricSet)
+	metrics.AppReadiness.Init()
 
 	oneBlockStoreStore, err := dstore.NewDBinStore(a.config.StorageOneBlockFilesPath)
 	if err != nil {

@@ -135,6 +135,27 @@ func TestCheckMergedBlocks_ValidateBlocksOnHealthyStore(t *testing.T) {
 	assert.NotContains(t, out, "beyond its bundle boundary")
 }
 
+func TestCheckMergedBlocks_UnlinkableBlocksAreInSummary(t *testing.T) {
+	tmp := t.TempDir()
+	storeURL := "file://" + filepath.Join(tmp, "merged-blocks")
+
+	store, err := dstore.NewDBinStore(storeURL)
+	require.NoError(t, err)
+
+	// no file missing, but 0000000200 lacks blocks 240-259 so nothing after 239 links
+	writeCheckMergedFile(t, store, "0000000100", 100, 199, nil)
+	writeCheckMergedBlocks(t, store, "0000000200", append(blockNums(200, 239), blockNums(260, 299)...))
+	writeCheckMergedFile(t, store, "0000000300", 300, 399, nil)
+
+	out := runCheckMergedBlocks(t, storeURL, 100, types.NewClosedRange(100, 400), MergedBlocksCheckOptions{ValidateBlocks: true})
+	assert.NotContains(t, out, "🆗 No hole found")
+	assert.Contains(t, out, "🆘 Unlinkable blocks found! 140 block(s) from #260 to #399 do not link to block #239, the last linkable one")
+
+	holesOnly := runCheckMergedBlocks(t, storeURL, 100, types.NewClosedRange(100, 400), MergedBlocksCheckOptions{})
+	assert.Contains(t, holesOnly, "🆗 No hole found", "linkability is only known when the blocks are read")
+	assert.NotContains(t, holesOnly, "Unlinkable blocks found")
+}
+
 // runCheckMergedBlocks runs the checker on a local store and returns its stdout.
 func runCheckMergedBlocks(t *testing.T, storeURL string, bundleSize uint64, blockRange types.BlockRange, options MergedBlocksCheckOptions) string {
 	t.Helper()
@@ -165,18 +186,30 @@ func runCheckMergedBlocks(t *testing.T, storeURL string, bundleSize uint64, bloc
 func writeCheckMergedFile(t *testing.T, store dstore.Store, name string, from, upTo uint64, extraneous []uint64) {
 	t.Helper()
 
+	writeCheckMergedBlocks(t, store, name, append(blockNums(from, upTo), extraneous...))
+}
+
+// writeCheckMergedBlocks writes exactly the given blocks, in order.
+func writeCheckMergedBlocks(t *testing.T, store dstore.Store, name string, nums []uint64) {
+	t.Helper()
+
 	var buf bytes.Buffer
 	writer, err := bstream.NewDBinBlockWriter(&buf)
 	require.NoError(t, err)
 
-	for i := from; i <= upTo; i++ {
-		require.NoError(t, writer.Write(newCheckTestBlock(i)))
-	}
-	for _, num := range extraneous {
+	for _, num := range nums {
 		require.NoError(t, writer.Write(newCheckTestBlock(num)))
 	}
 
 	require.NoError(t, store.WriteObject(context.Background(), name, bytes.NewReader(buf.Bytes())))
+}
+
+func blockNums(from, upTo uint64) []uint64 {
+	var out []uint64
+	for i := from; i <= upTo; i++ {
+		out = append(out, i)
+	}
+	return out
 }
 
 func newCheckTestBlock(num uint64) *pbbstream.Block {

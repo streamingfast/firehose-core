@@ -29,4 +29,4 @@ var HeadBlockNumber = MetricSet.NewHeadBlockNumber("merger")
 // number carried by those blocks would trail our own head and read as if the merger
 // were lagging finality.
 var FinalizedBlockNumber = coremetrics.NewFinalizedBlockNumber("merger")
-var AppReadiness = MetricSet.NewAppReadiness("merger")
+var AppReadiness = coremetrics.NewAppReadiness(MetricSet, "merger")

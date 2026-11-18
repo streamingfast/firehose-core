@@ -105,6 +105,7 @@ func New(logger *zap.Logger, tracer logging.Tracer, config *Config, modules *Mod
 
 func (a *App) Run() error {
 	dmetrics.Register(metrics.Metricset)
+	metrics.AppReadiness.Init()
 
 	a.logger.Info("running firehose", zap.Reflect("config", a.config))
 	if err := a.config.Validate(); err != nil {
