@@ -894,7 +894,7 @@ func purgeFolders(ctx context.Context, store *purgeStore, cfg *purgeConfig, toPu
 					return groupCtx.Err()
 				}
 				reprieved.Add(1)
-				logger.Info("keeping module folder", zap.String("folder", c.folder.String()), zap.String("reason", reason))
+				logger.Info("keeping module folder", zap.Stringer("folder", c.folder), zap.String("reason", reason))
 				return nil
 			}
 
