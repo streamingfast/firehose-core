@@ -156,7 +156,7 @@ func TestCheckMergedBlocks_UnlinkableBlocksAreInSummary(t *testing.T) {
 	assert.NotContains(t, holesOnly, "Unlinkable blocks found")
 }
 
-func TestCheckMergedBlocks_HideShortSegments(t *testing.T) {
+func TestCheckMergedBlocks_ValidateBlockCount(t *testing.T) {
 	tmp := t.TempDir()
 	storeURL := "file://" + filepath.Join(tmp, "merged-blocks")
 
@@ -168,10 +168,10 @@ func TestCheckMergedBlocks_HideShortSegments(t *testing.T) {
 	writeShortLinkedFile(t, store, "0000000200", 199, []uint64{200, 210, 250, 299})
 	writeCheckMergedFile(t, store, "0000000300", 300, 399, []uint64{420})
 
-	shown := runCheckMergedBlocks(t, storeURL, 100, types.NewClosedRange(100, 400), MergedBlocksCheckOptions{ValidateBlocks: true})
+	shown := runCheckMergedBlocks(t, storeURL, 100, types.NewClosedRange(100, 400), MergedBlocksCheckOptions{ValidateBlocks: true, ValidateBlockCount: true})
 	assert.Contains(t, shown, "🔶 Segment 0000000200 contained only 4 blocks (< 100)")
 
-	hidden := runCheckMergedBlocks(t, storeURL, 100, types.NewClosedRange(100, 400), MergedBlocksCheckOptions{ValidateBlocks: true, HideShortSegments: true})
+	hidden := runCheckMergedBlocks(t, storeURL, 100, types.NewClosedRange(100, 400), MergedBlocksCheckOptions{ValidateBlocks: true})
 	assert.NotContains(t, hidden, "contained only")
 	assert.Contains(t, hidden, "Merged blocks file 0000000300 holds 1 block(s) beyond its bundle boundary", "other findings are still printed")
 	assert.Contains(t, hidden, "🆗 No hole found", "skipped block numbers are not holes")
