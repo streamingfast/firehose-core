@@ -26,7 +26,7 @@ func Sort[C any](ctx context.Context, clients *Clients[C], sortValueFetch SortVa
 	for {
 		// Sort a snapshot rather than the pool itself: `FetchSortValue` below is a network
 		// call per client, and holding the lock across them would block every
-		// `WithClientsContext` for the whole round, so one hung provider would wedge the
+		// `Clients.Do` for the whole round, so one hung provider would wedge the
 		// entire pool (`StartSorting` gets no timeout, it's handed the app's context).
 		clients.lock.Lock()
 		pool := slices.Clone(clients.clients)

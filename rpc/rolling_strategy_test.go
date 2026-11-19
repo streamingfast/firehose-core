@@ -33,7 +33,7 @@ func TestStickyRollingStrategy(t *testing.T) {
 	clients.Add(&rollClient{name: "c.b"})
 
 	var clientNames []string
-	_, err := WithClients(clients, func(ctx context.Context, client *rollClient) (v any, err error) {
+	_, err := clients.Do(t.Context(), func(ctx context.Context, client *rollClient) (v any, err error) {
 		clientNames = append(clientNames, client.name)
 		if client.name == "c.3" {
 			return nil, nil
@@ -46,7 +46,7 @@ func TestStickyRollingStrategy(t *testing.T) {
 	//require.ErrorIs(t, err, ErrorNoMoreClient)
 	require.Equal(t, []string{"c.1", "c.2", "c.3"}, clientNames)
 
-	_, err = WithClients(clients, func(ctx context.Context, client *rollClient) (v any, err error) {
+	_, err = clients.Do(t.Context(), func(ctx context.Context, client *rollClient) (v any, err error) {
 		clientNames = append(clientNames, client.name)
 		return nil, fmt.Errorf("next please")
 	})
@@ -66,7 +66,7 @@ func TestRollingStrategySequentialWithSpreadStart_startsOnDifferentClientEachCal
 
 	for _, want := range []string{"c.1", "c.2", "c.3", "c.1"} {
 		var got string
-		_, err := WithClients(clients, func(ctx context.Context, client *rollClient) (v any, err error) {
+		_, err := clients.Do(t.Context(), func(ctx context.Context, client *rollClient) (v any, err error) {
 			got = client.name
 			return nil, nil
 		})
@@ -85,13 +85,13 @@ func TestRollingStrategySequentialWithSpreadStart_failoverWrapsFromStart(t *test
 	clients.Add(&rollClient{name: "c.3"})
 
 	// consume the first call's start (c.1) so the next call starts at c.2
-	_, err := WithClients(clients, func(ctx context.Context, client *rollClient) (v any, err error) {
+	_, err := clients.Do(t.Context(), func(ctx context.Context, client *rollClient) (v any, err error) {
 		return nil, nil
 	})
 	require.NoError(t, err)
 
 	var clientNames []string
-	_, err = WithClients(clients, func(ctx context.Context, client *rollClient) (v any, err error) {
+	_, err = clients.Do(t.Context(), func(ctx context.Context, client *rollClient) (v any, err error) {
 		clientNames = append(clientNames, client.name)
 		if client.name == "c.1" {
 			return nil, nil
@@ -110,7 +110,7 @@ func TestRollingStrategySequentialWithSpreadStart_resetToDeclaredOrderRestartsAt
 	clients.Add(&rollClient{name: "c.1"})
 	clients.Add(&rollClient{name: "c.2"})
 
-	_, err := WithClients(clients, func(ctx context.Context, client *rollClient) (v any, err error) {
+	_, err := clients.Do(t.Context(), func(ctx context.Context, client *rollClient) (v any, err error) {
 		return nil, nil
 	})
 	require.NoError(t, err)
@@ -118,7 +118,7 @@ func TestRollingStrategySequentialWithSpreadStart_resetToDeclaredOrderRestartsAt
 	clients.Reset()
 
 	var got string
-	_, err = WithClients(clients, func(ctx context.Context, client *rollClient) (v any, err error) {
+	_, err = clients.Do(t.Context(), func(ctx context.Context, client *rollClient) (v any, err error) {
 		got = client.name
 		return nil, nil
 	})
