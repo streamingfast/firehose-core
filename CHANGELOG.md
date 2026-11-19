@@ -31,6 +31,10 @@ If you were at `firehose-core` version `1.0.0` and are bumping to `1.1.0`, you s
 - Bump `github.com/streamingfast/payment-gateway` so the `tgm://` auth plugin sets the auth-method trusted headers (`x-auth-*`). The `auth_method`, `auth_jwt_lifetime_bucket`, `auth_jwt_iat` and `auth_jwt_exp` fields on incoming Firehose and Substreams request logs are now populated when tier1 authenticates through it, instead of always being empty.
 - Metrics: `ready{app="firehose"}`, `ready{app="merger"}`, `ready{app="relayer"}` and `ready{app="block-indexer"}` are now exported only by processes running that app, at 0 from its start until it is ready. Before, every process exported all four, stuck at 0 for apps it doesn't run. Dashboards or alerts reading them from other processes will now see no series instead of 0.
 
+### Deprecated
+
+- Deprecate `rpc.WithClients` and `rpc.WithClientsContext` in favor of the generic method `(*rpc.Clients[C]).Do(ctx, f)`. Replace `rpc.WithClientsContext(clients, ctx, f)` with `clients.Do(ctx, f)` and `rpc.WithClients(clients, f)` with `clients.Do(context.Background(), f)`.
+
 ### Fixed
 
 - Tools: `firecore tools check merged-blocks` with `--validate-blocks` or `-s` no longer reports `🆗 No hole found` when blocks are missing inside the merged-blocks files. Blocks that do not link to the chain were only shown as `🔶 Block #N is not linkable` lines and a `🔶 Range … has issues with forks` line, while the summary looked at missing file names only. The summary now prints `🆘 Unlinkable blocks found!` with how many blocks do not link, from which to which block, and the last linkable block.

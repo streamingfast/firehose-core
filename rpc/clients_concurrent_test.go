@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// TestWithClients_doesNotSerialize guards the fix in WithClientsContext: the
+// TestClientsDo_doesNotSerialize guards the fix in Clients.Do: the
 // clients lock must only protect rolling-strategy selection, NOT the call to
 // f. If the lock is (re)introduced around f, concurrent callers serialize and
 // only one can be inside f at a time.
@@ -19,7 +19,7 @@ import (
 // and we can read exactly how many made it in. If the lock is held across f,
 // only the first caller reaches f (the rest block on the mutex) and the bubble
 // never reaches an all-durably-blocked state, so the test hangs and fails.
-func TestWithClients_doesNotSerialize(t *testing.T) {
+func TestClientsDo_doesNotSerialize(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		clients := NewClients[any](time.Second, NewStickyRollingStrategy[any](), zlogTest)
 		for i := 0; i < 4; i++ {
@@ -35,7 +35,7 @@ func TestWithClients_doesNotSerialize(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				_, _ = WithClients(clients, func(ctx context.Context, c any) (any, error) {
+				_, _ = clients.Do(t.Context(), func(ctx context.Context, c any) (any, error) {
 					inside.Add(1) // record that we're inside f
 					<-release     // hold here until every caller is inside f
 					return nil, nil
@@ -49,7 +49,7 @@ func TestWithClients_doesNotSerialize(t *testing.T) {
 		synctest.Wait()
 
 		if got := inside.Load(); got != n {
-			t.Fatalf("only %d/%d callers entered f concurrently: WithClients is serializing on the clients lock", got, n)
+			t.Fatalf("only %d/%d callers entered f concurrently: Clients.Do is serializing on the clients lock", got, n)
 		}
 
 		close(release)
@@ -58,7 +58,7 @@ func TestWithClients_doesNotSerialize(t *testing.T) {
 }
 
 // TestRollingStrategySequentialWithSpreadStart_concurrentCallsUseDistinctStarts guards the point
-// of WithSpreadStart: concurrent WithClientsContext calls must not all
+// of WithSpreadStart: concurrent Clients.Do calls must not all
 // start on the same provider. Selection (reset+next) is serialized by clients.lock,
 // so N concurrent calls against N clients must claim exactly one starting client
 // each, with no provider picked twice and none left unused.
@@ -84,7 +84,7 @@ func TestRollingStrategySequentialWithSpreadStart_concurrentCallsUseDistinctStar
 		var wg sync.WaitGroup
 		for range names {
 			wg.Go(func() {
-				_, err := WithClients(clients, func(_ context.Context, client *rollClient) (any, error) {
+				_, err := clients.Do(t.Context(), func(_ context.Context, client *rollClient) (any, error) {
 					mu.Lock()
 					used[client.name]++
 					mu.Unlock()
