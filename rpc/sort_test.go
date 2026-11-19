@@ -28,7 +28,7 @@ func TestClientsSort(t *testing.T) {
 
 	fetcher := &testSortFetcher{}
 
-	err := Sort(context.Background(), clients, fetcher, SortDirectionDescending)
+	err := Sort(t.Context(), clients, fetcher, SortDirectionDescending)
 	require.NoError(t, err)
 
 	var names []string
@@ -38,7 +38,7 @@ func TestClientsSort(t *testing.T) {
 
 	require.Equal(t, []string{"c.b", "c.a", "c.3", "c.2", "c.1"}, names)
 
-	err = Sort(context.Background(), clients, fetcher, SortDirectionAscending)
+	err = Sort(t.Context(), clients, fetcher, SortDirectionAscending)
 	require.NoError(t, err)
 
 	names = []string{}

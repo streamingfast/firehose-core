@@ -27,17 +27,17 @@ func TestClientsNamesSortedAlongClients(t *testing.T) {
 	clients.AddNamed(&rollClient{name: "c.1", sortValue: 100}, "primary")
 	clients.AddNamed(&rollClient{name: "c.2", sortValue: 101}, "fallback")
 
-	require.NoError(t, Sort(context.Background(), clients, &testSortFetcher{}, SortDirectionDescending))
+	require.NoError(t, Sort(t.Context(), clients, &testSortFetcher{}, SortDirectionDescending))
 
 	assert.Equal(t, []string{"fallback", "primary"}, clients.Names())
 }
 
-func TestWithClientsErrorAttribution(t *testing.T) {
+func TestClientsDoErrorAttribution(t *testing.T) {
 	clients := NewClients(2*time.Second, NewStickyRollingStrategy[*rollClient](), zlogTest)
 	clients.AddNamed(&rollClient{name: "c.1"}, "primary")
 	clients.AddNamed(&rollClient{name: "c.2"}, "quicknode")
 
-	_, err := WithClients(clients, func(_ context.Context, client *rollClient) (any, error) {
+	_, err := clients.Do(t.Context(), func(_ context.Context, client *rollClient) (any, error) {
 		return nil, fmt.Errorf("boom on %s", client.name)
 	})
 
@@ -46,12 +46,12 @@ func TestWithClientsErrorAttribution(t *testing.T) {
 	assert.Contains(t, err.Error(), `provider "quicknode": boom on c.2`)
 }
 
-func TestWithClientsErrorAttributionAutoNamed(t *testing.T) {
+func TestClientsDoErrorAttributionAutoNamed(t *testing.T) {
 	clients := NewClients(2*time.Second, NewRollingStrategyAlwaysUseFirst[*rollClient](), zlogTest)
 	clients.Add(&rollClient{name: "c.1"})
 	clients.Add(&rollClient{name: "c.2"})
 
-	_, err := WithClients(clients, func(_ context.Context, client *rollClient) (any, error) {
+	_, err := clients.Do(t.Context(), func(_ context.Context, client *rollClient) (any, error) {
 		return nil, fmt.Errorf("boom on %s", client.name)
 	})
 
@@ -60,14 +60,14 @@ func TestWithClientsErrorAttributionAutoNamed(t *testing.T) {
 	assert.Contains(t, err.Error(), `provider "client-1": boom on c.2`)
 }
 
-func TestWithClientsLogsRoll(t *testing.T) {
+func TestClientsDoLogsRoll(t *testing.T) {
 	core, logs := observer.New(zapcore.WarnLevel)
 
 	clients := NewClients(2*time.Second, NewStickyRollingStrategy[*rollClient](), zap.New(core))
 	clients.AddNamed(&rollClient{name: "c.1"}, "primary")
 	clients.AddNamed(&rollClient{name: "c.2"}, "quicknode")
 
-	_, err := WithClients(clients, func(_ context.Context, client *rollClient) (any, error) {
+	_, err := clients.Do(t.Context(), func(_ context.Context, client *rollClient) (any, error) {
 		if client.name == "c.2" {
 			return nil, nil
 		}
@@ -84,10 +84,10 @@ func TestWithClientsLogsRoll(t *testing.T) {
 	assert.Equal(t, "quicknode", fields["to_provider"])
 }
 
-// TestWithClientsRollLogIsSampled guards against log spam: a pool using
+// TestClientsDoRollLogIsSampled guards against log spam: a pool using
 // RollingStrategyAlwaysUseFirst whose first provider is down rolls on every single
 // call, we must not emit a warning each time.
-func TestWithClientsRollLogIsSampled(t *testing.T) {
+func TestClientsDoRollLogIsSampled(t *testing.T) {
 	core, logs := observer.New(zapcore.DebugLevel)
 
 	clients := NewClients(2*time.Second, NewRollingStrategyAlwaysUseFirst[*rollClient](), zap.New(core))
@@ -103,7 +103,7 @@ func TestWithClientsRollLogIsSampled(t *testing.T) {
 	}
 
 	for range 5 {
-		_, err := WithClients(clients, downPrimary)
+		_, err := clients.Do(t.Context(), downPrimary)
 		require.NoError(t, err)
 	}
 
@@ -116,16 +116,16 @@ func TestWithClientsRollLogIsSampled(t *testing.T) {
 	// Once `rollLogInterval` elapsed, the roll warns again.
 	clients.rollLoggedAt["primary -> quicknode"] = time.Now().Add(-rollLogInterval - time.Second)
 
-	_, err := WithClients(clients, downPrimary)
+	_, err := clients.Do(t.Context(), downPrimary)
 	require.NoError(t, err)
 
 	warns := filterLevel(logs.FilterMessage("rolling to next RPC provider").All(), zapcore.WarnLevel)
 	assert.Len(t, warns, 2)
 }
 
-// TestWithClientsRollLogPerProviderPair ensures the sampling is per `from -> to`
+// TestClientsDoRollLogPerProviderPair ensures the sampling is per `from -> to`
 // pair, rolling to a different provider must not be swallowed by an earlier roll.
-func TestWithClientsRollLogPerProviderPair(t *testing.T) {
+func TestClientsDoRollLogPerProviderPair(t *testing.T) {
 	core, logs := observer.New(zapcore.WarnLevel)
 
 	clients := NewClients(2*time.Second, NewRollingStrategyAlwaysUseFirst[*rollClient](), zap.New(core))
@@ -133,7 +133,7 @@ func TestWithClientsRollLogPerProviderPair(t *testing.T) {
 	clients.AddNamed(&rollClient{name: "c.2"}, "quicknode")
 	clients.AddNamed(&rollClient{name: "c.3"}, "last-resort")
 
-	_, err := WithClients(clients, func(_ context.Context, client *rollClient) (any, error) {
+	_, err := clients.Do(t.Context(), func(_ context.Context, client *rollClient) (any, error) {
 		if client.name == "c.3" {
 			return nil, nil
 		}
@@ -196,7 +196,7 @@ func TestRollingStrategyAlwaysUseFirstResetFailback(t *testing.T) {
 	clients.AddNamed(&rollClient{name: "c.1"}, "primary")
 	clients.AddNamed(&rollClient{name: "c.2"}, "fallback")
 
-	// Roll away from the primary through the strategy directly, `WithClients` resets
+	// Roll away from the primary through the strategy directly, `Clients.Do` resets
 	// the strategy on entry so it would hide the failback we want to assert.
 	_, index, err := clients.rollingStrategy.next(clients)
 	require.NoError(t, err)
@@ -220,7 +220,7 @@ func firstProviderNames(t *testing.T, clients *Clients[*rollClient], f func(clie
 	t.Helper()
 
 	var tried []string
-	_, err := WithClients(clients, func(_ context.Context, client *rollClient) (any, error) {
+	_, err := clients.Do(t.Context(), func(_ context.Context, client *rollClient) (any, error) {
 		tried = append(tried, client.name)
 		return nil, f(client)
 	})
