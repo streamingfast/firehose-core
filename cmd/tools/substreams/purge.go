@@ -823,6 +823,27 @@ func (l *deletedFilesLog) Close() error {
 	return l.file.Close()
 }
 
+// reprieve checks a condemned folder again right before its deletion, since a request may
+// have started using it after the scan. It returns why the folder must be kept, or "".
+func reprieve(ctx context.Context, store *purgeStore, cfg *purgeConfig, folder moduleFolder) string {
+	markers, unreadable, err := readLastUsedMarkers(ctx, store, cfg, folder)
+	switch {
+	case err != nil || unreadable > 0:
+		return "last_used markers could not be read"
+	case markersKeepFolder(cfg, markers):
+		return "used since the scan: " + describeMarkers(markers)
+	}
+
+	protected, err := store.IsProtected(ctx, folder)
+	switch {
+	case err != nil:
+		return "DO_NOT_PRUNE marker could not be checked"
+	case protected:
+		return "protected by DO_NOT_PRUNE"
+	}
+	return ""
+}
+
 type deleteJob struct {
 	objectName string
 	size       int64
@@ -835,7 +856,7 @@ func purgeFolders(ctx context.Context, store *purgeStore, cfg *purgeConfig, toPu
 	started := time.Now()
 	jobs := make(chan deleteJob, 1000)
 
-	var deleted, failed, deletedBytes, purgedFolders, listErrors atomic.Int64
+	var deleted, failed, deletedBytes, purgedFolders, listErrors, reprieved atomic.Int64
 	var workers sync.WaitGroup
 
 	for range cfg.deleteWorkers {
@@ -868,6 +889,15 @@ func purgeFolders(ctx context.Context, store *purgeStore, cfg *purgeConfig, toPu
 
 	for i, c := range toPurge {
 		group.Go(func() error {
+			if reason := reprieve(groupCtx, store, cfg, c.folder); reason != "" {
+				if groupCtx.Err() != nil {
+					return groupCtx.Err()
+				}
+				reprieved.Add(1)
+				logger.Info("keeping module folder", zap.Stringer("folder", c.folder), zap.String("reason", reason))
+				return nil
+			}
+
 			logger.Info("purging module folder",
 				zap.String("folder", c.folder.String()),
 				zap.String("last_used", describeMarkers(c.markers)),
@@ -904,6 +934,7 @@ func purgeFolders(ctx context.Context, store *purgeStore, cfg *purgeConfig, toPu
 	close(jobs)
 	workers.Wait()
 
+	result.kept += int(reprieved.Load())
 	result.purgedFolders += int(purgedFolders.Load())
 	result.deletedFiles += deleted.Load()
 	result.deletedBytes += deletedBytes.Load()
