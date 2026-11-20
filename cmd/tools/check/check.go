@@ -31,13 +31,7 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-// Super hackish way to get the *cobra.command needed for sflags call but where
-// CheckMergedBlocks public method doesn't receive the *cobra.Command
-var globalToolsCheckCmd *cobra.Command
-
-func NewCheckCommand[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) (out *cobra.Command) {
-	defer func() { globalToolsCheckCmd = out }()
-
+func NewCheckCommand[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Logger) *cobra.Command {
 	toolsCheckCmd := &cobra.Command{Use: "check", Short: "Various checks for deployment, data integrity & debugging"}
 
 	toolsCheckForksCmd := &cobra.Command{
@@ -65,9 +59,7 @@ func NewCheckCommand[B firecore.Block](chain *firecore.Chain[B], rootLog *zap.Lo
 	toolsCheckCmd.PersistentFlags().StringP("range", "r", "", "Block range to use for the check")
 
 	toolsCheckMergedBlocksCmd.Flags().BoolP("validate-blocks", "b", false, "Read every merged-blocks file and validate its content: block numbers within the bundle boundaries claimed by the file name, block ordering and chain linkability. Without it only the file names are listed, which finds holes but not corrupted bundles")
-	toolsCheckMergedBlocksCmd.Flags().BoolP("print-stats", "s", false, "Natively decode each block in the segment and print statistics about it, ensuring it contains the required blocks (implies --validate-blocks)")
-	toolsCheckMergedBlocksCmd.Flags().BoolP("print-full", "f", false, "Natively decode each block and print the full JSON representation of the block, should be used with a small range only if you don't want to be overwhelmed (implies --validate-blocks)")
-	toolsCheckMergedBlocksCmd.Flags().Int("parallel", 1, "Number of merged-blocks files read at the same time when their content is read (--validate-blocks or --print-stats). Results are still linked and printed in file order, so the output is the same as with 1. Not supported with --print-full")
+	toolsCheckMergedBlocksCmd.Flags().Int("parallel", 8, "Number of merged-blocks files read at the same time with --validate-blocks. Results are still linked and printed in file order, so the output is the same as with 1; more only adds load on the store")
 
 	toolsCheckForksCmd.Flags().Uint64("min-depth", 1, "Only show forks that are at least this deep")
 	toolsCheckForksCmd.Flags().Uint64("after-block", 0, "Only show forks that happened after this block number, if value is not 0")
@@ -101,17 +93,7 @@ func createToolsCheckMergedBlocksE[B firecore.Block](chain *firecore.Chain[B], r
 			return err
 		}
 
-		printDetails := PrintNoDetails
-		if sflags.MustGetBool(cmd, "print-stats") {
-			printDetails = PrintStats
-		}
-
-		if sflags.MustGetBool(cmd, "print-full") {
-			printDetails = PrintFull
-		}
-
 		return CheckMergedBlocksWithOptions(cmd.Context(), chain, rootLog, storeURL, fileBlockSize, blockRange, MergedBlocksCheckOptions{
-			PrintDetails:   printDetails,
 			ValidateBlocks: sflags.MustGetBool(cmd, "validate-blocks"),
 			Parallel:       sflags.MustGetInt(cmd, "parallel"),
 		})

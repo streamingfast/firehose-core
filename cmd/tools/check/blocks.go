@@ -17,20 +17,9 @@ import (
 
 var numberRegex = regexp.MustCompile(`(\d{10})`)
 
-type PrintDetails uint8
-
-const (
-	PrintNoDetails PrintDetails = iota
-	PrintStats
-	PrintFull
-)
-
 // MergedBlocksCheckOptions configures what `tools check merged-blocks` looks at. Reading
 // the files is opt-in: a full-chain run would otherwise download the whole dataset.
 type MergedBlocksCheckOptions struct {
-	// PrintDetails prints each block as it is read. Implies ValidateBlocks.
-	PrintDetails PrintDetails
-
 	// ValidateBlocks reads every file and validates its content: bundle boundaries,
 	// block ordering and chain linkability.
 	ValidateBlocks bool
@@ -38,27 +27,14 @@ type MergedBlocksCheckOptions struct {
 	// Parallel is how many merged-blocks files are read at the same time when their content
 	// is read. Each file is downloaded, decoded and checked against its bundle boundaries
 	// concurrently, but the results are linked into the chain and printed in file order, so
-	// the output is the same as a sequential run and at most Parallel files are held in
-	// memory. Zero or one reads the files one at a time. Not supported with PrintFull.
+	// the output is the same as a sequential run. Only what linking needs is kept of each
+	// block. Zero or one reads the files one at a time.
 	Parallel int
 }
 
-func (o MergedBlocksCheckOptions) readAllBlocks() bool {
-	return o.ValidateBlocks || o.PrintDetails != PrintNoDetails
-}
-
-// Deprecated: use CheckMergedBlocksWithOptions, which can validate the content of the
-// files without printing every block.
-func CheckMergedBlocks[B firecore.Block](ctx context.Context, chain *firecore.Chain[B], logger *zap.Logger, storeURL string, fileBlockSize uint64, blockRange types.BlockRange, printDetails PrintDetails) error {
-	return CheckMergedBlocksWithOptions(ctx, chain, logger, storeURL, fileBlockSize, blockRange, MergedBlocksCheckOptions{PrintDetails: printDetails})
-}
-
 func CheckMergedBlocksWithOptions[B firecore.Block](ctx context.Context, chain *firecore.Chain[B], logger *zap.Logger, storeURL string, fileBlockSize uint64, blockRange types.BlockRange, options MergedBlocksCheckOptions) error {
-	readAllBlocks := options.readAllBlocks()
+	readAllBlocks := options.ValidateBlocks
 	parallel := max(options.Parallel, 1)
-	if parallel > 1 && options.PrintDetails == PrintFull {
-		return fmt.Errorf("printing full blocks cannot run in parallel, use a parallelism of 1")
-	}
 
 	fmt.Printf("Checking block holes on %s\n", storeURL)
 	if readAllBlocks {
@@ -123,7 +99,7 @@ func CheckMergedBlocksWithOptions[B firecore.Block](ctx context.Context, chain *
 	// read downloads and checks one file, touching nothing shared, so files can be read concurrently
 	read := func(ctx context.Context, item *checkItem) (*checkItem, error) {
 		if readAllBlocks {
-			item.content = readBlockSegment(ctx, chain, blocksStore, item.segment, item.baseNum, fileBlockSize, blockRange, options.PrintDetails)
+			item.content = readBlockSegment(ctx, blocksStore, item.segment, item.baseNum, fileBlockSize, blockRange)
 		}
 		return item, nil
 	}

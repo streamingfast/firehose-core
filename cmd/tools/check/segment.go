@@ -1,7 +1,6 @@
 package check
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -12,7 +11,6 @@ import (
 	"github.com/streamingfast/dhammer"
 	"github.com/streamingfast/dstore"
 	firecore "github.com/streamingfast/firehose-core"
-	print2 "github.com/streamingfast/firehose-core/cmd/tools/print"
 	"github.com/streamingfast/firehose-core/types"
 	"go.uber.org/zap"
 )
@@ -28,20 +26,14 @@ type checkItem struct {
 }
 
 // segmentContent is what reading one merged-blocks file found, gathered without touching
-// the shared fork database so that files can be read concurrently: its blocks in file order
-// with the details printed for each, and the lines printed after them.
+// the shared fork database so that files can be read concurrently: its blocks in file order,
+// holding only what linking needs, and the lines printed after them.
 type segmentContent struct {
-	blocks           []segmentBlock
+	blocks           []*pbbstream.Block
 	trailer          []string
 	lowestBlockSeen  uint64
 	highestBlockSeen uint64
 	broken           bool
-}
-
-type segmentBlock struct {
-	// block holds only what linking needs, the payload is dropped once details are rendered
-	block   *pbbstream.Block
-	details string
 }
 
 // sequentialCheck reads and applies each file as soon as the walk lists it.
@@ -89,9 +81,7 @@ func parallelCheck(ctx context.Context, logger *zap.Logger, parallel int, read d
 
 // apply links the blocks into the chain in file order and prints everything about the file.
 func (c *segmentContent) apply(tfdb *trackedForkDB) (lowestBlockSeen, highestBlockSeen uint64, broken bool) {
-	for _, entry := range c.blocks {
-		block := entry.block
-
+	for _, block := range c.blocks {
 		if !tfdb.fdb.HasLIB() {
 			tfdb.fdb.InitLIB(block.AsRef())
 		}
@@ -120,8 +110,6 @@ func (c *segmentContent) apply(tfdb *trackedForkDB) (lowestBlockSeen, highestBlo
 				tfdb.fdb.PurgeBeforeLIB(0)
 			}
 		}
-
-		fmt.Print(entry.details)
 	}
 
 	for _, line := range c.trailer {
@@ -133,15 +121,13 @@ func (c *segmentContent) apply(tfdb *trackedForkDB) (lowestBlockSeen, highestBlo
 
 // readBlockSegment reads one merged-blocks file and checks it against the bundle its name
 // claims. It doesn't link blocks (see segmentContent.apply) so it is safe to run concurrently.
-func readBlockSegment[B firecore.Block](
+func readBlockSegment(
 	ctx context.Context,
-	chain *firecore.Chain[B],
 	store dstore.Store,
 	segment string,
 	baseNum uint64,
 	fileBlockSize uint64,
 	blockRange types.BlockRange,
-	printDetails PrintDetails,
 ) *segmentContent {
 	content := &segmentContent{lowestBlockSeen: firecore.MaxUint64}
 
@@ -190,16 +176,8 @@ func readBlockSegment[B firecore.Block](
 				content.highestBlockSeen = block.Number
 			}
 
-			details, stop := renderBlockDetails(chain, block, printDetails)
-			content.blocks = append(content.blocks, segmentBlock{block: linkOnly(block), details: details})
+			content.blocks = append(content.blocks, linkOnly(block))
 			seenBlockCount++
-
-			if stop {
-				// only the full printing path stops early, like it used to break out of the loop
-				content.broken = validator.broken()
-				return content
-			}
-
 			continue
 		}
 
@@ -218,43 +196,6 @@ func readBlockSegment[B firecore.Block](
 			return content
 		}
 	}
-}
-
-// renderBlockDetails returns what --print-stats or --print-full prints for a block, and
-// whether reading the file should stop (an error that makes printing the rest pointless).
-func renderBlockDetails[B firecore.Block](chain *firecore.Chain[B], block *pbbstream.Block, printDetails PrintDetails) (details string, stop bool) {
-	var buf bytes.Buffer
-
-	switch printDetails {
-	case PrintStats:
-		printer := print2.TextOutputPrinter{}
-		if err := printer.PrintTo(block, &buf); err != nil {
-			buf.WriteString(fmt.Sprintf("❌ Unable to print block %s: %s\n", block.AsRef(), err))
-		}
-
-	case PrintFull:
-		printer, err := print2.GetOutputPrinter(globalToolsCheckCmd, chain.BlockFileDescriptor())
-		if err != nil {
-			return fmt.Sprintf("❌ Unable to create output printer: %s\n", err), true
-		}
-
-		var b = chain.BlockFactory()
-
-		if _, ok := b.(*pbbstream.Block); ok {
-			//todo: implements when buf registry available ...
-			panic("printing full block is not supported for pbbstream.Block")
-		}
-
-		if err := block.Payload.UnmarshalTo(b); err != nil {
-			return fmt.Sprintf("❌ Unable unmarshall block %s: %s\n", block.AsRef(), err), true
-		}
-
-		if err := printer.PrintTo(b, &buf); err != nil {
-			buf.WriteString(fmt.Sprintf("❌ Unable to print full block %s: %s\n", block.AsRef(), err))
-		}
-	}
-
-	return buf.String(), false
 }
 
 // linkOnly keeps what linking a block needs, so files waiting to be applied hold no payload.

@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"testing"
 
 	"github.com/streamingfast/bstream"
@@ -201,26 +200,6 @@ func TestCheckMergedBlocks_ParallelOutputMatchesSequential(t *testing.T) {
 		out := runCheckMergedBlocks(t, storeURL, 100, blockRange, MergedBlocksCheckOptions{ValidateBlocks: true, Parallel: parallel})
 		assert.Equal(t, sequential, out, "parallel %d", parallel)
 	}
-}
-
-func TestCheckMergedBlocks_ParallelPrintStatsMatchesSequential(t *testing.T) {
-	storeURL := writeParallelTestStore(t)
-	blockRange := types.NewClosedRange(100, 6100)
-
-	// the stats print each block's age, which changes between any two runs
-	age := regexp.MustCompile(`\(age [^)]*\)`)
-
-	sequential := runCheckMergedBlocks(t, storeURL, 100, blockRange, MergedBlocksCheckOptions{PrintDetails: PrintStats})
-	out := runCheckMergedBlocks(t, storeURL, 100, blockRange, MergedBlocksCheckOptions{PrintDetails: PrintStats, Parallel: 8})
-	assert.Contains(t, sequential, "(age ", "the stats must be printed for the comparison to mean something")
-	assert.Equal(t, age.ReplaceAllString(sequential, "(age)"), age.ReplaceAllString(out, "(age)"))
-}
-
-func TestCheckMergedBlocks_ParallelRefusesPrintFull(t *testing.T) {
-	storeURL := writeParallelTestStore(t)
-
-	err := CheckMergedBlocksWithOptions(context.Background(), &firecore.Chain[*pbbstream.Block]{}, zap.NewNop(), storeURL, 100, types.NewClosedRange(100, 6100), MergedBlocksCheckOptions{PrintDetails: PrintFull, Parallel: 4})
-	assert.ErrorContains(t, err, "cannot run in parallel")
 }
 
 // runCheckMergedBlocks runs the checker on a local store and returns its stdout.
