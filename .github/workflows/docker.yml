@@ -103,6 +103,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           provenance: false
+          sbom: true
           build-args: |
             VERSION=${{ steps.extract-version.outputs.VERSION }}
 
