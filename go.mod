@@ -37,7 +37,7 @@ require (
 	github.com/streamingfast/dauth v0.0.0-20261104193507-69230e98d89e
 	github.com/streamingfast/dbin v0.9.1-0.20231117225723-59790c798e2c
 	github.com/streamingfast/derr v0.0.0-20250814163534-bd7407bd89d7
-	github.com/streamingfast/dgrpc v0.0.0-20260929191947-99e20897ecc7
+	github.com/streamingfast/dgrpc v0.0.0-20261124211742-085339f7ac04
 	github.com/streamingfast/dhammer v0.0.0-20230125192823-c34bbd561bd4
 	github.com/streamingfast/diffx v0.0.0-20260428032925-db795b0d8333
 	github.com/streamingfast/dmetering v0.0.0-20260901152443-1ff4cd0d617d
@@ -53,7 +53,7 @@ require (
 	github.com/streamingfast/sf-tracing v0.0.0-20260716142341-6172a527bdd6
 	github.com/streamingfast/shutter v1.5.0
 	github.com/streamingfast/snapshotter v0.0.0-20230316190750-5bcadfde44d0
-	github.com/streamingfast/substreams v1.27.1-0.20261113021121-1661a96ed77a
+	github.com/streamingfast/substreams v1.27.1-0.20261127061307-9f0fc90baee7
 	github.com/stretchr/testify v1.12.1
 	github.com/test-go/testify v1.1.4
 	github.com/testcontainers/testcontainers-go v0.45.0
@@ -295,7 +295,7 @@ require (
 	go.uber.org/mock v0.5.2 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/crypto v0.58.0 // indirect
+	golang.org/x/crypto v0.58.1-0.20261009181718-2f1f834330b2 // indirect
 	golang.org/x/mod v0.42.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/term v0.47.0 // indirect
